@@ -555,6 +555,39 @@ class _TagManagementSectionState extends State<TagManagementSection> {
   }
 }
 
+/// The compact icon + label heading of a tag group (recent, popular, browse).
+class TagSectionHeading extends StatelessWidget {
+  const TagSectionHeading({
+    super.key,
+    required this.icon,
+    required this.label,
+    this.iconColor,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color? iconColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.cbColors;
+    return Row(
+      children: [
+        Icon(icon, size: CbSizes.iconSm, color: iconColor ?? c.iconSubtle),
+        const SizedBox(width: CbSpacing.xs + CbSpacing.xxs),
+        Expanded(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: CbTypography.labelSm.copyWith(color: c.textSecondary),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 /// Widget to display a list of popular tags with animation and hover effects
 class PopularTagsWidget extends StatelessWidget {
   final Function(String) onTagSelected;
@@ -566,7 +599,12 @@ class PopularTagsWidget extends StatelessWidget {
     required this.onTagSelected,
     this.limit = 20,
     this.loadPopularTags,
+    this.compact = false,
   });
+
+  /// Small muted heading, for a host whose own section titles are smaller
+  /// than the dialog-sized default.
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -584,26 +622,33 @@ class PopularTagsWidget extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Icon(
-                  PhosphorIconsLight.star,
-                  size: 18,
-                  color: Theme.of(context).brightness == Brightness.dark
-                      ? Colors.amber[300]
-                      : Colors.amber,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  AppLocalizations.of(context)!.popularTags,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
+            if (compact)
+              TagSectionHeading(
+                icon: PhosphorIconsLight.star,
+                iconColor: Colors.amber,
+                label: AppLocalizations.of(context)!.popularTags,
+              )
+            else
+              Row(
+                children: [
+                  Icon(
+                    PhosphorIconsLight.star,
+                    size: 18,
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.amber[300]
+                        : Colors.amber,
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
+                  const SizedBox(width: 8),
+                  Text(
+                    AppLocalizations.of(context)!.popularTags,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                ],
+              ),
+            SizedBox(height: compact ? CbSpacing.xs + CbSpacing.xxs : 12),
             AnimatedTagList(
               tags: popularTags.keys.toList(),
               counts: popularTags,
@@ -627,7 +672,12 @@ class RecentTagsWidget extends StatelessWidget {
     required this.onTagSelected,
     this.limit = 20,
     this.loadRecentTags,
+    this.compact = false,
   });
+
+  /// Small muted heading, for a host whose own section titles are smaller
+  /// than the dialog-sized default.
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -644,26 +694,32 @@ class RecentTagsWidget extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Icon(
-                  PhosphorIconsLight.clockCounterClockwise,
-                  size: 18,
-                  color: Theme.of(context).brightness == Brightness.dark
-                      ? Colors.grey[400]
-                      : Colors.grey[700],
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  AppLocalizations.of(context)!.recentTags,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
+            if (compact)
+              TagSectionHeading(
+                icon: PhosphorIconsLight.clockCounterClockwise,
+                label: AppLocalizations.of(context)!.recentTags,
+              )
+            else
+              Row(
+                children: [
+                  Icon(
+                    PhosphorIconsLight.clockCounterClockwise,
+                    size: 18,
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.grey[400]
+                        : Colors.grey[700],
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
+                  const SizedBox(width: 8),
+                  Text(
+                    AppLocalizations.of(context)!.recentTags,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                ],
+              ),
+            SizedBox(height: compact ? CbSpacing.xs + CbSpacing.xxs : 12),
             AnimatedTagList(tags: recentTags, onTagSelected: onTagSelected),
           ],
         );

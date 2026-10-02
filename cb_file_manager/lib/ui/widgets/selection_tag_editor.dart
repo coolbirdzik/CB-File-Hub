@@ -2,7 +2,9 @@ import 'package:cb_file_manager/helpers/tags/tag_manager.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
+import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:cb_file_manager/helpers/tags/tag_color_manager.dart';
 import 'package:cb_file_manager/helpers/tags/tag_hierarchy_manager.dart';
 import 'package:cb_file_manager/helpers/tags/tag_thumbnail_manager.dart';
@@ -14,8 +16,15 @@ import 'package:cb_file_manager/ui/widgets/tag_input_helpers.dart';
 import 'package:cb_file_manager/ui/widgets/tag_management_section.dart';
 
 class SelectionTagEditor extends StatefulWidget {
-  const SelectionTagEditor({super.key, required this.controller});
+  const SelectionTagEditor({
+    super.key,
+    required this.controller,
+    this.browseMaxHeight = 320,
+  });
   final SelectionTagsController controller;
+
+  /// Height cap for the expanded tag browser.
+  final double browseMaxHeight;
 
   @override
   State<SelectionTagEditor> createState() => _SelectionTagEditorState();
@@ -133,7 +142,6 @@ class _SelectionTagEditorState extends State<SelectionTagEditor> {
   Widget build(BuildContext context) {
     final c = widget.controller;
     final l10n = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
     if (c.loading && c.tagsByPath.isEmpty) return Text(l10n.loadingTags);
     if (c.loadError != null) {
       return Column(
@@ -150,80 +158,109 @@ class _SelectionTagEditorState extends State<SelectionTagEditor> {
     // until the new selection's tags arrive.
     final stale =
         c.loading && !setEquals(c.tagsByPath.keys.toSet(), c.paths.toSet());
+    // The host leaves only a narrow gutter so the browse expander can show its
+    // hover fill; everything else is inset to line up with its title.
+    const inset = EdgeInsets.symmetric(horizontal: CbSpacing.sm);
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(l10n.tags, style: theme.textTheme.titleSmall),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            CbSpacing.sm,
+            CbSpacing.xs + CbSpacing.xxs,
+            CbSpacing.sm,
+            CbSpacing.sm,
+          ),
+          child: Text(
+            l10n.tags,
+            style: CbTypography.label.copyWith(
+              color: context.cbColors.textPrimary,
+            ),
+          ),
+        ),
         if (c.saving) const LinearProgressIndicator(minHeight: 2),
-        const SizedBox(height: 8),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            IgnorePointer(
-              ignoring: stale,
-              child: AnimatedOpacity(
-                opacity: stale ? .5 : 1,
-                duration: const Duration(milliseconds: 150),
-                child: AnimatedSize(
-                  duration: const Duration(milliseconds: 180),
-                  curve: Curves.easeOutCubic,
-                  alignment: Alignment.topLeft,
-                  child: TagChipsField(
-                    fieldKey: _inputKey,
-                    tags: counts.keys.toList(),
-                    suggestions: _suggestions,
-                    scopeParent: _scope,
-                    onScopeChanged: (value) {
-                      setState(() => _scope = value);
-                      _suggest('');
-                    },
-                    hintText: l10n.propertiesTagHint,
-                    onTextChanged: _suggest,
-                    onSubmitted: (value) => _add(_query(value)),
-                    onSuggestionSelected: (value) =>
-                        _add(resolvePickedSuggestion(_query(_draft), value)),
-                    onRemoved: c.remove,
-                    // A tag only some selected files carry reads "tag n/total";
-                    // tapping it applies the tag to the rest.
-                    chipLabel: total > 1
-                        ? (tag) => '$tag ${counts[tag]}/$total'
-                        : null,
-                    chipTooltip: (tag) =>
-                        (counts[tag] ?? 0) < total ? l10n.addTag : null,
-                    onChipTapped: (tag) {
-                      if ((counts[tag] ?? 0) < total) _add(tag);
-                    },
+        Padding(
+          padding: inset,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              IgnorePointer(
+                ignoring: stale,
+                child: AnimatedOpacity(
+                  opacity: stale ? .5 : 1,
+                  duration: const Duration(milliseconds: 150),
+                  child: AnimatedSize(
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOutCubic,
+                    alignment: Alignment.topLeft,
+                    child: TagChipsField(
+                      fieldKey: _inputKey,
+                      tags: counts.keys.toList(),
+                      suggestions: _suggestions,
+                      scopeParent: _scope,
+                      onScopeChanged: (value) {
+                        setState(() => _scope = value);
+                        _suggest('');
+                      },
+                      hintText: l10n.propertiesTagHint,
+                      onTextChanged: _suggest,
+                      onSubmitted: (value) => _add(_query(value)),
+                      onSuggestionSelected: (value) =>
+                          _add(resolvePickedSuggestion(_query(_draft), value)),
+                      onRemoved: c.remove,
+                      // A tag only some selected files carry reads "tag n/total";
+                      // tapping it applies the tag to the rest.
+                      chipLabel: total > 1
+                          ? (tag) => '$tag ${counts[tag]}/$total'
+                          : null,
+                      chipTooltip: (tag) =>
+                          (counts[tag] ?? 0) < total ? l10n.addTag : null,
+                      onChipTapped: (tag) {
+                        if ((counts[tag] ?? 0) < total) _add(tag);
+                      },
+                    ),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(height: 12),
-            RecentTagsWidget(
-              limit: 6,
+              const SizedBox(height: CbSpacing.md),
+              RecentTagsWidget(
+                limit: 6,
+                compact: true,
+                onTagSelected: _add,
+                loadRecentTags: (_) => _recentTags,
+              ),
+              const SizedBox(height: CbSpacing.md),
+              PopularTagsWidget(
+                limit: 6,
+                compact: true,
+                onTagSelected: _add,
+                loadPopularTags: (_) => _popularTags,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: CbSpacing.xs),
+        CbExpander(
+          flush: true,
+          expanded: _browseExpanded,
+          onExpansionChanged: (value) =>
+              setState(() => _browseExpanded = value),
+          headerPadding: const EdgeInsets.symmetric(
+            horizontal: CbSpacing.sm,
+            vertical: CbSpacing.xs + CbSpacing.xxs,
+          ),
+          contentPadding: inset,
+          title: TagSectionHeading(
+            icon: PhosphorIconsLight.treeView,
+            label: l10n.browseTab,
+          ),
+          children: [
+            TagBrowseSection(
+              refreshVersion: widget.controller.revision,
+              selectedTags: counts.keys.where(c.isCommon).toList(),
               onTagSelected: _add,
-              loadRecentTags: (_) => _recentTags,
-            ),
-            const SizedBox(height: 12),
-            PopularTagsWidget(
-              limit: 6,
-              onTagSelected: _add,
-              loadPopularTags: (_) => _popularTags,
-            ),
-            ExpansionTile(
-              onExpansionChanged: (value) =>
-                  setState(() => _browseExpanded = value),
-              tilePadding: EdgeInsets.zero,
-              title: Text(l10n.browseTab),
-              children: [
-                if (_browseExpanded)
-                  TagBrowseSection(
-                    refreshVersion: widget.controller.revision,
-                    selectedTags: counts.keys.where(c.isCommon).toList(),
-                    onTagSelected: _add,
-                    onTagDeselected: (tag) => c.remove(tag),
-                    maxHeight: 220,
-                  ),
-              ],
+              onTagDeselected: (tag) => c.remove(tag),
+              maxHeight: widget.browseMaxHeight,
             ),
           ],
         ),

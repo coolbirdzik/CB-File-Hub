@@ -35,4 +35,23 @@ void main() {
       );
     },
   );
+
+  test('closest matches rank first, accents only breaking ties', () {
+    final ranked = rankTagSuggestions(
+      ['bro', 'robot', 'Rõ ràng', 'rõ', 'parent:ro', 'macro', 'Rock'],
+      'ro',
+      isParent: (tag) => tag == 'Rock',
+    );
+    expect(ranked, [
+      'rõ',
+      'Rock',
+      'robot',
+      'Rõ ràng',
+      'parent:ro',
+      'bro',
+      'macro',
+    ]);
+    expect(rankTagSuggestions(['ro', 'rõ'], 'rõ'), ['rõ', 'ro']);
+    expect(rankTagSuggestions(['rõ', 'ro'], 'ro'), ['ro', 'rõ']);
+  });
 }
