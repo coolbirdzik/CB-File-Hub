@@ -58,7 +58,12 @@ The pipeline will:
 1. Restore the `.pfx` from `MSIX_CERT_BASE64`
 2. Build the Windows MSIX
 3. Sign it with the certificate
-4. Upload the `.msix` as the `windows-msix` workflow artifact and create a Partner Center draft
+4. Upload the `.msix` as the `windows-msix` workflow artifact and upload its submission archive to Partner Center
+5. Commit the submission for certification with `targetPublishMode: Immediate`; Microsoft Store publishes it automatically after approval
+
+The release workflow always sets `PARTNER_CENTER_COMMIT_SUBMISSION=true` and
+`PARTNER_CENTER_TARGET_PUBLISH_MODE=Immediate`. Repository variables with those
+names do not override release publishing.
 
 The `.msix` is intentionally not attached to the GitHub Release: the certificate is
 self-signed, so a direct install fails with `0x800B010A` on machines that don't trust it.
@@ -84,7 +89,11 @@ certificate into **Local Machine > Trusted People** first.
 
 ## 5. Submit to Microsoft Store
 
-In Partner Center:
+Release builds submit automatically. Monitor certification and publication status
+in Partner Center; a successful workflow means the submission was committed,
+while Store approval and publication continue asynchronously.
+
+For a local MSIX build submitted manually in Partner Center:
 
 1. Open the app submission page
 2. Upload the generated `.msix`

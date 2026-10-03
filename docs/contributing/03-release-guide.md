@@ -37,7 +37,7 @@ CI will automatically:
 3. Commit the updated `pubspec.yaml` back to the repo.
 4. Build release artifacts (Windows portable ZIP, Windows MSI, Windows MSIX, Android APK, Android AAB).
 5. Create a GitHub Release with changelog and download links (MSIX excluded, see below).
-6. Create a Microsoft Partner Center draft submission from the MSIX.
+6. Upload the MSIX to Microsoft Partner Center, commit the submission for certification, and automatically publish after approval (`targetPublishMode: Immediate`).
 
 The MSIX is **not** attached to the GitHub Release. It is signed with a self-signed
 certificate that only the Store accepts (the Store re-signs it on publish). Installed
@@ -150,7 +150,7 @@ This is fully **repo-based** — no dependency on GitHub Run IDs, works with any
 | Android | `CBFileManager-{ver}.aab` | For Google Play |
 | Windows | `CBFileManager-{ver}-windows-portable.zip` | No install needed |
 | Windows | `CBFileManager-Setup-{ver}.msi` | Classic desktop installer |
-| Windows | `CBFileManager-{ver}.msix` | Microsoft Store only (workflow artifact + Partner Center draft, not on GitHub Release) |
+| Windows | `CBFileManager-{ver}.msix` | Microsoft Store only (workflow artifact + automatic Store publication after certification, not on GitHub Release) |
 
 ---
 

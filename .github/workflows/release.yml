@@ -462,19 +462,19 @@ jobs:
           "PARTNER_CENTER_PACKAGE_ARCHIVE=$archivePath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "PARTNER_CENTER_PACKAGE_FILE_NAME=$packageFileName" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
-      - name: Create Microsoft Partner Center MSIX draft
+      - name: Submit MSIX to Microsoft Store for automatic publishing
         shell: bash
         env:
           PARTNER_CENTER_TENANT_ID: ${{ secrets.PARTNER_CENTER_TENANT_ID }}
           PARTNER_CENTER_CLIENT_ID: ${{ secrets.PARTNER_CENTER_CLIENT_ID }}
           PARTNER_CENTER_CLIENT_SECRET: ${{ secrets.PARTNER_CENTER_CLIENT_SECRET }}
           PARTNER_CENTER_APP_ID: ${{ vars.PARTNER_CENTER_APP_ID }}
-          PARTNER_CENTER_COMMIT_SUBMISSION: ${{ vars.PARTNER_CENTER_COMMIT_SUBMISSION }}
-          # Defaults to Manual in partner_center_msix.mjs when unset.
-          PARTNER_CENTER_TARGET_PUBLISH_MODE: ${{ vars.PARTNER_CENTER_TARGET_PUBLISH_MODE || 'Manual' }}
+          # Release builds always submit for certification and publish once approved.
+          PARTNER_CENTER_COMMIT_SUBMISSION: "true"
+          PARTNER_CENTER_TARGET_PUBLISH_MODE: "Immediate"
         run: |
           SUBMISSION_ID="$(node scripts/partner_center_msix.mjs submit)"
-          echo "Partner Center draft prepared: $SUBMISSION_ID"
+          echo "Partner Center submission committed for automatic publishing after certification: $SUBMISSION_ID"
 
   # Build macOS DMG (signed with a self-signed certificate, not notarized: users
   # allow it once via System Settings > Privacy & Security > Open Anyway). The
