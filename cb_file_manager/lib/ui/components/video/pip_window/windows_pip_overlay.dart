@@ -1,7 +1,7 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/services/media/media_kit_playback.dart';
 
 import '../video_player/video_player_utils.dart';
@@ -89,13 +89,20 @@ class _WindowsPipOverlayWidgetState extends State<_WindowsPipOverlayWidget> {
   }
 
   Future<void> _init() async {
-    _player = PlaybackPlayer();
-    _controller = PlaybackVideoController(
-      _player!,
-      configuration: PlaybackVideoConfiguration(
-        enableHardwareAcceleration: !Platform.isWindows,
-      ),
-    );
+    // Same decoder choice as the main player.
+    var decoder = PlaybackVideoConfiguration.forDecoder(null);
+    try {
+      final prefs = UserPreferences.instance;
+      await prefs.init();
+      decoder = PlaybackVideoConfiguration.forDecoder(
+        await prefs.getVideoPlayerString('video_decoder'),
+      );
+    } catch (_) {}
+    if (!mounted) return;
+    setState(() {
+      _player = PlaybackPlayer();
+      _controller = PlaybackVideoController(_player!, configuration: decoder);
+    });
 
     final src = (widget.args['source'] as String?) ?? '';
     final positionMs = (widget.args['positionMs'] as int?) ?? 0;

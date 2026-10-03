@@ -34,7 +34,6 @@ abstract class _VideoPlayerSettingsHost extends _VideoPlayerVolumeHost {
   String get _videoScaleMode;
   set _videoScaleMode(String v);
   bool get _hardwareAcceleration;
-  set _hardwareAcceleration(bool v);
   String get _videoDecoder;
   set _videoDecoder(String v);
   String get _audioDecoder;
@@ -252,71 +251,7 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
                     ),
                     const SizedBox(height: 16),
 
-                    // Hardware Acceleration
-                    SwitchListTile(
-                      title: const Text('Hardware Acceleration'),
-                      subtitle: const Text('Use GPU for video decoding'),
-                      value: _hardwareAcceleration,
-                      onChanged: (value) {
-                        setDialogState(() {
-                          _hardwareAcceleration = value;
-                          _videoDecoder = value ? 'hardware' : 'software';
-                        });
-                        setState(() {
-                          _hardwareAcceleration = value;
-                          _videoDecoder = value ? 'hardware' : 'software';
-                          if (_player != null) {
-                            _videoController = PlaybackVideoController(
-                              _player!,
-                              configuration: _buildVideoControllerConfig(),
-                            );
-                          }
-                        });
-                        _saveSettings();
-                      },
-                    ),
-
-                    // Video Decoder
-                    const Text(
-                      'Video Decoder:',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    CbSelect<String>(
-                      value: _videoDecoder,
-                      expand: true,
-                      items: const [
-                        CbSelectItem(value: 'auto', label: 'Auto'),
-                        CbSelectItem(value: 'software', label: 'Software'),
-                        CbSelectItem(value: 'hardware', label: 'Hardware'),
-                      ],
-                      onChanged: (value) {
-                        setDialogState(() {
-                          _videoDecoder = value;
-                          if (value == 'software') {
-                            _hardwareAcceleration = false;
-                          }
-                          if (value == 'hardware') {
-                            _hardwareAcceleration = true;
-                          }
-                        });
-                        setState(() {
-                          _videoDecoder = value;
-                          if (value == 'software') {
-                            _hardwareAcceleration = false;
-                          }
-                          if (value == 'hardware') {
-                            _hardwareAcceleration = true;
-                          }
-                          if (_player != null) {
-                            _videoController = PlaybackVideoController(
-                              _player!,
-                              configuration: _buildVideoControllerConfig(),
-                            );
-                          }
-                        });
-                        _saveSettings();
-                      },
-                    ),
+                    _buildVideoDecodingSection(context, setDialogState),
                     const SizedBox(height: 16),
 
                     // Audio Decoder
@@ -476,6 +411,67 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
     }
   }
 
+  /// One user-facing decoder choice; see [PlaybackVideoConfiguration.forDecoder].
+  Widget _buildVideoDecodingSection(
+    BuildContext context,
+    StateSetter setDialogState,
+  ) {
+    final l10n = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final mode = switch (_videoDecoder) {
+      'hardware' || 'software' => _videoDecoder,
+      _ => 'auto',
+    };
+    final description = switch (mode) {
+      'hardware' => l10n.videoDecodingGpuDescription,
+      'software' => l10n.videoDecodingCpuDescription,
+      _ when !kIsWeb && Platform.isWindows =>
+        l10n.videoDecodingAutoDescriptionWindows,
+      _ => l10n.videoDecodingAutoDescription,
+    };
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          l10n.videoDecoding,
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 4),
+        CbSelect<String>(
+          value: mode,
+          expand: true,
+          items: [
+            CbSelectItem(value: 'auto', label: l10n.videoDecodingAuto),
+            CbSelectItem(value: 'hardware', label: l10n.videoDecodingGpu),
+            CbSelectItem(value: 'software', label: l10n.videoDecodingCpu),
+          ],
+          onChanged: (value) {
+            setState(() {
+              _videoDecoder = value;
+              if (_player != null) {
+                _videoController = PlaybackVideoController(
+                  _player!,
+                  configuration: _buildVideoControllerConfig(),
+                );
+              }
+            });
+            setDialogState(() {});
+            _saveSettings();
+          },
+        ),
+        const SizedBox(height: 6),
+        Text(description, style: theme.textTheme.bodySmall),
+        const SizedBox(height: 2),
+        Text(
+          l10n.videoDecodingReopenHint,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+  }
+
   // ── Persistence ───────────────────────────────────────────────────────────
 
   Future<void> _saveSettings() async {
@@ -509,46 +505,34 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
       final prefs = UserPreferences.instance;
       await prefs.init();
 
-      // Retain the existing Windows software-decoding migration preference.
-      // Users can still enable media_kit hardware decoding explicitly.
+      // An earlier one-time migration forced 'software' on every Windows
+      // install, indistinguishable from a real choice. 'auto' now keeps the
+      // CPU for normal videos there too, adding only GPU decoding for 4K with
+      // a live CPU fallback, so move those installs to it once.
       if (!kIsWeb && Platform.isWindows) {
         final migrated =
             await prefs.getVideoPlayerBool(
-              'hw_accel_windows_migrated',
+              'video_decoder_auto_migrated',
               defaultValue: false,
             ) ??
             false;
         if (!migrated) {
-          await prefs.setVideoPlayerBool('hardware_acceleration', false);
-          await prefs.setVideoPlayerString('video_decoder', 'software');
-          await prefs.setVideoPlayerBool('hw_accel_windows_migrated', true);
-          debugPrint(
-            'VideoPlayer: applied one-time Windows HW-accel safety migration',
-          );
+          final current = await prefs.getVideoPlayerString('video_decoder');
+          if (current != 'hardware') {
+            await prefs.setVideoPlayerString('video_decoder', 'auto');
+          }
+          await prefs.setVideoPlayerBool('video_decoder_auto_migrated', true);
         }
       }
 
-      // Preserve the established Windows default across the backend migration.
-      final hwAccelDefault = kIsWeb ? true : !Platform.isWindows;
       // The reads are independent; issue them together so the player (which
       // waits for these settings) is created sooner.
       final (
-        (
-          codec,
-          hardwareAcceleration,
-          videoDecoder,
-          audioDecoder,
-          videoOutputFormat,
-          videoScaleMode,
-        ),
+        (codec, videoDecoder, audioDecoder, videoOutputFormat, videoScaleMode),
         (bufferSize, networkTimeout, subtitleEncoding, videoSeekSpeed),
       ) = await (
         (
           prefs.getVideoPlayerString('video_codec', defaultValue: 'auto'),
-          prefs.getVideoPlayerBool(
-            'hardware_acceleration',
-            defaultValue: hwAccelDefault,
-          ),
           prefs.getVideoPlayerString('video_decoder', defaultValue: 'auto'),
           prefs.getVideoPlayerString('audio_decoder', defaultValue: 'auto'),
           prefs.getVideoPlayerString(
@@ -571,7 +555,6 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
         ).wait,
       ).wait;
       _selectedCodec = codec ?? 'auto';
-      _hardwareAcceleration = hardwareAcceleration ?? hwAccelDefault;
       _videoDecoder = videoDecoder ?? 'auto';
       _audioDecoder = audioDecoder ?? 'auto';
       _bufferSize = bufferSize ?? 10;
@@ -580,10 +563,6 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
       _videoOutputFormat = videoOutputFormat ?? 'auto';
       _videoScaleMode = videoScaleMode ?? 'contain';
       _videoSeekSpeed = videoSeekSpeed;
-
-      // Keep hardware acceleration in sync with explicit decoder choice
-      if (_videoDecoder == 'software') _hardwareAcceleration = false;
-      if (_videoDecoder == 'hardware') _hardwareAcceleration = true;
 
       debugPrint('Video player settings loaded successfully');
     } catch (e) {
@@ -594,7 +573,6 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
   void _resetSettings() {
     setState(() {
       _selectedCodec = 'auto';
-      _hardwareAcceleration = kIsWeb ? true : !Platform.isWindows;
       _videoDecoder = 'auto';
       _audioDecoder = 'auto';
       _bufferSize = 10;

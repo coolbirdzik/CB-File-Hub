@@ -124,32 +124,25 @@ class _DesktopPipWindowState extends State<DesktopPipWindow>
   }
 
   Future<void> _initPlayer() async {
-    // Load video performance settings from UserPreferences if available
+    // Same decoder choice as the main player.
+    var decoder = PlaybackVideoConfiguration.forDecoder(null);
     try {
       final prefs = UserPreferences.instance;
       await prefs.init();
-      _hardwareAcceleration =
-          await prefs.getVideoPlayerBool(
-            'hardware_acceleration',
-            defaultValue: !Platform.isWindows,
-          ) ??
-          !Platform.isWindows;
+      decoder = PlaybackVideoConfiguration.forDecoder(
+        await prefs.getVideoPlayerString('video_decoder'),
+      );
     } catch (_) {
       // Fallback to defaults if preferences are unavailable in PiP process
-      _hardwareAcceleration = !Platform.isWindows;
     }
+    _hardwareAcceleration = decoder.enableHardwareAcceleration;
 
     _player = PlaybackPlayer(
       configuration: PlaybackConfiguration(
         networkCaching: const Duration(seconds: 1),
       ),
     );
-    _controller = PlaybackVideoController(
-      _player!,
-      configuration: PlaybackVideoConfiguration(
-        enableHardwareAcceleration: _hardwareAcceleration,
-      ),
-    );
+    _controller = PlaybackVideoController(_player!, configuration: decoder);
 
     final type = (widget.args['sourceType'] as String?) ?? 'url';
     final src = (widget.args['source'] as String?) ?? '';

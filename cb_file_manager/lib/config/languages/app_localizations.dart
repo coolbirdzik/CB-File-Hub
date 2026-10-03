@@ -716,6 +716,16 @@ abstract class AppLocalizations {
   String get seekSpeedSlow;
   String get seekSpeedMedium;
   String get seekSpeedFast;
+  String get videoDecoding;
+  String get videoDecodingAuto;
+  String get videoDecodingGpu;
+  String get videoDecodingCpu;
+  String get videoDecodingAutoDescription;
+  String get videoDecodingAutoDescriptionWindows;
+  String get videoDecodingGpuDescription;
+  String get videoDecodingCpuDescription;
+  String get videoDecodingReopenHint;
+  String get videoDecodingFellBackToCpu;
   String get thumbnailCache;
   String get thumbnailCacheDescription;
   String get clearThumbnailCache;

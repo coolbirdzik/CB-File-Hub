@@ -69,6 +69,38 @@ void main() {
     },
   );
 
+  test('decoder choice maps to the playback configuration', () {
+    final hardware = PlaybackVideoConfiguration.forDecoder('hardware');
+    expect(hardware.enableHardwareAcceleration, isTrue);
+    final software = PlaybackVideoConfiguration.forDecoder('software');
+    expect(software.enableHardwareAcceleration, isFalse);
+    expect(software.gpuDecodeLargeVideos, isFalse);
+    // Legacy or missing values behave as auto.
+    for (final mode in [null, 'auto', 'unknown']) {
+      final auto = PlaybackVideoConfiguration.forDecoder(mode);
+      expect(auto.enableHardwareAcceleration, !Platform.isWindows);
+      expect(auto.gpuDecodeLargeVideos, Platform.isWindows);
+    }
+  });
+
+  test('GPU decoder failures are recognised, other errors are not', () {
+    expect(
+      PlaybackPlayer.isHardwareDecodeError('Failed to create D3D11 Device'),
+      isTrue,
+    );
+    expect(PlaybackPlayer.isHardwareDecodeError('error 0x8007000E'), isTrue);
+    expect(PlaybackPlayer.isHardwareDecodeError('No such file'), isFalse);
+  });
+
+  test('keyframe seeks fall back to a regular seek off libmpv', () async {
+    final native = DelayedPlayer();
+    final player = PlaybackPlayer(player: mk.Player(platformPlayer: native));
+    addTearDown(player.dispose);
+    native.loadMetadata(const Duration(seconds: 30));
+    await player.seek(const Duration(seconds: 7), exact: false);
+    expect(native.commands, ['seek:7']);
+  });
+
   test('SMB escaping and authentication reach the source resolver intact', () {
     const url =
         'smb://DOMAIN%3Buser:p%40ss%3Aword%23%25@nas/share/My%20video%23.mp4';

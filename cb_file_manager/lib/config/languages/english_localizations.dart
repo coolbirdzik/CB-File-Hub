@@ -1362,6 +1362,32 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get seekSpeedFast => 'Fast';
   @override
+  String get videoDecoding => 'Video decoding';
+  @override
+  String get videoDecodingAuto => 'Automatic (recommended)';
+  @override
+  String get videoDecodingGpu => 'Always use GPU';
+  @override
+  String get videoDecodingCpu => 'Always use CPU';
+  @override
+  String get videoDecodingAutoDescription =>
+      'Uses the GPU decoder built into this device for smooth playback and lower battery use. Falls back to the CPU if the GPU fails.';
+  @override
+  String get videoDecodingAutoDescriptionWindows =>
+      'Uses the CPU for most videos and switches to the GPU for 4K, so seeking stays smooth. Falls back to the CPU if the GPU fails.';
+  @override
+  String get videoDecodingGpuDescription =>
+      'Decodes every video on the graphics card. Lightest on the CPU, but some drivers fail; playback then switches to the CPU.';
+  @override
+  String get videoDecodingCpuDescription =>
+      'Works on every machine, but 4K videos seek slowly and use more CPU.';
+  @override
+  String get videoDecodingReopenHint =>
+      'Fully applies the next time a video is opened.';
+  @override
+  String get videoDecodingFellBackToCpu =>
+      "The GPU couldn't decode this video, so playback switched to the CPU. You can change this in Video settings.";
+  @override
   String get openVideoInNewWindow => 'Open videos in a separate window';
   @override
   String get openVideoInNewWindowDescription =>

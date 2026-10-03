@@ -10,6 +10,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:media_kit/media_kit.dart' as mk; // TEMP-DIAG
 import 'package:cb_file_manager/services/media/media_kit_playback.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:path/path.dart' as pathlib;
@@ -417,10 +418,10 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
   @override
   String _selectedCodec = 'auto'; // auto, h264, h265, vp9, av1
   @override
-  // Preserve the established Windows software-decoding default.
-  bool _hardwareAcceleration = kIsWeb ? true : !Platform.isWindows;
-  @override
   String _videoDecoder = 'auto'; // auto, software, hardware
+  @override
+  bool get _hardwareAcceleration =>
+      _buildVideoControllerConfig().enableHardwareAcceleration;
   @override
   String _audioDecoder = 'auto'; // auto, software, hardware
   @override
@@ -725,13 +726,10 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
         oldWidget.fileStream != widget.fileStream;
   }
 
-  /// Applies the persisted hardware decoding preference to libmpv.
+  /// Applies the persisted decoder choice to libmpv.
   @override
-  PlaybackVideoConfiguration _buildVideoControllerConfig() {
-    return PlaybackVideoConfiguration(
-      enableHardwareAcceleration: _hardwareAcceleration,
-    );
-  }
+  PlaybackVideoConfiguration _buildVideoControllerConfig() =>
+      PlaybackVideoConfiguration.forDecoder(_videoDecoder);
 
   Future<void> _initializePlayer() async {
     try {
@@ -831,6 +829,24 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
 
     // Track buffering state - but ignore buffering during seek to prevent UI flicker
     _player!.stream.buffering.listen((buffering) {
+      // TEMP-DIAG
+      if (_player?.controller.platform case final mk.NativePlayer n) {
+        () async {
+          final p = await (
+            n.getProperty('core-idle'),
+            n.getProperty('paused-for-cache'),
+            n.getProperty('hwdec-current'),
+            n.getProperty('time-pos'),
+            n.getProperty('pause'),
+            n.getProperty('seeking'),
+          ).wait;
+          tempDiag(
+            'buffering=$buffering isSeeking=$_isSeeking isLoading=$_isLoading '
+            'core-idle=${p.$1} pfc=${p.$2} hwdec=${p.$3} pos=${p.$4} '
+            'pause=${p.$5} seeking=${p.$6}',
+          );
+        }();
+      }
       if (!_isSeeking && mounted) {
         setState(() {
           _isLoading = buffering;
@@ -875,14 +891,6 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
     _player!.stream.error.listen((error) {
       debugPrint('Player error: $error');
 
-      // Hardware (D3D11/Direct3D) decoding can fail on some Windows
-      // GPUs/drivers or under GPU-memory pressure. We do NOT attempt to
-      // recreate the VideoController inline here: that would trigger another
-      // D3D11 device creation against an already-failing GPU/driver and can
-      // tear down the entire Flutter engine ("Lost connection to device").
-      //
-      // Instead, persist software decoding for next time and surface a clear
-      // error so the user just needs to reopen the video.
       // A missing/unavailable audio device (no sound card, disabled output,
       // headless CI runner) does not stop mpv from decoding and playing
       // video — it just plays silently. Surfacing this as a fatal error
@@ -892,8 +900,24 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
         return;
       }
 
-      if (_isHardwareDecodeError(error)) {
+      // Hardware (D3D11/Direct3D) decoding can fail on some Windows
+      // GPUs/drivers or under GPU-memory pressure. We do NOT recreate the
+      // VideoController here: another D3D11 device creation against a failing
+      // driver can tear down the entire Flutter engine ("Lost connection to
+      // device"). PlaybackPlayer instead switches libmpv's decoder to the CPU
+      // in place, and the choice is persisted for next time.
+      if (PlaybackPlayer.isHardwareDecodeError(error)) {
+        final firstFailure = !_hwDecodeFallbackAttempted;
         _persistSoftwareDecodingPreference();
+        if (_player?.fellBackToSoftware ?? false) {
+          if (firstFailure && mounted) {
+            AppToast.warning(
+              context,
+              AppLocalizations.of(context)!.videoDecodingFellBackToCpu,
+            );
+          }
+          return;
+        }
         if (mounted && !_hasError) {
           setState(() {
             _hasError = true;
@@ -918,29 +942,15 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
     });
   }
 
-  /// Returns true if [error] looks like a hardware/GPU decoding failure that
-  /// could be resolved by falling back to software decoding.
   bool _isAudioDeviceError(String error) {
     final lower = error.toLowerCase();
     return lower.contains('audio device') || lower.contains('no sound');
   }
 
-  bool _isHardwareDecodeError(String error) {
-    final lower = error.toLowerCase();
-    return lower.contains('d3d11') ||
-        lower.contains('direct3d') ||
-        lower.contains('d3derr') ||
-        lower.contains('0x8007000e') || // E_OUTOFMEMORY
-        lower.contains('0x8876086a') || // D3DERR_NOTAVAILABLE
-        lower.contains('hardware') ||
-        lower.contains('hwdec') ||
-        lower.contains('gpu');
-  }
-
-  /// Persists `hardware_acceleration=false` and `video_decoder=software` so the
-  /// next playback session on this machine skips the failing hardware path.
-  /// Does not touch the live player/controller — see notes in the error
-  /// listener above for why we avoid creating new GPU resources here.
+  /// Persists `video_decoder=software` so the next playback session on this
+  /// machine skips the failing hardware path. Does not touch the live
+  /// player/controller — see notes in the error listener above for why we
+  /// avoid creating new GPU resources here.
   void _persistSoftwareDecodingPreference() {
     if (_hwDecodeFallbackAttempted) return;
     _hwDecodeFallbackAttempted = true;
@@ -954,10 +964,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
         await prefs.setVideoPlayerBool('hardware_acceleration', false);
         await prefs.setVideoPlayerString('video_decoder', 'software');
         // Update in-memory state so a manual settings reopen reflects reality.
-        if (mounted) {
-          _hardwareAcceleration = false;
-          _videoDecoder = 'software';
-        }
+        if (mounted) _videoDecoder = 'software';
       } catch (e) {
         debugPrint('VideoPlayer: failed to persist software decoding pref: $e');
       }
@@ -3387,7 +3394,9 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
     _pendingSeekPreview = null;
     final player = _player;
     if (target == null || player == null) return;
-    unawaited(player.seek(target));
+    // Keyframe previews keep 4K scrubbing responsive; _finishSeekDrag lands
+    // on the exact frame.
+    unawaited(player.seek(target, exact: false));
 
     // Seeking this often is only safe because _startSeekDrag pauses first: a
     // paused input reacquires its clock between seeks, where a playing one

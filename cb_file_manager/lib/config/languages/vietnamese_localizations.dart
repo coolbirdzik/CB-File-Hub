@@ -1383,6 +1383,32 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get seekSpeedFast => 'Nhanh';
   @override
+  String get videoDecoding => 'Giải mã video';
+  @override
+  String get videoDecodingAuto => 'Tự động (khuyên dùng)';
+  @override
+  String get videoDecodingGpu => 'Luôn dùng GPU';
+  @override
+  String get videoDecodingCpu => 'Luôn dùng CPU';
+  @override
+  String get videoDecodingAutoDescription =>
+      'Dùng bộ giải mã GPU có sẵn của thiết bị để phát mượt và tiết kiệm pin. Nếu GPU lỗi sẽ tự quay về CPU.';
+  @override
+  String get videoDecodingAutoDescriptionWindows =>
+      'Dùng CPU cho video thường, tự chuyển sang GPU với video 4K để tua mượt hơn. Nếu GPU lỗi sẽ tự quay về CPU.';
+  @override
+  String get videoDecodingGpuDescription =>
+      'Giải mã mọi video bằng card đồ hoạ. Nhẹ CPU nhất, nhưng một số driver có thể lỗi; khi đó sẽ tự chuyển sang CPU.';
+  @override
+  String get videoDecodingCpuDescription =>
+      'Ổn định trên mọi máy, nhưng video 4K tua chậm và tốn CPU hơn.';
+  @override
+  String get videoDecodingReopenHint =>
+      'Áp dụng đầy đủ từ lần mở video tiếp theo.';
+  @override
+  String get videoDecodingFellBackToCpu =>
+      'GPU không giải mã được video này nên đã chuyển sang CPU. Bạn có thể đổi lại trong Cài đặt video.';
+  @override
   String get openVideoInNewWindow => 'Mở video ở cửa sổ riêng';
   @override
   String get openVideoInNewWindowDescription =>
