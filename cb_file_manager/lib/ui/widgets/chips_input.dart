@@ -954,7 +954,10 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         for (final tag in widget.values)
-                          widget.chipBuilder(context, tag),
+                          KeyedSubtree(
+                            key: ValueKey<T>(tag),
+                            child: widget.chipBuilder(context, tag),
+                          ),
                         TagScopeChip(
                           parent: parent,
                           onExit: _exitScope,
@@ -1063,6 +1066,9 @@ class ChipsInputEditingController<T> extends TextEditingController {
         WidgetSpan(
           alignment: PlaceholderAlignment.middle,
           child: Padding(
+            // Never transfer a deleted chip's animation/hover state to the
+            // next tag at this placeholder position (opacity 0/isDeleting).
+            key: ValueKey<T>(values[i]),
             padding: const EdgeInsets.only(right: 4),
             child: chipBuilder(context, values[i]),
           ),

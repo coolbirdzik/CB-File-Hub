@@ -1,5 +1,6 @@
 import 'dart:ui' as ui;
 
+import 'package:cb_file_manager/config/languages/app_localizations_delegate.dart';
 import 'package:cb_file_manager/ui/widgets/chips_input.dart';
 import 'package:cb_file_manager/ui/widgets/resizable_dialog.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_content_overlay.dart';
@@ -65,6 +66,108 @@ class _UpdateProbe extends Fake implements ui.SemanticsUpdateBuilder {
 
 void main() {
   final binding = _SemanticsBinding();
+  for (final scoped in [false, true]) {
+    for (final removedIndex in [0, 2]) {
+      testWidgets(
+        'deleting chip $removedIndex preserves visible chips (scoped=$scoped)',
+        (tester) async {
+          final semantics = tester.ensureSemantics();
+          binding.nodes.clear();
+          binding.errors.clear();
+          final key = GlobalKey<ChipsInputState<String>>();
+          var tags = <String>[
+            'Fukada Eimi',
+            'xanh dương',
+            'xanh dương nhạt',
+            'Trắng',
+            'thấy dây',
+          ];
+          late StateSetter update;
+          await tester.pumpWidget(
+            MaterialApp(
+              localizationsDelegates: const [AppLocalizationsDelegate()],
+              supportedLocales: const [Locale('en')],
+              home: Scaffold(
+                body: StatefulBuilder(
+                  builder: (context, setState) {
+                    update = setState;
+                    return ChipsInput<String>(
+                      key: key,
+                      values: tags,
+                      scopeParent: scoped ? 'People' : null,
+                      onChanged: (values) => setState(() => tags = values),
+                      chipBuilder: (context, tag) => TagInputChip(
+                        tag: tag,
+                        onDeleted: (removed) => setState(
+                          () => tags = tags.where((t) => t != removed).toList(),
+                        ),
+                        onSelected: (_) {},
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(find.byType(TextField));
+          final controller = key.currentState!.controller;
+          final prefix = controller.prefixFor(valueCount: tags.length);
+          tester.testTextInput.updateEditingValue(
+            TextEditingValue(
+              text: '${prefix}nhạt',
+              selection: TextSelection.collapsed(offset: prefix.length + 4),
+            ),
+          );
+          await tester.pumpAndSettle();
+
+          Finder chip(String tag) => find.widgetWithText(TagInputChip, tag);
+          Future<void> remove(String tag) async {
+            await tester.tap(
+              find.descendant(
+                of: chip(tag),
+                matching: find.byWidgetPredicate(
+                  (widget) => widget is GestureDetector && widget.child is Icon,
+                ),
+              ),
+            );
+            await tester.pumpAndSettle();
+          }
+
+          final removed = tags[removedIndex];
+          await remove(removed);
+          expect(chip(removed), findsNothing);
+          for (final tag in tags) {
+            final opacity = tester.widget<Opacity>(
+              find.descendant(of: chip(tag), matching: find.byType(Opacity)),
+            );
+            expect(opacity.opacity, 1, reason: '$tag must remain painted');
+          }
+          expect(controller.textWithoutReplacements, 'nhạt');
+          expect(
+            controller.selection.extentOffset,
+            controller.prefixFor(valueCount: tags.length).length + 4,
+          );
+
+          // A removed tag can be added again and deleted again; the remaining
+          // chips must keep working after each animated removal.
+          update(() => tags = [...tags, removed]);
+          await tester.pumpAndSettle();
+          for (final tag in [...tags]) {
+            await remove(tag);
+            expect(chip(tag), findsNothing);
+          }
+          expect(controller.textWithoutReplacements, 'nhạt');
+          expect(find.byType(TagInputChip), findsNothing);
+          expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox.shrink());
+          await tester.pumpAndSettle();
+          semantics.dispose();
+          expect(binding.errors, isEmpty);
+        },
+      );
+    }
+  }
   testWidgets('inactive tab sliders never emit orphan overlay nodes', (
     tester,
   ) async {
