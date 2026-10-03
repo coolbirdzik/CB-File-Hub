@@ -31,7 +31,9 @@ String playbackMediaSource(String source) {
 // TEMP-DIAG
 void tempDiag(String message) {
   try {
-    File('C:/Users/ngtan/AppData/Local/Temp/claude/l--Code-coolbirdfm-flutter/6b1fa93e-8926-4f83-b6f2-cb13bb1b692d/scratchpad/diag.log').writeAsStringSync(
+    File(
+      'C:/Users/ngtan/AppData/Local/Temp/claude/l--Code-coolbirdfm-flutter/6b1fa93e-8926-4f83-b6f2-cb13bb1b692d/scratchpad/diag.log',
+    ).writeAsStringSync(
       '${DateTime.now().toIso8601String()} $message\n',
       mode: FileMode.append,
       flush: true,
@@ -264,7 +266,9 @@ class PlaybackPlayer {
     if (_player.platform case final mk.NativePlayer native) {
       await controller.platform.future;
       if (_disposal == null) {
-        tempDiag('hwdec -> $_hwdec (large=$_largeVideoHwdec fallback=$_softwareFallback) frame=${configuration.framePreview}'); // TEMP-DIAG
+        tempDiag(
+          'hwdec -> $_hwdec (large=$_largeVideoHwdec fallback=$_softwareFallback) frame=${configuration.framePreview}',
+        ); // TEMP-DIAG
         await native.setProperty('hwdec', _hwdec);
       }
     }
@@ -279,7 +283,9 @@ class PlaybackPlayer {
     final height = state.height ?? 0;
     if (width == 0 || height == 0) return;
     final large = (width > height ? width : height) >= largeVideoLongEdge;
-    tempDiag('size ${width}x$height large=$large was=$_largeVideoHwdec'); // TEMP-DIAG
+    tempDiag(
+      'size ${width}x$height large=$large was=$_largeVideoHwdec',
+    ); // TEMP-DIAG
     if (large == _largeVideoHwdec) return;
     _largeVideoHwdec = large;
     if (!config.enableHardwareAcceleration) unawaited(_applyHwdec());
