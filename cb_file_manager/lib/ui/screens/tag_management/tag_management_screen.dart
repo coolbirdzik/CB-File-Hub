@@ -9,7 +9,7 @@ import 'package:cb_file_manager/helpers/tags/tag_color_manager.dart';
 import 'package:cb_file_manager/helpers/tags/tag_thumbnail_manager.dart';
 import 'package:cb_file_manager/helpers/tags/tag_hierarchy_manager.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/file_details_screen.dart';
-import 'package:cb_file_manager/ui/dialogs/thumbnail_browser_dialog.dart';
+import 'package:cb_file_manager/ui/tab_manager/components/tag_context_menu.dart';
 import 'package:cb_file_manager/ui/widgets/tag_chip.dart';
 import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:cb_file_manager/ui/components/common/shared_file_context_menu.dart';
@@ -1673,144 +1673,21 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     );
   }
 
-  Future<void> _showThumbnailPicker(String tag) async {
-    final currentThumbnail = _tagThumbnailManager.getThumbnailSync(tag);
-    final theme = Theme.of(context);
+  Future<void> _showThumbnailPicker(String tag) => showTagThumbnailPicker(
+    context,
+    tag,
+    onChanged: () {
+      if (mounted) setState(() {});
+    },
+  );
 
-    final result = await RouteUtils.showAcrylicDialog<String?>(
-      context: context,
-      builder: (BuildContext context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: Text('Thumbnail for "$tag"'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Preview area
-                  Container(
-                    width: 160,
-                    height: 160,
-                    decoration: CbDecorations.card(context, radius: 16),
-                    child: currentThumbnail != null
-                        ? ClipRRect(
-                            borderRadius: BorderRadius.circular(15),
-                            child: Image.file(
-                              File(currentThumbnail),
-                              width: 160,
-                              height: 160,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, _, _) => Center(
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      PhosphorIconsLight.imageSquare,
-                                      size: 48,
-                                      color: theme.colorScheme.onSurfaceVariant,
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      'File not found',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color:
-                                            theme.colorScheme.onSurfaceVariant,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          )
-                        : Center(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  PhosphorIconsLight.image,
-                                  size: 48,
-                                  color: theme.colorScheme.onSurfaceVariant
-                                      .withValues(alpha: 0.5),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'No thumbnail',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: theme.colorScheme.onSurfaceVariant
-                                        .withValues(alpha: 0.7),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                  ),
-                ],
-              ),
-              actions: [
-                if (currentThumbnail != null)
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop('remove'),
-                    child: Text(
-                      'Remove',
-                      style: TextStyle(color: theme.colorScheme.error),
-                    ),
-                  ),
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(null),
-                  child: Text(AppLocalizations.of(context)!.cancel),
-                ),
-                ElevatedButton.icon(
-                  onPressed: () => Navigator.of(context).pop('browse'),
-                  icon: const Icon(PhosphorIconsLight.folderOpen, size: 18),
-                  label: Text(AppLocalizations.of(context)!.browse),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-
-    if (result == 'browse') {
-      await _pickThumbnailFromBrowser(tag);
-    } else if (result == 'remove') {
-      await _tagThumbnailManager.deleteThumbnail(tag);
-      if (mounted) {
-        AppToast.success(context, 'Thumbnail removed for "$tag"');
-        setState(() {});
-      }
-    }
-  }
-
-  /// Opens the shared thumbnail browser (folders + tag search, with inline
-  /// video-frame extraction) and applies the chosen image as the tag thumbnail.
-  Future<void> _pickThumbnailFromBrowser(String tag) async {
-    try {
-      final imagePath = await showThumbnailBrowserDialog(
-        context,
-        title: '${AppLocalizations.of(context)!.setThumbnail}: "$tag"',
-        initialTagQuery: tag,
-      );
-      if (imagePath == null) return;
-
-      final ok = await _tagThumbnailManager.setThumbnail(tag, imagePath);
-      if (mounted) {
-        if (ok) {
-          AppToast.success(context, 'Thumbnail set for "$tag"');
-          setState(() {});
-        } else {
-          AppToast.error(context, 'Failed to set thumbnail');
-        }
-      }
-    } catch (e) {
-      AppLogger.error('Error picking thumbnail: $e');
-      if (mounted) {
-        AppToast.error(context, 'Error: $e');
-      }
-    }
-  }
+  Future<void> _removeThumbnail(String tag) => removeTagThumbnail(
+    context,
+    tag,
+    onChanged: () {
+      if (mounted) setState(() {});
+    },
+  );
 
   Future<void> _showColorPickerDialog(String tag) async {
     final AppLocalizations localizations = AppLocalizations.of(context)!;
@@ -2422,6 +2299,20 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                         _showThumbnailPicker(_selectedTagForFiles!);
                       },
               ),
+              if (_selectedTagForFiles != null &&
+                  _tagThumbnailManager.getThumbnailSync(
+                        _selectedTagForFiles!,
+                      ) !=
+                      null)
+                ListTile(
+                  leading: const Icon(PhosphorIconsLight.imageSquare),
+                  title: Text(localizations.removeThumbnail),
+                  onTap: () {
+                    final tag = _selectedTagForFiles!;
+                    Navigator.pop(context);
+                    _removeThumbnail(tag);
+                  },
+                ),
               ListTile(
                 leading: const Icon(PhosphorIconsLight.treeStructure),
                 title: Text(localizations.manageHierarchy),
@@ -2621,10 +2512,17 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
           ),
           ContextMenuAction(
             id: 'thumbnail',
-            label: 'Set Thumbnail',
+            label: l10n.setThumbnail,
             icon: PhosphorIconsLight.image,
             onSelected: (_) => _showThumbnailPicker(tag),
           ),
+          if (_tagThumbnailManager.getThumbnailSync(tag) != null)
+            ContextMenuAction(
+              id: 'remove_thumbnail',
+              label: l10n.removeThumbnail,
+              icon: PhosphorIconsLight.imageSquare,
+              onSelected: (_) => _removeThumbnail(tag),
+            ),
           ContextMenuAction(
             id: 'hierarchy',
             label: 'Manage Hierarchy',

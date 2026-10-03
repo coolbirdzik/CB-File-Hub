@@ -37,7 +37,7 @@ class _SelectionTagEditorState extends State<SelectionTagEditor> {
   final _colors = TagColorManager.instance;
   late Future<List<String>> _recentTags;
   late Future<Map<String, int>> _popularTags;
-  int _catalogRevision = -1;
+  int _quickPicksRevision = 0;
   Timer? _debounce;
   int _generation = 0;
   bool _browseExpanded = false;
@@ -56,7 +56,7 @@ class _SelectionTagEditorState extends State<SelectionTagEditor> {
   }
 
   void _loadQuickPicks() {
-    _catalogRevision = widget.controller.revision;
+    _quickPicksRevision++;
     _recentTags = TagManager.getRecentTags(limit: 6);
     _popularTags = TagManager.instance.getPopularTags(limit: 6);
   }
@@ -64,11 +64,13 @@ class _SelectionTagEditorState extends State<SelectionTagEditor> {
   @override
   void didUpdateWidget(SelectionTagEditor oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (_catalogRevision != widget.controller.revision) _loadQuickPicks();
     // The editor stays mounted across selections (rebuilding it made the pane
     // blink), so an uncommitted draft is discarded here instead.
     if (!identical(_selection, widget.controller.paths)) {
       _selection = widget.controller.paths;
+      // Keep quick picks still while assigning tags. Take a fresh snapshot
+      // only when editing a different selection (or reopening the editor).
+      _loadQuickPicks();
       _debounce?.cancel();
       _generation++;
       _draft = '';
@@ -104,11 +106,12 @@ class _SelectionTagEditorState extends State<SelectionTagEditor> {
     _debounce?.cancel();
     final generation = ++_generation;
     final query = _query(value);
-    setState(() => _suggestions = []);
     if (query.trim().isEmpty) {
       setState(() => _suggestions = []);
       return;
     }
+    // Keep the current popup until the debounced results arrive, rather than
+    // removing and reinserting it for every keystroke.
     _debounce = Timer(const Duration(milliseconds: 100), () async {
       try {
         final suggestions = await computeTagSuggestions(
@@ -164,21 +167,32 @@ class _SelectionTagEditorState extends State<SelectionTagEditor> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-            CbSpacing.sm,
-            CbSpacing.xs + CbSpacing.xxs,
-            CbSpacing.sm,
-            CbSpacing.sm,
-          ),
-          child: Text(
-            l10n.tags,
-            style: CbTypography.label.copyWith(
-              color: context.cbColors.textPrimary,
+        Stack(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                CbSpacing.sm,
+                CbSpacing.xs + CbSpacing.xxs,
+                CbSpacing.sm,
+                CbSpacing.sm,
+              ),
+              child: Text(
+                l10n.tags,
+                style: CbTypography.label.copyWith(
+                  color: context.cbColors.textPrimary,
+                ),
+              ),
             ),
-          ),
+            // Saving must not change the input's vertical position.
+            if (c.saving)
+              const Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: LinearProgressIndicator(minHeight: 2),
+              ),
+          ],
         ),
-        if (c.saving) const LinearProgressIndicator(minHeight: 2),
         Padding(
           padding: inset,
           child: Column(
@@ -189,36 +203,31 @@ class _SelectionTagEditorState extends State<SelectionTagEditor> {
                 child: AnimatedOpacity(
                   opacity: stale ? .5 : 1,
                   duration: const Duration(milliseconds: 150),
-                  child: AnimatedSize(
-                    duration: const Duration(milliseconds: 180),
-                    curve: Curves.easeOutCubic,
-                    alignment: Alignment.topLeft,
-                    child: TagChipsField(
-                      fieldKey: _inputKey,
-                      tags: counts.keys.toList(),
-                      suggestions: _suggestions,
-                      scopeParent: _scope,
-                      onScopeChanged: (value) {
-                        setState(() => _scope = value);
-                        _suggest('');
-                      },
-                      hintText: l10n.propertiesTagHint,
-                      onTextChanged: _suggest,
-                      onSubmitted: (value) => _add(_query(value)),
-                      onSuggestionSelected: (value) =>
-                          _add(resolvePickedSuggestion(_query(_draft), value)),
-                      onRemoved: c.remove,
-                      // A tag only some selected files carry reads "tag n/total";
-                      // tapping it applies the tag to the rest.
-                      chipLabel: total > 1
-                          ? (tag) => '$tag ${counts[tag]}/$total'
-                          : null,
-                      chipTooltip: (tag) =>
-                          (counts[tag] ?? 0) < total ? l10n.addTag : null,
-                      onChipTapped: (tag) {
-                        if ((counts[tag] ?? 0) < total) _add(tag);
-                      },
-                    ),
+                  child: TagChipsField(
+                    fieldKey: _inputKey,
+                    tags: counts.keys.toList(),
+                    suggestions: _suggestions,
+                    scopeParent: _scope,
+                    onScopeChanged: (value) {
+                      setState(() => _scope = value);
+                      _suggest('');
+                    },
+                    hintText: l10n.propertiesTagHint,
+                    onTextChanged: _suggest,
+                    onSubmitted: (value) => _add(_query(value)),
+                    onSuggestionSelected: (value) =>
+                        _add(resolvePickedSuggestion(_query(_draft), value)),
+                    onRemoved: c.remove,
+                    // A tag only some selected files carry reads "tag n/total";
+                    // tapping it applies the tag to the rest.
+                    chipLabel: total > 1
+                        ? (tag) => '$tag ${counts[tag]}/$total'
+                        : null,
+                    chipTooltip: (tag) =>
+                        (counts[tag] ?? 0) < total ? l10n.addTag : null,
+                    onChipTapped: (tag) {
+                      if ((counts[tag] ?? 0) < total) _add(tag);
+                    },
                   ),
                 ),
               ),
@@ -228,6 +237,7 @@ class _SelectionTagEditorState extends State<SelectionTagEditor> {
                 compact: true,
                 onTagSelected: _add,
                 loadRecentTags: (_) => _recentTags,
+                refreshVersion: _quickPicksRevision,
               ),
               const SizedBox(height: CbSpacing.md),
               PopularTagsWidget(

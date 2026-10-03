@@ -55,6 +55,7 @@ class AppUpdateService extends ChangeNotifier {
   /// Whether the user has opened the Status Center since the current update
   /// (or its finished download) showed up there. Drives the bell badge.
   bool _updateSeen = true;
+  bool _startupNotificationPending = false;
 
   http.Client? _downloadClient;
   bool _cancelRequested = false;
@@ -82,9 +83,21 @@ class AppUpdateService extends ChangeNotifier {
       !_updateSeen &&
       (hasUpdate || (_phase == AppUpdatePhase.error && _update != null));
 
+  /// The startup check found a new release before the toolbar was ready.
+  /// The bell consumes this request when it opens the update notification.
+  bool get shouldExpandStartupNotification =>
+      _startupNotificationPending && hasUpdate;
+
+  void requestStartupNotification() {
+    if (!hasUpdate || !hasUnseenUpdate || _startupNotificationPending) return;
+    _startupNotificationPending = true;
+    notifyListeners();
+  }
+
   void markUpdateSeen() {
-    if (_updateSeen) return;
+    if (_updateSeen && !_startupNotificationPending) return;
     _updateSeen = true;
+    _startupNotificationPending = false;
     notifyListeners();
   }
 
@@ -514,6 +527,7 @@ class AppUpdateService extends ChangeNotifier {
     _totalBytes = totalBytes;
     _error = error;
     _updateSeen = seen;
+    _startupNotificationPending = false;
     notifyListeners();
   }
 }

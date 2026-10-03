@@ -447,6 +447,7 @@ abstract class AppLocalizations {
   String get viewFilesWithTag;
   String get renameTag;
   String get setThumbnail;
+  String get removeThumbnail;
   String get manageHierarchy;
   String tagRenamed(String oldTag, String newTag);
   String get openInSplitView;

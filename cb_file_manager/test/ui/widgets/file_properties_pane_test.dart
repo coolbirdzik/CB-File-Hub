@@ -16,6 +16,7 @@ import 'package:cb_file_manager/ui/controllers/selection_tags_controller.dart';
 import 'package:cb_file_manager/ui/widgets/file_properties_pane.dart';
 import 'package:cb_file_manager/ui/widgets/file_pane_layout.dart';
 import 'package:cb_file_manager/ui/widgets/chips_input.dart';
+import 'package:cb_file_manager/ui/widgets/tag_management_section.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -195,6 +196,12 @@ void main() {
         ),
       );
       await settle(tester);
+      final recentSnapshot = tester
+          .widget<RecentTagsWidget>(find.byType(RecentTagsWidget))
+          .loadRecentTags!(6);
+      final popularSnapshot = tester
+          .widget<PopularTagsWidget>(find.byType(PopularTagsWidget))
+          .loadPopularTags!(6);
       final input = find.descendant(
         of: find.byType(ChipsInput<String>),
         matching: find.byType(TextField),
@@ -204,6 +211,24 @@ void main() {
       await tester.testTextInput.receiveAction(TextInputAction.done);
       await settle(tester);
       expect(store[first], ['work', 'urgent']);
+      expect(
+        identical(
+          recentSnapshot,
+          tester
+              .widget<RecentTagsWidget>(find.byType(RecentTagsWidget))
+              .loadRecentTags!(6),
+        ),
+        isTrue,
+      );
+      expect(
+        identical(
+          popularSnapshot,
+          tester
+              .widget<PopularTagsWidget>(find.byType(PopularTagsWidget))
+              .loadPopularTags!(6),
+        ),
+        isTrue,
+      );
       final editable = tester.widget<EditableText>(
         find.descendant(
           of: find.byType(ChipsInput<String>),
@@ -214,6 +239,15 @@ void main() {
       await tester.enterText(input, 'uncommitted');
       update(() => selected = [second]);
       await settle(tester);
+      expect(
+        identical(
+          recentSnapshot,
+          tester
+              .widget<RecentTagsWidget>(find.byType(RecentTagsWidget))
+              .loadRecentTags!(6),
+        ),
+        isFalse,
+      );
       final state = tester.state<ChipsInputState<String>>(
         find.byType(ChipsInput<String>),
       );
@@ -226,6 +260,144 @@ void main() {
   );
 
   testWidgets(
+    'saving a tag keeps the input position, focus and scroll offset stable',
+    (tester) async {
+      final started = Completer<void>();
+      final finish = Completer<void>();
+      addTearDown(() {
+        if (!finish.isCompleted) finish.complete();
+      });
+      controller.dispose();
+      controller = SelectionTagsController(
+        read: (path) async => List.of(store[path]!),
+        write: (path, tags) async {
+          started.complete();
+          await finish.future;
+          store[path] = List.of(tags);
+          return true;
+        },
+        changed: (_) {},
+        changes: const Stream.empty(),
+      );
+      await tester.pumpWidget(app(pane(files: [first])));
+      await settle(tester);
+      final input = find.descendant(
+        of: find.byType(ChipsInput<String>),
+        matching: find.byType(TextField),
+      );
+      await tester.ensureVisible(input);
+      await tester.tap(input);
+      await tester.pumpAndSettle();
+      final state = tester.state<ChipsInputState<String>>(
+        find.byType(ChipsInput<String>),
+      );
+      final editable = tester.widget<EditableText>(
+        find.descendant(of: input, matching: find.byType(EditableText)),
+      );
+      final scroll = Scrollable.of(tester.element(input)).position;
+      final offset = scroll.pixels;
+      final top = tester.getTopLeft(input);
+      final height = tester.getSize(input).height;
+      tester.testTextInput.updateEditingValue(
+        const TextEditingValue(
+          text: '\uFFFEnew',
+          selection: TextSelection.collapsed(offset: 4),
+        ),
+      );
+      await tester.pump();
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await started.future;
+      await tester.pump();
+      expect(controller.saving, isTrue);
+      expect(state.controller.textWithoutReplacements, isEmpty);
+      expect(state.controller.values, ['work', 'new']);
+      expect(find.text('new'), findsOneWidget);
+      expect(tester.getTopLeft(input), top);
+      expect(tester.getSize(input).height, height);
+      expect(scroll.pixels, offset);
+      expect(editable.focusNode.hasFocus, isTrue);
+      expect(
+        identical(
+          tester.state<ChipsInputState<String>>(
+            find.byType(ChipsInput<String>),
+          ),
+          state,
+        ),
+        isTrue,
+      );
+      finish.complete();
+      await settle(tester);
+      expect(store[first], ['work', 'new']);
+      expect(state.controller.values, ['work', 'new']);
+      expect(tester.getTopLeft(input), top);
+      expect(tester.getSize(input).height, height);
+      expect(scroll.pixels, offset);
+      expect(editable.focusNode.hasFocus, isTrue);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      await settle(tester);
+    },
+  );
+
+  testWidgets('typing keeps tag suggestions visible during the next debounce', (
+    tester,
+  ) async {
+    await tester.runAsync(
+      () => TagManager.setTags(first, ['suggest-alpha', 'suggest-alpine']),
+    );
+    await tester.pumpWidget(app(pane(files: [first])));
+    await settle(tester);
+    final input = find.descendant(
+      of: find.byType(ChipsInput<String>),
+      matching: find.byType(TextField),
+    );
+    await tester.ensureVisible(input);
+    await tester.tap(input);
+    tester.testTextInput.updateEditingValue(
+      const TextEditingValue(
+        text: '\uFFFEsuggest-al',
+        selection: TextSelection.collapsed(offset: 11),
+      ),
+    );
+    await settle(tester);
+    final suggestions = tester
+        .widget<ChipsInput<String>>(find.byType(ChipsInput<String>))
+        .suggestions;
+    expect(suggestions, containsAll(['suggest-alpha', 'suggest-alpine']));
+    final overlayHeading = find.text('Suggested tags');
+    expect(overlayHeading, findsOneWidget);
+    final headingElement = tester.element(overlayHeading);
+    tester.testTextInput.updateEditingValue(
+      const TextEditingValue(
+        text: '\uFFFEsuggest-alp',
+        selection: TextSelection.collapsed(offset: 12),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(
+      tester
+          .widget<ChipsInput<String>>(find.byType(ChipsInput<String>))
+          .suggestions,
+      suggestions,
+    );
+    expect(overlayHeading, findsOneWidget);
+    expect(identical(tester.element(overlayHeading), headingElement), isTrue);
+    // An empty draft must still dismiss the popup immediately.
+    tester.testTextInput.updateEditingValue(
+      const TextEditingValue(
+        text: '\uFFFE',
+        selection: TextSelection.collapsed(offset: 1),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    expect(overlayHeading, findsNothing);
+    await tester.pumpWidget(const SizedBox());
+    await tester.runAsync(() => TagManager.setTags(first, []));
+    await settle(tester);
+  });
+
+  testWidgets(
     'docking properties preserves a tag draft when its contents change columns',
     (tester) async {
       tester.view.physicalSize = const Size(1200, 800);
@@ -233,6 +405,7 @@ void main() {
       addTearDown(tester.view.reset);
       final layout = FilePaneLayoutController();
       addTearDown(layout.dispose);
+      var layoutBuilds = 0;
       await tester.pumpWidget(
         app(
           FilePropertiesPane(
@@ -244,16 +417,19 @@ void main() {
             onHeightChanged: (_) {},
             onClose: () {},
             headerLeading: const FilePaneDragHandle(pane: FilePane.properties),
-            paneLayoutBuilder: (context, panel) => FilePaneLayout(
-              controller: layout,
-              files: const Text('file list'),
-              preview: const SizedBox(),
-              properties: panel,
-              previewVisible: true,
-              propertiesVisible: true,
-              previewWidth: 360,
-              propertiesHeight: 260,
-            ),
+            paneLayoutBuilder: (context, panel) {
+              layoutBuilds++;
+              return FilePaneLayout(
+                controller: layout,
+                files: const Text('file list'),
+                preview: const SizedBox(),
+                properties: panel,
+                previewVisible: true,
+                propertiesVisible: true,
+                previewWidth: 360,
+                propertiesHeight: 260,
+              );
+            },
             child: const SizedBox(),
           ),
         ),
@@ -282,9 +458,11 @@ void main() {
       );
       expect(identical(before, after), isTrue);
       expect(after.controller.textWithoutReplacements, 'uncommitted');
+      final buildsBeforeSaving = layoutBuilds;
       await tester.testTextInput.receiveAction(TextInputAction.done);
       await settle(tester);
       expect(store[first], ['work', 'uncommitted']);
+      expect(layoutBuilds, buildsBeforeSaving);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
       await settle(tester);

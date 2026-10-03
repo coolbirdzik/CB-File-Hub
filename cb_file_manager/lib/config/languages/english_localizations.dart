@@ -939,6 +939,8 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get setThumbnail => 'Set Thumbnail';
   @override
+  String get removeThumbnail => 'Remove Thumbnail';
+  @override
   String get manageHierarchy => 'Manage Hierarchy';
   @override
   String get renameTag => 'Rename Tag';

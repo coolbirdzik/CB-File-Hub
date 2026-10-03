@@ -62,7 +62,6 @@ class _FilePropertiesPaneState extends State<FilePropertiesPane> {
   void initState() {
     super.initState();
     _tags = widget.controller ?? SelectionTagsController();
-    _tags.addListener(_changed);
     if (widget.visible) _select();
   }
 
@@ -75,10 +74,6 @@ class _FilePropertiesPaneState extends State<FilePropertiesPane> {
             !listEquals(oldWidget.folderPaths, widget.folderPaths))) {
       _select();
     }
-  }
-
-  void _changed() {
-    if (mounted) setState(() {});
   }
 
   void _select() {
@@ -106,7 +101,6 @@ class _FilePropertiesPaneState extends State<FilePropertiesPane> {
   @override
   void dispose() {
     _generation++;
-    _tags.removeListener(_changed);
     if (widget.controller == null) _tags.dispose();
     super.dispose();
   }
@@ -210,7 +204,14 @@ class _FilePropertiesPaneState extends State<FilePropertiesPane> {
     );
   }
 
-  Widget _contents(BuildContext context) {
+  // A tag write only updates the panel contents, preserving the surrounding
+  // dock layout and file/preview panes throughout saving and reloading.
+  Widget _contents(BuildContext context) => ListenableBuilder(
+    listenable: _tags,
+    builder: (context, _) => _buildContents(context),
+  );
+
+  Widget _buildContents(BuildContext context) {
     if (_paths.isEmpty && _tags.failures.isEmpty) {
       return Center(
         child: Text(AppLocalizations.of(context)!.propertiesSelectFile),

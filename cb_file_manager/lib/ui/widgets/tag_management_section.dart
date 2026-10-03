@@ -662,7 +662,7 @@ class PopularTagsWidget extends StatelessWidget {
 }
 
 /// Widget to display a list of recently used tags with animation and hover effects
-class RecentTagsWidget extends StatelessWidget {
+class RecentTagsWidget extends StatefulWidget {
   final Function(String) onTagSelected;
   final int limit;
   final Future<List<String>> Function(int limit)? loadRecentTags;
@@ -673,17 +673,50 @@ class RecentTagsWidget extends StatelessWidget {
     this.limit = 20,
     this.loadRecentTags,
     this.compact = false,
+    this.refreshVersion = 0,
   });
+
+  /// Refresh at a new editing session, rather than shuffling buttons every
+  /// time a tag is assigned and the parent rebuilds.
+  final int refreshVersion;
 
   /// Small muted heading, for a host whose own section titles are smaller
   /// than the dialog-sized default.
   final bool compact;
 
   @override
+  State<RecentTagsWidget> createState() => _RecentTagsWidgetState();
+}
+
+class _RecentTagsWidgetState extends State<RecentTagsWidget> {
+  late Future<List<String>> _recentTags;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(RecentTagsWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.limit != widget.limit ||
+        oldWidget.refreshVersion != widget.refreshVersion) {
+      _load();
+    }
+  }
+
+  void _load() {
+    _recentTags =
+        widget.loadRecentTags?.call(widget.limit) ??
+        TagManager.getRecentTags(limit: widget.limit);
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final compact = widget.compact;
     return FutureBuilder<List<String>>(
-      future:
-          loadRecentTags?.call(limit) ?? TagManager.getRecentTags(limit: limit),
+      future: _recentTags,
       builder: (context, snapshot) {
         if (!snapshot.hasData || snapshot.data!.isEmpty) {
           return const SizedBox.shrink();
@@ -720,7 +753,10 @@ class RecentTagsWidget extends StatelessWidget {
                 ],
               ),
             SizedBox(height: compact ? CbSpacing.xs + CbSpacing.xxs : 12),
-            AnimatedTagList(tags: recentTags, onTagSelected: onTagSelected),
+            AnimatedTagList(
+              tags: recentTags,
+              onTagSelected: widget.onTagSelected,
+            ),
           ],
         );
       },

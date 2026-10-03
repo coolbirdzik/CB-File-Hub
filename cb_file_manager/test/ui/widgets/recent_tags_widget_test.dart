@@ -9,6 +9,10 @@ void main() {
     tester,
   ) async {
     String? selectedTag;
+    var recentTags = ['urgent', 'work'];
+    var loads = 0;
+    var refreshVersion = 0;
+    late StateSetter update;
 
     await tester.pumpWidget(
       MaterialApp(
@@ -21,9 +25,21 @@ void main() {
         ],
         supportedLocales: const [Locale('en'), Locale('vi')],
         home: Scaffold(
-          body: RecentTagsWidget(
-            loadRecentTags: (_) async => const ['urgent', 'work'],
-            onTagSelected: (tag) => selectedTag = tag,
+          body: StatefulBuilder(
+            builder: (context, setState) {
+              update = setState;
+              return RecentTagsWidget(
+                refreshVersion: refreshVersion,
+                loadRecentTags: (_) async {
+                  loads++;
+                  return List.of(recentTags);
+                },
+                onTagSelected: (tag) {
+                  selectedTag = tag;
+                  setState(() => recentTags = [tag, 'urgent']);
+                },
+              );
+            },
           ),
         ),
       ),
@@ -34,7 +50,23 @@ void main() {
     expect(find.text('urgent'), findsOneWidget);
     expect(find.text('work'), findsOneWidget);
 
-    await tester.tap(find.text('urgent'));
-    expect(selectedTag, 'urgent');
+    final workPosition = tester.getTopLeft(find.text('work'));
+    await tester.tap(find.text('work'));
+    await tester.pumpAndSettle();
+    expect(selectedTag, 'work');
+    expect(loads, 1);
+    expect(tester.widget<AnimatedTagList>(find.byType(AnimatedTagList)).tags, [
+      'urgent',
+      'work',
+    ]);
+    expect(tester.getTopLeft(find.text('work')), workPosition);
+
+    update(() => refreshVersion++);
+    await tester.pumpAndSettle();
+    expect(loads, 2);
+    expect(tester.widget<AnimatedTagList>(find.byType(AnimatedTagList)).tags, [
+      'work',
+      'urgent',
+    ]);
   });
 }

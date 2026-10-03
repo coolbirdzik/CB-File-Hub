@@ -76,6 +76,7 @@ class _StatusCenterToolbarButtonState extends State<StatusCenterToolbarButton>
   late final Animation<double> _glowAnimation;
   int _lastUnseenCount = 0;
   int _lastRunningCount = 0;
+  bool _startupOpenScheduled = false;
 
   @override
   void initState() {
@@ -111,6 +112,7 @@ class _StatusCenterToolbarButtonState extends State<StatusCenterToolbarButton>
     );
     _controller.addListener(_onChanged);
     _updates.addListener(_onChanged);
+    _scheduleStartupNotification();
   }
 
   /// Unseen task notifications plus an update the user has not looked at.
@@ -143,17 +145,43 @@ class _StatusCenterToolbarButtonState extends State<StatusCenterToolbarButton>
     _lastUnseenCount = unseenCount;
     _lastRunningCount = runningCount;
     if (mounted) setState(() {});
+    _scheduleStartupNotification();
   }
 
   OverlayEntry? _panelOverlay;
+
+  void _scheduleStartupNotification() {
+    if (!_updates.shouldExpandStartupNotification || _startupOpenScheduled) {
+      return;
+    }
+    _startupOpenScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _startupOpenScheduled = false;
+      if (!mounted || !_updates.shouldExpandStartupNotification) return;
+      // Wait for a visible, laid-out toolbar rather than opening from a hidden
+      // route or an inactive pane during startup.
+      if (!TickerMode.valuesOf(context).enabled ||
+          !(ModalRoute.of(context)?.isCurrent ?? true)) {
+        return;
+      }
+      final box = context.findRenderObject();
+      if (box is! RenderBox || !box.hasSize || box.size.isEmpty) return;
+      _showStatusCenter();
+    });
+  }
 
   void _openStatusCenter() {
     if (_panelOverlay != null) {
       _closePanelOverlay();
       return;
     }
+    _showStatusCenter();
+  }
+
+  void _showStatusCenter() {
     _controller.markAllSeen();
     _updates.markUpdateSeen();
+    if (_panelOverlay != null) return;
 
     final overlay = Overlay.of(context);
     final overlayBox = overlay.context.findRenderObject() as RenderBox;
@@ -197,6 +225,7 @@ class _StatusCenterToolbarButtonState extends State<StatusCenterToolbarButton>
 
   @override
   Widget build(BuildContext context) {
+    _scheduleStartupNotification();
     final theme = Theme.of(context);
     final unseenCount = _unseenCount;
     final runningCount = _controller.runningCount;

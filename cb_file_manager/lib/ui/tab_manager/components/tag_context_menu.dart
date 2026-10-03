@@ -118,6 +118,14 @@ List<ContextMenuSection> _buildTagContextMenuSections(
           onSelected: (ctx) =>
               showTagThumbnailPicker(ctx, tag, onChanged: onChanged),
         ),
+        if (TagThumbnailManager.instance.getThumbnailSync(tag) != null)
+          ContextMenuAction(
+            id: 'remove_thumbnail',
+            label: l10n.removeThumbnail,
+            icon: PhosphorIconsLight.imageSquare,
+            onSelected: (ctx) =>
+                removeTagThumbnail(ctx, tag, onChanged: onChanged),
+          ),
         ContextMenuAction(
           id: 'hierarchy',
           label: l10n.manageHierarchy,
@@ -281,95 +289,9 @@ Future<void> showTagColorPickerDialog(
   onChanged?.call();
 }
 
-/// Set / replace / remove the thumbnail for [tag].
-Future<void> showTagThumbnailPicker(
-  BuildContext context,
-  String tag, {
-  VoidCallback? onChanged,
-}) async {
-  final thumbnailManager = TagThumbnailManager.instance;
-  final currentThumbnail = thumbnailManager.getThumbnailSync(tag);
-  final theme = Theme.of(context);
-  final l10n = AppLocalizations.of(context)!;
-
-  final result = await RouteUtils.showAcrylicDialog<String?>(
-    context: context,
-    builder: (context) {
-      return AlertDialog(
-        title: Text('${l10n.setThumbnail}: "$tag"'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 160,
-              height: 160,
-              decoration: CbDecorations.card(context, radius: 16),
-              child: currentThumbnail != null
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(15),
-                      child: Image.file(
-                        File(currentThumbnail),
-                        width: 160,
-                        height: 160,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) => Center(
-                          child: Icon(
-                            PhosphorIconsLight.imageSquare,
-                            size: 48,
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
-                    )
-                  : Center(
-                      child: Icon(
-                        PhosphorIconsLight.image,
-                        size: 48,
-                        color: theme.colorScheme.onSurfaceVariant.withValues(
-                          alpha: 0.5,
-                        ),
-                      ),
-                    ),
-            ),
-          ],
-        ),
-        actions: [
-          if (currentThumbnail != null)
-            TextButton(
-              onPressed: () => Navigator.of(context).pop('remove'),
-              child: Text(
-                l10n.delete,
-                style: TextStyle(color: theme.colorScheme.error),
-              ),
-            ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(null),
-            child: Text(l10n.cancel),
-          ),
-          ElevatedButton.icon(
-            onPressed: () => Navigator.of(context).pop('browse'),
-            icon: const Icon(PhosphorIconsLight.folderOpen, size: 18),
-            label: Text(l10n.browse),
-          ),
-        ],
-      );
-    },
-  );
-
-  if (!context.mounted) return;
-  if (result == 'browse') {
-    await _pickThumbnailFromBrowser(context, tag, onChanged: onChanged);
-  } else if (result == 'remove') {
-    final toast = AppToast.capture(context);
-    await thumbnailManager.deleteThumbnail(tag);
-    toast.success('Thumbnail removed for "$tag"');
-    onChanged?.call();
-  }
-}
-
 /// Opens the shared thumbnail browser (folders + tag search, with inline
 /// video-frame extraction) and applies the chosen image as the tag thumbnail.
-Future<void> _pickThumbnailFromBrowser(
+Future<void> showTagThumbnailPicker(
   BuildContext context,
   String tag, {
   VoidCallback? onChanged,
@@ -378,6 +300,7 @@ Future<void> _pickThumbnailFromBrowser(
     final imagePath = await showThumbnailBrowserDialog(
       context,
       title: '${AppLocalizations.of(context)!.setThumbnail}: "$tag"',
+      initialTagQuery: tag,
     );
     if (imagePath == null) return;
 
@@ -393,6 +316,22 @@ Future<void> _pickThumbnailFromBrowser(
   } catch (e) {
     AppLogger.error('Error picking thumbnail: $e');
     if (context.mounted) AppToast.error(context, 'Error: $e');
+  }
+}
+
+/// Removes the thumbnail association for [tag].
+Future<void> removeTagThumbnail(
+  BuildContext context,
+  String tag, {
+  VoidCallback? onChanged,
+}) async {
+  final toast = AppToast.capture(context);
+  final ok = await TagThumbnailManager.instance.deleteThumbnail(tag);
+  if (ok) {
+    toast.success('Thumbnail removed for "$tag"');
+    onChanged?.call();
+  } else {
+    toast.error('Failed to remove thumbnail');
   }
 }
 

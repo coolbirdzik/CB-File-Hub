@@ -1,5 +1,6 @@
 import 'package:cb_file_manager/config/languages/app_localizations_delegate.dart';
 import 'package:cb_file_manager/config/theme_config.dart';
+import 'package:cb_file_manager/core/service_locator.dart';
 import 'package:cb_file_manager/services/app_update/app_update_models.dart';
 import 'package:cb_file_manager/services/app_update/app_update_service.dart';
 import 'package:cb_file_manager/ui/components/app_update/app_update_dialog.dart';
@@ -34,8 +35,140 @@ Widget _host(Widget child) => MaterialApp(
 
 void main() {
   final service = AppUpdateService.instance;
+  late OperationProgressController controller;
 
-  tearDown(() => service.debugSetState(phase: AppUpdatePhase.idle));
+  setUp(() {
+    controller = OperationProgressController();
+    locator.registerSingleton<OperationProgressController>(controller);
+  });
+
+  tearDown(() async {
+    service.debugSetState(phase: AppUpdatePhase.idle);
+    await locator.unregister<OperationProgressController>();
+    controller.dispose();
+  });
+
+  Widget toolbarHost() => _host(
+    const Align(
+      alignment: Alignment.topRight,
+      child: StatusCenterToolbarButton(),
+    ),
+  );
+
+  testWidgets('startup opens the bell when a newer release is found', (
+    tester,
+  ) async {
+    await tester.pumpWidget(toolbarHost());
+    await tester.pumpAndSettle();
+    expect(find.byType(StatusCenterPanel), findsNothing);
+
+    service.debugSetState(
+      phase: AppUpdatePhase.available,
+      update: _update,
+      currentVersion: '1.1.0',
+    );
+    // An available update by itself only changes the badge.
+    await tester.pumpAndSettle();
+    expect(find.byType(StatusCenterPanel), findsNothing);
+    service.requestStartupNotification();
+    await tester.pumpAndSettle();
+    expect(find.byType(StatusCenterPanel), findsOneWidget);
+    expect(find.text('Update available'), findsOneWidget);
+    expect(find.text('Download'), findsOneWidget);
+    expect(find.byType(AppUpdateDialog), findsNothing);
+    expect(service.hasUnseenUpdate, isFalse);
+    expect(service.shouldExpandStartupNotification, isFalse);
+
+    await tester.tapAt(const Offset(20, 580));
+    await tester.pumpAndSettle();
+    expect(find.byType(StatusCenterPanel), findsNothing);
+    service.requestStartupNotification();
+    final task = controller.begin(title: 'Copy', total: 1);
+    controller.succeed(task);
+    await tester.pumpAndSettle();
+    expect(find.byType(StatusCenterPanel), findsNothing);
+    service.debugSetState(
+      phase: AppUpdatePhase.readyToInstall,
+      update: _update,
+      currentVersion: '1.1.0',
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(StatusCenterPanel), findsNothing);
+    // The bell can still be opened manually after dismissal.
+    await tester.tap(find.byType(IconButton).first);
+    await tester.pumpAndSettle();
+    expect(find.byType(StatusCenterPanel), findsOneWidget);
+  });
+
+  testWidgets('startup request waits for the toolbar to mount', (tester) async {
+    service.debugSetState(phase: AppUpdatePhase.available, update: _update);
+    service.requestStartupNotification();
+    await tester.pumpWidget(toolbarHost());
+    await tester.pumpAndSettle();
+    expect(find.byType(StatusCenterPanel), findsOneWidget);
+    expect(service.shouldExpandStartupNotification, isFalse);
+  });
+
+  testWidgets('startup waits until the toolbar becomes active', (tester) async {
+    service.debugSetState(phase: AppUpdatePhase.available, update: _update);
+    service.requestStartupNotification();
+    Widget host(bool active) => _host(
+      TickerMode(
+        enabled: active,
+        child: const Align(
+          alignment: Alignment.topRight,
+          child: StatusCenterToolbarButton(),
+        ),
+      ),
+    );
+    await tester.pumpWidget(host(false));
+    await tester.pumpAndSettle();
+    expect(find.byType(StatusCenterPanel), findsNothing);
+    expect(service.shouldExpandStartupNotification, isTrue);
+    await tester.pumpWidget(host(true));
+    await tester.pumpAndSettle();
+    expect(find.byType(StatusCenterPanel), findsOneWidget);
+    expect(service.shouldExpandStartupNotification, isFalse);
+  });
+
+  testWidgets('startup keeps the bell closed without a newer release', (
+    tester,
+  ) async {
+    await tester.pumpWidget(toolbarHost());
+    for (final phase in [
+      AppUpdatePhase.idle,
+      AppUpdatePhase.checking,
+      AppUpdatePhase.upToDate,
+      AppUpdatePhase.error,
+    ]) {
+      service.debugSetState(phase: phase);
+      service.requestStartupNotification();
+      await tester.pumpAndSettle();
+      expect(find.byType(StatusCenterPanel), findsNothing);
+      expect(find.byType(AppUpdateDialog), findsNothing);
+    }
+  });
+
+  testWidgets('release notes expand inside the update notification', (
+    tester,
+  ) async {
+    service.debugSetState(
+      phase: AppUpdatePhase.available,
+      update: _update,
+      currentVersion: '1.1.0',
+    );
+    await tester.pumpWidget(_host(StatusCenterPanel(controller: controller)));
+    await tester.pumpAndSettle();
+    expect(find.byType(ReleaseNotesView), findsNothing);
+    await tester.tap(find.text("What's new"));
+    await tester.pumpAndSettle();
+    expect(find.byType(ReleaseNotesView), findsOneWidget);
+    expect(find.text('Show updates in the status center'), findsOneWidget);
+    expect(find.byType(AppUpdateDialog), findsNothing);
+    await tester.tap(find.text("What's new"));
+    await tester.pumpAndSettle();
+    expect(find.byType(ReleaseNotesView), findsNothing);
+  });
 
   testWidgets('Status Center lists an available update with its actions', (
     tester,
@@ -45,9 +178,7 @@ void main() {
       update: _update,
       currentVersion: '1.1.0',
     );
-    await tester.pumpWidget(
-      _host(StatusCenterPanel(controller: OperationProgressController())),
-    );
+    await tester.pumpWidget(_host(StatusCenterPanel(controller: controller)));
     await tester.pumpAndSettle();
 
     expect(find.text('App update'), findsOneWidget);
@@ -73,9 +204,7 @@ void main() {
       receivedBytes: 512 * 1024,
       totalBytes: 1024 * 1024,
     );
-    await tester.pumpWidget(
-      _host(StatusCenterPanel(controller: OperationProgressController())),
-    );
+    await tester.pumpWidget(_host(StatusCenterPanel(controller: controller)));
     await tester.pumpAndSettle();
 
     expect(find.text('50%'), findsOneWidget);

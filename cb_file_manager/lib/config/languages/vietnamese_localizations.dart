@@ -932,6 +932,8 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get setThumbnail => 'Đặt ảnh thu nhỏ';
   @override
+  String get removeThumbnail => 'Xóa ảnh thu nhỏ';
+  @override
   String get manageHierarchy => 'Quản lý phân cấp';
   @override
   String get renameTag => 'Đổi tên thẻ';

@@ -689,12 +689,14 @@ Future<void> runCbFileApp() async {
   }
 }
 
-/// Background update check result. On desktop nothing pops up: the update
-/// sits in the Status Center and the toolbar bell shows a badge until it is
-/// opened. Mobile has no bell, so it gets a toast whose action opens the
-/// update dialog.
+/// Background update check result. A newer desktop release opens the toolbar
+/// bell's Status Center once, with download/install actions inside the panel.
+/// Mobile has no bell, so it gets a toast whose action opens the update dialog.
 void _announceAppUpdate(AppUpdateInfo update, {int attempt = 0}) {
-  if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) return;
+  if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
+    AppUpdateService.instance.requestStartupNotification();
+    return;
+  }
   final context = navigatorKey.currentContext;
   final l10n = context != null && context.mounted
       ? AppLocalizations.of(context)

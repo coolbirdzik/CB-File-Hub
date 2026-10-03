@@ -32,6 +32,93 @@ void main() {
   tearDown(() => controller.dispose());
 
   test(
+    'submitted tag stays visible through saving and confirmation reload',
+    () async {
+      final started = Completer<void>();
+      final finish = Completer<void>();
+      final reloadStarted = Completer<void>();
+      final refreshed = Completer<List<String>>();
+      var written = false;
+      final c = SelectionTagsController(
+        read: (path) {
+          if (written) {
+            if (!reloadStarted.isCompleted) reloadStarted.complete();
+            return refreshed.future;
+          }
+          return Future.value(List.of(store[path]!));
+        },
+        write: (path, tags) async {
+          started.complete();
+          await finish.future;
+          store[path] = List.of(tags);
+          written = true;
+          return true;
+        },
+        changed: (_) {},
+        changes: const Stream.empty(),
+      );
+      addTearDown(c.dispose);
+      await c.select(['a']);
+      final snapshots = <Map<String, int>>[];
+      c.addListener(() => snapshots.add(c.counts));
+      final pending = c.add('new');
+      expect(c.counts['new'], 1);
+      expect(c.isCommon('new'), isTrue);
+      expect(c.tagsByPath['a'], isNot(contains('new')));
+      await started.future;
+      expect(c.counts['new'], 1);
+      finish.complete();
+      await reloadStarted.future;
+      expect(c.saving, isTrue);
+      expect(c.counts['new'], 1);
+      refreshed.complete(List.of(store['a']!));
+      await pending;
+      expect(c.saving, isFalse);
+      expect(c.tagsByPath['a'], contains('new'));
+      expect(snapshots.every((counts) => counts['new'] == 1), isTrue);
+    },
+  );
+
+  test('queued tags stay visible while earlier edits reload', () async {
+    await controller.select(['a']);
+    final snapshots = <Map<String, int>>[];
+    controller.addListener(() => snapshots.add(controller.counts));
+    final first = controller.add('first');
+    final second = controller.add('second');
+    expect(controller.counts, containsPair('first', 1));
+    expect(controller.counts, containsPair('second', 1));
+    expect(controller.counts.keys, ['one', 'Common', 'first', 'second']);
+    await Future.wait([first, second]);
+    expect(controller.counts.keys, ['one', 'Common', 'first', 'second']);
+    expect(snapshots.skip(1).every((counts) => counts['second'] == 1), isTrue);
+    expect(snapshots.every((counts) => counts['first'] == 1), isTrue);
+    expect(store['a'], ['one', 'Common', 'first', 'second']);
+  });
+
+  test(
+    'failed optimistic tags roll back only on failed files and can retry',
+    () async {
+      rejected.add('b');
+      await controller.select(['a', 'b']);
+      final pending = controller.add('new');
+      expect(controller.counts['new'], 2);
+      expect(controller.counts.keys, ['one', 'Common', 'two', 'new']);
+      expect(controller.isCommon('new'), isTrue);
+      await pending;
+      expect(controller.counts['new'], 1);
+      expect(controller.counts.keys, ['one', 'Common', 'two', 'new']);
+      expect(controller.isCommon('new'), isFalse);
+      expect(controller.failures.single.paths, ['b']);
+      rejected.clear();
+      final retry = controller.retry(controller.failures.single);
+      expect(controller.counts['new'], 2);
+      await retry;
+      expect(controller.counts['new'], 2);
+      expect(controller.failures, isEmpty);
+    },
+  );
+
+  test(
     'union counts are case insensitive and edits preserve unique tags',
     () async {
       await controller.select(['a', 'b']);
@@ -82,6 +169,7 @@ void main() {
       final first = controller.add('first');
       final second = controller.add('second');
       await controller.select(['b']);
+      expect(controller.counts, {'common': 1, 'two': 1});
       await Future.wait([first, second]);
       expect(store['a'], ['one', 'Common', 'first', 'second']);
       expect(store['b'], ['two', 'common']);
