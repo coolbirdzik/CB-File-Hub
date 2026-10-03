@@ -45,7 +45,8 @@ import 'widgets/widgets.dart';
 /// This is essentially a file browsing screen with different data source and actions.
 class TrashBinScreen extends StatefulWidget {
   final String tabId;
-  const TrashBinScreen({super.key, required this.tabId});
+  final TrashManager? trashManager;
+  const TrashBinScreen({super.key, required this.tabId, this.trashManager});
 
   @override
   State<TrashBinScreen> createState() => _TrashBinScreenState();
@@ -106,21 +107,14 @@ bool _listEquals<T>(List<T> a, List<T> b) {
 }
 
 class _TrashBinScreenState extends State<TrashBinScreen> {
-  final TrashManager _trashManager = TrashManager();
+  late final TrashManager _trashManager;
   late final SelectionBloc _selectionBloc;
   List<TrashItem> _trashItems = [];
-  // Legacy "background action in progress" flag. Was used to gate a
-  // full-screen skeleton during delete/restore/empty actions; the
-  // skeleton is now driven exclusively by `_isStreaming` so this flag
-  // is effectively dead state. Kept (with a lint suppression) so the
-  // existing delete/restore/empty handlers do not need 13 individual
-  // edits to remove their `setState(() { _isLoading = ...; })` calls.
-  // ignore: unused_field
-  bool _isLoading = true;
+  bool _isOperating = false;
+  bool _isEmptying = false;
+  bool get _isBusy => _isOperating || _isEmptying;
 
-  /// True while the streaming load is still emitting chunks. Used to
-  /// show a non-blocking progress indicator while items keep arriving,
-  /// without blocking the screen with a skeleton like _isLoading does.
+  /// True while the streaming load is still emitting chunks.
   bool _isStreaming = false;
   String? _errorCode;
   List<String> _errorArgs = [];
@@ -133,6 +127,7 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
   bool _showSearch = false;
   int _gridZoomLevel = UserPreferences.defaultGridZoomLevel;
   final SearchTextController _searchController = SearchTextController();
+  final _searchFocusNode = FocusNode(debugLabel: 'trash search');
 
   // Drag-to-select state (desktop only — lasso / rubber-band selection)
   bool _isDraggingRect = false;
@@ -150,6 +145,7 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
   @override
   void initState() {
     super.initState();
+    _trashManager = widget.trashManager ?? TrashManager();
     _selectionBloc = SelectionBloc();
     _loadPreferences();
     _loadTrashItems();
@@ -159,6 +155,7 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
   void dispose() {
     _trashLoadSub?.cancel();
     _searchController.dispose();
+    _searchFocusNode.dispose();
     _selectionBloc.close();
     super.dispose();
   }
@@ -215,19 +212,21 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
   bool get _isDesktop =>
       Platform.isWindows || Platform.isLinux || Platform.isMacOS;
 
-  Future<void> _loadTrashItems() async {
+  Future<void> _loadTrashItems({bool afterOperation = false}) async {
+    if (!mounted || (_isBusy && !afterOperation)) return;
     // Cancel any in-flight load before starting a new one (e.g. when the
     // user pulls to refresh while the previous lazy-load is still
     // streaming recycle-bin pages).
     await _trashLoadSub?.cancel();
     _trashLoadSub = null;
+    if (!mounted) return;
 
     // Drop skeleton immediately. Even if the native COM enumeration is
     // slow on a huge Recycle Bin, the user should see the toolbar +
     // empty-state without being blocked. Items will progressively
     // populate as stream chunks arrive.
     setState(() {
-      _isLoading = false;
+      _isOperating = false;
       _isStreaming = true;
       _trashItems = [];
       _displayItems = [];
@@ -240,7 +239,7 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
 
     _trashLoadSub = _trashManager.getTrashItemsStreaming().listen(
       (chunk) {
-        if (!mounted) return;
+        if (!mounted || _isOperating) return;
         accumulator.addAll(chunk);
         // Don't re-sort the whole accumulator on every chunk — that is
         // O(n log n) per chunk and was a major UI-thread hog. The
@@ -258,16 +257,16 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
         _updateThumbnailDisplayIndex();
       },
       onError: (Object e, StackTrace st) {
-        if (!mounted) return;
+        if (!mounted || _isOperating) return;
         setState(() {
           _errorCode = 'load';
           _errorArgs = [e.toString()];
-          _isLoading = false;
+          _isOperating = false;
           _isStreaming = false;
         });
       },
       onDone: () {
-        if (!mounted) return;
+        if (!mounted || _isOperating) return;
         // Now that the stream is finished, sort once newest-first and
         // push a final snapshot. This is the single sort cost for the
         // whole load, instead of one sort per chunk.
@@ -301,8 +300,9 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
   }
 
   Future<void> _restoreItem(TrashItem item) async {
+    if (_isBusy) return;
     setState(() {
-      _isLoading = true;
+      _isOperating = true;
     });
 
     try {
@@ -324,17 +324,17 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
             l10n.itemRestoredSuccess(item.displayNameValue),
           );
         }
-        await _loadTrashItems();
+        await _loadTrashItems(afterOperation: true);
       } else {
         setState(() {
-          _isLoading = false;
+          _isOperating = false;
           _errorCode = 'restore_failed';
           _errorArgs = [item.displayNameValue];
         });
       }
     } catch (e) {
       setState(() {
-        _isLoading = false;
+        _isOperating = false;
         _errorCode = 'restore_error';
         _errorArgs = [e.toString()];
       });
@@ -342,6 +342,7 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
   }
 
   Future<void> _deleteItem(TrashItem item) async {
+    if (_isBusy) return;
     final l10n = AppLocalizations.of(context)!;
     final confirm = await BrowserLikeActionHandlers.showConfirmationDialog(
       context: context,
@@ -364,10 +365,10 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
       ),
     );
 
-    if (!confirm) return;
+    if (!confirm || !mounted || _isBusy) return;
 
     setState(() {
-      _isLoading = true;
+      _isOperating = true;
     });
 
     try {
@@ -376,17 +377,17 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
           : await _trashManager.deleteFromTrash(item.trashFileName);
 
       if (success) {
-        await _loadTrashItems();
+        await _loadTrashItems(afterOperation: true);
       } else {
         setState(() {
-          _isLoading = false;
+          _isOperating = false;
           _errorCode = 'delete_failed';
           _errorArgs = [item.displayNameValue];
         });
       }
     } catch (e) {
       setState(() {
-        _isLoading = false;
+        _isOperating = false;
         _errorCode = 'delete_error';
         _errorArgs = [e.toString()];
       });
@@ -415,6 +416,7 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
   }
 
   Future<void> _emptyTrash() async {
+    if (_isBusy) return;
     final l10n = AppLocalizations.of(context)!;
     final confirm = await BrowserLikeActionHandlers.showConfirmationDialog(
       context: context,
@@ -437,32 +439,50 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
       ),
     );
 
-    if (!confirm) return;
+    if (!confirm || !mounted || _isBusy) return;
 
     setState(() {
-      _isLoading = true;
+      _isOperating = true;
+      _isEmptying = true;
+      _errorCode = null;
+      _errorArgs = [];
     });
+    _clearSelection();
 
     try {
-      final success = await _trashManager.emptyTrash();
-
+      await _trashLoadSub?.cancel();
+      _trashLoadSub = null;
+      final errors = <String>[];
+      final success = await _trashManager.emptyTrash(
+        onError: (path, error) => errors.add('$path: $error'),
+      );
+      if (!mounted) return;
+      // Even a failed empty can have deleted some of the listed payloads.
+      await _loadTrashItems(afterOperation: true);
+      if (!mounted) return;
       if (success) {
-        if (mounted) {
-          AppToast.success(context, l10n.trashEmptiedSuccess);
-        }
-        await _loadTrashItems();
+        AppToast.success(context, l10n.trashEmptiedSuccess);
       } else {
-        setState(() {
-          _isLoading = false;
-          _errorCode = 'empty_failed';
-        });
+        AppToast.error(
+          context,
+          errors.isEmpty
+              ? l10n.failedToEmptyTrash
+              : l10n.errorEmptyingTrashWithError(errors.join('\n')),
+        );
       }
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-        _errorCode = 'empty_error';
-        _errorArgs = [e.toString()];
-      });
+      if (!mounted) return;
+      await _loadTrashItems(afterOperation: true);
+      if (mounted) {
+        AppToast.error(context, l10n.errorEmptyingTrashWithError(e.toString()));
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isOperating = false;
+          _isEmptying = false;
+        });
+      }
     }
   }
 
@@ -557,6 +577,7 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
   }
 
   Future<void> _deleteSelectedItems() async {
+    if (_isBusy) return;
     final l10n = AppLocalizations.of(context)!;
     final keys = List<String>.from(_selectedPaths);
     final confirm = await BrowserLikeActionHandlers.showConfirmationDialog(
@@ -580,11 +601,11 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
       ),
     );
 
-    if (!confirm) return;
+    if (!confirm || !mounted || _isBusy) return;
 
     _clearSelection();
     setState(() {
-      _isLoading = true;
+      _isOperating = true;
     });
 
     try {
@@ -610,10 +631,10 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
         );
       }
 
-      await _loadTrashItems();
+      await _loadTrashItems(afterOperation: true);
     } catch (e) {
       setState(() {
-        _isLoading = false;
+        _isOperating = false;
         _errorCode = 'delete_items_error';
         _errorArgs = [e.toString()];
       });
@@ -789,7 +810,7 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
         const PopupMenuDivider(),
         PopupMenuItem<String>(
           value: 'empty',
-          enabled: _trashItems.isNotEmpty,
+          enabled: _trashItems.isNotEmpty && !_isBusy,
           child: Row(
             children: [
               Icon(
@@ -836,6 +857,7 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
   Widget _buildInlineSearchField(AppLocalizations l10n) {
     return SearchTextField(
       controller: _searchController,
+      focusNode: _searchFocusNode,
       autofocus: true,
       decoration: InputDecoration(
         hintText: l10n.search,
@@ -877,57 +899,98 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
   Widget build(BuildContext context) {
     return BlocProvider.value(
       value: _selectionBloc,
-      child: Scaffold(
-        backgroundColor: _isDesktop ? Colors.transparent : null,
-        appBar: _buildAppBar(AppLocalizations.of(context)!),
-        body: Stack(
-          alignment: Alignment.bottomCenter,
-          children: [
-            FileViewShell(
-              viewMode: _viewMode,
-              onViewScaleDelta: _handleViewScaleDelta,
-              onRefresh: _loadTrashItems,
-              onSelectAll: _trashItems.isNotEmpty ? _selectAll : null,
-              onDelete: ({required bool permanent}) async {
-                if (_selectionBloc.state.selectedFilePaths.isEmpty) {
-                  return;
-                }
-                await _deleteSelectedItems();
-              },
-              onSearch: _toggleSearch,
-              onEscape: _showSearch || _selectionBloc.state.selectedCount > 0
-                  ? _handleEscape
-                  : null,
-              child: _buildBody(),
-            ),
-            if (_isDesktop)
-              BlocSelector<
-                SelectionBloc,
-                SelectionState,
-                _TrashSelectionSummaryData
-              >(
-                selector: (state) => _TrashSelectionSummaryData(
-                  paths: state.selectedFilePaths.toList(),
-                  visible: state.selectedFilePaths.length > 1,
+      child: FileViewShell(
+        viewMode: _viewMode,
+        enableKeyboardShortcuts: !_isBusy,
+        onSearch: _openOrFocusSearch,
+        child: AbsorbPointer(
+          absorbing: _isBusy,
+          child: Scaffold(
+            backgroundColor: _isDesktop ? Colors.transparent : null,
+            appBar: _buildAppBar(AppLocalizations.of(context)!),
+            body: Stack(
+              alignment: Alignment.bottomCenter,
+              children: [
+                FileViewShell(
+                  viewMode: _viewMode,
+                  enableKeyboardShortcuts: !_isBusy,
+                  onViewScaleDelta: _handleViewScaleDelta,
+                  onRefresh: _loadTrashItems,
+                  onSelectAll: _trashItems.isNotEmpty ? _selectAll : null,
+                  onDelete: ({required bool permanent}) async {
+                    if (_selectionBloc.state.selectedFilePaths.isEmpty) {
+                      return;
+                    }
+                    await _deleteSelectedItems();
+                  },
+                  onEscape:
+                      _showSearch || _selectionBloc.state.selectedCount > 0
+                      ? _handleEscape
+                      : null,
+                  child: _buildBody(),
                 ),
-                builder: (context, selection) {
-                  if (!selection.visible) {
-                    return const SizedBox.shrink();
-                  }
-                  return Positioned(
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    child: SelectionSummaryTooltip(
-                      selectedFileCount: selection.paths.length,
-                      selectedFolderCount: 0,
-                      selectedFilePaths: selection.paths,
-                      selectedFolderPaths: const [],
+                if (_isDesktop)
+                  BlocSelector<
+                    SelectionBloc,
+                    SelectionState,
+                    _TrashSelectionSummaryData
+                  >(
+                    selector: (state) => _TrashSelectionSummaryData(
+                      paths: state.selectedFilePaths.toList(),
+                      visible: state.selectedFilePaths.length > 1,
                     ),
-                  );
-                },
-              ),
-          ],
+                    builder: (context, selection) {
+                      if (!selection.visible) {
+                        return const SizedBox.shrink();
+                      }
+                      return Positioned(
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        child: SelectionSummaryTooltip(
+                          selectedFileCount: selection.paths.length,
+                          selectedFolderCount: 0,
+                          selectedFilePaths: selection.paths,
+                          selectedFolderPaths: const [],
+                        ),
+                      );
+                    },
+                  ),
+                if (_isBusy)
+                  Positioned.fill(
+                    child: BlockSemantics(
+                      child: ColoredBox(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.surface.withValues(alpha: 0.85),
+                        child: Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              CircularProgressIndicator(
+                                semanticsLabel: _isEmptying
+                                    ? AppLocalizations.of(
+                                        context,
+                                      )!.emptyingTrash
+                                    : AppLocalizations.of(context)!.processing,
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                _isEmptying
+                                    ? AppLocalizations.of(
+                                        context,
+                                      )!.emptyingTrash
+                                    : AppLocalizations.of(context)!.processing,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -950,6 +1013,11 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
         _showSearch = true;
       });
     }
+  }
+
+  void _openOrFocusSearch() {
+    if (!_showSearch) setState(() => _showSearch = true);
+    _searchFocusNode.requestFocus();
   }
 
   String _getErrorMessage(AppLocalizations l10n) {
@@ -981,13 +1049,6 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
 
   Widget _buildBody() {
     final l10n = AppLocalizations.of(context)!;
-
-    // Note: the legacy `_isLoading && _trashItems.isEmpty` branch was
-    // removed — `_loadTrashItems` now flips `_isLoading` to false
-    // immediately and the streaming branch below renders the skeleton
-    // while `_isStreaming && _trashItems.isEmpty`. Keeping both branches
-    // briefly stacked two skeletons on top of each other during the
-    // initial frame.
 
     if (_errorCode != null) {
       return Center(

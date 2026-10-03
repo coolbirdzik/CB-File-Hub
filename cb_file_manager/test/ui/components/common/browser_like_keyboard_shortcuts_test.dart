@@ -166,7 +166,44 @@ void main() {
     expect(renames, 0);
   });
 
-  testWidgets('typing in a text field is never a shortcut', (tester) async {
+  testWidgets(
+    'Ctrl+F works while editing and leaves other text shortcuts alone',
+    (tester) async {
+      final focusNode = FocusNode();
+      addTearDown(focusNode.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: TextField(focusNode: focusNode, autofocus: true),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(focusNode.hasFocus, isTrue);
+      var searches = 0;
+      final result = await _press(
+        tester,
+        LogicalKeyboardKey.keyF,
+        holding: const [LogicalKeyboardKey.controlLeft],
+        onSearch: () => searches++,
+      );
+      expect(result, KeyEventResult.handled);
+      expect(searches, 1);
+      final selectAllResult = await _press(
+        tester,
+        LogicalKeyboardKey.keyA,
+        holding: const [LogicalKeyboardKey.controlLeft],
+        onSelectAll: () =>
+            fail('file selection must not run during text editing'),
+      );
+      expect(selectAllResult, KeyEventResult.ignored);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+
+  testWidgets('typing in a text field does not trigger file actions', (
+    tester,
+  ) async {
     final focusNode = FocusNode();
     addTearDown(focusNode.dispose);
 

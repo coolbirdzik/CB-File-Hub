@@ -76,6 +76,19 @@ class _FilePropertiesPaneState extends State<FilePropertiesPane> {
     }
   }
 
+  @override
+  void reassemble() {
+    super.reassemble();
+    _tags.removeListener(_changed);
+  }
+
+  // Older mounted panes registered this tear-off before tag updates moved to
+  // ListenableBuilder. Hot reload preserves those listeners, so keep the
+  // callback callable and detach it without rebuilding the surrounding panes.
+  void _changed() {
+    _tags.removeListener(_changed);
+  }
+
   void _select() {
     _paths = [...widget.filePaths, ...widget.folderPaths]..sort();
     _stat = _paths.length == 1 ? FileStat.stat(_paths.single) : null;
@@ -101,6 +114,7 @@ class _FilePropertiesPaneState extends State<FilePropertiesPane> {
   @override
   void dispose() {
     _generation++;
+    _tags.removeListener(_changed);
     if (widget.controller == null) _tags.dispose();
     super.dispose();
   }

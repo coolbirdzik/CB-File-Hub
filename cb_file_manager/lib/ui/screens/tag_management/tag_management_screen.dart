@@ -112,6 +112,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
 
   // Search functionality
   final SearchTextController _searchController = SearchTextController();
+  final _searchFocusNode = FocusNode(debugLabel: 'tag search');
   final TextEditingController _addressController = TextEditingController(
     text: '#tags',
   );
@@ -282,7 +283,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
       onSelectAll: browsingTags && _editingTag == null
           ? _selectAllFilteredTags
           : null,
-      onSearch: browsingTags ? _toggleSearch : null,
+      onSearch: browsingTags ? _openOrFocusSearch : null,
       onRename: renameTarget == null
           ? null
           : () {
@@ -524,6 +525,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     HardwareKeyboard.instance.removeHandler(_onKeyEvent);
     _searchController.removeQueryListener(_filterTags);
     _searchController.dispose();
+    _searchFocusNode.dispose();
     _addressController.dispose();
     _dragSelectionRect.dispose();
     _editingTagController?.dispose();
@@ -1774,6 +1776,11 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     });
   }
 
+  void _openOrFocusSearch() {
+    if (!_isSearching) setState(() => _isSearching = true);
+    _searchFocusNode.requestFocus();
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -1832,6 +1839,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                       Expanded(
                         child: SearchTextField(
                           controller: _searchController,
+                          focusNode: _searchFocusNode,
                           autofocus: true,
                           textInputAction: TextInputAction.search,
                           style: TextStyle(color: theme.colorScheme.onSurface),

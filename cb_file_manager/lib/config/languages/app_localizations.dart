@@ -846,6 +846,7 @@ abstract class AppLocalizations {
 
   // Trash / Recycle Bin screen
   String get emptyTrash;
+  String get emptyingTrash;
   String get emptyTrashConfirm;
   String get emptyTrashButton;
   String permanentlyDeleteItemsTitle(int count);

@@ -2240,6 +2240,8 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get emptyTrash => 'Làm trống thùng rác';
   @override
+  String get emptyingTrash => 'Đang dọn thùng rác…';
+  @override
   String get emptyTrashConfirm =>
       'Bạn có chắc chắn muốn xóa vĩnh viễn tất cả mục trong thùng rác? Hành động này không thể hoàn tác.';
   @override

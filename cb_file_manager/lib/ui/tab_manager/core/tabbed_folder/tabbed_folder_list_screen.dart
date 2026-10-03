@@ -91,12 +91,14 @@ class SplitPaneAppBarData {
   final List<Widget> actions;
   final bool isSelectionMode;
   final Widget? selectionAppBar;
+  final VoidCallback? onSearch;
 
   const SplitPaneAppBarData({
     required this.titleWidget,
     required this.actions,
     this.isSelectionMode = false,
     this.selectionAppBar,
+    this.onSearch,
   });
 }
 
@@ -132,6 +134,7 @@ class TabbedFolderListScreen extends StatefulWidget {
 class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
     with PreferencesManagerMixin {
   late TextEditingController _searchController;
+  final _searchFocusNode = FocusNode(debugLabel: 'folder search');
   late TextEditingController _tagController;
   late TextEditingController _pathController;
   String? _currentFilter;
@@ -452,6 +455,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
   void dispose() {
     // Clean up resources
     _searchController.dispose();
+    _searchFocusNode.dispose();
     _tagController.dispose();
     _pathController.dispose();
     _folderListBloc.close();
@@ -944,6 +948,11 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
     await _showSearchTip(context);
   }
 
+  void _openOrFocusSearch() {
+    if (!_showSearchBar) setState(() => _showSearchBar = true);
+    _searchFocusNode.requestFocus();
+  }
+
   void _navigateToPath(String path) {
     _navigationController.navigateToPath(
       context,
@@ -1417,6 +1426,12 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
           if (!TabFocusGate.isActiveTab(context)) {
             return KeyEventResult.ignored;
           }
+          final searchResult = BrowserLikeKeyboardShortcuts.handleSearch(
+            isDesktop: isDesktopPlatform,
+            event: event,
+            onSearch: _openOrFocusSearch,
+          );
+          if (searchResult != KeyEventResult.ignored) return searchResult;
           // Keys the focused preview pane didn't use (it only claims the
           // video player's) must not drive the list behind it.
           if (_keyboardController.previewFocusNode.hasFocus ||
@@ -1484,7 +1499,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
             onPaste: _handlePaste,
             onRename: _handleRename,
             onRefresh: _refreshFileList,
-            onSearch: () => unawaited(_toggleSearchBar(context)),
+            onSearch: _openOrFocusSearch,
             onScrollToIndex: _scrollToIndex,
             event: event,
           );
@@ -1627,6 +1642,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
           // FolderListBloc directly to avoid a context lookup failure.
           final titleWidget = _showSearchBar
               ? tab_components.SearchBar(
+                  focusNode: _searchFocusNode,
                   currentPath: _currentPath,
                   tabId: widget.tabId,
                   folderListBloc: _folderListBloc,
@@ -1659,6 +1675,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
                 );
           final newData = SplitPaneAppBarData(
             titleWidget: titleWidget,
+            onSearch: _openOrFocusSearch,
             actions: _getAppBarActions(),
             isSelectionMode:
                 selectionState.isSelectionMode && !isDesktopPlatform,
@@ -1694,6 +1711,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
               // In split mode, search bar is shown in shared bar above; suppress it here.
               showSearchBar: notifier != null ? false : _showSearchBar,
               searchBar: tab_components.SearchBar(
+                focusNode: _searchFocusNode,
                 currentPath: _currentPath,
                 tabId: widget.tabId,
                 onCloseSearch: () {

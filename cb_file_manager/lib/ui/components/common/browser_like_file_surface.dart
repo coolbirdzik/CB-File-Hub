@@ -75,7 +75,7 @@ class BrowserLikeFileSurface extends StatefulWidget {
   )?
   onKeyEvent;
 
-  /// `Ctrl+F` — open / toggle the search bar.
+  /// `Ctrl+F` — open the search bar or focus its existing input.
   final VoidCallback? onSearch;
 
   const BrowserLikeFileSurface({
@@ -141,14 +141,23 @@ class _BrowserLikeFileSurfaceState extends State<BrowserLikeFileSurface> {
   }
 
   KeyEventResult _handleKeyEvent(KeyEvent event) {
-    if (!widget.isDesktop ||
-        BrowserLikeKeyboardShortcuts.isTextInputFocused()) {
+    if (!widget.isDesktop) {
       return KeyEventResult.ignored;
     }
 
     // Hidden tabs stay mounted in the tab shell's IndexedStack, so a stale
     // focus must never run shortcuts against a view the user cannot see.
     if (!TabFocusGate.isActiveTab(context)) {
+      return KeyEventResult.ignored;
+    }
+
+    final searchResult = BrowserLikeKeyboardShortcuts.handleSearch(
+      isDesktop: widget.isDesktop,
+      event: event,
+      onSearch: widget.onSearch,
+    );
+    if (searchResult != KeyEventResult.ignored) return searchResult;
+    if (BrowserLikeKeyboardShortcuts.isTextInputFocused()) {
       return KeyEventResult.ignored;
     }
 

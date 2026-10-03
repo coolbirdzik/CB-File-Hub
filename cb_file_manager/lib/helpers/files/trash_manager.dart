@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import '../../utils/app_logger.dart';
 import 'recycle_bin_reader.dart' as direct_reader;
 import 'windows_file_operations.dart';
+import 'windows_recycle_bin.dart';
 
 const int defaultPermanentDeleteConcurrency = 8;
 
@@ -306,20 +307,19 @@ class TrashManager {
   }
 
   /// Empty the Windows Recycle Bin
-  Future<bool> emptyWindowsRecycleBin() async {
+  Future<bool> emptyWindowsRecycleBin({
+    void Function(String path, String error)? onError,
+  }) async {
     if (!Platform.isWindows) {
       return false;
     }
 
     try {
-      final result = await Process.run('powershell.exe', [
-        '-Command',
-        'Clear-RecycleBin -Force',
-      ]);
-
-      return result.exitCode == 0;
+      await emptyWindowsRecycleBinNative();
+      return true;
     } catch (e) {
       debugPrint('Error emptying Windows Recycle Bin: $e');
+      onError?.call('Windows Recycle Bin', e.toString());
       return false;
     }
   }
@@ -947,37 +947,66 @@ class TrashManager {
   }
 
   /// Empty the trash (delete all files)
-  Future<bool> emptyTrash() async {
+  Future<bool> emptyTrash({
+    void Function(String path, String error)? onError,
+  }) async {
     bool success = true;
 
     // Empty Windows Recycle Bin if on Windows
     if (Platform.isWindows) {
-      bool winSuccess = await emptyWindowsRecycleBin();
+      bool winSuccess = await emptyWindowsRecycleBin(onError: onError);
       if (!winSuccess) {
         success = false;
         debugPrint('Failed to empty Windows Recycle Bin');
       }
     }
 
-    // Also empty our internal trash
+    final internalSuccess = await emptyInternalTrash(onError: onError);
+    return success && internalSuccess;
+  }
+
+  /// Delete internal payloads, retaining metadata for anything that failed.
+  Future<bool> emptyInternalTrash({
+    void Function(String path, String error)? onError,
+  }) async {
+    var success = true;
     try {
       final trashDir = await getTrashDirectory();
-
-      // List all files in the trash directory
+      final metadataFile = File(pathlib.join(trashDir.path, metadataFileName));
+      final metadata = await metadataFile.exists()
+          ? Map<String, String>.from(
+              json.decode(await metadataFile.readAsString()),
+            )
+          : <String, String>{};
       final entities = await trashDir.list().toList();
-
-      // Delete all files except the metadata file
       for (final entity in entities) {
-        if (entity is File &&
-            pathlib.basename(entity.path) != metadataFileName) {
-          await entity.delete();
+        final name = pathlib.basename(entity.path);
+        if (name == metadataFileName) continue;
+        try {
+          await entity.delete(recursive: entity is Directory);
+          metadata.remove(name);
+        } catch (e) {
+          success = false;
+          debugPrint('Error emptying internal trash item ${entity.path}: $e');
+          onError?.call(entity.path, e.toString());
         }
       }
-
-      // Reset metadata
-      await saveMetadata({});
+      // Remove orphaned metadata too, but never forget surviving payloads.
+      for (final name in metadata.keys.toList()) {
+        if (await FileSystemEntity.type(
+              pathlib.join(trashDir.path, name),
+              followLinks: false,
+            ) ==
+            FileSystemEntityType.notFound) {
+          metadata.remove(name);
+        }
+      }
+      await File(
+        pathlib.join(trashDir.path, metadataFileName),
+      ).writeAsString(json.encode(metadata));
     } catch (e) {
       debugPrint('Error emptying internal trash: $e');
+      onError?.call(trashDirName, e.toString());
       success = false;
     }
 

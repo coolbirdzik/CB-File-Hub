@@ -71,6 +71,7 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
   final Map<int, Future<int>> _albumCountFutures = {};
   bool _isLoading = true;
   bool _showSearchBar = false;
+  final _searchFocusNode = FocusNode(debugLabel: 'album search');
   String _searchQuery = '';
   SortOption _sortOption = SortOption.nameAsc;
   int _gridZoomLevel = 3;
@@ -174,6 +175,11 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
 
   void _toggleSearchBar() => setState(() => _showSearchBar = !_showSearchBar);
 
+  void _openOrFocusSearch() {
+    if (!_showSearchBar) setState(() => _showSearchBar = true);
+    _searchFocusNode.requestFocus();
+  }
+
   void _closeSearchBar() => setState(() => _showSearchBar = false);
 
   void _setSearchQuery(String value) => setState(() => _searchQuery = value);
@@ -189,6 +195,7 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
 
   @override
   void dispose() {
+    _searchFocusNode.dispose();
     _view.removeListener(_onViewChanged);
     _view.dispose();
     _dragSelectionController.dispose();
@@ -783,7 +790,9 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
             onRefresh: _loadAlbums,
             showRefreshAction: false,
             showSearchBar: _showSearchBar,
+            onSearch: _openOrFocusSearch,
             searchBar: tab_components.SearchBar(
+              focusNode: _searchFocusNode,
               currentPath: widget.rootPath,
               tabId: widget.tabId,
               initialQuery: _searchQuery,

@@ -29,6 +29,7 @@ class LibraryHubScaffold extends StatefulWidget {
   final String? parentPath;
   final ViewMode viewMode;
   final VoidCallback? onEscape;
+  final VoidCallback? onSearch;
   final ValueChanged<int>? onViewScaleDelta;
   final bool enablePathEditing;
   final ValueChanged<String>? onPathSubmitted;
@@ -54,6 +55,7 @@ class LibraryHubScaffold extends StatefulWidget {
     this.parentPath,
     this.viewMode = ViewMode.grid,
     this.onEscape,
+    this.onSearch,
     this.onViewScaleDelta,
     this.enablePathEditing = false,
     this.onPathSubmitted,
@@ -114,6 +116,7 @@ class _LibraryHubScaffoldState extends State<LibraryHubScaffold> {
     return FileViewShell(
       viewMode: widget.viewMode,
       onEscape: widget.onEscape,
+      onSearch: widget.onSearch,
       onViewScaleDelta: widget.onViewScaleDelta,
       onMouseBack: () => tabs.backNavigationToPath(widget.tabId),
       onMouseForward: () => tabs.forwardNavigationToPath(widget.tabId),

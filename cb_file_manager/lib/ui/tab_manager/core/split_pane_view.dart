@@ -1,4 +1,7 @@
+import 'dart:io';
 import 'dart:ui';
+import 'package:cb_file_manager/ui/components/common/browser_like_keyboard_shortcuts.dart';
+import 'package:cb_file_manager/ui/tab_manager/core/tab_focus_gate.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cb_file_manager/ui/utils/fluent_background.dart';
@@ -185,7 +188,19 @@ class _SplitPaneViewState extends State<SplitPaneView> {
         return Column(
           children: [
             // Shared address bar — reflects the focused pane.
-            sharedBar,
+            Focus(
+              onKeyEvent: (_, event) => TabFocusGate.isActiveTab(context)
+                  ? BrowserLikeKeyboardShortcuts.handleSearch(
+                      isDesktop:
+                          Platform.isWindows ||
+                          Platform.isMacOS ||
+                          Platform.isLinux,
+                      event: event,
+                      onSearch: activeBar?.onSearch,
+                    )
+                  : KeyEventResult.ignored,
+              child: sharedBar,
+            ),
             // Pane row.
             Expanded(
               child: Row(

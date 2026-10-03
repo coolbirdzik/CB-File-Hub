@@ -88,6 +88,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
   ViewMode _viewMode = ViewMode.grid;
   String? _searchQuery;
   bool _showSearchBar = false;
+  final _searchFocusNode = FocusNode(debugLabel: 'album detail search');
   SortOption _sortOption = SortOption.nameAsc;
   bool _isShuffled = false;
   late UserPreferences _preferences;
@@ -152,6 +153,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
 
   @override
   void dispose() {
+    _searchFocusNode.dispose();
     _selectionBloc.close();
     _dragController.dispose();
     _collectionDragController.dispose();
@@ -847,6 +849,11 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
 
   void _toggleSearchBar() => setState(() => _showSearchBar = !_showSearchBar);
 
+  void _openOrFocusSearch() {
+    if (!_showSearchBar) setState(() => _showSearchBar = true);
+    _searchFocusNode.requestFocus();
+  }
+
   void _closeSearchBar() => setState(() => _showSearchBar = false);
 
   void _setSearchQuery(String value) {
@@ -1141,7 +1148,9 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
             onRefresh: _loadAlbumFiles,
             showRefreshAction: false,
             showSearchBar: _showSearchBar,
+            onSearch: _openOrFocusSearch,
             searchBar: tab_components.SearchBar(
+              focusNode: _searchFocusNode,
               currentPath: '#album/${widget.album.id}',
               tabId: widget.tabId,
               initialQuery: _searchQuery,

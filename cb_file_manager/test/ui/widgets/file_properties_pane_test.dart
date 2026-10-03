@@ -398,7 +398,7 @@ void main() {
   });
 
   testWidgets(
-    'docking properties preserves a tag draft when its contents change columns',
+    'hot reload and docking properties preserve a tag draft and stable layout',
     (tester) async {
       tester.view.physicalSize = const Size(1200, 800);
       tester.view.devicePixelRatio = 1;
@@ -444,6 +444,25 @@ void main() {
       final before = tester.state<ChipsInputState<String>>(
         find.byType(ChipsInput<String>),
       );
+      final paneBefore = tester.state(find.byType(FilePropertiesPane));
+      final reassembly = tester.binding.reassembleApplication();
+      await tester.pump();
+      await reassembly;
+      await settle(tester);
+      expect(
+        identical(tester.state(find.byType(FilePropertiesPane)), paneBefore),
+        isTrue,
+      );
+      expect(
+        identical(
+          tester.state<ChipsInputState<String>>(
+            find.byType(ChipsInput<String>),
+          ),
+          before,
+        ),
+        isTrue,
+      );
+      expect(before.controller.textWithoutReplacements, 'uncommitted');
       layout.update(
         layout.value.dock(
           FilePane.properties,

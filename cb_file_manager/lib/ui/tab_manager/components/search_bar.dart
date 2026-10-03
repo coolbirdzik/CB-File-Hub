@@ -30,6 +30,7 @@ class SearchBar extends StatefulWidget {
   final bool showGlobalSearchToggle;
   final bool showRegexToggle;
   final bool showClearButton;
+  final FocusNode? focusNode;
 
   /// Optional: provide the [FolderListBloc] directly so the widget works
   /// even when rendered outside its normal [BlocProvider] subtree
@@ -54,6 +55,7 @@ class SearchBar extends StatefulWidget {
     this.showGlobalSearchToggle = true,
     this.showRegexToggle = true,
     this.showClearButton = true,
+    this.focusNode,
   });
 
   @override
@@ -62,7 +64,9 @@ class SearchBar extends StatefulWidget {
 
 class _SearchBarState extends State<SearchBar> {
   final SearchTextController _searchController = SearchTextController();
-  final FocusNode _searchFocusNode = FocusNode();
+  final FocusNode _internalSearchFocusNode = FocusNode();
+  FocusNode get _searchFocusNode =>
+      widget.focusNode ?? _internalSearchFocusNode;
   final LayerLink _suggestionsLink = LayerLink();
   final Object _tapRegionGroupId = Object();
   final _suggestionsRequest = SearchRequestGuard();
@@ -108,6 +112,12 @@ class _SearchBarState extends State<SearchBar> {
   @override
   void didUpdateWidget(SearchBar oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.focusNode != widget.focusNode) {
+      (oldWidget.focusNode ?? _internalSearchFocusNode).removeListener(
+        _onSearchFocusChanged,
+      );
+      _searchFocusNode.addListener(_onSearchFocusChanged);
+    }
     if (oldWidget.tabId != widget.tabId ||
         oldWidget.currentPath != widget.currentPath) {
       _removeOverlay();
@@ -152,7 +162,7 @@ class _SearchBarState extends State<SearchBar> {
     _searchFocusNode.removeListener(_onSearchFocusChanged);
     _suggestionsRequest.dispose();
     _searchController.dispose();
-    _searchFocusNode.dispose();
+    _internalSearchFocusNode.dispose();
     super.dispose();
   }
 

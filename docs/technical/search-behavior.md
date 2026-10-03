@@ -5,6 +5,11 @@ filters. It supplies a transparent Material ancestor for the Fluent shell,
 a single line and the search keyboard action. Native text selection and
 editing shortcuts must remain intact.
 
+On desktop, Ctrl+F (Cmd+F on macOS) opens search and focuses its input. When
+search is already visible, the shortcut only restores input focus and keeps
+the query. Handle it before the text-input guard; other file shortcuts remain
+disabled while editing text. Toolbar search buttons may still toggle visibility.
+
 When listening to a controller, use `SearchTextController.addQueryListener`,
 not `TextEditingController.addListener`. Query listeners ignore selection-only
 changes and wait for IME composition to commit. Ordinary controller listeners

@@ -72,6 +72,7 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
   List<String> _activeSearchTags = const [];
   Set<String>? _tagMatchedPaths;
   bool _showSearchBar = false;
+  final _searchFocusNode = FocusNode(debugLabel: 'video library search');
   bool _useRegexSearch = false;
   bool _isSearchLoading = false;
   List<FileSystemEntity>? _liveSearchSource;
@@ -128,6 +129,7 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
 
   @override
   void dispose() {
+    _searchFocusNode.dispose();
     _tagRefreshDebounce?.cancel();
     _tagChanges?.cancel();
     _searchRequests.dispose();
@@ -485,6 +487,11 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
     });
   }
 
+  void _openOrFocusSearch() {
+    if (!_showSearchBar) setState(() => _showSearchBar = true);
+    _searchFocusNode.requestFocus();
+  }
+
   void _toggleSelectionMode() {
     _selectionBloc.add(const ToggleSelectionMode());
   }
@@ -528,6 +535,7 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
   }
 
   Widget _buildSearchBar(AppLocalizations l10n) => tab_components.SearchBar(
+    focusNode: _searchFocusNode,
     currentPath: '#video-library/${widget.library.id}',
     tabId: widget.tabId ?? '#video-library/${widget.library.id}',
     initialQuery: _searchQuery,
@@ -813,7 +821,7 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
                       : _showSearchBar
                       ? _closeSearchBar
                       : null,
-                  onSearch: _toggleSearchBar,
+                  onSearch: _openOrFocusSearch,
                   onSelectAll: () => _selectAllVisible(state),
                   onDelete: (keyboardController, permanent) =>
                       _handleDelete(keyboardController, permanent),

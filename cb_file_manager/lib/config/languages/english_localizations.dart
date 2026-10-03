@@ -2242,6 +2242,8 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get emptyTrash => 'Empty Trash';
   @override
+  String get emptyingTrash => 'Emptying trash…';
+  @override
   String get emptyTrashConfirm =>
       'Are you sure you want to permanently delete all items in the trash? This action cannot be undone.';
   @override
