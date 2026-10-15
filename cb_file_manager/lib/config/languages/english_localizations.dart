@@ -3568,6 +3568,35 @@ class EnglishLocalizations implements AppLocalizations {
   String get diskCleanerCleanDone => 'Cleanup complete';
   @override
   String get diskCleanerAskAgent => 'Ask CB Agent';
+
+  @override
+  String get diskCleanerSuggestAndSelect => 'Suggest & select';
+
+  @override
+  String get diskCleanerAiSelectRecommendationsRequest =>
+      'Interact directly with my completed scan. Inspect a few important '
+      'files/folders one at a time using inspect_cleaner_scan_item so I can '
+      'see which row you are examining. Then use set_cleaner_scan_item_analysis '
+      'to explain whether to clean, review or keep each item on this screen. '
+      'Use select:true for recommended CLEAN items. Leave REVIEW and KEEP '
+      'unchecked. Use the latest scan_id returned by each interaction. '
+      'Do not delete any files. Answer in English.';
+  @override
+  String get diskCleanerAgentAnalysisTitle => 'CB Agent analysis';
+  @override
+  String get diskCleanerAgentInspecting => 'CB Agent is examining this item';
+  @override
+  String get diskCleanerAgentCanClean => 'Can clean';
+  @override
+  String get diskCleanerAgentNeedsReview => 'Review first';
+  @override
+  String get diskCleanerAgentKeep => 'Keep';
+  @override
+  String get diskCleanerAiInspectItemRequest =>
+      'Read get_current_cleaner_scan, then inspect this exact path using '
+      'inspect_cleaner_scan_item and show your assessment on the scan screen '
+      'using set_cleaner_scan_item_analysis with select:false. Explain whether '
+      'to clean, review or keep it. Answer in English.';
   @override
   String get diskCleanerMoveToRecycleBin => 'Move to Recycle Bin';
   @override

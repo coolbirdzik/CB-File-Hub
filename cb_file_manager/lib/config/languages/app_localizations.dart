@@ -1543,6 +1543,14 @@ abstract class AppLocalizations {
   String get diskCleanerCleanTitle;
   String get diskCleanerCleanDone;
   String get diskCleanerAskAgent;
+  String get diskCleanerSuggestAndSelect;
+  String get diskCleanerAiSelectRecommendationsRequest;
+  String get diskCleanerAiInspectItemRequest;
+  String get diskCleanerAgentAnalysisTitle;
+  String get diskCleanerAgentInspecting;
+  String get diskCleanerAgentCanClean;
+  String get diskCleanerAgentNeedsReview;
+  String get diskCleanerAgentKeep;
   String get diskCleanerMoveToRecycleBin;
   String get diskCleanerPermanentDelete;
   String get diskCleanerSelectCategories;

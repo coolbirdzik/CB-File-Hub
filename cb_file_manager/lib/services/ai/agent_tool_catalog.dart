@@ -20,6 +20,24 @@ class AgentToolCatalog {
       'Read workflows and less common tools. Topics: files, tags, media, cleaner, app.',
       {'topic': 'string'},
     ),
+    'select_cleaner_scan_items': AgentToolSpec(
+      'Select recommended exact paths in the current Cleaner scan for user review. No deletion. Read get_current_cleaner_scan first for scan_id and paths. replace defaults to true; false adds to selection.',
+      {'scan_id': 'string', 'paths': 'strings', 'replace': 'bool?'},
+    ),
+    'inspect_cleaner_scan_item': AgentToolSpec(
+      'Interact with an existing Cleaner scan: reveal and highlight one exact row, update its chart and show that CB Agent is inspecting it. No cleanup checkbox changes. Returns evidence and the latest scan_id.',
+      {'scan_id': 'string', 'path': 'string'},
+    ),
+    'set_cleaner_scan_item_analysis': AgentToolSpec(
+      'After inspecting that item, show its CLEAN/REVIEW/KEEP assessment and concrete reason on the scan UI. select:true checks CLEAN junk for later user review, never deletes. Use the latest scan_id returned by the previous interaction.',
+      {
+        'scan_id': 'string',
+        'path': 'string',
+        'decision': 'string',
+        'reason': 'string',
+        'select': 'bool?',
+      },
+    ),
     'list_directory': AgentToolSpec(
       'List files/folders with exact size_bytes. Empty path lists drives. Follow next_cursor until null.',
       {

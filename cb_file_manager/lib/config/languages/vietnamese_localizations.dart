@@ -3562,6 +3562,35 @@ class VietnameseLocalizations implements AppLocalizations {
   String get diskCleanerCleanDone => 'Dọn xong';
   @override
   String get diskCleanerAskAgent => 'Hỏi CB Agent';
+
+  @override
+  String get diskCleanerSuggestAndSelect => 'Gợi ý và chọn';
+
+  @override
+  String get diskCleanerAiSelectRecommendationsRequest =>
+      'Tương tác trực tiếp với kết quả scan đã xong. Dùng '
+      'inspect_cleaner_scan_item để lần lượt xem một vài file/thư mục đáng '
+      'chú ý, cho tôi thấy dòng bạn đang xem. Sau đó dùng '
+      'set_cleaner_scan_item_analysis để hiện lý do nên dọn, cần xem lại hay '
+      'nên giữ ngay trên màn hình này. Dùng select:true cho các mục CLEAN '
+      'được đề xuất. Không chọn các mục REVIEW và KEEP. Dùng scan_id mới nhất '
+      'trả về từ mỗi thao tác. Không xóa file. Trả lời bằng tiếng Việt.';
+  @override
+  String get diskCleanerAgentAnalysisTitle => 'Phân tích của CB Agent';
+  @override
+  String get diskCleanerAgentInspecting => 'CB Agent đang xem mục này';
+  @override
+  String get diskCleanerAgentCanClean => 'Có thể dọn';
+  @override
+  String get diskCleanerAgentNeedsReview => 'Cần xem lại';
+  @override
+  String get diskCleanerAgentKeep => 'Nên giữ';
+  @override
+  String get diskCleanerAiInspectItemRequest =>
+      'Đọc get_current_cleaner_scan, sau đó dùng inspect_cleaner_scan_item '
+      'để xem đúng đường dẫn này và set_cleaner_scan_item_analysis với '
+      'select:false để hiện phân tích ngay trên màn hình scan. Giải thích '
+      'nên dọn, cần xem lại hay nên giữ. Trả lời bằng tiếng Việt.';
   @override
   String get diskCleanerMoveToRecycleBin => 'Chuyển vào Thùng Rác';
   @override

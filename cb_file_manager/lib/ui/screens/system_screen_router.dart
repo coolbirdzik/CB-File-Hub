@@ -127,7 +127,7 @@ class SystemScreenRouter {
             cacheKey: cacheKey,
           );
         }
-        return const CbAgentCleanerScreen();
+        return CbAgentCleanerScreen(tabId: tabId);
     }
 
     // 2. Handle dynamic paths

@@ -154,6 +154,11 @@ Supported tools:
 - `get_file_tags`: list tags attached to one file.
 - `list_all_tags`: list all known tags.
 - `search_content`: grep-like recursive search inside text files.
+- `select_cleaner_scan_items`: select exact paths from the current Cleaner scan for review, without deleting files. Read `get_current_cleaner_scan` first and pass its `scan_id`; `replace: false` adds to existing checked targets.
+
+After a fresh Disk usage scan, **Suggest & select** asks CB Agent to explain and check evidence-backed CLEAN candidates in the results tree. The tree reveals the selected rows and updates the selected size. REVIEW and KEEP items remain unchecked unless explicitly requested. Selection rejects stale scans, unknown paths, drive roots, and another tab's results. The user can adjust the checks, then use the existing review and cleanup confirmation controls.
+
+The interactive walkthrough uses `inspect_cleaner_scan_item` to expand, scroll to and highlight a real scanned row before analyzing it. `set_cleaner_scan_item_analysis` then displays a CLEAN/REVIEW/KEEP badge on that row and a reason in the adjacent CB Agent analysis pane. Assessments can be clicked to reveal their row again without changing checks. Only scanner-marked safe junk can be labelled CLEAN and automatically checked; focus alone never selects a cleanup target. Each interaction returns a fresh `scan_id` for the next step. Changing the scan invalidates earlier inspections and assessments. Completion, failure or Stop clears the live inspecting indicator.
 
 Tool execution is iterative. The agent can call tools, receive tool results, and continue for up to `ToolExecutor.maxToolCalls` rounds before it must produce a final answer.
 

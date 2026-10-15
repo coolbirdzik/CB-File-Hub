@@ -6,6 +6,7 @@ import '../../helpers/files/trash_manager.dart';
 import '../../utils/app_logger.dart';
 import '../album_service.dart';
 import '../disk_cleaner/cleaner_categories.dart';
+import '../disk_cleaner/cleaner_agent_review.dart';
 import '../disk_cleaner/cleaner_models.dart';
 import '../disk_cleaner/disk_cleaner_service.dart';
 import '../disk_cleaner/disk_tree_node.dart';
@@ -415,6 +416,15 @@ class ToolExecutor {
           return _getPendingCleanupReview(call.arguments);
         case 'get_current_cleaner_scan':
           return _getCurrentCleanerScan(call.arguments);
+        case 'select_cleaner_scan_items':
+          return _selectCleanerScanItems(call.arguments);
+        case 'inspect_cleaner_scan_item':
+          return _interactWithCleanerScanItem(call.arguments, inspecting: true);
+        case 'set_cleaner_scan_item_analysis':
+          return _interactWithCleanerScanItem(
+            call.arguments,
+            inspecting: false,
+          );
         case 'get_current_app_storage':
           return _getCurrentAppStorage(call.arguments);
         default:
@@ -1285,6 +1295,95 @@ class ToolExecutor {
     );
   }
 
+  ToolResult _interactWithCleanerScanItem(
+    Map<String, dynamic> args, {
+    required bool inspecting,
+  }) {
+    final toolName = inspecting
+        ? 'inspect_cleaner_scan_item'
+        : 'set_cleaner_scan_item_analysis';
+    CleanerItemAnalysis? analysis;
+    if (!inspecting) {
+      final decision = switch ((args['decision'] as String).toLowerCase()) {
+        'clean' => CleanerItemDecision.clean,
+        'review' => CleanerItemDecision.review,
+        'keep' => CleanerItemDecision.keep,
+        _ => null,
+      };
+      if (decision == null) {
+        return ToolResult(
+          toolName: toolName,
+          success: false,
+          output: jsonEncode({
+            'ok': false,
+            'error': 'decision must be CLEAN, REVIEW or KEEP.',
+          }),
+        );
+      }
+      analysis = CleanerItemAnalysis(
+        decision: decision,
+        reason: args['reason'] as String,
+        selectForCleanup: args['select'] as bool? ?? false,
+      );
+    }
+    final result = DiskCleanerService.instance.interactWithCleanerScanItem(
+      ownerTabId: ownerTabId,
+      scanId: args['scan_id'] as String,
+      path: args['path'] as String,
+      analysis: analysis,
+    );
+    final node = result.node;
+    return ToolResult(
+      toolName: toolName,
+      success: result.error == null,
+      output: jsonEncode({
+        'ok': result.error == null,
+        if (result.error != null) 'error': result.error,
+        if (node != null) ...{
+          'scan_id': result.scanId,
+          'path': node.fullPath,
+          'size_bytes': node.sizeBytes,
+          'type': node.isFile ? 'file' : 'folder',
+          'evidence': _formatSpaceConsumer(node),
+          'selected_for_cleanup': node.isSelectedForDeletion,
+          if (analysis != null)
+            'decision': analysis.decision.name.toUpperCase(),
+          'message': inspecting
+              ? 'Item revealed on the scan UI. Read this evidence, then call set_cleaner_scan_item_analysis with this latest scan_id. Do not infer deletion safety from size alone.'
+              : 'Analysis displayed on the scan UI. No files deleted. Use this latest scan_id for the next interaction.',
+        },
+      }),
+    );
+  }
+
+  ToolResult _selectCleanerScanItems(Map<String, dynamic> args) {
+    final result = DiskCleanerService.instance.selectCleanerScanItems(
+      ownerTabId: ownerTabId,
+      scanId: args['scan_id'] as String,
+      paths: (args['paths'] as List).cast<String>(),
+      replace: args['replace'] as bool? ?? true,
+    );
+    return ToolResult(
+      toolName: 'select_cleaner_scan_items',
+      success: result.error == null,
+      output: jsonEncode({
+        'ok': result.error == null,
+        if (result.error != null) 'error': result.error,
+        if (result.error == null) ...{
+          'selected_paths': result.selected
+              .map((node) => node.fullPath)
+              .toList(),
+          'selected_bytes': result.selected.fold<int>(
+            0,
+            (sum, node) => sum + node.sizeBytes,
+          ),
+          'message':
+              'Selected in scan results for review. No files deleted. The user must review and confirm cleanup in the Cleaner UI.',
+        },
+      }),
+    );
+  }
+
   ToolResult _getCurrentCleanerScan(Map<String, dynamic> args) {
     final service = DiskCleanerService.instance;
     final context = service.getCleanerScanContext(ownerTabId: ownerTabId);
@@ -1351,6 +1450,13 @@ class ToolExecutor {
           : 'CURRENT CLEANER SCAN',
     );
     buffer.writeln('Owner tab: ${context.ownerTabId}');
+    buffer.writeln('scan_id: ${context.scanId}');
+    buffer.writeln(
+      'Interactive review available: ${!context.isScanning && !context.isCached && context.reviewItem != null}',
+    );
+    buffer.writeln(
+      'Selection available: ${!context.isScanning && !context.isCached && context.selectTargets != null}',
+    );
     buffer.writeln('Context published: ${context.updatedAt.toIso8601String()}');
     buffer.writeln(
       'Status: ${context.isCached
@@ -1433,7 +1539,14 @@ class ToolExecutor {
       'RESPONSE REQUIREMENT: Answer with a readable ranked report, '
       'not JSON. Explain what each item belongs to and label it CLEAN, REVIEW, '
       'or KEEP with a reason. Do not call clean_disk_junk for an analysis or '
-      'recommendation request.',
+      'recommendation request. When asked to select recommendations, call '
+      'select_cleaner_scan_items with this exact scan_id and scanned paths. '
+      'For an interactive review, inspect_cleaner_scan_item one item at a time '
+      'to reveal it, then set_cleaner_scan_item_analysis with a concrete reason '
+      'and select:true only for CLEAN candidates when selection was requested. '
+      'Use the latest scan_id returned by each interaction. '
+      'Select CLEAN candidates; leave REVIEW/KEEP items unchecked unless the '
+      'user explicitly requests them. Selection alone does not delete anything.',
     );
 
     return ToolResult(
