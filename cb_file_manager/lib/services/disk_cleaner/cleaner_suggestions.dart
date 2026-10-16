@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'dart:isolate';
 
+import 'package:path/path.dart' as p;
+
 import 'cleaner_categories.dart';
 import 'cleaner_models.dart';
 import 'cleaner_space_insights.dart';
@@ -650,7 +652,7 @@ class CleanerSuggestionScanner {
         }
         if (entity is! File) continue;
         final extension = CleanerSpaceInsights.extensionOf(
-          entity.path.substring(entity.path.lastIndexOf(r'\') + 1),
+          p.basename(entity.path),
         );
         if (!downloadsExtensions.contains(extension)) continue;
         try {

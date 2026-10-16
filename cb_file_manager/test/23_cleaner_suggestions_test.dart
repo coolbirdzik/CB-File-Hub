@@ -6,6 +6,7 @@ import 'package:cb_file_manager/services/disk_cleaner/cleaner_suggestions.dart';
 import 'package:cb_file_manager/services/disk_cleaner/disk_cleaner_isolate.dart';
 import 'package:cb_file_manager/services/disk_cleaner/disk_tree_node.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:path/path.dart' as p;
 
 const _mb = 1024 * 1024;
 const _gb = 1024 * _mb;
@@ -84,7 +85,8 @@ void main() {
     tearDown(() => temp.deleteSync(recursive: true));
 
     File write(String relative, int bytes, DateTime modified) {
-      final file = File('${temp.path}\\$relative')..createSync(recursive: true);
+      final file = File(p.join(temp.path, relative))
+        ..createSync(recursive: true);
       final raf = file.openSync(mode: FileMode.write);
       raf.truncateSync(bytes);
       raf.closeSync();
@@ -96,17 +98,17 @@ void main() {
       final old = DateTime.now().subtract(const Duration(days: 90));
       final recent = DateTime.now().subtract(const Duration(days: 2));
       write('setup.exe', 20 * _mb, old);
-      write(r'tools\driver.zip', 8 * _mb, old);
+      write(p.join('tools', 'driver.zip'), 8 * _mb, old);
       write('fresh.iso', 50 * _mb, recent);
       write('tiny.msi', 1 * _mb, old);
       write('report.docx', 40 * _mb, old);
-      write(r'a\b\deep.zip', 40 * _mb, old);
+      write(p.join('a', 'b', 'deep.zip'), 40 * _mb, old);
 
       final items = CleanerSuggestionScanner.listDownloadsLeftovers(
         temp.path,
         DateTime.now().subtract(CleanerSuggestionScanner.downloadsMinAge),
       );
-      final names = items.map((i) => i.path.split(r'\').last).toSet();
+      final names = items.map((i) => p.basename(i.path)).toSet();
 
       expect(names, {'setup.exe', 'driver.zip'});
       expect(items.every((item) => item.isUserSelected), isTrue);
@@ -196,9 +198,13 @@ void main() {
         );
         return _junkReport();
       },
-      // Profile without a Downloads folder, and no system drive match, so
-      // the test never reads the real hiberfil.sys or Windows.old.
-      environment: {'USERPROFILE': temp.path, 'SystemDrive': 'Z:'},
+      // Model a Windows profile on the scanned drive even on a Linux host.
+      // This unique, missing profile has no Downloads folder; system checks
+      // also avoid the host's real hiberfil.sys and Windows.old.
+      environment: {
+        'USERPROFILE': p.windows.join(r'C:\', p.basename(temp.path)),
+        'SystemDrive': 'Z:',
+      },
     );
 
     final report = await scanner.scan(
@@ -230,11 +236,42 @@ void main() {
     expect(last.sourceBytes['windows_temp'], 300 * _mb);
     expect(last.sourceBytes['windows_update_cache'], 900 * _mb);
     expect(last.sources, contains(CleanerSuggestionSource.diskScan));
+    expect(last.sources, contains(CleanerSuggestionSource.downloads));
+    expect(last.sourceBytes[CleanerSuggestionSource.downloads], 0);
+    expect(report.errors, isEmpty);
     expect(report.usedDiskScan, isTrue);
     expect(report.suggestions.first.tier, CleanerSuggestionTier.clean);
     expect(report.suggestions.last.tier, CleanerSuggestionTier.review);
     expect(report.reclaimableBytes, 1400 * _mb);
   });
+
+  test(
+    'scan skips Downloads when the profile belongs to another drive',
+    () async {
+      final updates = <CleanerSuggestionProgress>[];
+      final scanner = CleanerSuggestionScanner(
+        scanJunk: (_, _, _) async => _junkReport(),
+        environment: {'USERPROFILE': r'Z:\Users\Tester', 'SystemDrive': 'Z:'},
+      );
+      final report = await scanner.scan(
+        drivePath: r'C:\',
+        diskTree: _node(r'C:'),
+        onProgress: updates.add,
+      );
+
+      expect(updates.map((u) => u.step).toSet(), {
+        CleanerSuggestionStep.junk,
+        CleanerSuggestionStep.system,
+        CleanerSuggestionStep.diskScan,
+      });
+      expect(
+        updates.last.sources,
+        isNot(contains(CleanerSuggestionSource.downloads)),
+      );
+      expect(updates.last.fraction, closeTo(1, 0.0001));
+      expect(report.errors, isEmpty);
+    },
+  );
 
   test('disk-tree suggestions leave the UI event loop responsive', () async {
     final tree = _node(
