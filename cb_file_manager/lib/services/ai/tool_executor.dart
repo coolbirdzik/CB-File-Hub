@@ -77,6 +77,17 @@ class ToolExecutor {
   ToolCall prepareCall(ToolCall call) {
     final normalized = normalizeCall(call);
     final args = Map<String, dynamic>.from(normalized.arguments);
+    // These paths identify rows in an existing scan, not files relative to
+    // the agent's working directory. A Windows scan can also be inspected
+    // on a non-Windows host (for example in unit tests).
+    if (const {
+      'explore_cleaner_scan',
+      'select_cleaner_scan_items',
+      'inspect_cleaner_scan_item',
+      'set_cleaner_scan_item_analysis',
+    }.contains(normalized.name)) {
+      return normalized;
+    }
     // Freeze exact resolved targets before approval. Empty list_directory path
     // explicitly means drive discovery; omitted path means the current folder.
     for (final key in ['path', 'source', 'destination', 'working_directory']) {

@@ -7,7 +7,7 @@
 #   just e2e Navigation           # run one E2E suite
 #   just e2e                      # all E2E suites (single process)
 #   just e2e-parallel             # all E2E suites (parallel + dashboard)
-#   just analyze                  # analyze code
+#   just analyze                  # CI checks: format, analyze, unit/widget tests
 #   just format                   # format code
 
 # Shell config: use bash on all platforms
@@ -78,8 +78,12 @@ deep-clean:
     rm -rf {{project_dir}}/ios/Flutter/Flutter.framework 2>/dev/null || true
     rm -rf {{project_dir}}/ios/Flutter/Flutter.podspec 2>/dev/null || true
 
-# Analyze code
+# Run the same checks as the CI analyze job (no E2E)
 analyze:
+    bash scripts/check_quality.sh {{flutter}}
+
+# Static analysis only
+lint:
     cd {{project_dir}} && {{flutter}} analyze
 
 # Format code

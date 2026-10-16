@@ -190,6 +190,14 @@ void main() {
     service.publishCleanerScanContext(ownerTabId: tabId, root: root);
     final executor = ToolExecutor(ownerTabId: tabId);
 
+    // Empty scope means the scan root even when no agent working directory
+    // exists; it must not be resolved as a live filesystem path.
+    final wholeScan = await executor.execute(
+      const ToolCall(name: 'explore_cleaner_scan', arguments: {'path': ''}),
+    );
+    expect(wholeScan.success, isTrue);
+    expect(wholeScan.output, contains('Path: ${root.fullPath}'));
+
     final explore = await executor.execute(
       const ToolCall(
         name: 'explore_cleaner_scan',

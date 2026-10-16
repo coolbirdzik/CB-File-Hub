@@ -255,7 +255,7 @@ void main() {
 
   for (final useLocal in [false, true]) {
     test(
-      '48 Cleaner groups need six bounded requests (${useLocal ? 'local' : 'remote'})',
+      '48 unknown Cleaner groups limit AI to 24 and explain the rest from metadata (${useLocal ? 'local' : 'remote'})',
       () async {
         const owner = 'batch-speed-harness';
         final cleaner = DiskCleanerService.instance;
@@ -265,7 +265,12 @@ void main() {
           fullPath: r'C:\',
           children: List.generate(
             48,
-            (i) => DiskTreeNode(name: 'scope$i', fullPath: 'C:\\scope$i'),
+            (i) => DiskTreeNode(
+              name: 'data.unknown',
+              fullPath: 'C:\\scope$i\\data.unknown',
+              isFile: true,
+              sizeBytes: 48 - i,
+            ),
           ),
         );
         var focuses = 0;
@@ -327,15 +332,25 @@ void main() {
         );
         await until(() => requestedBatches.isNotEmpty && !bloc.state.isLoading);
         expect(bloc.state.error, isNull);
-        expect(requestedBatches, hasLength(6));
+        expect(requestedBatches, hasLength(3));
         expect(requestedBatches.every((batch) => batch.length == 8), isTrue);
         expect(
           requestedBatches.expand((batch) => batch).toSet(),
-          hasLength(48),
+          hasLength(24),
         );
-        expect(focuses, 6);
+        expect(focuses, 4); // One metadata batch and three AI batches.
         expect(acceptedGroups, 48);
-        expect(cleaner.fullCleanerReview(owner)!.isComplete, isTrue);
+        final review = cleaner.fullCleanerReview(owner)!;
+        expect(review.isComplete, isTrue);
+        expect(review.groups.where((g) => g.analysis!.fromScan), hasLength(24));
+        expect(
+          review.groups.where((g) => !g.analysis!.fromScan).map((g) => g.scope),
+          List.generate(24, (i) => 'C:\\scope$i'),
+        );
+        expect(
+          review.groups.every((g) => !g.analysis!.selectForCleanup),
+          isTrue,
+        );
         expect(tools.calls, isEmpty);
       },
     );
@@ -347,12 +362,21 @@ void main() {
         const owner = 'stop-review-harness';
         final cleaner = DiskCleanerService.instance;
         tools = _Tools(tags, ownerTabId: owner);
-        final first = DiskTreeNode(name: 'first', fullPath: r'C:\first');
-        final second = DiskTreeNode(name: 'second', fullPath: r'C:\second');
+        final files = List.generate(
+          9,
+          (i) => DiskTreeNode(
+            name: 'data.unknown',
+            fullPath: 'C:\\scope$i\\data.unknown',
+            isFile: true,
+            sizeBytes: 9 - i,
+          ),
+        );
+        final first = files.first;
+        final second = files.last;
         final root = DiskTreeNode(
           name: 'C:',
           fullPath: r'C:\',
-          children: [first, second],
+          children: files,
         );
         final assessed = <String>[];
         final focused = <String>[];
@@ -403,14 +427,14 @@ void main() {
         bloc.add(
           const SendMessage('Review all', reviewEntireCleanerScan: true),
         );
-        await waiting.future;
+        await until(() => waiting.isCompleted);
         bloc.add(const StopGeneration());
         await until(() => !bloc.state.isLoading);
         final review = cleaner.fullCleanerReview(owner)!;
-        expect(review.reviewed, 1);
+        expect(review.reviewed, 8);
         expect(review.next, same(second));
         expect(tools.calls, isEmpty);
-        expect(focused, [first.fullPath]);
+        expect(focused, [first.fullPath, second.fullPath]);
         final original = bloc.state.messages.firstWhere(
           (m) => m.role == AiMessageRole.user,
         );
@@ -424,13 +448,13 @@ void main() {
         expect(bloc.state.error, isNull);
         expect(cleaner.fullCleanerReview(owner), same(review));
         expect(review.isComplete, isTrue);
-        expect(assessed, [first.fullPath, second.fullPath]);
+        expect(assessed, files.map((n) => n.fullPath));
         expect(tools.calls, isEmpty);
-        expect(focused, [first.fullPath, second.fullPath]);
+        expect(focused, [first.fullPath, second.fullPath, second.fullPath]);
       },
     );
 
-    test('full Cleaner review batches all groups and repairs early summaries '
+    test('quick Cleaner overview replaces early summaries with metadata advice '
         '(${useLocal ? 'local' : 'remote'})', () async {
       const owner = 'full-review-harness';
       final cleaner = DiskCleanerService.instance;
@@ -480,7 +504,8 @@ void main() {
       var round = 0;
       String respond() {
         round++;
-        // Even several apparently final answers cannot finish a partial review.
+        // Unsupported final answers get conservative scan advice, without
+        // repeated model requests or claiming the AI reviewed the data.
         if (round <= 3) return 'Review finished.';
         final review = cleaner.fullCleanerReview(owner)!;
         return jsonEncode({
@@ -510,85 +535,95 @@ void main() {
       );
       await until(() => round > 0 && !bloc.state.isLoading);
       expect(bloc.state.error, isNull);
-      expect(assessed, [
-        folder.fullPath,
-        ...files.map((f) => f.fullPath),
-        ...root.children.skip(1).map((n) => n.fullPath),
-      ]);
+      expect(
+        assessed,
+        unorderedEquals([
+          folder.fullPath,
+          ...files.map((f) => f.fullPath),
+          ...root.children.skip(1).map((n) => n.fullPath),
+        ]),
+      );
       expect(cleaner.fullCleanerReview(owner)!.remaining, 0);
-      expect(round, 8); // Failed batches shrink; healthy batches stay batched.
-      expect(bloc.state.messages.last.content, contains('38 / 38'));
+      expect(round, 1);
+      expect(
+        bloc.state.messages.last.content,
+        contains('Quick overview ready'),
+      );
+      expect(
+        bloc.state.messages.last.content,
+        contains('0 with AI recommendations'),
+      );
+      expect(
+        cleaner
+            .fullCleanerReview(owner)!
+            .groups
+            .every(
+              (g) => g.analysis!.fromScan && !g.analysis!.selectForCleanup,
+            ),
+        isTrue,
+      );
       expect(
         tools.calls.every((c) => !ToolExecutor.dangerousTools.contains(c.name)),
         isTrue,
       );
     });
 
-    test(
-      'full Cleaner review keeps invalid responses pending with explicit REVIEW '
-      '(${useLocal ? 'local' : 'remote'})',
-      () async {
-        const owner = 'stalled-review-harness';
-        final cleaner = DiskCleanerService.instance;
-        tools = _Tools(tags, ownerTabId: owner);
-        cleaner.publishCleanerScanContext(
-          ownerTabId: owner,
-          root: DiskTreeNode(
-            name: 'C:',
-            fullPath: r'C:\',
-            children: [DiskTreeNode(name: 'data', fullPath: r'C:\data')],
-          ),
-          reviewItem: (_, _) => true,
-          reviewGroup: (_, _) => true,
-        );
-        addTearDown(() => cleaner.clearCleanerScanContext(owner));
-        var round = 0;
-        var recover = false;
-        String respond() {
-          round++;
-          if (recover) {
-            return jsonEncode({
-              'group_id': cleaner.fullCleanerReview(owner)!.groups.single.id,
-              'decision': 'KEEP',
-              'reason': 'User data without disposable evidence.',
-            });
-          }
-          return 'Done.';
-        }
+    test('quick Cleaner overview explains known folders without calling AI '
+        '(${useLocal ? 'local' : 'remote'})', () async {
+      const owner = 'stalled-review-harness';
+      final cleaner = DiskCleanerService.instance;
+      tools = _Tools(tags, ownerTabId: owner);
+      cleaner.publishCleanerScanContext(
+        ownerTabId: owner,
+        root: DiskTreeNode(
+          name: 'C:',
+          fullPath: r'C:\',
+          children: [DiskTreeNode(name: 'data', fullPath: r'C:\data')],
+        ),
+        reviewItem: (_, _) => true,
+        reviewGroup: (_, _) => true,
+      );
+      addTearDown(() => cleaner.clearCleanerScanContext(owner));
+      var round = 0;
+      String respond() {
+        round++;
+        return 'Done.';
+      }
 
-        final bloc = useLocal
-            ? await local(_Runtime([], respond: respond))
-            : AiAgentBloc(
-                providerService: _Remote([], respond: respond),
-                toolExecutor: tools,
-              );
-        if (!useLocal) addTearDown(bloc.close);
-        bloc.add(
-          const SendMessage('Review all', reviewEntireCleanerScan: true),
-        );
-        await until(() => round > 0 && !bloc.state.isLoading);
-        expect(round, 2);
-        expect(bloc.state.error, isNull);
-        final review = cleaner.fullCleanerReview(owner)!;
-        expect(review.remaining, 1);
-        expect(review.reviewed, 0);
-        expect(review.isComplete, isFalse);
-        expect(review.groups.single.usedFallback, isTrue);
-        expect(review.groups.single.analysis!.selectForCleanup, isFalse);
-        expect(bloc.state.messages.last.content, contains('remain pending'));
-        recover = true;
-        bloc.add(const RetryLastMessage());
-        await until(() => round == 3 && !bloc.state.isLoading);
-        expect(cleaner.fullCleanerReview(owner), same(review));
-        expect(review.reviewed, 1);
-        expect(review.isComplete, isTrue);
-        expect(review.groups.single.usedFallback, isFalse);
-      },
-    );
+      final bloc = useLocal
+          ? await local(_Runtime([], respond: respond))
+          : AiAgentBloc(
+              providerService: _Remote([], respond: respond),
+              toolExecutor: tools,
+            );
+      if (!useLocal) addTearDown(bloc.close);
+      bloc.add(const SendMessage('Review all', reviewEntireCleanerScan: true));
+      await until(
+        () => bloc.state.messages.length >= 2 && !bloc.state.isLoading,
+      );
+      expect(round, 0);
+      expect(bloc.state.error, isNull);
+      final review = cleaner.fullCleanerReview(owner)!;
+      expect(review.remaining, 0);
+      expect(review.reviewed, 1);
+      expect(review.isComplete, isTrue);
+      expect(review.groups.single.usedFallback, isFalse);
+      expect(review.groups.single.analysis!.fromScan, isTrue);
+      expect(
+        review.groups.single.analysis!.decision,
+        CleanerItemDecision.review,
+      );
+      expect(review.groups.single.analysis!.selectForCleanup, isFalse);
+      expect(
+        bloc.state.messages.last.content,
+        contains('Quick overview ready'),
+      );
+      expect(tools.calls, isEmpty);
+    });
   }
 
   test(
-    'malformed eight-group batches automatically split into valid single assessments',
+    'malformed eight-group AI batch uses metadata without recursive retries',
     () async {
       const owner = 'split-batch-review';
       final cleaner = DiskCleanerService.instance;
@@ -600,7 +635,12 @@ void main() {
           fullPath: r'C:\',
           children: List.generate(
             8,
-            (i) => DiskTreeNode(name: 'folder$i', fullPath: 'C:\\folder$i'),
+            (i) => DiskTreeNode(
+              name: 'data.unknown',
+              fullPath: 'C:\\scope$i\\data.unknown',
+              isFile: true,
+              sizeBytes: 8 - i,
+            ),
           ),
         ),
         reviewItem: (_, _) => true,
@@ -629,13 +669,19 @@ void main() {
       final review = cleaner.fullCleanerReview(owner)!;
       expect(review.reviewed, 8);
       expect(review.unresolvedItems, 0);
-      expect(provider.requests.length, 15);
+      expect(provider.requests.length, 1);
+      expect(
+        review.groups.every(
+          (g) => g.analysis!.fromScan && !g.analysis!.selectForCleanup,
+        ),
+        isTrue,
+      );
       expect(tools.calls, isEmpty);
     },
   );
 
   test(
-    '598142-entry Cleaner scan preserves 8 valid reviews without false completion',
+    '598142-entry Cleaner scan preserves 8 reviews and labels the rest as metadata advice',
     () async {
       const owner = 'large-review-harness';
       final cleaner = DiskCleanerService.instance;
@@ -644,7 +690,9 @@ void main() {
         598141,
         (i) => DiskTreeNode(
           name: 'file$i.txt',
-          fullPath: 'E:\\reco\\ShinodaYu\\file$i.txt',
+          fullPath: i < 7
+              ? 'E:\\prior$i.txt'
+              : 'E:\\reco\\ShinodaYu\\file$i.txt',
           isFile: true,
           sizeBytes: 1,
         ),
@@ -652,12 +700,12 @@ void main() {
       final folder = DiskTreeNode(
         name: 'ShinodaYu',
         fullPath: r'E:\reco\ShinodaYu',
-        children: files,
+        children: files.skip(7).toList(),
       );
       final root = DiskTreeNode(
         name: 'E:',
         fullPath: r'E:\',
-        children: [folder],
+        children: [...files.take(7), folder],
       );
       var acceptedGroups = 0;
       void publish() => cleaner.publishCleanerScanContext(
@@ -678,11 +726,27 @@ void main() {
       publish();
       addTearDown(() => cleaner.clearCleanerScanContext(owner));
       final review = cleaner.beginFullCleanerReview(owner);
-      review.markReviewed(folder);
-      for (final file in files.take(7)) {
-        review.markReviewed(file);
+      await review.prepareGroups(checkActive: () {});
+      final previousGroups = review.groups.take(2).toList();
+      const previousAnalysis = CleanerItemAnalysis(
+        decision: CleanerItemDecision.review,
+        reason: 'Previously accepted AI recommendation; retain user data.',
+      );
+      cleaner.inspectFullReviewGroups(
+        ownerTabId: owner,
+        review: review,
+        groups: previousGroups,
+      );
+      for (final group in previousGroups) {
+        cleaner.applyFullReviewGroup(
+          ownerTabId: owner,
+          review: review,
+          group: group,
+          analysis: previousAnalysis,
+        );
       }
       expect(review.reviewed, 8);
+      acceptedGroups = 0;
       var rounds = 0;
       final remote = _Remote(
         [],
@@ -697,11 +761,18 @@ void main() {
       bloc.add(const SendMessage('Review all', reviewEntireCleanerScan: true));
       await until(() => rounds > 0 && !bloc.state.isLoading);
       expect(bloc.state.error, isNull);
-      expect(review.reviewed, 8);
-      expect(review.remaining, 598134);
-      expect(review.isComplete, isFalse);
+      expect(review.reviewed, 598142);
+      expect(review.remaining, 0);
+      expect(review.isComplete, isTrue);
       expect(acceptedGroups, 1);
-      expect(rounds, 2);
+      expect(rounds, 1);
+      expect(review.groups.last.nodes, hasLength(598134));
+      expect(review.groups.last.analysis!.fromScan, isTrue);
+      expect(
+        previousGroups.every((g) => identical(g.analysis, previousAnalysis)),
+        isTrue,
+      );
+      expect(files.every((file) => !file.isSelectedForDeletion), isTrue);
       expect(tools.calls, isEmpty);
       expect(
         remote.requests.every(
@@ -709,10 +780,13 @@ void main() {
         ),
         isTrue,
       );
-      expect(bloc.state.messages.last.content, contains('8 / 598142'));
       expect(
         bloc.state.messages.last.content,
-        contains('AI review incomplete'),
+        contains('1 groups explained from scan metadata'),
+      );
+      expect(
+        bloc.state.messages.last.content,
+        contains('2 with AI recommendations'),
       );
       print(
         'CLEANER 598142 elapsed_ms=${elapsed.elapsedMilliseconds} requests=$rounds',
@@ -721,7 +795,7 @@ void main() {
   );
 
   test(
-    'local response-budget exhaustion splits failed batches and recovers all groups',
+    'local response-budget exhaustion explains all groups from metadata without splitting',
     () async {
       const owner = 'empty-local-review';
       final cleaner = DiskCleanerService.instance;
@@ -731,7 +805,12 @@ void main() {
         fullPath: r'C:\',
         children: List.generate(
           9,
-          (i) => DiskTreeNode(name: 'folder$i', fullPath: 'C:\\folder$i'),
+          (i) => DiskTreeNode(
+            name: 'data.unknown',
+            fullPath: 'C:\\scope$i\\data.unknown',
+            isFile: true,
+            sizeBytes: 9 - i,
+          ),
         ),
       );
       void publish() => cleaner.publishCleanerScanContext(
@@ -768,13 +847,15 @@ void main() {
       );
       final bloc = await local(runtime);
       bloc.add(const SendMessage('Review all', reviewEntireCleanerScan: true));
-      await until(() => requests >= 3 && !bloc.state.isLoading);
+      await until(() => requests > 0 && !bloc.state.isLoading);
+      expect(requests, 2); // One bounded attempt per batch, without splitting.
       expect(bloc.state.error, isNull);
       final review = cleaner.fullCleanerReview(owner)!;
       expect(review.isComplete, isTrue);
       expect(review.groups.first.usedFallback, isFalse);
       expect(review.groups.last.usedFallback, isFalse);
       expect(review.groups.first.analysis!.selectForCleanup, isFalse);
+      expect(review.groups.every((g) => g.analysis!.fromScan), isTrue);
     },
   );
 
@@ -836,7 +917,10 @@ void main() {
           cleanerReviewLanguageCode: 'vi',
         ),
       );
-      await until(() => runtime.requests.isNotEmpty && !bloc.state.isLoading);
+      await until(
+        () => bloc.state.messages.length >= 2 && !bloc.state.isLoading,
+        timeout: const Duration(seconds: 150),
+      );
       expect(bloc.state.error, isNull);
       final review = cleaner.fullCleanerReview(owner)!;
       expect(review.isComplete, isTrue);
@@ -882,7 +966,10 @@ void main() {
         });
         addTearDown(subscription.cancel);
         bloc.add(SendMessage(prompt));
-        await until(() => runtime.requests.isNotEmpty && !bloc.state.isLoading);
+        await until(
+          () => runtime.requests.isNotEmpty && !bloc.state.isLoading,
+          timeout: const Duration(seconds: 150),
+        );
         expect(bloc.state.error, isNull);
         final names = tools.calls.map((c) => c.name).toList();
         print(
@@ -1042,8 +1129,11 @@ class _Runtime extends LocalAiChatRuntime
 
 class _RealHttp extends HttpOverrides {}
 
-Future<void> until(bool Function() condition) async {
-  final deadline = DateTime.now().add(const Duration(seconds: 150));
+Future<void> until(
+  bool Function() condition, {
+  Duration timeout = const Duration(seconds: 20),
+}) async {
+  final deadline = DateTime.now().add(timeout);
   while (DateTime.now().isBefore(deadline)) {
     if (condition()) return;
     await Future<void>.delayed(const Duration(milliseconds: 10));

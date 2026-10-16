@@ -42,7 +42,8 @@ Run from repo root via `just` (requires Git Bash on Windows):
 | E2E plain output (debug) | `just e2e-plain`                                    |
 | E2E serial (debug order) | `just e2e-serial`                                   |
 | List all E2E test names  | `just e2e-list`                                     |
-| Analyze                  | `just analyze`                                      |
+| CI format, analysis, unit/widget tests | `just analyze`                            |
+| Static analysis only     | `just lint`                                         |
 | Format                   | `just format`                                       |
 | Format + analyze         | `just verify`                                       |
 | Clean                    | `just clean`                                        |
@@ -72,7 +73,12 @@ flutter test integration_test -d windows --dart-define=CB_E2E=true  # E2E
 
 ## CI pipeline order
 
-CI runs: **format check -> analyze -> unit tests -> E2E (Windows) -> build**. Match this locally with `just verify` before pushing.
+CI runs: **format check -> analyze -> unit tests -> E2E (Windows) -> build**.
+Run `just analyze` before pushing to match the CI analyze job (including
+unit/widget tests, excluding E2E). Both use `scripts/check_quality.sh` and stop
+on the first failure. `just verify` runs only format check and static analysis;
+`just lint` runs only static analysis. Local checks use the host OS; the CI
+analyze job runs on Ubuntu, so platform-specific failures still need a Linux run.
 
 ## Architecture notes
 

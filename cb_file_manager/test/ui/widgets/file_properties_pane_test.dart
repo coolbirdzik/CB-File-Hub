@@ -342,8 +342,12 @@ void main() {
   testWidgets('typing keeps tag suggestions visible during the next debounce', (
     tester,
   ) async {
-    await tester.runAsync(
-      () => TagManager.setTags(first, ['suggest-alpha', 'suggest-alpine']),
+    const expectedSuggestions = ['suggest-alpha', 'suggest-alpine'];
+    expect(
+      await tester.runAsync(
+        () => TagManager.setTags(first, expectedSuggestions),
+      ),
+      isTrue,
     );
     await tester.pumpWidget(app(pane(files: [first])));
     await settle(tester);
@@ -359,11 +363,27 @@ void main() {
         selection: TextSelection.collapsed(offset: 11),
       ),
     );
-    await settle(tester);
+    // Fire the debounce in fake time, then wait for the actual SQLite result.
+    // A fixed number of pumps (or pumpAndSettle) cannot wait for real I/O,
+    // especially while other test files are loading the machine.
+    await tester.pump(const Duration(milliseconds: 100));
+    final chipsInput = find.byType(ChipsInput<String>);
+    final ioWait = Stopwatch()..start();
+    while (ioWait.elapsed < const Duration(seconds: 5) &&
+        !expectedSuggestions.every(
+          tester.widget<ChipsInput<String>>(chipsInput).suggestions.contains,
+        )) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 10)),
+      );
+      await tester.pump();
+    }
+    // Suggestions insert their overlay in a post-frame callback.
+    await tester.pump();
     final suggestions = tester
-        .widget<ChipsInput<String>>(find.byType(ChipsInput<String>))
+        .widget<ChipsInput<String>>(chipsInput)
         .suggestions;
-    expect(suggestions, containsAll(['suggest-alpha', 'suggest-alpine']));
+    expect(suggestions, containsAll(expectedSuggestions));
     final overlayHeading = find.text('Suggested tags');
     expect(overlayHeading, findsOneWidget);
     final headingElement = tester.element(overlayHeading);

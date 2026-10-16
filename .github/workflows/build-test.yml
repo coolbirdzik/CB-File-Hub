@@ -32,25 +32,8 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: 'stable'
 
-      - name: Install dependencies
-        run: |
-          cd ${{ env.PROJECT_DIR }}
-          flutter pub get
-
-      - name: Verify formatting
-        run: |
-          cd ${{ env.PROJECT_DIR }}
-          dart format --output=none --set-exit-if-changed .
-
-      - name: Analyze project
-        run: |
-          cd ${{ env.PROJECT_DIR }}
-          flutter analyze
-
-      - name: Run tests
-        run: |
-          cd ${{ env.PROJECT_DIR }}
-          flutter test
+      - name: Check formatting, analysis and unit/widget tests
+        run: bash scripts/check_quality.sh
 
   # Desktop E2E (integration_test on Windows; requires --dart-define=CB_E2E=true)
   e2e-windows:
