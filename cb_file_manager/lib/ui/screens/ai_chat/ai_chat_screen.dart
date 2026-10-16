@@ -609,6 +609,26 @@ class _AiChatBodyState extends State<_AiChatBody> {
                     color: theme.colorScheme.onSurface,
                   ),
                 ),
+                if (state.messages.any((m) => m.role == AiMessageRole.user))
+                  TextButton.icon(
+                    key: const ValueKey('chat-banner-retry'),
+                    onPressed: state.isLoading
+                        ? null
+                        : () => context.read<AiAgentBloc>().add(
+                            RetryLastMessage(
+                              messageId: state.messages
+                                  .lastWhere(
+                                    (m) => m.role == AiMessageRole.user,
+                                  )
+                                  .id,
+                            ),
+                          ),
+                    icon: const Icon(
+                      PhosphorIconsLight.arrowClockwise,
+                      size: 14,
+                    ),
+                    label: Text(AppLocalizations.of(context)!.retryMessage),
+                  ),
               ],
             ),
           ),
@@ -716,9 +736,12 @@ class _AiChatBodyState extends State<_AiChatBody> {
                                 ),
                               )
                             : null,
-                        onRetry: message.error != null
+                        onRetry:
+                            !state.isLoading &&
+                                (message.role == AiMessageRole.user ||
+                                    index == state.messages.length - 1)
                             ? () => context.read<AiAgentBloc>().add(
-                                const RetryLastMessage(),
+                                RetryLastMessage(messageId: message.id),
                               )
                             : null,
                       ),

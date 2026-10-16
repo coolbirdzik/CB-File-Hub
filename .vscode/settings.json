@@ -47,5 +47,6 @@
   "terminal.integrated.defaultProfile.windows": "PowerShell",
   "terminal.integrated.suggest.enabled": true,
   "terminal.integrated.shellIntegration.enabled": true,
-  "terminal.integrated.gpuAcceleration": "off"
+  "terminal.integrated.gpuAcceleration": "off",
+  "diffEditor.codeLens": true
 }

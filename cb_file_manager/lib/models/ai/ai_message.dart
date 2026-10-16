@@ -73,6 +73,10 @@ class AiMessage extends Equatable {
   /// Files referenced (dropped/dragged) into the chat by the user.
   final List<ReferencedFile>? referencedFiles;
 
+  /// Preserve the explicit full-scan action when retrying an unchanged request.
+  final bool reviewEntireCleanerScan;
+  final String cleanerReviewLanguageCode;
+
   const AiMessage({
     required this.id,
     required this.role,
@@ -84,6 +88,8 @@ class AiMessage extends Equatable {
     this.error,
     this.toolCalls,
     this.referencedFiles,
+    this.reviewEntireCleanerScan = false,
+    this.cleanerReviewLanguageCode = 'en',
   });
 
   AiMessage copyWith({
@@ -107,6 +113,8 @@ class AiMessage extends Equatable {
       error: clearError ? null : (error ?? this.error),
       toolCalls: toolCalls ?? this.toolCalls,
       referencedFiles: referencedFiles ?? this.referencedFiles,
+      reviewEntireCleanerScan: reviewEntireCleanerScan,
+      cleanerReviewLanguageCode: cleanerReviewLanguageCode,
     );
   }
 
@@ -122,6 +130,8 @@ class AiMessage extends Equatable {
     error,
     toolCalls,
     referencedFiles,
+    reviewEntireCleanerScan,
+    cleanerReviewLanguageCode,
   ];
 
   Map<String, dynamic> toJson() => {
@@ -133,6 +143,9 @@ class AiMessage extends Equatable {
     'searchResults': searchResults?.map((r) => r.toJson()).toList(),
     'toolCalls': toolCalls?.map((c) => c.toJson()).toList(),
     'referencedFiles': referencedFiles?.map((f) => f.toJson()).toList(),
+    if (reviewEntireCleanerScan) 'reviewEntireCleanerScan': true,
+    if (reviewEntireCleanerScan)
+      'cleanerReviewLanguageCode': cleanerReviewLanguageCode,
   };
 
   factory AiMessage.fromJson(Map<String, dynamic> json) {
@@ -149,6 +162,9 @@ class AiMessage extends Equatable {
       role: role,
       content: json['content'] as String? ?? '',
       reasoning: json['reasoning'] as String?,
+      reviewEntireCleanerScan: json['reviewEntireCleanerScan'] == true,
+      cleanerReviewLanguageCode:
+          json['cleanerReviewLanguageCode'] as String? ?? 'en',
       timestamp:
           DateTime.tryParse(json['timestamp'] as String? ?? '') ??
           DateTime.now(),

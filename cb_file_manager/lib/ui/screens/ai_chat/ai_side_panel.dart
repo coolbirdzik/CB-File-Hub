@@ -415,6 +415,26 @@ class _AiSidePanelState extends State<AiSidePanel> {
                     color: theme.colorScheme.onSurface,
                   ),
                 ),
+                if (state.messages.any((m) => m.role == AiMessageRole.user))
+                  TextButton.icon(
+                    key: const ValueKey('chat-banner-retry'),
+                    onPressed: state.isLoading
+                        ? null
+                        : () => _bloc.add(
+                            RetryLastMessage(
+                              messageId: state.messages
+                                  .lastWhere(
+                                    (m) => m.role == AiMessageRole.user,
+                                  )
+                                  .id,
+                            ),
+                          ),
+                    icon: const Icon(
+                      PhosphorIconsLight.arrowClockwise,
+                      size: 14,
+                    ),
+                    label: Text(AppLocalizations.of(context)!.retryMessage),
+                  ),
               ],
             ),
           ),
@@ -681,6 +701,13 @@ class _AiSidePanelState extends State<AiSidePanel> {
                     ),
                   ChatMessageBubble(
                     message: message,
+                    onRetry:
+                        !state.isLoading &&
+                            (message.role == AiMessageRole.user ||
+                                index == state.messages.length - 1)
+                        ? () =>
+                              _bloc.add(RetryLastMessage(messageId: message.id))
+                        : null,
                     onEdit:
                         !state.isLoading && message.role == AiMessageRole.user
                         ? (content) => _bloc.add(

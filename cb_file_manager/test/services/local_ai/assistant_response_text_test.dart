@@ -7,6 +7,38 @@ import 'package:cb_file_manager/config/languages/app_localizations_delegate.dart
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test(
+    'inspection announcements need continuation, completed answers do not',
+    () {
+      for (final text in [
+        '## 🐳 **Docker Storage Location Report**\n\n'
+            'Để xem chi tiết vị trí Docker trên hệ thống, tôi sẽ kiểm tra scan đang hoạt động:',
+        'Tôi sẽ kiểm tra scan hiện tại.',
+        'Let me inspect the current scan.',
+        'To locate Docker storage, I will check the current scan:',
+        'I\'ll search the scanned files.',
+        '<think>Need data</think>Mình sẽ tìm Docker trong scan.',
+      ]) {
+        expect(endsWithPendingInspection(text), isTrue, reason: text);
+      }
+      for (final text in [
+        'Xin chào!',
+        'Docker chiếm 20 GB ở C:/Docker/data.vhdx.',
+        'Tôi sẽ kiểm tra scan. Kết quả: Docker chiếm 20 GB.',
+        'Không có scan hiện tại. Hãy chạy scan trước.',
+        'Tôi sẽ kiểm tra sau khi bạn cung cấp đường dẫn.',
+        'If you want, I will check the scan.',
+        'I will check the scan once you share it.',
+        'Tôi sẽ kiểm tra scan được không?',
+        '> Tôi sẽ kiểm tra scan.',
+        'Ví dụ: "Tôi sẽ kiểm tra scan".',
+        '<think>Tôi sẽ kiểm tra scan.</think>Xin chào!',
+      ]) {
+        expect(endsWithPendingInspection(text), isFalse, reason: text);
+      }
+    },
+  );
+
   test('split reasoning tags stay hidden throughout streaming', () {
     const reasoning =
         '<think>Maybe call <tool_call>{"name":"list_all_tags","arguments":{}}</tool_call></think>';

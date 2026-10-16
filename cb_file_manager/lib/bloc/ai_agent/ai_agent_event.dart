@@ -17,10 +17,30 @@ class SendMessage extends AiAgentEvent {
   /// List of file paths that were dropped/dragged into the chat.
   final List<String> referencedFiles;
 
-  const SendMessage(this.message, {this.referencedFiles = const []});
+  /// Explicit Cleaner action: show a bounded, metadata-first quick overview.
+  final bool reviewEntireCleanerScan;
+  final String cleanerReviewLanguageCode;
+
+  /// Start a separate conversation atomically before sending this message.
+  /// Retry and edit events leave this false so they stay in their conversation.
+  final bool startNewConversation;
+
+  const SendMessage(
+    this.message, {
+    this.referencedFiles = const [],
+    this.reviewEntireCleanerScan = false,
+    this.cleanerReviewLanguageCode = 'en',
+    this.startNewConversation = false,
+  });
 
   @override
-  List<Object?> get props => [message, referencedFiles];
+  List<Object?> get props => [
+    message,
+    referencedFiles,
+    reviewEntireCleanerScan,
+    cleanerReviewLanguageCode,
+    startNewConversation,
+  ];
 }
 
 /// Stop the currently active AI generation or tool loop.
@@ -74,9 +94,15 @@ class UpdateCurrentPath extends AiAgentEvent {
   List<Object?> get props => [path];
 }
 
-/// Retry the last failed message.
+/// Rerun a user turn, defaulting to the latest one. An assistant ID resolves
+/// to the user message that started its turn.
 class RetryLastMessage extends AiAgentEvent {
-  const RetryLastMessage();
+  final String? messageId;
+
+  const RetryLastMessage({this.messageId});
+
+  @override
+  List<Object?> get props => [messageId];
 }
 
 /// React to provider configuration changes.

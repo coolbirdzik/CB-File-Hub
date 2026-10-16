@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:cb_file_manager/services/ai/agent_tool_catalog.dart';
 import 'package:cb_file_manager/services/ai/tool_executor.dart';
+import 'package:cb_file_manager/services/ai/cleaner_review_run.dart';
+import 'package:cb_file_manager/services/disk_cleaner/cleaner_agent_review.dart';
 import 'package:cb_file_manager/services/disk_cleaner/disk_cleaner_service.dart';
 import 'package:cb_file_manager/services/disk_cleaner/disk_tree_node.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -86,6 +88,61 @@ void main() {
     publish();
   });
   tearDown(() => cleaner.clearCleanerScanContext(tabId));
+
+  test(
+    'full review counts accepted verdicts, not inspection or rejected calls',
+    () async {
+      final run = CleanerReviewRun(tabId);
+      await run.review.prepareGroups(checkActive: () {});
+      expect(run.review.total, 2);
+      expect(run.review.next, junk);
+      await inspect(junk);
+      expect(run.review.reviewed, 0);
+      accepted = false;
+      expect((await assess(junk)).success, isFalse);
+      expect(run.review.reviewed, 0);
+      accepted = true;
+      await assess(junk);
+      await assess(junk);
+      expect(run.review.reviewed, 1);
+      expect(run.review.next, personal);
+      expect(run.requireActiveContext().root, same(root));
+      publish(scanning: true);
+      expect(run.requireActiveContext, throwsStateError);
+    },
+  );
+
+  test('full review retains descendants and reports aggregates separately', () {
+    final folder = DiskTreeNode(
+      name: 'folder',
+      fullPath: r'C:\folder',
+      children: [
+        personal,
+        DiskTreeNode(name: 'Others', fullPath: '', aggregatedItemCount: 500),
+      ],
+    );
+    final review = CleanerFullReview(
+      DiskTreeNode(name: 'C:', fullPath: r'C:\', children: [folder, junk]),
+    );
+    expect(review.total, 3);
+    expect(review.aggregatedItems, 500);
+    review.markReviewed(folder);
+    expect(review.remaining, 2);
+    expect(review.next, personal);
+    review.markReviewed(personal);
+    review.markReviewed(junk);
+    expect(review.isComplete, isTrue);
+  });
+
+  test('new roots and closed tabs invalidate full review runs', () {
+    final run = CleanerReviewRun(tabId);
+    root = DiskTreeNode(name: 'C:', fullPath: r'C:\', children: [junk]);
+    publish();
+    expect(run.requireActiveContext, throwsStateError);
+    final nextRun = CleanerReviewRun(tabId);
+    cleaner.clearCleanerScanContext(tabId);
+    expect(nextRun.requireActiveContext, throwsStateError);
+  });
 
   test(
     'inspection reports actual evidence and the fresh ID before visible assessment',

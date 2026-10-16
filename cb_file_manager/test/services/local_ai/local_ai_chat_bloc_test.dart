@@ -6,6 +6,10 @@ import 'package:cb_file_manager/models/ai/ai_message.dart';
 import 'package:cb_file_manager/models/local_ai/local_ai_advisor_model.dart';
 import 'package:cb_file_manager/services/ai/ai_provider_service.dart';
 import 'package:cb_file_manager/services/ai/tool_executor.dart';
+import 'package:cb_file_manager/services/ai/cleaner_review_run.dart';
+import 'package:cb_file_manager/services/disk_cleaner/cleaner_agent_review.dart';
+import 'package:cb_file_manager/services/disk_cleaner/disk_cleaner_service.dart';
+import 'package:cb_file_manager/services/disk_cleaner/disk_tree_node.dart';
 import 'package:cb_file_manager/services/local_ai/local_ai_advisor_service.dart';
 import 'package:cb_file_manager/services/local_ai/llama_cpp_chat_client.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -104,7 +108,239 @@ void main() {
     );
   });
 
+  for (final providerFails in [false, true]) {
+    test('quick Cleaner review bounds model calls across 1531 groups '
+        '(providerFails: $providerFails)', () async {
+      const owner = 'quick-cleaner-bloc-test';
+      final cleaner = DiskCleanerService.instance;
+      final files = List.generate(
+        1531,
+        (i) => DiskTreeNode(
+          name: 'data.bin',
+          fullPath: 'C:\\Data\\app$i\\data.bin',
+          isFile: true,
+          sizeBytes: i + 1,
+        ),
+      );
+      files.first.isSelectedForDeletion = true; // User's existing selection.
+      final root = DiskTreeNode(name: 'C:', fullPath: r'C:\', children: files);
+      cleaner.publishCleanerScanContext(
+        ownerTabId: owner,
+        root: root,
+        reviewItem: (_, _) => true,
+        reviewGroup: (_, analysis) {
+          expect(analysis.selectForCleanup, isFalse);
+          return true;
+        },
+      );
+      addTearDown(() => cleaner.clearCleanerScanContext(owner));
+      final runtime = _ConversationRuntime(
+        providerFails
+            ? []
+            : [
+                [
+                  '{"assessments":[{"group_id":"group_1530","decision":"KEEP","reason":"Application data."}]}',
+                ],
+                ['Not valid JSON'],
+                ['Not valid JSON'],
+                ['Not valid JSON'],
+              ],
+      );
+      final tools = _RecordingTools(ownerTabId: owner);
+      final bloc = await createBloc(runtime, tools);
+      bloc.add(
+        const SendMessage('Quick review', reviewEntireCleanerScan: true),
+      );
+      await _waitUntil(
+        () => bloc.state.messages.isNotEmpty && !bloc.state.isLoading,
+      );
+      final review = cleaner.fullCleanerReview(owner)!;
+      expect(review.groups, hasLength(1531));
+      expect(review.isComplete, isTrue);
+      expect(review.unresolvedItems, 0);
+      expect(
+        runtime.requests.length,
+        inInclusiveRange(1, CleanerReviewRun.maxAiBatches),
+      );
+      if (providerFails) expect(runtime.requests, hasLength(1));
+      final sentIds = <String>[];
+      for (final request in runtime.requests) {
+        final prompt = request.single['content']!;
+        final evidence = jsonDecode(prompt.split('Evidence: ').last) as List;
+        sentIds.addAll(evidence.map((e) => e['group_id'] as String));
+      }
+      expect(sentIds.length, lessThanOrEqualTo(CleanerReviewRun.maxAiGroups));
+      expect(
+        sentIds.toSet().length,
+        sentIds.length,
+        reason: 'No automatic retries',
+      );
+      expect(
+        sentIds.first,
+        'group_1530',
+        reason: 'Largest unclear data gets AI time first',
+      );
+      expect(files.first.isSelectedForDeletion, isTrue);
+      expect(
+        files.skip(1).every((file) => !file.isSelectedForDeletion),
+        isTrue,
+      );
+      expect(review.groups.every((g) => !g.analysis!.selectForCleanup), isTrue);
+      if (!providerFails) {
+        expect(review.groups.last.analysis!.fromScan, isFalse);
+        expect(review.groups.last.analysis!.decision, CleanerItemDecision.keep);
+      }
+      expect(bloc.state.error, isNull);
+      expect(
+        bloc.state.messages.last.content,
+        contains('Quick overview ready'),
+      );
+      expect(tools.calls, isEmpty);
+    });
+  }
+
+  test('recognized Cleaner data needs no model calls', () async {
+    const owner = 'quick-known-cleaner-test';
+    final cleaner = DiskCleanerService.instance;
+    final root = DiskTreeNode(
+      name: 'C:',
+      fullPath: r'C:\',
+      children: [
+        DiskTreeNode(
+          name: 'cache.tmp',
+          fullPath: r'C:\Temp\cache.tmp',
+          isFile: true,
+          junkCategoryId: 'windows_temp',
+        ),
+        DiskTreeNode(
+          name: 'photo.jpg',
+          fullPath: r'C:\Data\photo.jpg',
+          isFile: true,
+        ),
+        DiskTreeNode(
+          name: 'pagefile.sys',
+          fullPath: r'C:\pagefile.sys',
+          isFile: true,
+        ),
+      ],
+    );
+    cleaner.publishCleanerScanContext(
+      ownerTabId: owner,
+      root: root,
+      reviewItem: (_, _) => true,
+      reviewGroup: (_, _) => true,
+    );
+    addTearDown(() => cleaner.clearCleanerScanContext(owner));
+    final runtime = _ConversationRuntime([]);
+    final bloc = await createBloc(runtime, _RecordingTools(ownerTabId: owner));
+    bloc.add(
+      const SendMessage(
+        'Xem nhanh',
+        reviewEntireCleanerScan: true,
+        cleanerReviewLanguageCode: 'vi',
+      ),
+    );
+    await _waitUntil(
+      () => bloc.state.messages.isNotEmpty && !bloc.state.isLoading,
+    );
+    expect(runtime.requests, isEmpty);
+    final review = cleaner.fullCleanerReview(owner)!;
+    expect(review.isComplete, isTrue);
+    expect(review.groups.map((g) => g.analysis!.decision), [
+      CleanerItemDecision.clean,
+      CleanerItemDecision.review,
+      CleanerItemDecision.keep,
+    ]);
+    expect(review.groups.every((g) => g.analysis!.fromScan), isTrue);
+    expect(review.groups.every((g) => !g.analysis!.selectForCleanup), isTrue);
+    expect(
+      bloc.state.messages.last.content,
+      contains('3 nhóm từ dữ liệu quét, 0 nhóm có gợi ý AI'),
+    );
+  });
+
   final liveUrl = Platform.environment['CB_LOCAL_CHAT_TEST_URL'];
+  test('Docker inspection announcement continues into a real scan tool', () async {
+    final runtime = _ConversationRuntime([
+      [
+        '## 🐳 **Docker Storage Location Report**\n\n'
+            'Để xem chi tiết vị trí Docker trên hệ thống, tôi sẽ kiểm tra scan đang hoạt động:',
+      ],
+      [
+        '<tool_call>{"name":"get_current_cleaner_scan","arguments":{}}</tool_call>',
+      ],
+      ['Docker storage is at C:/Docker/data.vhdx.'],
+    ]);
+    final tools = _RecordingTools();
+    final bloc = await createBloc(runtime, tools);
+    bloc.add(
+      const SendMessage('Docker đang chiếm dung lượng ở đâu trong scan?'),
+    );
+    await _waitUntil(
+      () => runtime.requests.length == 3 && !bloc.state.isLoading,
+    );
+    expect(bloc.state.error, isNull);
+    expect(tools.calls.map((call) => call.name), ['get_current_cleaner_scan']);
+    expect(runtime.requests[1].last['content'], contains('only announced'));
+    expect(runtime.requests[2].last['content'], contains('<tool_result'));
+    expect(bloc.state.messages.last.content, contains('C:/Docker/data.vhdx'));
+    expect(
+      bloc.state.messages.last.toolCalls!.single.toolName,
+      'get_current_cleaner_scan',
+    );
+    expect(
+      bloc.state.messages.where((m) => m.content.contains('tôi sẽ kiểm tra')),
+      isEmpty,
+    );
+  });
+
+  test('a promise after tool evidence also continues inspection', () async {
+    final runtime = _ConversationRuntime([
+      [
+        '<tool_call>{"name":"get_current_cleaner_scan","arguments":{}}</tool_call>',
+      ],
+      ['Tôi sẽ kiểm tra thêm thư mục Docker:'],
+      [
+        '<tool_call>{"name":"explore_cleaner_scan","arguments":{"path":"C:/Docker","depth":1,"limit":12}}</tool_call>',
+      ],
+      ['Docker data is in its virtual disk.'],
+    ]);
+    final tools = _RecordingTools();
+    final bloc = await createBloc(runtime, tools);
+    bloc.add(const SendMessage('Inspect Docker storage'));
+    await _waitUntil(
+      () => runtime.requests.length == 4 && !bloc.state.isLoading,
+    );
+    expect(bloc.state.error, isNull);
+    expect(tools.calls.map((call) => call.name), [
+      'get_current_cleaner_scan',
+      'explore_cleaner_scan',
+    ]);
+    expect(
+      bloc.state.messages.last.content,
+      'Docker data is in its virtual disk.',
+    );
+  });
+
+  test(
+    'repeated promises stop with an error instead of claiming completion',
+    () async {
+      final runtime = _ConversationRuntime(
+        List.generate(3, (_) => ['Tôi sẽ kiểm tra scan:']),
+      );
+      final tools = _RecordingTools();
+      final bloc = await createBloc(runtime, tools);
+      bloc.add(const SendMessage('Inspect the scan'));
+      await _waitUntil(
+        () => runtime.requests.length == 3 && !bloc.state.isLoading,
+      );
+      expect(tools.calls, isEmpty);
+      expect(bloc.state.error, contains('did not carry it out'));
+      expect(bloc.state.messages.last.isLoading, isFalse);
+      expect(bloc.state.messages.last.error, isNotNull);
+    },
+  );
+
   test(
     'live Qwen can still request a directory tool',
     () async {
@@ -167,6 +403,7 @@ class _NoRemoteProvider extends AiProviderService {
 }
 
 class _RecordingTools extends ToolExecutor {
+  _RecordingTools({super.ownerTabId});
   final calls = <ToolCall>[];
   @override
   Future<ToolResult> execute(ToolCall call) async {

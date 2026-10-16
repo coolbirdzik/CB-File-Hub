@@ -7,6 +7,152 @@ import 'package:cb_file_manager/services/ai/assistant_response_text.dart';
 import 'package:cb_file_manager/services/ai/tool_executor.dart';
 
 void main() {
+  test(
+    'bounded classification disables thinking without changing normal chat defaults',
+    () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      final http = HttpClient();
+      addTearDown(() async {
+        http.close(force: true);
+        await server.close(force: true);
+      });
+      final served = server.first.then((request) async {
+        final body = jsonDecode(await utf8.decoder.bind(request).join()) as Map;
+        expect(body['chat_template_kwargs']['enable_thinking'], isFalse);
+        request.response.write(
+          'data: {"choices":[{"delta":{"content":"{}"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n',
+        );
+        await request.response.close();
+      });
+      final result = await LlamaCppChatClient(http)
+          .stream(
+            baseUri: Uri.parse('http://127.0.0.1:${server.port}'),
+            messages: [
+              {'role': 'user', 'content': 'Assess a group'},
+            ],
+            maxResponseTokens: 100,
+            catalogId: 'unsloth/Qwen3.5-4B-GGUF',
+            enableThinking: false,
+          )
+          .join();
+      expect(result, '{}');
+      await served;
+    },
+  );
+
+  test('header disconnect retries once with a fresh connection', () async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    final http = HttpClient();
+    final bodies = <String>[];
+    final ports = <int>[];
+    final persistent = <bool>[];
+    var requests = 0;
+    final subscription = server.listen((request) async {
+      requests++;
+      ports.add(request.connectionInfo!.remotePort);
+      persistent.add(request.persistentConnection);
+      bodies.add(await utf8.decoder.bind(request).join());
+      if (requests == 1) {
+        final socket = await request.response.detachSocket(writeHeaders: false);
+        socket.destroy();
+      } else {
+        request.response.write(
+          'data: {"choices":[{"delta":{"content":"Recovered"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n',
+        );
+        await request.response.close();
+      }
+    });
+    addTearDown(() async {
+      http.close(force: true);
+      await subscription.cancel();
+      await server.close(force: true);
+    });
+    final answer = await LlamaCppChatClient(http)
+        .stream(
+          baseUri: Uri.parse('http://127.0.0.1:${server.port}'),
+          messages: [
+            {'role': 'user', 'content': 'Check the current scan'},
+          ],
+          maxResponseTokens: 100,
+        )
+        .join()
+        .timeout(const Duration(seconds: 5));
+    expect(answer, 'Recovered');
+    expect(requests, 2);
+    expect(bodies[1], bodies[0]);
+    expect(ports.toSet(), hasLength(2));
+    expect(persistent, [false, false]);
+  });
+
+  test('repeated header disconnects fail after exactly one retry', () async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    final http = HttpClient();
+    var requests = 0;
+    final subscription = server.listen((request) async {
+      requests++;
+      await request.drain<void>();
+      final socket = await request.response.detachSocket(writeHeaders: false);
+      socket.destroy();
+    });
+    addTearDown(() async {
+      http.close(force: true);
+      await subscription.cancel();
+      await server.close(force: true);
+    });
+    await expectLater(
+      LlamaCppChatClient(http)
+          .stream(
+            baseUri: Uri.parse('http://127.0.0.1:${server.port}'),
+            messages: [
+              {'role': 'user', 'content': 'Hi'},
+            ],
+            maxResponseTokens: 100,
+          )
+          .toList()
+          .timeout(const Duration(seconds: 5)),
+      throwsA(isA<HttpException>()),
+    );
+    expect(requests, 2);
+  });
+
+  test('a partial response is never replayed after streaming starts', () async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    final http = HttpClient();
+    var requests = 0;
+    final subscription = server.listen((request) async {
+      requests++;
+      await request.drain<void>();
+      request.response.write(
+        'data: {"choices":[{"delta":{"content":"Partial"}}]}\n\n',
+      );
+      await request.response.close();
+    });
+    addTearDown(() async {
+      http.close(force: true);
+      await subscription.cancel();
+      await server.close(force: true);
+    });
+    final chunks = <String>[];
+    await expectLater(
+      LlamaCppChatClient(http)
+          .stream(
+            baseUri: Uri.parse('http://127.0.0.1:${server.port}'),
+            messages: [
+              {'role': 'user', 'content': 'Hi'},
+            ],
+            maxResponseTokens: 100,
+          )
+          .map((chunk) {
+            chunks.add(chunk);
+            return chunk;
+          })
+          .toList(),
+      throwsStateError,
+    );
+    expect(chunks, ['Partial']);
+    expect(requests, 1);
+  });
+
   for (final profile in [
     ('unsloth/Qwen3.5-2B-GGUF', 0.7, 20, 0.8, false),
     ('unsloth/Qwen3.5-4B-GGUF', 1.0, 20, 0.95, true),

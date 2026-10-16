@@ -3564,19 +3564,22 @@ class VietnameseLocalizations implements AppLocalizations {
   String get diskCleanerAskAgent => 'Hỏi CB Agent';
 
   @override
-  String get diskCleanerSuggestAndSelect => 'Gợi ý và chọn';
+  String get diskCleanerSuggestAndSelect => 'Xem nhanh';
+  @override
+  String get diskCleanerAdviceFromScan => 'Theo dữ liệu quét';
+  @override
+  String get diskCleanerAdviceFromAi => 'Gợi ý từ AI';
 
   @override
   String get diskCleanerAiSelectRecommendationsRequest =>
-      'Tương tác trực tiếp với kết quả scan đã xong. Dùng '
-      'inspect_cleaner_scan_item để lần lượt xem một vài file/thư mục đáng '
-      'chú ý, cho tôi thấy dòng bạn đang xem. Sau đó dùng '
-      'set_cleaner_scan_item_analysis để hiện lý do nên dọn, cần xem lại hay '
-      'nên giữ ngay trên màn hình này. Dùng select:true cho các mục CLEAN '
-      'được đề xuất. Không chọn các mục REVIEW và KEEP. Dùng scan_id mới nhất '
-      'trả về từ mỗi thao tác. Không xóa file. Trả lời bằng tiếng Việt.';
+      'Xem sơ qua kết quả quét: đây là dữ liệu gì, nên giữ hay có thể cân nhắc xóa. '
+      'Giải thích ngắn theo nhóm; AI chỉ xem một số ít nhóm chưa rõ. '
+      'Không đọc nội dung file, không tích chọn và không xóa. Trả lời bằng tiếng Việt.';
   @override
   String get diskCleanerAgentAnalysisTitle => 'Phân tích của CB Agent';
+  @override
+  String diskCleanerAgentGroupCount(int count) =>
+      '$count mục được đánh giá theo nhóm';
   @override
   String get diskCleanerAgentInspecting => 'CB Agent đang xem mục này';
   @override
@@ -4017,6 +4020,166 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get cleanerAppsUtilityDescription =>
       'Tìm ứng dụng lớn, ít dùng và xem dữ liệu liên quan';
+
+  // Cleaner - cleanup suggestions
+  @override
+  String get cleanerSuggestionsTitle => 'Gợi ý dọn dẹp';
+  @override
+  String get cleanerSuggestionsUtilityDescription =>
+      'Quét những thứ nên dọn trên ổ đĩa';
+  @override
+  String get cleanerSuggestionsIntro =>
+      'Tìm file rác, bộ cài còn sót, file lớn lâu không dùng và dung lượng '
+      'Windows có thể thu hồi, kèm lý do cho từng mục. Không có gì bị xoá cho '
+      'tới khi bạn xác nhận, và file sẽ được chuyển vào Thùng rác.';
+  @override
+  String get cleanerSuggestionsScan => 'Quét gợi ý';
+  @override
+  String get cleanerSuggestionsStepJunk => 'Đang kiểm tra cache và file tạm...';
+  @override
+  String get cleanerSuggestionsStepDownloads =>
+      'Đang kiểm tra thư mục Downloads...';
+  @override
+  String get cleanerSuggestionsStepSystem =>
+      'Đang kiểm tra file hệ thống Windows...';
+  @override
+  String get cleanerSuggestionsStepDiskScan =>
+      'Đang xem lại kết quả Phân tích ổ đĩa...';
+  @override
+  String cleanerSuggestionsFoundItems(int count) => 'Tìm thấy $count mục';
+  @override
+  String cleanerSuggestionsFoundSize(String size) => 'Đã tìm thấy $size';
+  @override
+  String get cleanerSuggestionsSourcesTitle => 'Các nguồn đang kiểm tra';
+  @override
+  String get cleanerSuggestionsSourceDownloads => 'Thư mục Downloads';
+  @override
+  String get cleanerSuggestionsSourceSystem => 'File hệ thống Windows';
+  @override
+  String get cleanerSuggestionsSourceDiskScan => 'Kết quả Phân tích ổ đĩa';
+  @override
+  String get cleanerSuggestionsTierClean => 'Nên dọn - an toàn';
+  @override
+  String get cleanerSuggestionsTierCleanHint =>
+      'Windows hoặc ứng dụng sẽ tự tạo lại.';
+  @override
+  String get cleanerSuggestionsTierReview => 'Xem lại trước khi dọn';
+  @override
+  String get cleanerSuggestionsTierReviewHint =>
+      'Thường xoá được, nhưng hãy chắc là bạn không cần nữa.';
+  @override
+  String get cleanerSuggestionsTierGuided => 'Giải phóng bằng công cụ Windows';
+  @override
+  String get cleanerSuggestionsTierGuidedHint =>
+      'Không xoá trực tiếp; hãy dùng công cụ được gợi ý.';
+  @override
+  String cleanerSuggestionsReclaimable(String size) =>
+      'Có thể giải phóng tới $size';
+  @override
+  String cleanerSuggestionsSelected(String size, int count) =>
+      'Đã chọn: $size trong $count mục';
+  @override
+  String get cleanerSuggestionsNothing =>
+      'Không tìm thấy gì đáng dọn trên ổ đĩa này.';
+  @override
+  String get cleanerSuggestionsDiskScanHint =>
+      'Chạy Phân tích ổ đĩa cho ổ này để tìm thêm file lớn không dùng, thư '
+      'mục node_modules và ổ đĩa ảo.';
+  @override
+  String get cleanerSuggestionsConfirmTitle => 'Chuyển vào Thùng rác?';
+  @override
+  String cleanerSuggestionsConfirmBody(int count, String size) =>
+      '$count mục ($size) sẽ được chuyển vào Thùng rác. Bạn có thể khôi phục '
+      'từ đó.';
+  @override
+  String cleanerSuggestionsConfirmPersonal(int count) =>
+      'Trong đó có $count file của bạn, không phải file rác. Hãy chắc là bạn '
+      'không cần chúng nữa.';
+  @override
+  String cleanerSuggestionsConfirmRecycleBin(int count) =>
+      '$count mục đang có trong Thùng rác sẽ bị xoá vĩnh viễn.';
+  @override
+  String cleanerSuggestionsCleaned(String size) =>
+      'Đã dọn $size. File chuyển vào Thùng rác vẫn chiếm dung lượng cho tới '
+      'khi bạn dọn sạch Thùng rác.';
+  @override
+  String get cleanerSuggestionsCopyCommand => 'Sao chép lệnh';
+  @override
+  String cleanerSuggestionsCommandCopied(String command) =>
+      'Đã sao chép "$command". Hãy chạy trong Terminal (Admin).';
+  @override
+  String get cleanerSuggestionsOpenSettings => 'Mở cài đặt Windows';
+  @override
+  String cleanerSuggestionsShowItems(int count) => 'Xem $count mục';
+  @override
+  String get cleanerSuggestionsHideItems => 'Ẩn danh sách';
+  @override
+  String cleanerSuggestionsAtLeast(String size) => 'ít nhất $size';
+  @override
+  String cleanerSuggestionsMoreItems(int count) => '... và $count mục khác';
+  @override
+  String cleanerSuggestionsScanFailed(String error) =>
+      'Không thể quét gợi ý: $error';
+  @override
+  String get cleanerSuggestionsJunkScanBusy =>
+      'Đang có một lượt quét rác khác (Dọn nhanh hoặc CB Agent) nên phần '
+      'cache và file tạm đã bị bỏ qua. Hãy quét lại khi nó xong.';
+  @override
+  String cleanerSuggestionsPartialScan(String error) =>
+      'Một phần của lượt quét bị lỗi nên có thể thiếu gợi ý: $error';
+  @override
+  String cleanerSuggestionTitle(String id) => switch (id) {
+    'downloads_leftovers' => 'Bộ cài và file nén cũ trong Downloads',
+    'old_large_files' => 'File lớn lâu không dùng',
+    'node_modules' => 'Thư mục node_modules',
+    'hibernation_file' => 'File ngủ đông (hiberfil.sys)',
+    'previous_windows' => 'Bản Windows cũ (Windows.old)',
+    'wsl_disk' => 'Ổ đĩa Linux của WSL',
+    'docker_data' => 'Dữ liệu Docker Desktop',
+    'virtual_machine_disk' => 'Ổ đĩa máy ảo',
+    'game_library' => 'Game đã cài',
+    'phone_backup' => 'Bản sao lưu iPhone / iPad',
+    'android_dev' => 'Android SDK và máy ảo Android',
+    'ai_models' => 'Model AI đã tải',
+    _ => id,
+  };
+  @override
+  String cleanerSuggestionDetail(String id) => switch (id) {
+    'downloads_leftovers' =>
+      'Bộ cài, file ảnh đĩa và file nén không đụng tới hơn 30 ngày. Thường '
+          'chỉ cần dùng một lần.',
+    'old_large_files' =>
+      'File lớn của bạn lâu rồi không có hoạt động. Cũ không có nghĩa là '
+          'không cần: nếu không chắc, hãy chuyển sang ổ khác.',
+    'node_modules' =>
+      'Thư viện của dự án JavaScript. Xoá ở các dự án không còn làm; chạy '
+          '"npm install" để cài lại.',
+    'hibernation_file' =>
+      'Lưu bộ nhớ cho chế độ ngủ đông và Fast Startup. Nếu không dùng ngủ '
+          'đông, chạy "powercfg /h off" trong terminal quyền Admin để gỡ.',
+    'previous_windows' =>
+      'Được giữ lại sau khi nâng cấp Windows để có thể quay về. Xoá trong '
+          'Lưu trữ > File tạm khi bản nâng cấp đã ổn định.',
+    'wsl_disk' =>
+      'Ổ đĩa ảo Linux không tự co lại. Xoá file bên trong Linux, chạy '
+          '"wsl --shutdown", rồi thu gọn ổ đĩa.',
+    'docker_data' =>
+      'Image, container và build cache. Kiểm tra bằng "docker system df" '
+          'rồi dọn những gì không cần.',
+    'virtual_machine_disk' =>
+      'Ổ đĩa của máy ảo. Xoá máy ảo không dùng trong trình quản lý máy ảo.',
+    'game_library' =>
+      'Gỡ game không còn chơi từ launcher của game; có thể tải lại sau.',
+    'phone_backup' =>
+      'Bản sao lưu thiết bị từ Apple Devices / iTunes. Xoá bản cũ trong ứng '
+          'dụng đó.',
+    'android_dev' =>
+      'Xoá system image và máy ảo không dùng trong Android Studio.',
+    'ai_models' =>
+      'File model từ Ollama, LM Studio... Xoá model không dùng ngay trong '
+          'công cụ đó.',
+    _ => '',
+  };
   @override
   String get cleanerAppsLoading => 'Đang phân tích ứng dụng đã cài...';
   @override

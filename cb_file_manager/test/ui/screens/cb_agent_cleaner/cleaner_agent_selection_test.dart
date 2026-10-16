@@ -5,6 +5,7 @@ import 'package:cb_file_manager/config/languages/app_localizations_delegate.dart
 import 'package:cb_file_manager/bloc/ai_agent/ai_agent_bloc.dart';
 import 'package:cb_file_manager/bloc/ai_agent/ai_agent_event.dart';
 import 'package:cb_file_manager/bloc/ai_agent/ai_agent_state.dart';
+import 'package:cb_file_manager/models/ai/ai_provider_model.dart';
 import 'package:cb_file_manager/services/ai/ai_provider_service.dart';
 import 'package:cb_file_manager/ui/screens/ai_chat/ai_panel_controller.dart';
 import 'package:cb_file_manager/services/disk_cleaner/cleaner_models.dart';
@@ -20,6 +21,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:get_it/get_it.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class _Cleaner extends DiskCleanerService {
@@ -45,13 +47,46 @@ class _Cleaner extends DiskCleanerService {
 }
 
 class _ReviewBloc extends AiAgentBloc {
+  final reviewRequests = <SendMessage>[];
   _ReviewBloc() : super(providerService: AiProviderService());
   void beginReview() => emit(const AiAgentState(isLoading: true));
+
+  @override
+  void add(AiAgentEvent event) {
+    if (event is SendMessage) {
+      reviewRequests.add(event);
+      return;
+    }
+    super.add(event);
+  }
+}
+
+class _AvailableProvider extends AiProviderService {
+  @override
+  Future<List<AiProviderConfig>> getEnabledProviders() async => const [
+    AiProviderConfig(
+      id: 'test',
+      name: 'Test',
+      apiType: AiApiType.openaiCompatible,
+      apiKey: '',
+      endpoint: '',
+      modelName: 'test',
+      createdAt: 0,
+      updatedAt: 0,
+    ),
+  ];
 }
 
 class _Panel extends AiPanelController {
   final AiAgentBloc reviewBloc;
+  var openCalls = 0;
   _Panel(this.reviewBloc);
+
+  @override
+  void open({String? path, String? tabId}) {
+    openCalls++;
+    super.open(path: path, tabId: tabId);
+  }
 
   @override
   AiAgentBloc blocForTab(
@@ -68,6 +103,9 @@ void main() {
     'agent selection checks and reveals exact scan rows and keeps deletion behind review',
     (tester) async {
       SharedPreferences.setMockInitialValues({});
+      GetIt.instance.pushNewScope();
+      GetIt.instance.registerSingleton<AiProviderService>(_AvailableProvider());
+      addTearDown(GetIt.instance.popScope);
       if (Platform.environment['CB_CLEANER_REVIEW_PREVIEW'] == 'true') {
         await tester.runAsync(() async {
           final textFont = FontLoader('CleanerPreview');
@@ -179,6 +217,21 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('cleaner-scan-cta')));
       await tester.pumpAndSettle();
 
+      expect(find.text('Quick review'), findsOneWidget);
+      await tester.tap(
+        find.byKey(const ValueKey('cleaner-agent-select-recommendations')),
+      );
+      // Open the chat synchronously, before review processing or a new frame.
+      expect(panel.openCalls, 1);
+      expect(panel.isOpen, isTrue);
+      expect(panel.ownerTabId, tabId);
+      expect(panel.currentPath, '#cb-agent-cleaner');
+      await tester.pumpAndSettle();
+      expect(panel.openCalls, 1);
+      expect(panel.isOpen, isTrue);
+      expect(reviewBloc.reviewRequests, hasLength(1));
+      expect(reviewBloc.reviewRequests.single.reviewEntireCleanerScan, isTrue);
+
       expect(find.text('first.tmp'), findsNothing);
       await tester.tap(find.text('keep.iso').first);
       await tester.pumpAndSettle();
@@ -195,7 +248,12 @@ void main() {
       );
       reviewBloc.beginReview();
       expect(interact(first).error, isNull);
-      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 200));
+      final reviewingButton = tester.widget<FilledButton>(
+        find.byKey(const ValueKey('cleaner-agent-select-recommendations')),
+      );
+      expect(reviewingButton.onPressed, isNull);
+      expect(find.byType(CircularProgressIndicator), findsWidgets);
       expect(
         find.byKey(ValueKey('cleaner-agent-inspecting-${first.fullPath}')),
         findsOneWidget,
@@ -305,6 +363,70 @@ void main() {
       }
       expect(cleaner.pendingCleanupItems, isEmpty);
       expect(cleaner.pendingCleanupBytes, 0);
+
+      // Group verdicts select safe members and preserve explicit user checks.
+      expect(select([personal.fullPath]).error, isNull);
+      final fullReview = cleaner.beginFullCleanerReview(tabId);
+      await fullReview.prepareGroups(checkActive: () {});
+      final safeGroup = fullReview.groups.firstWhere(
+        (group) => group.nodes.contains(first),
+      );
+      expect(safeGroup.nodes, containsAll([first, second]));
+      expect(interact(safeGroup.representative).error, isNull);
+      cleaner.applyFullReviewGroup(
+        ownerTabId: tabId,
+        review: fullReview,
+        group: safeGroup,
+        analysis: firstAnalysis,
+      );
+      await tester.pumpAndSettle();
+      expect(first.isSelectedForDeletion, isTrue);
+      expect(second.isSelectedForDeletion, isTrue);
+      expect(personal.isSelectedForDeletion, isTrue);
+      expect(fullReview.analysisForPath(first.fullPath), same(firstAnalysis));
+      expect(find.text('2 entries assessed together'), findsOneWidget);
+      expect(interact(safeGroup.representative).error, isNull);
+      cleaner.applyFullReviewGroup(
+        ownerTabId: tabId,
+        review: fullReview,
+        group: safeGroup,
+        analysis: secondAnalysis,
+      );
+      await tester.pumpAndSettle();
+      expect(first.isSelectedForDeletion, isFalse);
+      expect(second.isSelectedForDeletion, isFalse);
+      expect(personal.isSelectedForDeletion, isTrue);
+      expect(fullReview.analysisForPath(first.fullPath), same(secondAnalysis));
+      expect(select([first.fullPath, second.fullPath]).error, isNull);
+      await tester.pumpAndSettle();
+
+      // A completed group review exposes the visual overview in the main
+      // results area. Its navigation preserves the user's exact checks.
+      expect(
+        find.byKey(const ValueKey('cleaner-review-overview')),
+        findsNothing,
+      );
+      for (final group in fullReview.groups.where((g) => g.analysis == null)) {
+        expect(interact(group.representative).error, isNull);
+        cleaner.applyFullReviewGroup(
+          ownerTabId: tabId,
+          review: fullReview,
+          group: group,
+          analysis: personalAnalysis,
+        );
+      }
+      await tester.pumpAndSettle();
+      expect(fullReview.isComplete, isTrue);
+      expect(
+        find.byKey(const ValueKey('cleaner-review-overview')),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(ValueKey('cleaner-summary-${safeGroup.id}')));
+      await tester.pumpAndSettle();
+      expect(first.isSelectedForDeletion, isTrue);
+      expect(second.isSelectedForDeletion, isTrue);
+      expect(personal.isSelectedForDeletion, isFalse);
+      expect(tester.takeException(), isNull);
 
       // A response arriving after the user switches tabs cannot modify this tree.
       tabs.add(AddTab(path: '#home'));

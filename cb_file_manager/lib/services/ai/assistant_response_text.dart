@@ -43,3 +43,28 @@ String extractAssistantReasoning(String text) {
       .where((block) => block.isNotEmpty)
       .join('\n\n');
 }
+
+/// A short closing promise to inspect data is an intermediate step, not an
+/// answer. Request another model round; never infer or execute a tool from it.
+bool endsWithPendingInspection(String text) {
+  final visible = stripAssistantReasoning(text);
+  final lines = visible.split('\n').where((line) => line.trim().isNotEmpty);
+  if (lines.isEmpty) return false;
+  final last = lines.last.trim().replaceAll(RegExp(r'[*_`]'), '').toLowerCase();
+  if (last.length > 500 || last.endsWith('?')) return false;
+  if (RegExp(r'[.!]\s+\S').hasMatch(last)) return false;
+  // Conditional offers and requests for user input are valid stopping points.
+  if (RegExp(
+    r'\b(?:if you|once you|after you|when you|later|tomorrow)\b|'
+    r'nếu bạn|khi bạn|sau khi bạn|nếu anh|nếu chị|ngày mai',
+  ).hasMatch(last)) {
+    return false;
+  }
+  return RegExp(
+    r'^(?:(?:để|to)\s+[^.!?\n]{1,180}[,:]\s*)?'
+    r'(?:(?:tôi|mình|em|chúng ta)\s+sẽ\s+'
+    r'(?:kiểm tra|xem|tìm|đọc|quét|phân tích)|'
+    r'(?:i(?: will|[\x27’]ll| am going to)|let me)\s+'
+    r'(?:check|inspect|search|read|scan|look|analyze|analyse)\b)',
+  ).hasMatch(last);
+}

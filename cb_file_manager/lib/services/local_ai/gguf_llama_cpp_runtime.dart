@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import '../../models/local_ai/local_ai_advisor_model.dart';
+import '../../utils/app_logger.dart';
 import 'windows_process_reaper.dart';
 import 'llama_cpp_chat_client.dart';
 
@@ -19,7 +20,10 @@ import 'llama_cpp_chat_client.dart';
 /// and reused across requests. It is only restarted when the selected model or
 /// the configured context window changes.
 class GgufLlamaCppLocalAiChatRuntime
-    implements LocalAiChatRuntime, LocalAiConversationRuntime {
+    implements
+        LocalAiChatRuntime,
+        LocalAiConversationRuntime,
+        LocalAiDirectConversationRuntime {
   /// GPU layers to offload. 99 offloads all layers to the GPU (via the bundled
   /// Vulkan backend); the server falls back to CPU for layers the GPU cannot
   /// fit. Set to 0 to force CPU-only inference.
@@ -105,6 +109,33 @@ class GgufLlamaCppLocalAiChatRuntime
     required List<Map<String, String>> messages,
     String? systemPrompt,
     int maxTokens = 4096,
+  }) => _sendConversationStream(
+    model: model,
+    messages: messages,
+    systemPrompt: systemPrompt,
+    maxTokens: maxTokens,
+  );
+
+  @override
+  Stream<String> sendDirectConversationStream({
+    required InstalledLocalModel model,
+    required List<Map<String, String>> messages,
+    String? systemPrompt,
+    int maxTokens = 4096,
+  }) => _sendConversationStream(
+    model: model,
+    messages: messages,
+    systemPrompt: systemPrompt,
+    maxTokens: maxTokens,
+    enableThinking: false,
+  );
+
+  Stream<String> _sendConversationStream({
+    required InstalledLocalModel model,
+    required List<Map<String, String>> messages,
+    String? systemPrompt,
+    int maxTokens = 4096,
+    bool? enableThinking,
   }) async* {
     final modelPath = model.localPath;
     // Restart the server if the model or context window changed.
@@ -140,6 +171,7 @@ class GgufLlamaCppLocalAiChatRuntime
       ],
       maxResponseTokens: nPredict,
       catalogId: model.catalogId,
+      enableThinking: enableThinking,
     );
   }
 
@@ -204,6 +236,11 @@ class GgufLlamaCppLocalAiChatRuntime
     unawaited(
       process.exitCode.then((code) {
         if (identical(_serverProcess, process)) {
+          AppLogger.error(
+            '[LocalAI] llama-server exited unexpectedly: '
+            'pid=${process.pid}, exit=$code '
+            '(0x${(code & 0xffffffff).toRadixString(16).padLeft(8, '0')}).',
+          );
           _serverProcess = null;
           _serverPort = null;
           _loadedModelPath = null;

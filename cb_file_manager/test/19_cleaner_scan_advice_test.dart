@@ -104,7 +104,8 @@ void main() {
         ),
       );
 
-      expect(result.output, contains('Largest folders'));
+      expect(result.output, contains('Space hotspots'));
+      expect(result.output, contains('Known space causes'));
       expect(result.output, contains('Largest files'));
       expect(result.output, contains(r'installer.iso'));
       expect(result.output, contains('owner=User Downloads'));

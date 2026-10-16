@@ -3570,19 +3570,23 @@ class EnglishLocalizations implements AppLocalizations {
   String get diskCleanerAskAgent => 'Ask CB Agent';
 
   @override
-  String get diskCleanerSuggestAndSelect => 'Suggest & select';
+  String get diskCleanerSuggestAndSelect => 'Quick review';
+  @override
+  String get diskCleanerAdviceFromScan => 'Based on scan metadata';
+  @override
+  String get diskCleanerAdviceFromAi => 'AI recommendation';
 
   @override
   String get diskCleanerAiSelectRecommendationsRequest =>
-      'Interact directly with my completed scan. Inspect a few important '
-      'files/folders one at a time using inspect_cleaner_scan_item so I can '
-      'see which row you are examining. Then use set_cleaner_scan_item_analysis '
-      'to explain whether to clean, review or keep each item on this screen. '
-      'Use select:true for recommended CLEAN items. Leave REVIEW and KEEP '
-      'unchecked. Use the latest scan_id returned by each interaction. '
-      'Do not delete any files. Answer in English.';
+      'Give a quick overview from scan metadata: what the data is and whether '
+      'to keep it or consider removing it. Use short group explanations; '
+      'review only a small number of unclear groups with AI. '
+      'Do not read file contents, select files or delete anything. Answer in English.';
   @override
   String get diskCleanerAgentAnalysisTitle => 'CB Agent analysis';
+  @override
+  String diskCleanerAgentGroupCount(int count) =>
+      '$count entries assessed together';
   @override
   String get diskCleanerAgentInspecting => 'CB Agent is examining this item';
   @override
@@ -4021,6 +4025,167 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get cleanerAppsUtilityDescription =>
       'Find large or rarely used apps and review their data';
+
+  // Cleaner - cleanup suggestions
+  @override
+  String get cleanerSuggestionsTitle => 'Cleanup suggestions';
+  @override
+  String get cleanerSuggestionsUtilityDescription =>
+      'Scan for things worth cleaning on this drive';
+  @override
+  String get cleanerSuggestionsIntro =>
+      'Finds junk files, leftover installers, old large files and space that '
+      'Windows can reclaim, and explains why each one is suggested. Nothing '
+      'is deleted until you confirm, and files go to the Recycle Bin.';
+  @override
+  String get cleanerSuggestionsScan => 'Scan for suggestions';
+  @override
+  String get cleanerSuggestionsStepJunk =>
+      'Checking caches and temporary files...';
+  @override
+  String get cleanerSuggestionsStepDownloads =>
+      'Checking the Downloads folder...';
+  @override
+  String get cleanerSuggestionsStepSystem => 'Checking Windows system files...';
+  @override
+  String get cleanerSuggestionsStepDiskScan =>
+      'Reviewing the Disk usage results...';
+  @override
+  String cleanerSuggestionsFoundItems(int count) => '$count items found';
+  @override
+  String cleanerSuggestionsFoundSize(String size) => '$size found';
+  @override
+  String get cleanerSuggestionsSourcesTitle => 'Sources checked';
+  @override
+  String get cleanerSuggestionsSourceDownloads => 'Downloads folder';
+  @override
+  String get cleanerSuggestionsSourceSystem => 'Windows system files';
+  @override
+  String get cleanerSuggestionsSourceDiskScan => 'Disk usage results';
+  @override
+  String get cleanerSuggestionsTierClean => 'Safe to clean';
+  @override
+  String get cleanerSuggestionsTierCleanHint =>
+      'Recreated automatically by Windows or apps.';
+  @override
+  String get cleanerSuggestionsTierReview => 'Review before cleaning';
+  @override
+  String get cleanerSuggestionsTierReviewHint =>
+      'Usually removable, but check that you no longer need them.';
+  @override
+  String get cleanerSuggestionsTierGuided => 'Free up with Windows tools';
+  @override
+  String get cleanerSuggestionsTierGuidedHint =>
+      'Do not delete these directly; use the suggested tool instead.';
+  @override
+  String cleanerSuggestionsReclaimable(String size) =>
+      'Up to $size can be freed';
+  @override
+  String cleanerSuggestionsSelected(String size, int count) =>
+      'Selected: $size in $count items';
+  @override
+  String get cleanerSuggestionsNothing =>
+      'Nothing worth cleaning was found on this drive.';
+  @override
+  String get cleanerSuggestionsDiskScanHint =>
+      'Run a Disk usage scan of this drive to also find large unused files, '
+      'node_modules folders and virtual disks.';
+  @override
+  String get cleanerSuggestionsConfirmTitle => 'Move to Recycle Bin?';
+  @override
+  String cleanerSuggestionsConfirmBody(int count, String size) =>
+      '$count items ($size) will be moved to the Recycle Bin. You can restore '
+      'them from there.';
+  @override
+  String cleanerSuggestionsConfirmPersonal(int count) =>
+      '$count of them are your own files, not junk. Make sure you no longer '
+      'need them.';
+  @override
+  String cleanerSuggestionsConfirmRecycleBin(int count) =>
+      '$count items already in the Recycle Bin will be deleted permanently.';
+  @override
+  String cleanerSuggestionsCleaned(String size) =>
+      'Cleaned $size. Files moved to the Recycle Bin still use space until '
+      'it is emptied.';
+  @override
+  String get cleanerSuggestionsCopyCommand => 'Copy command';
+  @override
+  String cleanerSuggestionsCommandCopied(String command) =>
+      'Copied "$command". Run it in Terminal (Admin).';
+  @override
+  String get cleanerSuggestionsOpenSettings => 'Open Windows settings';
+  @override
+  String cleanerSuggestionsShowItems(int count) => 'Show $count items';
+  @override
+  String get cleanerSuggestionsHideItems => 'Hide items';
+  @override
+  String cleanerSuggestionsAtLeast(String size) => 'at least $size';
+  @override
+  String cleanerSuggestionsMoreItems(int count) => '... and $count more';
+  @override
+  String cleanerSuggestionsScanFailed(String error) =>
+      'Could not scan for suggestions: $error';
+  @override
+  String get cleanerSuggestionsJunkScanBusy =>
+      'Another junk scan is running (Quick clean or CB Agent), so caches and '
+      'temporary files were skipped. Scan again when it finishes.';
+  @override
+  String cleanerSuggestionsPartialScan(String error) =>
+      'Part of the scan failed, so some suggestions may be missing: $error';
+  @override
+  String cleanerSuggestionTitle(String id) => switch (id) {
+    'downloads_leftovers' => 'Old installers and archives in Downloads',
+    'old_large_files' => 'Large files not used for a long time',
+    'node_modules' => 'node_modules folders',
+    'hibernation_file' => 'Hibernation file',
+    'previous_windows' => 'Previous Windows installation',
+    'wsl_disk' => 'WSL Linux disk',
+    'docker_data' => 'Docker Desktop data',
+    'virtual_machine_disk' => 'Virtual machine disks',
+    'game_library' => 'Installed games',
+    'phone_backup' => 'iPhone / iPad backups',
+    'android_dev' => 'Android SDK and emulators',
+    'ai_models' => 'Downloaded AI models',
+    _ => id,
+  };
+  @override
+  String cleanerSuggestionDetail(String id) => switch (id) {
+    'downloads_leftovers' =>
+      'Installers, disk images and archives not touched for 30+ days. They '
+          'are usually only needed once.',
+    'old_large_files' =>
+      'Your own large files with no recent activity. Old does not mean '
+          'unneeded: move them to another drive if unsure.',
+    'node_modules' =>
+      'JavaScript dependencies. Remove them from projects you no longer work '
+          'on; "npm install" restores them.',
+    'hibernation_file' =>
+      'Stores memory for hibernate and Fast Startup. Run "powercfg /h off" '
+          'in an admin terminal to remove it if you do not use hibernate.',
+    'previous_windows' =>
+      'Kept after a Windows upgrade so you can roll back. Remove it under '
+          'Storage > Temporary files once the upgrade is stable.',
+    'wsl_disk' =>
+      'Linux virtual disk that does not shrink by itself. Delete files '
+          'inside Linux, run "wsl --shutdown", then compact the disk.',
+    'docker_data' =>
+      'Images, containers and build cache. Check with "docker system df" '
+          'and prune what you no longer need.',
+    'virtual_machine_disk' =>
+      'Virtual machine disks. Remove unused VMs from their VM manager.',
+    'game_library' =>
+      'Uninstall games you no longer play from their launcher; they can be '
+          'downloaded again.',
+    'phone_backup' =>
+      'Device backups from Apple Devices / iTunes. Delete old backups from '
+          'the app.',
+    'android_dev' =>
+      'Remove unused system images and emulators from Android Studio.',
+    'ai_models' =>
+      'Model files from tools like Ollama or LM Studio. Remove models you no '
+          'longer use from the tool.',
+    _ => '',
+  };
   @override
   String get cleanerAppsLoading => 'Analyzing installed apps...';
   @override

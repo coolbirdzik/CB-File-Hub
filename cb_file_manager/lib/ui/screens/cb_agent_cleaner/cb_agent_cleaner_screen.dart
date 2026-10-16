@@ -44,11 +44,14 @@ import '../../../services/disk_cleaner/disk_tree_node.dart';
 import '../../../services/disk_cleaner/disk_tree_selection.dart';
 import '../../../services/disk_cleaner/cleaner_agent_review.dart';
 import 'cleaner_agent_analysis_panel.dart';
+import 'cleaner_review_overview.dart';
 import '../../../services/disk_cleaner/full_disk_scan_isolate.dart';
 import '../../tab_manager/core/tab_manager.dart';
 import '../../widgets/app_progress_indicator.dart';
 import '../ai_chat/ai_panel_controller.dart';
 import 'cleaner_apps_view.dart';
+import 'cleaner_suggestions_view.dart';
+import '../../../services/disk_cleaner/cleaner_suggestions.dart';
 import 'cleaner_utilities_shell.dart';
 
 /// Full disk analyzer + cleaner screen (TreeSize-style).
@@ -193,7 +196,7 @@ enum _CleanDeleteMode { recycleBin, permanent }
 /// about reclaiming space, instead of requiring them to walk the hierarchy.
 enum _TreePreset { none, largeFiles, logsAndCaches, installers }
 
-enum _CleanerSubFeature { diskCleaner, appInsights }
+enum _CleanerSubFeature { diskCleaner, appInsights, suggestions }
 
 class _AppInsightsEvidence {
   final InstalledAppInventoryResult inventory;
@@ -360,6 +363,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
   final Set<DiskTreeNode> _agentCheckedTargets = {};
   StreamSubscription<AiAgentState>? _agentReviewStateSub;
   String? _agentReviewStateTabId;
+  bool _agentReviewLoading = false;
   bool _showCleanableOnly = false;
   _TreePreset _activePreset = _TreePreset.none;
 
@@ -1580,8 +1584,8 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
 
   void _askAiToSelectRecommendations() {
     _sendToAi(
-      '${_buildAiSummary()}\n'
-      '${AppLocalizations.of(context)!.diskCleanerAiSelectRecommendationsRequest}',
+      AppLocalizations.of(context)!.diskCleanerAiSelectRecommendationsRequest,
+      reviewEntireCleanerScan: true,
     );
   }
 
@@ -1652,7 +1656,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     );
   }
 
-  void _sendToAi(String message) {
+  void _sendToAi(String message, {bool reviewEntireCleanerScan = false}) {
     final controller = AiPanelScope.maybeOf(context);
     if (controller == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1673,11 +1677,22 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     controller.open(path: '#cb-agent-cleaner', tabId: tabId);
     final bloc = controller.blocForTab(
       tabId,
+      initialPath: '#cb-agent-cleaner',
       thinkingPhrases: const ['Analyzing...', 'Checking...'],
       waitingApproval: 'Waiting for approval...',
       runningToolTemplate: 'Running {}...',
     );
-    bloc.add(SendMessage(message));
+    if (reviewEntireCleanerScan) {
+      _watchAgentReviewState(tabId, restart: true);
+    }
+    bloc.add(
+      SendMessage(
+        message,
+        reviewEntireCleanerScan: reviewEntireCleanerScan,
+        startNewConversation: reviewEntireCleanerScan,
+        cleanerReviewLanguageCode: Localizations.localeOf(context).languageCode,
+      ),
+    );
   }
 
   String _buildAiSummary() {
@@ -1685,7 +1700,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     if (root == null) return 'Please scan my disk for junk files.';
     final buffer = StringBuffer();
     buffer.writeln(
-      'Please inspect the current CB Agent Cleaner scan. Call get_current_cleaner_scan first, then inspect and assess a few important items directly on the scan screen using inspect_cleaner_scan_item and set_cleaner_scan_item_analysis.',
+      'Please inspect the current CB Agent Cleaner scan. Call get_current_cleaner_scan first and explain what is actually filling the drive: investigate the hotspots and known causes with explore_cleaner_scan and search_cleaner_scan. Inspect and assess items directly on the scan screen using inspect_cleaner_scan_item and set_cleaner_scan_item_analysis.',
     );
     buffer.writeln();
     buffer.writeln('I scanned drive ${root.fullPath}:');
@@ -2027,6 +2042,13 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
               group: l.cleanerUtilitiesStorageGroup,
               icon: PhosphorIconsLight.appWindow,
             ),
+            CleanerUtilityDestination(
+              id: _CleanerSubFeature.suggestions.name,
+              title: l.cleanerSuggestionsTitle,
+              description: l.cleanerSuggestionsUtilityDescription,
+              group: l.cleanerUtilitiesStorageGroup,
+              icon: PhosphorIconsLight.sparkle,
+            ),
           ];
           return CleanerUtilitiesShell(
             title: l.cleanerUtilitiesTitle,
@@ -2042,7 +2064,11 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
               _setSubFeature(selected);
             },
             child: IndexedStack(
-              index: feature == _CleanerSubFeature.appInsights ? 1 : 0,
+              index: switch (feature) {
+                _CleanerSubFeature.diskCleaner => 0,
+                _CleanerSubFeature.appInsights => 1,
+                _CleanerSubFeature.suggestions => 2,
+              },
               children: [
                 RepaintBoundary(
                   key: const ValueKey<String>('cleaner-storage-results-pane'),
@@ -2054,6 +2080,10 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
                 RepaintBoundary(
                   key: const ValueKey<String>('cleaner-apps-results-pane'),
                   child: _buildAppsFeature(theme, l),
+                ),
+                RepaintBoundary(
+                  key: const ValueKey<String>('cleaner-suggestions-pane'),
+                  child: _buildSuggestionsFeature(l),
                 ),
               ],
             ),
@@ -2496,6 +2526,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     final tabId = widget.tabId ?? _activeTabId();
     if (tabId == null || tabId.isEmpty) return;
     _publishedCleanerContextTabId = tabId;
+    final scanResult = identical(_lastDiskScanResult?.root, _rootNode)
+        ? _lastDiskScanResult
+        : null;
     _service.publishCleanerScanContext(
       ownerTabId: tabId,
       root: _rootNode,
@@ -2512,6 +2545,11 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       reviewItem: _canSelectAgentTargets
           ? (node, analysis) => _reviewAgentItem(tabId, node, analysis)
           : null,
+      reviewGroup: _canSelectAgentTargets
+          ? (group, analysis) => _reviewAgentGroup(tabId, group, analysis)
+          : null,
+      coverageIssues: scanResult?.coverageIssues ?? const [],
+      oldLargeItems: scanResult?.oldLargeItems ?? const [],
     );
   }
 
@@ -2522,12 +2560,18 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
   ) {
     if (!_canSelectAgentTargets || _activeTabId() != tabId) return false;
     _chartUpdateTimer?.cancel();
+    final filtersChanged =
+        _showCleanableOnly ||
+        _showGrowthOnly ||
+        _activePreset != _TreePreset.none;
     setState(() {
       _showCleanableOnly = false;
       _showGrowthOnly = false;
       _activePreset = _TreePreset.none;
-      _invalidatePresetCache();
-      _flatRowsValid = false;
+      if (filtersChanged) {
+        _invalidatePresetCache();
+        _flatRowsValid = false;
+      }
       _agentInspectingNode = analysis == null ? node : null;
       if (analysis != null) {
         _agentReviewedItems[node.fullPath] = CleanerReviewedItem(
@@ -2553,8 +2597,8 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     return true;
   }
 
-  void _watchAgentReviewState(String tabId) {
-    if (_agentReviewStateTabId == tabId) return;
+  void _watchAgentReviewState(String tabId, {bool restart = false}) {
+    if (_agentReviewStateTabId == tabId && !restart) return;
     final controller = AiPanelScope.maybeOf(context);
     if (controller == null) return;
     _agentReviewStateSub?.cancel();
@@ -2566,15 +2610,93 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       runningToolTemplate: 'Running {}...',
     );
     _agentReviewStateSub = bloc.stream.listen((state) {
-      if (!mounted || state.isLoading || _agentInspectingNode == null) return;
-      // Completion, failure and Stop all end the live inspecting indicator.
-      setState(() => _agentInspectingNode = null);
+      if (!mounted) return;
+      final clearInspection = !state.isLoading && _agentInspectingNode != null;
+      if (_agentReviewLoading == state.isLoading && !clearInspection) return;
+      setState(() {
+        _agentReviewLoading = state.isLoading;
+        // Completion, failure and Stop all end the live inspecting indicator.
+        if (clearInspection) _agentInspectingNode = null;
+      });
     });
+  }
+
+  bool _reviewAgentGroup(
+    String tabId,
+    CleanerReviewGroup group,
+    CleanerItemAnalysis analysis,
+  ) {
+    if (!_canSelectAgentTargets || _activeTabId() != tabId) return false;
+    final previousTargets = analysis.selectForCleanup
+        ? _selectedTreeTargets.toSet()
+        : const <DiskTreeNode>{};
+    Set<DiskTreeNode>? nextTargets;
+    final review = _service.fullCleanerReview(tabId);
+    final indexedGroup =
+        identical(review?.root, _rootNode) && review!.ownsGroup(group);
+    setState(() {
+      _agentInspectingNode = null;
+      // Quick review changes advice, not every member row. Use the prepared
+      // index to visit only existing UI entries and agent-owned checks, even
+      // when a single group contains hundreds of thousands of files.
+      bool belongsToGroup(DiskTreeNode node) => indexedGroup
+          ? identical(review.groupForPath(node.fullPath), group)
+          : group.nodes.contains(node);
+      if (group.nodes.length <=
+          _agentReviewedItems.length + _agentCheckedTargets.length) {
+        for (final node in group.nodes) {
+          _agentReviewedItems.remove(node.fullPath);
+          if (!analysis.selectForCleanup && _agentCheckedTargets.remove(node)) {
+            (nextTargets ??= _selectedTreeTargets.toSet()).remove(node);
+          }
+        }
+      } else {
+        _agentReviewedItems.removeWhere((_, item) => belongsToGroup(item.node));
+        if (!analysis.selectForCleanup) {
+          final withdrawn = _agentCheckedTargets.where(belongsToGroup).toList();
+          for (final node in withdrawn) {
+            _agentCheckedTargets.remove(node);
+            (nextTargets ??= _selectedTreeTargets.toSet()).remove(node);
+          }
+        }
+      }
+      _agentReviewedItems[group.representative.fullPath] = CleanerReviewedItem(
+        node: group.representative,
+        analysis: analysis,
+        coveredItems: group.nodes.length,
+      );
+    });
+    if (analysis.selectForCleanup) {
+      // CLEAN groups contain only scanner-confirmed safe files or empty folders.
+      // Never select a parent folder on the strength of its members' verdict.
+      _replaceTreeTargets(
+        _canonicalTreeTargets([..._selectedTreeTargets, ...group.nodes]),
+      );
+      _agentCheckedTargets.addAll(
+        group.nodes.where(
+          (node) =>
+              _selectedTreeTargets.contains(node) &&
+              !previousTargets.contains(node),
+        ),
+      );
+      _rootNode?.invalidateSelectionCache();
+    } else if (nextTargets != null) {
+      _replaceTreeTargets(nextTargets!);
+      _rootNode?.invalidateSelectionCache();
+    }
+    _watchAgentReviewState(tabId);
+    _publishCleanerScanContext();
+    return true;
   }
 
   DiskTreeNode? _parentOfScannedNode(DiskTreeNode target) {
     final root = _rootNode;
     if (root == null) return null;
+    final review = _service.fullCleanerReview(widget.tabId ?? _activeTabId());
+    if (identical(review?.root, root)) {
+      final parent = review?.parentOf(target);
+      if (parent != null) return parent;
+    }
     final stack = <DiskTreeNode>[root];
     while (stack.isNotEmpty) {
       final node = stack.removeLast();
@@ -2625,19 +2747,29 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
   }
 
   Set<DiskTreeNode> _canonicalTreeTargets(Iterable<DiskTreeNode> nodes) {
-    final sorted = nodes.where((node) => node.fullPath.isNotEmpty).toList()
-      ..sort((a, b) {
-        final aPath = AppStorageAnalyzer.normalizeWindowsPath(a.fullPath);
-        final bPath = AppStorageAnalyzer.normalizeWindowsPath(b.fullPath);
-        return aPath.length.compareTo(bPath.length);
-      });
+    final paths = {
+      for (final node in nodes)
+        if (node.fullPath.isNotEmpty)
+          node: AppStorageAnalyzer.normalizeWindowsPath(node.fullPath),
+    };
+    final sorted = paths.keys.toList()
+      ..sort((a, b) => paths[a]!.length.compareTo(paths[b]!.length));
     final targets = <DiskTreeNode>{};
-    final targetPaths = <String>[];
+    final targetPaths = <String>{};
     for (final node in sorted) {
-      final path = AppStorageAnalyzer.normalizeWindowsPath(node.fullPath);
-      if (targetPaths.any(
-        (parent) => AppStorageAnalyzer.isSameOrDescendant(path, parent),
-      )) {
+      final path = paths[node]!;
+      var ancestor = path;
+      var covered = false;
+      while (ancestor.isNotEmpty) {
+        if (targetPaths.contains(ancestor)) {
+          covered = true;
+          break;
+        }
+        final slash = ancestor.lastIndexOf(r'\');
+        if (slash < 0) break;
+        ancestor = ancestor.substring(0, slash);
+      }
+      if (covered) {
         continue;
       }
       targets.add(node);
@@ -2891,7 +3023,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
           unawaited(_startAppInsightsScan());
         }
       }
-    } else {
+    } else if (feature == _CleanerSubFeature.diskCleaner) {
       _resultsFocusNode.requestFocus();
     }
     _publishCleanerScanContext();
@@ -3061,6 +3193,13 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
   Widget _buildResults(ThemeData theme, AppLocalizations l) {
     final root = _rootNode!;
     final viewNode = _chartNode ?? _selectedNode ?? root;
+    final review = _service.fullCleanerReview(widget.tabId ?? _activeTabId());
+    final showOverview =
+        identical(review?.root, root) &&
+        review!.isComplete &&
+        review.groups.isNotEmpty &&
+        !_isShowingCachedDiskScan &&
+        !_isScanningFullDisk;
     return Focus(
       focusNode: _resultsFocusNode,
       autofocus: true,
@@ -3074,39 +3213,68 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
           _buildOldLargeItemsPanel(theme, l, root),
           const Divider(height: 1),
           Expanded(
-            child: Row(
-              children: [
-                // Left: tree view (~65%)
-                Expanded(flex: 65, child: _buildTreePanel(theme, l, root)),
-                const VerticalDivider(width: 1),
-                // Right: pie chart (~35%). Old-large evidence is full-width
-                // above this split so folder rows remain easy to discover.
-                Expanded(
-                  flex: 35,
-                  child: Column(
-                    children: [
-                      if (_agentInspectingNode != null ||
-                          _agentReviewedItems.isNotEmpty) ...[
+            child: LayoutBuilder(
+              builder: (context, constraints) => Column(
+                children: [
+                  if (showOverview) ...[
+                    SizedBox(
+                      height: math.min(310.0, constraints.maxHeight * 0.48),
+                      child: CleanerReviewOverview(
+                        review: review,
+                        coverageIssueCount:
+                            _lastDiskScanResult?.coverageIssues.length ?? 0,
+                        onReveal: (node) => _revealNodeInTree(node),
+                      ),
+                    ),
+                    const Divider(height: 1),
+                  ],
+                  Expanded(
+                    child: Row(
+                      children: [
+                        // Left: tree view (~65%)
                         Expanded(
-                          flex: 45,
-                          child: CleanerAgentAnalysisPanel(
-                            key: const ValueKey('cleaner-agent-analysis-panel'),
-                            inspectingNode: _agentInspectingNode,
-                            focusedPath: _selectedNode?.fullPath,
-                            items: _agentReviewedItems.values.toList(),
-                            onReveal: (node) => _revealNodeInTree(node),
+                          flex: 65,
+                          child: _buildTreePanel(theme, l, root),
+                        ),
+                        const VerticalDivider(width: 1),
+                        // Right: pie chart (~35%). Old-large evidence is full-width
+                        // above this split so folder rows remain easy to discover.
+                        Expanded(
+                          flex: 35,
+                          child: Column(
+                            children: [
+                              if (_agentInspectingNode != null ||
+                                  _agentReviewedItems.isNotEmpty) ...[
+                                Expanded(
+                                  flex: 45,
+                                  child: CleanerAgentAnalysisPanel(
+                                    key: const ValueKey(
+                                      'cleaner-agent-analysis-panel',
+                                    ),
+                                    inspectingNode: _agentInspectingNode,
+                                    showSummary: false,
+                                    focusedPath: _selectedNode?.fullPath,
+                                    items: _agentReviewedItems.values.toList(),
+                                    review: _service.fullCleanerReview(
+                                      widget.tabId ?? _activeTabId(),
+                                    ),
+                                    onReveal: (node) => _revealNodeInTree(node),
+                                  ),
+                                ),
+                                const Divider(height: 1),
+                              ],
+                              Expanded(
+                                flex: 55,
+                                child: _buildPiePanel(theme, l, viewNode),
+                              ),
+                            ],
                           ),
                         ),
-                        const Divider(height: 1),
                       ],
-                      Expanded(
-                        flex: 55,
-                        child: _buildPiePanel(theme, l, viewNode),
-                      ),
-                    ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
           ValueListenableBuilder<Set<String>>(
@@ -3383,14 +3551,18 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
           FilledButton.tonalIcon(
             style: FilledButton.styleFrom(shape: _cleanerButtonShape),
             key: const ValueKey<String>('cleaner-agent-select-recommendations'),
-            onPressed: _canSelectAgentTargets
+            onPressed: _canSelectAgentTargets && !_agentReviewLoading
                 ? _askAiToSelectRecommendations
-                : _openAiPanel,
-            icon: const Icon(PhosphorIconsLight.sparkle, size: 16),
+                : null,
+            icon: _agentReviewLoading
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(PhosphorIconsLight.sparkle, size: 16),
             label: Text(
-              _canSelectAgentTargets
-                  ? l.diskCleanerSuggestAndSelect
-                  : l.diskCleanerAskAgent,
+              l.diskCleanerSuggestAndSelect,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -3646,7 +3818,10 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
                       selectedPaths: _selectedTreePathListenable,
                       focusedPath: _focusedTreePathListenable,
                       agentAnalysis:
-                          _agentReviewedItems[row.node.fullPath]?.analysis,
+                          _agentReviewedItems[row.node.fullPath]?.analysis ??
+                          _service
+                              .fullCleanerReview(widget.tabId ?? _activeTabId())
+                              ?.analysisForPath(row.node.fullPath),
                       agentInspecting: identical(
                         _agentInspectingNode,
                         row.node,
@@ -3728,6 +3903,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     if (root == null || target.fullPath.isEmpty) return;
 
     final targetUpper = target.fullPath.toUpperCase();
+    var structureChanged = false;
     bool expandTowards(DiskTreeNode node) {
       if (identical(node, target)) return true;
       for (final child in node.children) {
@@ -3739,6 +3915,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
           continue;
         }
         if (expandTowards(child)) {
+          structureChanged = structureChanged || !node.isExpanded;
           node.isExpanded = true;
           return true;
         }
@@ -3746,11 +3923,22 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       return false;
     }
 
-    expandTowards(root);
+    final review = _service.fullCleanerReview(widget.tabId ?? _activeTabId());
+    final ancestors = identical(review?.root, root)
+        ? review?.ancestorsOf(target)
+        : null;
+    if (ancestors != null) {
+      for (final ancestor in ancestors) {
+        structureChanged = structureChanged || !ancestor.isExpanded;
+        ancestor.isExpanded = true;
+      }
+    } else {
+      expandTowards(root);
+    }
 
     setState(() {
       _selectedNode = target;
-      _flatRowsValid = false;
+      if (structureChanged) _flatRowsValid = false;
     });
     _focusedTreePathListenable.value = target.fullPath;
     _selectionAnchorPath = target.fullPath;
@@ -5126,33 +5314,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
           .where((i) => succeededSet.contains(i.path))
           .toList();
 
-      // Prune deleted paths from the in-memory tree so returning to the
-      // results view shows the freed space without a re-scan.
-      if (_rootNode != null && succeededSet.isNotEmpty) {
-        _agentInspectingNode = null;
-        _agentReviewedItems.clear();
-        _agentCheckedTargets.clear();
-        final deletedUpper = succeededSet.map((p) => p.toUpperCase()).toSet();
-        _pruneDeletedPaths(_rootNode!, deletedUpper);
-        _recalculateTreeStats(_rootNode!);
-        _rootNode!.invalidateJunkCache();
-        _aggregateCacheRoot = null;
-        // If the currently-viewed pie node was deleted, fall back to root.
-        if (_selectedNode != null &&
-            deletedUpper.contains(_selectedNode!.fullPath.toUpperCase())) {
-          _selectedNode = _rootNode;
-          _chartNode = _rootNode;
-        }
-        _selectedTreeTargets.removeWhere(
-          (target) => deletedUpper.contains(target.fullPath.toUpperCase()),
-        );
-        _rebuildReviewVisibleTreePaths();
-        _publishTreeSelection();
-        if (_selectionAnchorPath != null &&
-            deletedUpper.contains(_selectionAnchorPath!.toUpperCase())) {
-          _selectionAnchorPath = null;
-        }
-      }
+      _pruneCleanedFromTree(succeededSet);
 
       setState(() {
         _isCleaningJunk = false;
@@ -5208,6 +5370,145 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
         ),
       );
     }
+  }
+
+  /// Prunes deleted paths from the in-memory tree so returning to the results
+  /// view shows the freed space without a re-scan.
+  void _pruneCleanedFromTree(Set<String> succeededSet) {
+    if (_rootNode == null || succeededSet.isEmpty) return;
+    _agentInspectingNode = null;
+    _agentReviewedItems.clear();
+    _agentCheckedTargets.clear();
+    final deletedUpper = succeededSet.map((p) => p.toUpperCase()).toSet();
+    _pruneDeletedPaths(_rootNode!, deletedUpper);
+    _recalculateTreeStats(_rootNode!);
+    _rootNode!.invalidateJunkCache();
+    _aggregateCacheRoot = null;
+    // If the currently-viewed pie node was deleted, fall back to root.
+    if (_selectedNode != null &&
+        deletedUpper.contains(_selectedNode!.fullPath.toUpperCase())) {
+      _selectedNode = _rootNode;
+      _chartNode = _rootNode;
+    }
+    _selectedTreeTargets.removeWhere(
+      (target) => deletedUpper.contains(target.fullPath.toUpperCase()),
+    );
+    _rebuildReviewVisibleTreePaths();
+    _publishTreeSelection();
+    if (_selectionAnchorPath != null &&
+        deletedUpper.contains(_selectionAnchorPath!.toUpperCase())) {
+      _selectionAnchorPath = null;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Cleanup suggestions
+  // ---------------------------------------------------------------------------
+
+  String get _suggestionsDrive =>
+      _selectedDrive ?? _defaultDrivePath(_drives) ?? r'C:\';
+
+  /// The Disk usage tree, when it is complete and belongs to the drive the
+  /// suggestions are for.
+  DiskTreeNode? get _suggestionsDiskTree {
+    final root = _rootNode;
+    if (root == null || _isScanningFullDisk) return null;
+    final drive = _suggestionsDrive.substring(0, 2).toUpperCase();
+    return root.fullPath.toUpperCase().startsWith(drive) ? root : null;
+  }
+
+  Future<CleanerSuggestionReport> _scanSuggestions(
+    void Function(CleanerSuggestionProgress progress) onProgress,
+  ) {
+    final tree = _suggestionsDiskTree;
+    final scanResult = identical(_lastDiskScanResult?.root, tree)
+        ? _lastDiskScanResult
+        : null;
+    return CleanerSuggestionScanner(
+      scanJunk: (drives, ids, onJunkProgress) => _service.scanJunk(
+        drivePaths: drives,
+        categoryIds: ids,
+        onProgress: onJunkProgress,
+      ),
+    ).scan(
+      drivePath: _suggestionsDrive,
+      diskTree: tree,
+      oldLargeItems: scanResult?.oldLargeItems ?? const [],
+      onProgress: onProgress,
+    );
+  }
+
+  /// Moves the items checked in Cleanup suggestions to the Recycle Bin
+  /// through the same guarded pipeline as the Disk usage cleanup.
+  Future<CleanReport?> _cleanSuggestionItems(
+    List<JunkItem> items,
+    void Function(int done, int total, String? path) onProgress,
+  ) async {
+    if (_isCleaningJunk || items.isEmpty) return null;
+    setState(() => _isCleaningJunk = true);
+    try {
+      final result = await _service.cleanJunk(
+        items: items,
+        permanent: false,
+        onDeleteFailure: _promptDeleteFailureAction,
+        onProgress: onProgress,
+      );
+      if (!mounted) return result;
+      _pruneCleanedFromTree(result.succeeded.toSet());
+      setState(() {
+        _cachedFlatRoot = null;
+        _flatRowsValid = false;
+      });
+      unawaited(_refreshFreeSpaceAfterClean());
+      if (result.skippedInUseCount > 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              AppLocalizations.of(
+                context,
+              )!.diskCleanerSkippedInUseSnack(result.skippedInUseCount),
+            ),
+          ),
+        );
+      }
+      return result;
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              AppLocalizations.of(
+                context,
+              )!.diskCleanerCleanupFailedMsg('$error'),
+            ),
+          ),
+        );
+      }
+      return null;
+    } finally {
+      if (mounted) setState(() => _isCleaningJunk = false);
+    }
+  }
+
+  Widget _buildSuggestionsFeature(AppLocalizations l) {
+    return CleanerSuggestionsView(
+      drivePath: _suggestionsDrive,
+      hasDiskScan: _suggestionsDiskTree != null,
+      // Suggestions use the junk scanner, not the full-disk scan, so a Disk
+      // usage or App Insights scan running in the background must not block
+      // them. Only a cleanup in progress does.
+      enabled: !_isCleaningJunk && !_isQuickCleaning,
+      onScan: _scanSuggestions,
+      onClean: _cleanSuggestionItems,
+      onOpenFolder: (path) =>
+          EntityOpenActions.openInNewTab(context, sourcePath: path),
+      onOpenSettings: (uri) => unawaited(
+        launchUrl(Uri.parse(uri), mode: LaunchMode.externalApplication),
+      ),
+      onOpenDiskUsage: () => _setSubFeature(_CleanerSubFeature.diskCleaner),
+      categoryLabel: (id) => _junkCategoryTitle(l, id),
+      categoryReason: (id) => _junkReason(l, id),
+    );
   }
 
   Future<void> _permanentDeleteCleaned() async {
