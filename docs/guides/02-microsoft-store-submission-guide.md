@@ -55,12 +55,13 @@ Push a release tag or run the release workflow manually.
 
 The pipeline will:
 
-1. Validate the checked-in English/Vietnamese listing text and run mocked submission tests
-2. Upload `store-listings-en-vi`, a shared JSON preview of the exact text for Microsoft Store and Google Play
-3. Restore the `.pfx` from `MSIX_CERT_BASE64`, build and sign the Windows MSIX
-4. Upload the `.msix` as the `windows-msix` artifact and prepare its submission archive
-5. Update the Store draft's `en-us` and `vi-vn` descriptions/features and upload the package
-6. Commit for certification with `targetPublishMode: Immediate`; Microsoft Store publishes automatically after approval
+1. Validate the checked-in listing text and images (`en-us`, `vi-vn`, `tr-tr`, `zh-cn`) and run mocked submission tests
+2. Upload `store-listings`, a shared JSON preview of the exact text and images for Microsoft Store and Google Play
+3. Restore the `.pfx` from `MSIX_CERT_BASE64`, build and sign the Windows MSIX (its manifest declares the same four languages)
+4. Upload the `.msix` as the `windows-msix` artifact
+5. Update every listing's description, features, screenshots and hero art, then upload one ZIP with the package and any changed images
+6. Commit for certification with `targetPublishMode: Immediate` and wait until Partner Center has processed the commit; the job fails on `CommitFailed` and prints Partner Center's errors/warnings
+7. Microsoft Store publishes automatically after certification (this can take up to a few business days; the public listing keeps the old text and images until then)
 
 The release workflow always sets `PARTNER_CENTER_COMMIT_SUBMISSION=true` and
 `PARTNER_CENTER_TARGET_PUBLISH_MODE=Immediate`. Repository variables with those
@@ -102,35 +103,54 @@ For a local MSIX build submitted manually in Partner Center:
 4. Complete store listing fields
 5. Submit for certification
 
-## 6. Maintain English and Vietnamese Descriptions
+## 6. Maintain Listing Text and Images
 
-Microsoft Store and Google Play share these version-controlled descriptions:
+Microsoft Store and Google Play share these version-controlled listings, one per
+app UI language:
 
-| Language | Full description and feature bullets | Short description / locale metadata |
+| Language | Full description and feature bullets | Short description / locale / images |
 |---|---|---|
 | English (`en-us`) | [`store/listings/en-us.txt`](../../store/listings/en-us.txt) | [`en-us.json`](../../store/listings/en-us.json) |
 | Vietnamese (`vi-vn`) | [`store/listings/vi-vn.txt`](../../store/listings/vi-vn.txt) | [`vi-vn.json`](../../store/listings/vi-vn.json) |
+| Turkish (`tr-tr`) | [`store/listings/tr-tr.txt`](../../store/listings/tr-tr.txt) | [`tr-tr.json`](../../store/listings/tr-tr.json) |
+| Simplified Chinese (`zh-cn`) | [`store/listings/zh-cn.txt`](../../store/listings/zh-cn.txt) | [`zh-cn.json`](../../store/listings/zh-cn.json) |
 
-Keep both languages concise and aligned. Lines beginning with `- ` generate
+Keep all languages concise and aligned. Lines beginning with `- ` generate
 Microsoft Store's features automatically, so feature text is maintained once.
-The `.json` files hold `descriptionFile`, `shortDescription` and
-`googlePlayLanguage`; product capabilities and platform limits live in the `.txt`.
+The `.json` files hold `descriptionFile`, `shortDescription`,
+`googlePlayLanguage` and `microsoftStoreImages`; product capabilities and
+platform limits live in the `.txt`. The same locales are declared in the MSIX
+manifest (`msix_config.languages`), so Partner Center lists them as supported
+package languages; a test keeps both lists identical.
 
 `scripts/store_listings.mjs` validates required locales, shared description length
-(1–4,000 characters), short descriptions (1–80 characters), and feature bullets
-(1–20 entries, at most 200 characters each). The shared limit fits
-[Google Play](https://support.google.com/googleplay/android-developer/answer/9859152?hl=en)
-and Microsoft Store. `scripts/partner_center_msix.mjs submit` validates the text before
-authenticating or modifying a draft, then merges only `description` and `features`
-into `listings[locale].baseListing`. The data shape follows the
+(1–4,000 characters), short descriptions (1–80 characters), feature bullets
+(1–20 entries, at most 200 characters each) and images (PNG type, dimensions per
+image type, count, 50 MB, 200-character captions). `scripts/partner_center_msix.mjs submit`
+validates everything before authenticating or modifying a draft, then merges
+`description`, `features` and the managed `images` into
+`listings[locale].baseListing`. The data shape follows the
 [Microsoft Store submission API](https://learn.microsoft.com/en-us/windows/uwp/monetize/manage-app-submissions).
 
-Existing titles, images, policy/support URLs, terms, release notes, platform
-overrides and unrelated languages remain intact. If Vietnamese is new, its
-listing is seeded from the existing English Store metadata before applying the
-Vietnamese text. An initial Store listing with a registered title must already
+Images are managed per image type: for each type listed in a locale's
+`microsoftStoreImages` (by default `Screenshot` and `PromotionalArt16x9`), the
+existing images of that type are marked `PendingDelete` and the checked-in ones
+are added as `PendingUpload`, in order. Uploaded file names contain a content
+hash, so when Partner Center still reports the same files nothing is re-uploaded.
+Image types not listed (for example a manually uploaded `Icon` or Xbox art) stay
+untouched. Set `PARTNER_CENTER_UPDATE_IMAGES=false` to update only text.
+
+Existing titles, policy/support URLs, terms, release notes, platform overrides
+and unrelated languages remain intact. A new language listing is seeded from the
+existing English Store metadata (without English images) before applying its
+text and images. An initial Store listing with a registered title must already
 exist. `PARTNER_CENTER_LISTINGS_DIR` can select another content directory; release
 CI explicitly uses `store/listings`.
+
+After the commit, the script polls the submission status
+(`PARTNER_CENTER_COMMIT_POLL_SECONDS`, default 30;
+`PARTNER_CENTER_COMMIT_TIMEOUT_SECONDS`, default 1800). `CommitFailed` fails the
+job with Partner Center's error list; a timeout only emits a warning.
 
 Preview and test locally from the repository root without Store credentials or
 network requests:
@@ -141,8 +161,8 @@ node --test scripts/tests/store_listings.test.mjs scripts/tests/google_play_list
 ```
 
 PR/push CI validates the content. Release jobs wait for the same checks and
-upload a `store-listings-en-vi` preview containing payloads for both stores.
-Google Play's AAB job prepares an uncommitted edit with both descriptions and
+upload a `store-listings` preview containing payloads for both stores.
+Google Play's AAB job prepares an uncommitted edit with every description and
 passes its ID to `upload-google-play`; that action uploads the AAB and commits
 the descriptions with the release. Failed updates/uploads discard the edit.
 Internal app sharing skips listing updates because it has no store release edit.
@@ -167,4 +187,4 @@ flutter test --no-pub tool/capture_torrent_screenshots_test.dart --dart-define=C
 
 This is an opt-in widget renderer. It does not launch the Windows app, scan user
 data, contact trackers or download payloads. README screenshots are independent
-of existing Store image assets, which this description update preserves.
+of the Store images, which come from `screenshots/promo/` (see section 6).

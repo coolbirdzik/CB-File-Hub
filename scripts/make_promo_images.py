@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import math
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -21,6 +22,8 @@ DESKTOP_SIZE = (2400, 1350)
 MOBILE_SIZE = (1440, 2560)
 TABLET7_SIZE = (1200, 1920)
 FEATURE_SIZE = (1024, 500)
+STORE_HERO_SIZE = (1920, 1080)
+LOGO_PATH = ROOT / "cb_file_manager" / "assets" / "images" / "logo_circle.png"
 
 DESKTOP_SOURCE_NAMES = [
     "002_showcase_file_browser_result.png",
@@ -114,8 +117,96 @@ TABLET7_SPECS_VI = [
 ]
 
 
-def load_font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
-    candidates = [
+DESKTOP_SPECS_TR = [
+    PromoSpec("dosya_tarayici", "Her çalışma alanına göz atın", "Yerel dosyalar, sekmeler, etiketler ve zengin önizlemeler tek bir masaüstü görünümünde.", (54, 166, 255)),
+    PromoSpec("galeri_merkezi", "Büyük kitaplıklar için galeri", "Albümleri, medya klasörlerini ve görsel koleksiyonları bağlamı kaybetmeden tarayın.", (250, 169, 64)),
+    PromoSpec("album_ayrintisi", "Hızlı medya ayrıntıları", "Albümleri açın ve akıcı küçük resim ızgaralarıyla gezinmeye devam edin.", (75, 204, 143)),
+    PromoSpec("yapay_zeka_arama", "Yapay zekâ destekli arama", "Entegre asistan paneliyle dosyaları bulun, inceleyin ve işlem yapın.", (138, 112, 255)),
+    PromoSpec("yapay_zeka_onayi", "Kontrol sizde", "Dosyalarınızda bir şey değişmeden önce asistanın işlemlerini gözden geçirin.", (255, 107, 107)),
+    PromoSpec("yapay_zeka_sohbet", "Dosyalarınız hakkında sorun", "Çalışma alanınızın yanında dosyaları anlayan bir sohbet sürdürün.", (102, 217, 232)),
+    PromoSpec("etiket_yonetimi", "Etiketleyin ve düzenleyin", "Projeler, kaynaklar ve medya koleksiyonları için hafif sistemler kurun.", (255, 214, 102)),
+    PromoSpec("etiket_agaci", "Etiket ağaçlarında gezinin", "Üst-alt etiket hiyerarşileri oluşturun ve ihtiyacınız olan dalı açın.", (92, 219, 149)),
+    PromoSpec("disk_temizleyici", "Güvenle temizleyin", "Büyük klasörleri tarayın, gereksiz dosyaları inceleyin ve silmeden önce CB Agent'a sorun.", (255, 149, 0)),
+]
+
+DESKTOP_SPECS_ZH = [
+    PromoSpec("liulan_wenjian", "浏览每一个工作区", "本地文件、标签页、标签和丰富预览，尽在一个专注的桌面视图中。", (54, 166, 255)),
+    PromoSpec("tuku", "为大型图库而生", "浏览相册、媒体文件夹和图片收藏，始终不丢失上下文。", (250, 169, 64)),
+    PromoSpec("xiangce_xiangqing", "快速查看媒体详情", "打开相册，在流畅的缩略图网格中继续浏览。", (75, 204, 143)),
+    PromoSpec("ai_sousuo", "AI 辅助搜索", "通过集成的助手侧边栏查找、查看并处理文件。", (138, 112, 255)),
+    PromoSpec("ai_shenhe", "一切尽在掌控", "在文件发生任何更改之前，先审核助手的操作。", (255, 107, 107)),
+    PromoSpec("ai_duihua", "询问你的文件", "在当前工作区旁，与理解文件的助手持续对话。", (102, 217, 232)),
+    PromoSpec("biaoqian_guanli", "标签与整理", "为项目、参考资料和媒体收藏建立轻量的整理体系。", (255, 214, 102)),
+    PromoSpec("biaoqian_shu", "浏览标签树", "建立父子标签层级，展开你需要的那一个分支。", (92, 219, 149)),
+    PromoSpec("cipan_qingli", "放心清理", "扫描占用空间的文件夹，检查可清理的文件，删除前先询问 CB Agent。", (255, 149, 0)),
+]
+
+# Desktop-only languages that reuse the shared source screenshots. Output goes
+# to screenshots/promo/<code>/desktop and feeds the Microsoft Store listings.
+EXTRA_DESKTOP_LANGUAGES = {
+    "tr": DESKTOP_SPECS_TR,
+    "zh": DESKTOP_SPECS_ZH,
+}
+DISK_CLEANER_STEMS = {"disk_cleaner", "don_dep_o_dia", "disk_temizleyici", "cipan_qingli"}
+
+
+@dataclass(frozen=True)
+class ExtraPromo:
+    """Desktop promo with its own source and fixed slot, so existing promo filenames stay stable."""
+
+    slot: int
+    # "desktop:<file>" in --desktop-source, or "torrent:<scene>" rendered by
+    # cb_file_manager/tool/capture_torrent_screenshots_test.dart (en/vi; other
+    # languages fall back to English).
+    source: str
+    specs: dict[str, PromoSpec]
+    # Optional (left, top, right, bottom) crop of the source, e.g. to trim the
+    # empty canvas around a rendered dialog.
+    crop: tuple[int, int, int, int] | None = None
+
+
+TORRENT_SOURCE = ROOT / "screenshots" / "features" / "torrents"
+
+EXTRA_DESKTOP_PROMOS = [
+    ExtraPromo(11, "torrent:qbittorrent", {
+        "en": PromoSpec("torrent_library", "Your torrent library", "Import qBittorrent backups and keep .torrent files and magnet links in one searchable library.", (75, 204, 143)),
+        "vi": PromoSpec("thu_vien_torrent", "Thư viện torrent của bạn", "Nhập bản sao lưu qBittorrent, gom file .torrent và magnet vào một thư viện có tìm kiếm.", (75, 204, 143)),
+        "tr": PromoSpec("torrent_kitapligi", "Torrent kitaplığınız", "qBittorrent yedeklerini içe aktarın; .torrent dosyalarını ve magnet bağlantılarını aranabilir tek kitaplıkta tutun.", (75, 204, 143)),
+        "zh": PromoSpec("zhongzi_ku", "你的种子库", "导入 qBittorrent 备份，将 .torrent 文件和磁力链接集中到一个可搜索的库中。", (75, 204, 143)),
+    }, crop=(200, 40, 1240, 860)),
+    ExtraPromo(12, "desktop:020_showcase_tag_assignment_result.png", {
+        "en": PromoSpec("tag_assignment", "Tag files in seconds", "Pick popular or recent tags, or browse the tag tree, without leaving your files.", (255, 214, 102)),
+        "vi": PromoSpec("gan_tag", "Gắn tag trong vài giây", "Chọn tag phổ biến, tag gần đây hoặc duyệt cây tag ngay bên cạnh tập tin.", (255, 214, 102)),
+        "tr": PromoSpec("etiketleme", "Saniyeler içinde etiketleyin", "Popüler veya son etiketleri seçin ya da dosyalarınızdan ayrılmadan etiket ağacına göz atın.", (255, 214, 102)),
+        "zh": PromoSpec("biaoqian_fenpei", "几秒钟完成标签", "选择常用或最近的标签，或直接浏览标签树，无需离开文件。", (255, 214, 102)),
+    }),
+]
+
+
+def extra_promo_source(extra: ExtraPromo, language: str, desktop_source: Path) -> Path:
+    kind, name = extra.source.split(":", 1)
+    if kind == "desktop":
+        source = desktop_source / name
+    else:
+        localized = TORRENT_SOURCE / language / f"{name}.png"
+        source = localized if localized.exists() else TORRENT_SOURCE / "en" / f"{name}.png"
+    if not source.exists():
+        raise SystemExit(f"Missing promo source: {source}")
+    return source
+CJK_CLOSING_PUNCTUATION = "，。、；：！？）」』"
+
+
+def contains_cjk(text: str) -> bool:
+    return any("\u3000" <= char <= "\u9fff" or "\uff00" <= char <= "\uffef" for char in text)
+
+
+def load_font(size: int, bold: bool = False, cjk: bool = False) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
+    cjk_candidates = [
+        Path("C:/Windows/Fonts/msyhbd.ttc" if bold else "C:/Windows/Fonts/msyh.ttc"),
+        Path("/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc" if bold else "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"),
+        Path("/System/Library/Fonts/PingFang.ttc"),
+    ]
+    candidates = (cjk_candidates if cjk else []) + [
         Path("C:/Windows/Fonts/segoeuib.ttf" if bold else "C:/Windows/Fonts/segoeui.ttf"),
         Path("C:/Windows/Fonts/arialbd.ttf" if bold else "C:/Windows/Fonts/arial.ttf"),
         Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
@@ -189,8 +280,9 @@ def create_background(size: tuple[int, int], accent: tuple[int, int, int]) -> Im
 
 
 def draw_text_block(draw: ImageDraw.ImageDraw, xy: tuple[int, int], title: str, subtitle: str, width: int, title_size: int) -> None:
-    title_font = load_font(title_size, bold=True)
-    subtitle_font = load_font(round(title_size * 0.34))
+    cjk = contains_cjk(title + subtitle)
+    title_font = load_font(title_size, bold=True, cjk=cjk)
+    subtitle_font = load_font(round(title_size * 0.34), cjk=cjk)
     eyebrow_font = load_font(round(title_size * 0.24), bold=True)
     x, y = xy
     draw.text((x, y), "CB FILE HUB", font=eyebrow_font, fill=(147, 197, 253, 255))
@@ -204,6 +296,8 @@ def draw_text_block(draw: ImageDraw.ImageDraw, xy: tuple[int, int], title: str, 
 
 
 def wrap_text(text: str, font: ImageFont.ImageFont, max_width: int) -> str:
+    if contains_cjk(text):
+        return wrap_cjk_text(text, font, max_width)
     words = text.split()
     lines: list[str] = []
     current = ""
@@ -217,6 +311,27 @@ def wrap_text(text: str, font: ImageFont.ImageFont, max_width: int) -> str:
         current = word
     if current:
         lines.append(current)
+    return "\n".join(lines)
+
+
+def wrap_cjk_text(text: str, font: ImageFont.ImageFont, max_width: int) -> str:
+    # CJK text has no spaces: break between characters, keep Latin words such
+    # as "CB Agent" whole and never start a line with closing punctuation.
+    tokens = re.findall(r"[A-Za-z0-9][A-Za-z0-9.+'\-]*|\s+|.", text)
+    lines: list[str] = []
+    current = ""
+    for token in tokens:
+        if token.isspace() and not current:
+            continue
+        candidate = current + token
+        fits = font.getlength(candidate.rstrip()) <= max_width
+        if fits or not current.strip() or token in CJK_CLOSING_PUNCTUATION:
+            current = candidate
+            continue
+        lines.append(current.rstrip())
+        current = "" if token.isspace() else token
+    if current.strip():
+        lines.append(current.rstrip())
     return "\n".join(lines)
 
 
@@ -339,8 +454,10 @@ def create_feature_graphic(sources: list[Path], output: Path, title: str, subtit
     image.convert("RGB").save(output, optimize=True)
 
 
-def create_desktop_promo(source: Path, output: Path, spec: PromoSpec) -> None:
+def create_desktop_promo(source: Path, output: Path, spec: PromoSpec, crop: tuple[int, int, int, int] | None = None) -> None:
     screenshot = Image.open(source).convert("RGBA")
+    if crop:
+        screenshot = screenshot.crop(crop)
     image = create_background(DESKTOP_SIZE, spec.accent)
     draw_desktop_frame(image, screenshot, spec)
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -363,8 +480,43 @@ def create_tablet7_promo(source: Path, output: Path, spec: PromoSpec) -> None:
     image.convert("RGB").save(output, optimize=True)
 
 
+def create_store_hero(output: Path) -> None:
+    """Text-free 16:9 Microsoft Store hero art: no UI, key content above the bottom third."""
+    width, height = STORE_HERO_SIZE
+    image = create_background(STORE_HERO_SIZE, (54, 166, 255))
+    overlay = Image.new("RGBA", STORE_HERO_SIZE, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay)
+    center_x, center_y = width // 2, round(height * 0.40)
+    draw.ellipse((center_x - 520, center_y - 420, center_x + 520, center_y + 420), fill=(54, 166, 255, 34))
+    draw.ellipse((center_x - 340, center_y - 280, center_x + 340, center_y + 280), fill=(92, 219, 149, 26))
+    image = Image.alpha_composite(image, overlay)
+    # Abstract file cards around the logo, in the promo accent colors.
+    cards = [
+        (-560, -170, 210, 150, (54, 166, 255), -8),
+        (-470, 150, 180, 128, (250, 169, 64), 6),
+        (370, -230, 190, 136, (138, 112, 255), 7),
+        (420, 110, 220, 156, (92, 219, 149), -5),
+        (-250, -330, 130, 94, (255, 214, 102), 4),
+        (190, 250, 140, 100, (255, 107, 107), -7),
+    ]
+    for dx, dy, card_w, card_h, color, tilt in cards:
+        card = Image.new("RGBA", (card_w + 60, card_h + 60), (0, 0, 0, 0))
+        card_draw = ImageDraw.Draw(card)
+        card_draw.rounded_rectangle((30, 30, 30 + card_w, 30 + card_h), radius=22, fill=(*color, 70), outline=(*color, 150), width=3)
+        card_draw.rounded_rectangle((30, 30, 30 + card_w // 2, 30 + card_h // 5), radius=10, fill=(*color, 120))
+        card = card.rotate(tilt, resample=Image.Resampling.BICUBIC, expand=True)
+        image.alpha_composite(card, (center_x + dx - card.width // 2, center_y + dy - card.height // 2))
+
+    logo = contain_resize(Image.open(LOGO_PATH).convert("RGBA"), (440, 440))
+    logo_x, logo_y = center_x - logo.width // 2, center_y - logo.height // 2
+    draw_shadow(image, (logo_x + 30, logo_y + 40, logo_x + logo.width - 30, logo_y + logo.height + 10), logo.width // 2, 40, 140)
+    image.alpha_composite(logo, (logo_x, logo_y))
+    output.parent.mkdir(parents=True, exist_ok=True)
+    image.convert("RGB").save(output, optimize=True)
+
+
 def desktop_promo_filename(index: int, spec: PromoSpec) -> str:
-    if spec.stem in {"disk_cleaner", "don_dep_o_dia"}:
+    if spec.stem in DISK_CLEANER_STEMS:
         return f"10_{spec.stem}.png"
     return f"{index + 1:02d}_{spec.stem}.png"
 
@@ -395,7 +547,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--desktop-source", type=Path, default=DEFAULT_DESKTOP_SOURCE)
     parser.add_argument("--mobile-source", type=Path, default=DEFAULT_MOBILE_SOURCE)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
-    parser.add_argument("--desktop-only", action="store_true", help="Regenerate only English and Vietnamese desktop promos.")
+    parser.add_argument("--desktop-only", action="store_true", help="Regenerate only desktop promos and the Store hero art.")
+    parser.add_argument(
+        "--languages",
+        default=",".join(["en", "vi", *EXTRA_DESKTOP_LANGUAGES]),
+        help="Comma-separated desktop promo languages to (re)generate, e.g. tr,zh.",
+    )
     return parser
 
 
@@ -416,15 +573,33 @@ def main() -> None:
     mobile_vi_output = args.output / "vi" / "mobile"
     tablet7_vi_output = args.output / "vi" / "tablet7"
 
-    for index, source in enumerate(desktop_sources):
-        spec = DESKTOP_SPECS[index % len(DESKTOP_SPECS)]
-        create_desktop_promo(source, desktop_output / desktop_promo_filename(index, spec), spec)
-        vi_spec = DESKTOP_SPECS_VI[index % len(DESKTOP_SPECS_VI)]
-        create_desktop_promo(source, desktop_vi_output / desktop_promo_filename(index, vi_spec), vi_spec)
+    languages = {code.strip() for code in args.languages.split(",") if code.strip()}
+    unknown = languages - {"en", "vi", *EXTRA_DESKTOP_LANGUAGES}
+    if unknown:
+        raise SystemExit(f"Unknown promo languages: {', '.join(sorted(unknown))}")
+    desktop_targets = []
+    if "en" in languages:
+        desktop_targets.append(("en", DESKTOP_SPECS, desktop_output))
+    if "vi" in languages:
+        desktop_targets.append(("vi", DESKTOP_SPECS_VI, desktop_vi_output))
+    for code, specs in EXTRA_DESKTOP_LANGUAGES.items():
+        if code in languages:
+            desktop_targets.append((code, specs, args.output / code / "desktop"))
+
+    for code, specs, output in desktop_targets:
+        for index, source in enumerate(desktop_sources):
+            spec = specs[index % len(specs)]
+            create_desktop_promo(source, output / desktop_promo_filename(index, spec), spec)
+        for extra in EXTRA_DESKTOP_PROMOS:
+            spec = extra.specs[code]
+            source = extra_promo_source(extra, code, args.desktop_source)
+            create_desktop_promo(source, output / f"{extra.slot:02d}_{spec.stem}.png", spec, extra.crop)
+        print(f"Created {len(desktop_sources) + len(EXTRA_DESKTOP_PROMOS)} desktop promo images in {output}")
+
+    create_store_hero(args.output / "store" / "hero_16x9.png")
+    print(f"Created Microsoft Store hero art in {args.output / 'store'}")
 
     if args.desktop_only:
-        print(f"Created {len(desktop_sources)} desktop promo images in {desktop_output}")
-        print(f"Created {len(desktop_sources)} Vietnamese desktop promo images in {desktop_vi_output}")
         return
 
     for index, source in enumerate(mobile_sources):
@@ -452,10 +627,8 @@ def main() -> None:
         "Tab, tag, thumbnail, SMB và FTP trong một ứng dụng gọn gàng.",
     )
 
-    print(f"Created {len(desktop_sources)} desktop promo images in {desktop_output}")
     print(f"Created {len(mobile_sources)} mobile promo images in {mobile_output}")
     print(f"Created {len(mobile_sources)} 7-inch tablet promo images in {tablet7_output}")
-    print(f"Created {len(desktop_sources)} Vietnamese desktop promo images in {desktop_vi_output}")
     print(f"Created {len(mobile_sources)} Vietnamese mobile promo images in {mobile_vi_output}")
     print(f"Created {len(mobile_sources)} Vietnamese 7-inch tablet promo images in {tablet7_vi_output}")
     print(f"Created feature graphics in {args.output} and {args.output / 'vi'}")

@@ -1,6 +1,8 @@
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { applyStoreListings, loadStoreListings, defaultListingsDirectory } from './store_listings.mjs';
+import { writeStoredZip } from './stored_zip.mjs';
 
 const TOKEN_RESOURCE = 'https://manage.devcenter.microsoft.com';
 const API_ROOT = 'https://manage.devcenter.microsoft.com/v1.0/my';
@@ -237,6 +239,62 @@ function packageForDeletion(appPackage) {
   };
 }
 
+function buildSubmissionArchive(submissionId, packagePath, packageFileName, imageUploads) {
+  const archivePath = path.join(
+    optionalEnv('RUNNER_TEMP') || os.tmpdir(),
+    `partner-center-${submissionId}.zip`,
+  );
+  writeStoredZip(archivePath, [
+    { name: packageFileName, source: packagePath },
+    ...imageUploads.map((image) => ({ name: image.fileName, source: image.source })),
+  ]);
+  return archivePath;
+}
+
+function describeIssues(issues) {
+  return (issues || [])
+    .map((issue) => `${issue.code}: ${issue.details}`)
+    .join('; ');
+}
+
+// Commit only starts asynchronous processing. Wait until Partner Center
+// accepts or rejects the submission so CI fails on CommitFailed instead of
+// reporting success while the Store never receives the update.
+async function waitForCommit(accessToken, appId, submissionId) {
+  const timeoutSeconds = Number(optionalEnv('PARTNER_CENTER_COMMIT_TIMEOUT_SECONDS') || 1800);
+  const pollSeconds = Number(optionalEnv('PARTNER_CENTER_COMMIT_POLL_SECONDS') || 30);
+  const deadline = Date.now() + timeoutSeconds * 1000;
+  for (;;) {
+    const status = await apiRequest(
+      accessToken,
+      'GET',
+      `/applications/${encodeURIComponent(appId)}/submissions/${encodeURIComponent(
+        submissionId,
+      )}/status`,
+    );
+    const warnings = describeIssues(status?.statusDetails?.warnings);
+    if (status?.status !== 'CommitStarted') {
+      if (warnings) console.error(`Partner Center warnings: ${warnings}`);
+      if (status?.status === 'CommitFailed') {
+        throw new Error(
+          `Partner Center submission ${submissionId} failed to commit: ${
+            describeIssues(status.statusDetails?.errors) || formatError(status)
+          }`,
+        );
+      }
+      console.error(`Partner Center submission ${submissionId} status: ${status?.status}`);
+      return status;
+    }
+    if (Date.now() >= deadline) {
+      console.error(
+        `::warning::Partner Center submission ${submissionId} is still committing after ${timeoutSeconds}s; check its status in Partner Center.`,
+      );
+      return status;
+    }
+    await sleep(pollSeconds * 1000);
+  }
+}
+
 async function uploadSubmissionArchive(sasUrl, archivePath) {
   const stat = await fs.promises.stat(archivePath);
   const body = fs.createReadStream(archivePath);
@@ -258,17 +316,19 @@ async function uploadSubmissionArchive(sasUrl, archivePath) {
 
 async function submitPackage() {
   const appId = requiredEnv('PARTNER_CENTER_APP_ID');
-  const archivePath = path.resolve(requiredEnv('PARTNER_CENTER_PACKAGE_ARCHIVE'));
+  const packagePath = path.resolve(requiredEnv('PARTNER_CENTER_PACKAGE_PATH'));
   const packageFileName =
-    optionalEnv('PARTNER_CENTER_PACKAGE_FILE_NAME') || path.basename(archivePath);
+    optionalEnv('PARTNER_CENTER_PACKAGE_FILE_NAME') || path.basename(packagePath);
 
-  if (!fs.existsSync(archivePath)) {
-    throw new Error(`Package archive not found: ${archivePath}`);
+  if (!fs.existsSync(packagePath)) {
+    throw new Error(`Package not found: ${packagePath}`);
   }
 
-  // Validate checked-in English/Vietnamese copy before changing a Store draft.
+  // Validate checked-in listing text and images before changing a Store draft.
+  const updateImages = optionalEnv('PARTNER_CENTER_UPDATE_IMAGES') !== 'false';
   const listingContent = loadStoreListings(
     optionalEnv('PARTNER_CENTER_LISTINGS_DIR') || defaultListingsDirectory,
+    { images: updateImages },
   );
 
   const accessToken = await getAccessToken();
@@ -373,8 +433,16 @@ async function submitPackage() {
   }
   console.error(`Partner Center targetPublishMode: ${publishMode}`);
 
-  submission = applyStoreListings(submission, listingContent);
+  const listingUpdate = applyStoreListings(submission, listingContent);
+  submission = listingUpdate.submission;
   console.error(`Partner Center listing text updated: ${Object.keys(listingContent).join(', ')}`);
+  if (!updateImages) {
+    console.error('Partner Center listing images left unchanged (PARTNER_CENTER_UPDATE_IMAGES=false)');
+  } else if (listingUpdate.uploads.length > 0) {
+    console.error(`Partner Center listing images queued for upload: ${listingUpdate.uploads.length}`);
+  } else {
+    console.error('Partner Center listing images already up to date');
+  }
 
   submission.applicationPackages = [
     ...(submission.applicationPackages || []).map(packageForDeletion),
@@ -394,7 +462,17 @@ async function submitPackage() {
     )}`,
     submission,
   );
-  await uploadSubmissionArchive(submission.fileUploadUrl, archivePath);
+  const archivePath = buildSubmissionArchive(
+    submission.id,
+    packagePath,
+    packageFileName,
+    listingUpdate.uploads,
+  );
+  try {
+    await uploadSubmissionArchive(submission.fileUploadUrl, archivePath);
+  } finally {
+    fs.rmSync(archivePath, { force: true });
+  }
   if (optionalEnv('PARTNER_CENTER_COMMIT_SUBMISSION') === 'true') {
     await apiRequest(
       accessToken,
@@ -404,6 +482,7 @@ async function submitPackage() {
       )}/commit`,
     );
     console.error(`Partner Center submission committed: ${submission.id}`);
+    await waitForCommit(accessToken, appId, submission.id);
   } else {
     console.error(
       `Partner Center draft prepared without commit: ${submission.id}`,

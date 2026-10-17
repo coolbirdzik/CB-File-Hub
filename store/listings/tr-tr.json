@@ -1,0 +1,61 @@
+{
+  "descriptionFile": "tr-tr.txt",
+  "shortDescription": "Dosya, fotoğraf, video, torrent ve uzak depolamayı tek uygulamada yönetin.",
+  "googlePlayLanguage": "tr-TR",
+  "microsoftStoreImages": [
+    {
+      "file": "../../screenshots/promo/tr/desktop/01_dosya_tarayici.png",
+      "imageType": "Screenshot",
+      "description": "Yerel dosyalar, sekmeler, etiketler ve zengin önizlemeler tek bir masaüstü görünümünde."
+    },
+    {
+      "file": "../../screenshots/promo/tr/desktop/02_galeri_merkezi.png",
+      "imageType": "Screenshot",
+      "description": "Albümleri, medya klasörlerini ve görsel koleksiyonları bağlamı kaybetmeden tarayın."
+    },
+    {
+      "file": "../../screenshots/promo/tr/desktop/11_torrent_kitapligi.png",
+      "imageType": "Screenshot",
+      "description": "qBittorrent yedeklerini içe aktarın; .torrent dosyalarını ve magnet bağlantılarını aranabilir tek kitaplıkta tutun."
+    },
+    {
+      "file": "../../screenshots/promo/tr/desktop/04_yapay_zeka_arama.png",
+      "imageType": "Screenshot",
+      "description": "Entegre asistan paneliyle dosyaları bulun, inceleyin ve işlem yapın."
+    },
+    {
+      "file": "../../screenshots/promo/tr/desktop/05_yapay_zeka_onayi.png",
+      "imageType": "Screenshot",
+      "description": "Dosyalarınızda bir şey değişmeden önce asistanın işlemlerini gözden geçirin."
+    },
+    {
+      "file": "../../screenshots/promo/tr/desktop/06_yapay_zeka_sohbet.png",
+      "imageType": "Screenshot",
+      "description": "Çalışma alanınızın yanında dosyaları anlayan bir sohbet sürdürün."
+    },
+    {
+      "file": "../../screenshots/promo/tr/desktop/12_etiketleme.png",
+      "imageType": "Screenshot",
+      "description": "Popüler veya son etiketleri seçin ya da dosyalarınızdan ayrılmadan etiket ağacına göz atın."
+    },
+    {
+      "file": "../../screenshots/promo/tr/desktop/07_etiket_yonetimi.png",
+      "imageType": "Screenshot",
+      "description": "Projeler, kaynaklar ve medya koleksiyonları için hafif sistemler kurun."
+    },
+    {
+      "file": "../../screenshots/promo/tr/desktop/08_etiket_agaci.png",
+      "imageType": "Screenshot",
+      "description": "Üst-alt etiket hiyerarşileri oluşturun ve ihtiyacınız olan dalı açın."
+    },
+    {
+      "file": "../../screenshots/promo/tr/desktop/10_disk_temizleyici.png",
+      "imageType": "Screenshot",
+      "description": "Büyük klasörleri tarayın, gereksiz dosyaları inceleyin ve silmeden önce CB Agent'a sorun."
+    },
+    {
+      "file": "../../screenshots/promo/store/hero_16x9.png",
+      "imageType": "PromotionalArt16x9"
+    }
+  ]
+}

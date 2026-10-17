@@ -1,0 +1,16 @@
+CB File Hub dosyalarınızı, medyanızı ve uzak depolamanızı tek bir uygulamada bir araya getirir.
+
+- Klasörlerde sekmelerle gezinin, bölünmüş görünüm kullanın, konumları sabitleyin ve çalışma alanınızı geri yükleyin.
+- Liste, ızgara, ayrıntılar, ağaç veya sütun görünümünü seçin. Arayın, sıralayın ve birden çok dosya seçin; büyük klasörler isteğe bağlı yüklenir.
+- Fotoğrafları görüntüleyin, resimleri düzenleyin ve video kitaplıklarına göz atın. Medyayı altyazı ve ses parçalarıyla oynatın; masaüstünde resim içinde resim kullanın.
+- Koleksiyonları etiketler, albümler ve otomatik albüm kurallarıyla düzenleyin.
+- SMB, FTP, SFTP ve WebDAV depolamaya bağlanın. SSH bağlantılarını yönetin ve yerleşik terminali kullanın.
+- .torrent dosyalarını ve magnet bağlantılarını aranabilir tek bir kitaplıkta tutun. Yinelenenleri birleştirin, magnet bağlantılarını kopyalayın ve dosyaların nerede saklanacağını seçin.
+- Masaüstünde torrent indirin, hedef klasör seçin, duraklatın ve sürdürün. Windows'ta qBittorrent yedekleri dahil diğer istemcilerdeki kayıtlı torrentleri içe aktarın.
+- Dosyaları bulmak ve düzenlemek için CB Agent'tan yardım isteyin. Uyumlu yerel GGUF modelleri masaüstünde isteğe bağlıdır.
+- Windows disk temizleyicisiyle gereksiz dosyaları inceleyin ve kaldırın.
+- ZIP ve desteklenen diğer arşivlere göz atın ve bunları çıkarın. Ek 7z/RAR araçları Windows'ta yüklü 7-Zip'i kullanır.
+- Ayarları ve etiketleri yedekleyin; Google Drive, Dropbox ve OneDrive entegrasyonları kullanılabilir.
+- Açık veya koyu tema, vurgu rengi ve arayüz dilinizi seçin.
+
+Özellikler platforma göre değişir. Ağ, bulut yedekleme ve yapay zekâ hizmetleri hesap veya ek kurulum gerektirebilir.

@@ -1,5 +1,61 @@
 {
   "descriptionFile": "en-us.txt",
   "shortDescription": "Manage files, photos, videos, torrents and remote storage in one app.",
-  "googlePlayLanguage": "en-US"
+  "googlePlayLanguage": "en-US",
+  "microsoftStoreImages": [
+    {
+      "file": "../../screenshots/promo/desktop/01_file_browser.png",
+      "imageType": "Screenshot",
+      "description": "Local files, tabs, tags, and rich previews in one focused desktop view."
+    },
+    {
+      "file": "../../screenshots/promo/desktop/02_gallery_hub.png",
+      "imageType": "Screenshot",
+      "description": "Scan albums, media folders, and visual collections without losing context."
+    },
+    {
+      "file": "../../screenshots/promo/desktop/11_torrent_library.png",
+      "imageType": "Screenshot",
+      "description": "Import qBittorrent backups and keep .torrent files and magnet links in one searchable library."
+    },
+    {
+      "file": "../../screenshots/promo/desktop/04_ai_search.png",
+      "imageType": "Screenshot",
+      "description": "Find, review, and act on files with an integrated assistant side panel."
+    },
+    {
+      "file": "../../screenshots/promo/desktop/05_ai_approval.png",
+      "imageType": "Screenshot",
+      "description": "Review assistant actions before anything changes in your files."
+    },
+    {
+      "file": "../../screenshots/promo/desktop/06_ai_conversation.png",
+      "imageType": "Screenshot",
+      "description": "Keep a file-aware conversation beside the workspace you are using."
+    },
+    {
+      "file": "../../screenshots/promo/desktop/12_tag_assignment.png",
+      "imageType": "Screenshot",
+      "description": "Pick popular or recent tags, or browse the tag tree, without leaving your files."
+    },
+    {
+      "file": "../../screenshots/promo/desktop/07_tag_management.png",
+      "imageType": "Screenshot",
+      "description": "Build lightweight systems for projects, references, and media collections."
+    },
+    {
+      "file": "../../screenshots/promo/desktop/08_tagged_files.png",
+      "imageType": "Screenshot",
+      "description": "Build parent-child tag hierarchies and expand the exact branch you need."
+    },
+    {
+      "file": "../../screenshots/promo/desktop/10_disk_cleaner.png",
+      "imageType": "Screenshot",
+      "description": "Scan bulky folders, review junk candidates, and ask CB Agent before deleting."
+    },
+    {
+      "file": "../../screenshots/promo/store/hero_16x9.png",
+      "imageType": "PromotionalArt16x9"
+    }
+  ]
 }

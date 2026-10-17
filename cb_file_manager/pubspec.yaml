@@ -214,3 +214,5 @@ msix_config:
   capabilities: internetClient, privateNetworkClientServer
   file_extension: .torrent
   protocol_activation: magnet
+  # UI languages; must match the Store listings in store/listings/.
+  languages: en-us, vi-vn, tr-tr, zh-cn

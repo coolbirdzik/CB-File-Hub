@@ -1,0 +1,61 @@
+{
+  "descriptionFile": "zh-cn.txt",
+  "shortDescription": "在一个应用中管理文件、照片、视频、种子和远程存储。",
+  "googlePlayLanguage": "zh-CN",
+  "microsoftStoreImages": [
+    {
+      "file": "../../screenshots/promo/zh/desktop/01_liulan_wenjian.png",
+      "imageType": "Screenshot",
+      "description": "本地文件、标签页、标签和丰富预览，尽在一个专注的桌面视图中。"
+    },
+    {
+      "file": "../../screenshots/promo/zh/desktop/02_tuku.png",
+      "imageType": "Screenshot",
+      "description": "浏览相册、媒体文件夹和图片收藏，始终不丢失上下文。"
+    },
+    {
+      "file": "../../screenshots/promo/zh/desktop/11_zhongzi_ku.png",
+      "imageType": "Screenshot",
+      "description": "导入 qBittorrent 备份，将 .torrent 文件和磁力链接集中到一个可搜索的库中。"
+    },
+    {
+      "file": "../../screenshots/promo/zh/desktop/04_ai_sousuo.png",
+      "imageType": "Screenshot",
+      "description": "通过集成的助手侧边栏查找、查看并处理文件。"
+    },
+    {
+      "file": "../../screenshots/promo/zh/desktop/05_ai_shenhe.png",
+      "imageType": "Screenshot",
+      "description": "在文件发生任何更改之前，先审核助手的操作。"
+    },
+    {
+      "file": "../../screenshots/promo/zh/desktop/06_ai_duihua.png",
+      "imageType": "Screenshot",
+      "description": "在当前工作区旁，与理解文件的助手持续对话。"
+    },
+    {
+      "file": "../../screenshots/promo/zh/desktop/12_biaoqian_fenpei.png",
+      "imageType": "Screenshot",
+      "description": "选择常用或最近的标签，或直接浏览标签树，无需离开文件。"
+    },
+    {
+      "file": "../../screenshots/promo/zh/desktop/07_biaoqian_guanli.png",
+      "imageType": "Screenshot",
+      "description": "为项目、参考资料和媒体收藏建立轻量的整理体系。"
+    },
+    {
+      "file": "../../screenshots/promo/zh/desktop/08_biaoqian_shu.png",
+      "imageType": "Screenshot",
+      "description": "建立父子标签层级，展开你需要的那一个分支。"
+    },
+    {
+      "file": "../../screenshots/promo/zh/desktop/10_cipan_qingli.png",
+      "imageType": "Screenshot",
+      "description": "扫描占用空间的文件夹，检查可清理的文件，删除前先询问 CB Agent。"
+    },
+    {
+      "file": "../../screenshots/promo/store/hero_16x9.png",
+      "imageType": "PromotionalArt16x9"
+    }
+  ]
+}
