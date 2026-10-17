@@ -157,19 +157,19 @@ class _MobileCreateFolderDialogState extends State<_MobileCreateFolderDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('New Folder'),
+      title: Text(context.tr.newFolder),
       content: TextField(
         controller: _nameController,
-        decoration: const InputDecoration(labelText: 'Folder name'),
+        decoration: InputDecoration(labelText: context.tr.folderNameLabelShort),
         autofocus: true,
         onSubmitted: (_) => _submit(),
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
+          child: Text(context.tr.cancel),
         ),
-        TextButton(onPressed: _submit, child: const Text('Create')),
+        TextButton(onPressed: _submit, child: Text(context.tr.create)),
       ],
     );
   }

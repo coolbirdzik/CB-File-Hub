@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:window_manager/window_manager.dart';
+import 'package:cb_file_manager/config/translation_helper.dart';
 
 /// Enum trạng thái progress (mirror OperationProgressStatus không import controller)
 enum _ProgressStatus { running, success, error }
@@ -253,14 +254,14 @@ class _ProgressWindowScreenState extends State<ProgressWindowScreen>
                   // Minimize
                   _TitleBarBtn(
                     icon: PhosphorIconsLight.minus,
-                    tooltip: 'Minimize',
+                    tooltip: context.tr.minimize,
                     onTap: () => windowManager.minimize(),
                     isDark: isDark,
                   ),
                   // Close (only when finished)
                   _TitleBarBtn(
                     icon: PhosphorIconsLight.x,
-                    tooltip: 'Close',
+                    tooltip: context.tr.close,
                     onTap: _isFinished ? _closeWindow : null,
                     isDark: isDark,
                     enabled: _isFinished,

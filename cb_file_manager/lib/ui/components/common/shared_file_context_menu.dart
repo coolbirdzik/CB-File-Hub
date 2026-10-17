@@ -9,6 +9,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import '../../controllers/file_operations_handler.dart';
+import '../../utils/torrent_open_actions.dart';
 import '../../controllers/archive_operations_handler.dart';
 import '../../controllers/archive_navigation.dart';
 import '../../widgets/file_preview_pane.dart';
@@ -44,6 +45,7 @@ import '../../utils/entity_open_actions.dart';
 import '../../utils/video_playback_launcher.dart';
 import '../../../utils/app_logger.dart';
 import '../../screens/settings/context_menu_layout_settings_screen.dart';
+import 'package:cb_file_manager/config/translation_helper.dart';
 
 enum ContextMenuTargetType { file, folder, multiSelection, background }
 
@@ -87,6 +89,30 @@ class ContextMenuSection {
   final List<ContextMenuAction> actions;
 
   const ContextMenuSection({this.title, required this.actions});
+}
+
+/// Adds collection-specific commands to the regular file menu. Virtual entries
+/// use only these commands, so native operations never receive virtual paths.
+class FileContextMenuExtension extends InheritedWidget {
+  final List<ContextMenuSection> Function(BuildContext, List<String>) sections;
+  final bool Function(String) isVirtual;
+  final FutureOr<void> Function(File)? onOpen;
+  final bool allowPaste;
+
+  const FileContextMenuExtension({
+    super.key,
+    required this.sections,
+    required this.isVirtual,
+    this.onOpen,
+    this.allowPaste = true,
+    required super.child,
+  });
+
+  static FileContextMenuExtension? maybeOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<FileContextMenuExtension>();
+
+  @override
+  bool updateShouldNotify(FileContextMenuExtension oldWidget) => true;
 }
 
 bool _isMobileContextMenuPlatform() => Platform.isAndroid || Platform.isIOS;
@@ -1900,6 +1926,12 @@ List<ContextMenuSection> _buildFileContextMenuSections({
           label: l10n.open,
           icon: PhosphorIconsLight.file,
           onSelected: (_) {
+            final onOpen = FileContextMenuExtension.maybeOf(context)?.onOpen;
+            if (onOpen != null) {
+              unawaited(Future<void>.sync(() => onOpen(file)));
+              return;
+            }
+            if (TorrentOpenActions.tryOpen(context, file.path)) return;
             if (isTextOrPdf) {
               InAppFileViewer.open(context, file);
             } else {
@@ -1910,7 +1942,7 @@ List<ContextMenuSection> _buildFileContextMenuSections({
         if (showOpenFileLocation && isDesktopPlatform)
           ContextMenuAction(
             id: 'open_file_location',
-            label: 'Open file location',
+            label: context.tr.openFileLocation,
             icon: PhosphorIconsLight.folderOpen,
             onSelected: (_) => EntityOpenActions.openInNewTab(
               context,
@@ -1999,7 +2031,9 @@ List<ContextMenuSection> _buildFileContextMenuSections({
           id: 'paste',
           label: l10n.pasteHere,
           icon: PhosphorIconsLight.clipboard,
-          isEnabled: (folderListBloc ?? _maybeFolderListBloc(context)) != null,
+          isEnabled:
+              (folderListBloc ?? _maybeFolderListBloc(context)) != null &&
+              (FileContextMenuExtension.maybeOf(context)?.allowPaste ?? true),
           onSelected: (_) => FileOperationsHandler.pasteFromClipboard(
             context: context,
             destinationPath: file.parent.path,
@@ -2132,6 +2166,45 @@ void showFileContextMenu({
   Offset? globalPosition,
 }) {
   final folderListBloc = _maybeFolderListBloc(context);
+  final extension = FileContextMenuExtension.maybeOf(context);
+  if (extension != null) {
+    final position =
+        globalPosition ?? MediaQuery.sizeOf(context).center(Offset.zero);
+    final virtual = extension.isVirtual(file.path);
+    final sections = [
+      ...extension.sections(context, [file.path]),
+      if (!virtual)
+        ..._buildFileContextMenuSections(
+          context: context,
+          folderListBloc: folderListBloc,
+          file: file,
+          fileTags: fileTags,
+          isVideo: isVideo,
+          isImage: isImage,
+          showAddTagToFileDialog: showAddTagToFileDialog,
+          onDeleteFile: onDeleteFile,
+          showOpenFileLocation: showOpenFileLocation,
+          globalPosition: position,
+        ),
+    ];
+    unawaited(
+      _isMobileContextMenuPlatform()
+          ? showContextMenuSheet(
+              context: context,
+              title: pathlib.basename(file.path),
+              icon: PhosphorIconsLight.file,
+              sections: sections,
+            )
+          : _showAppContextMenu(
+              context: context,
+              sections: sections,
+              paths: virtual ? [] : [file.path],
+              globalPosition: position,
+              layoutTarget: ContextMenuLayoutTarget.file,
+            ),
+    );
+    return;
+  }
   if (_isMobileContextMenuPlatform()) {
     unawaited(
       showModalBottomSheet<void>(
@@ -2764,14 +2837,20 @@ void showMultipleFilesContextMenu({
   final screenSize = MediaQuery.of(context).size;
   final effectivePosition =
       globalPosition ?? Offset(screenSize.width / 2, screenSize.height / 2);
-  final sections = _buildMultiSelectionContextMenuSections(
-    context: context,
-    folderListBloc: _maybeFolderListBloc(context),
-    selectedPaths: selectedPaths,
-    onClearSelection: onClearSelection,
-    onDeleteFiles: onDeleteFiles,
-    globalPosition: effectivePosition,
-  );
+  final extension = FileContextMenuExtension.maybeOf(context);
+  final hasVirtual = selectedPaths.any((p) => extension?.isVirtual(p) ?? false);
+  final sections = [
+    ...?extension?.sections(context, selectedPaths),
+    if (!hasVirtual)
+      ..._buildMultiSelectionContextMenuSections(
+        context: context,
+        folderListBloc: _maybeFolderListBloc(context),
+        selectedPaths: selectedPaths,
+        onClearSelection: onClearSelection,
+        onDeleteFiles: onDeleteFiles,
+        globalPosition: effectivePosition,
+      ),
+  ];
 
   if (_isMobileContextMenuPlatform()) {
     final l10n = AppLocalizations.of(context)!;
@@ -2790,7 +2869,7 @@ void showMultipleFilesContextMenu({
     await _showAppContextMenu(
       context: context,
       sections: sections,
-      paths: selectedPaths,
+      paths: hasVirtual ? [] : selectedPaths,
       globalPosition: effectivePosition,
       layoutTarget: ContextMenuLayoutTarget.multiSelection,
     );
@@ -2834,7 +2913,9 @@ List<ContextMenuSection> _buildMultiSelectionContextMenuSections({
           id: 'paste',
           label: l10n.pasteHere,
           icon: PhosphorIconsLight.clipboard,
-          isEnabled: bloc != null,
+          isEnabled:
+              bloc != null &&
+              (FileContextMenuExtension.maybeOf(context)?.allowPaste ?? true),
           onSelected: (_) {
             if (bloc == null) return;
             FileOperationsHandler.pasteFromClipboard(

@@ -35,11 +35,20 @@ class _CleanerReviewOverviewState extends State<CleanerReviewOverview> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final vi = Localizations.localeOf(context).languageCode == 'vi';
+    final languageCode = Localizations.localeOf(context).languageCode;
     final l = AppLocalizations.of(context)!;
+    String t(String en, String vi, String tr, String zh) =>
+        switch (languageCode) {
+          'vi' => vi,
+          'tr' => tr,
+          'zh' => zh,
+          _ => en,
+        };
     final summary = CleanerReviewSummary(
       widget.review,
-      languageCode: vi ? 'vi' : 'en',
+      languageCode: const ['vi', 'tr', 'zh'].contains(languageCode)
+          ? languageCode
+          : 'en',
     );
     final index =
         _selected ??
@@ -168,7 +177,7 @@ class _CleanerReviewOverviewState extends State<CleanerReviewOverview> {
                                     ),
                                   ),
                                   Text(
-                                    '${summary.sections[i].groups.length} ${vi ? 'nhóm' : 'groups'}',
+                                    '${summary.sections[i].groups.length} ${t('groups', 'nhóm', 'grup', '个分组')}',
                                     style: theme.textTheme.labelSmall,
                                   ),
                                 ],
@@ -212,7 +221,7 @@ class _CleanerReviewOverviewState extends State<CleanerReviewOverview> {
                   ...[
                     const SizedBox(height: 8),
                     Text(
-                      '${section.title} · ${section.folderTotals ? (vi ? 'Tổng thư mục' : 'Folder totals') : (vi ? 'Các nhóm lớn nhất' : 'Largest groups')}',
+                      '${section.title} · ${section.folderTotals ? t('Folder totals', 'Tổng thư mục', 'Klasör toplamları', '文件夹合计') : t('Largest groups', 'Các nhóm lớn nhất', 'En büyük gruplar', '最大的分组')}',
                       style: theme.textTheme.labelSmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -220,9 +229,12 @@ class _CleanerReviewOverviewState extends State<CleanerReviewOverview> {
                     section.groups.isEmpty
                         ? Center(
                             child: Text(
-                              vi
-                                  ? 'Chưa có nhóm file trong mục này.'
-                                  : 'No file groups in this category.',
+                              t(
+                                'No file groups in this category.',
+                                'Chưa có nhóm file trong mục này.',
+                                'Bu kategoride dosya grubu yok.',
+                                '此类别中没有文件分组。',
+                              ),
                               style: theme.textTheme.bodySmall,
                             ),
                           )
@@ -319,7 +331,7 @@ class _CleanerReviewOverviewState extends State<CleanerReviewOverview> {
                                                 backgroundColor: colors[index]
                                                     .withValues(alpha: 0.08),
                                                 semanticsLabel:
-                                                    '${group.scope}: ${(fraction * 100).round()}% ${vi ? 'dung lượng trong mục này' : 'of this category'}',
+                                                    '${group.scope}: ${(fraction * 100).round()}% ${t('of this category', 'dung lượng trong mục này', 'bu kategorinin', '占此类别的比例')}',
                                               ),
                                             ),
                                           const SizedBox(height: 4),
@@ -352,9 +364,12 @@ class _CleanerReviewOverviewState extends State<CleanerReviewOverview> {
                                               group.representative,
                                             ),
                                             child: Text(
-                                              vi
-                                                  ? 'Xem trong kết quả'
-                                                  : 'Show in results',
+                                              t(
+                                                'Show in results',
+                                                'Xem trong kết quả',
+                                                'Sonuçlarda göster',
+                                                '在结果中显示',
+                                              ),
                                               style: theme.textTheme.labelSmall
                                                   ?.copyWith(
                                                     color: theme
@@ -377,9 +392,9 @@ class _CleanerReviewOverviewState extends State<CleanerReviewOverview> {
                     Tooltip(
                       message: summary.scopeNote,
                       child: Text(
-                        '${vi ? 'Theo dữ liệu quét · Chọn mục trong cây kết quả để dọn' : 'Scan metadata · Select items in the result tree to clean'}'
-                        '${widget.review.aggregatedItems > 0 ? ' · ${widget.review.aggregatedItems} ${vi ? 'mục chỉ có tổng dung lượng' : 'size-only entries'}' : ''}'
-                        '${widget.coverageIssueCount > 0 ? ' · ${widget.coverageIssueCount} ${vi ? 'đường dẫn chưa quét đầy đủ' : 'paths with scan limits'}' : ''}',
+                        '${t('Scan metadata · Select items in the result tree to clean', 'Theo dữ liệu quét · Chọn mục trong cây kết quả để dọn', 'Tarama meta verileri · Temizlemek için sonuç ağacından öğe seçin', '扫描元数据 · 在结果树中选择要清理的项目')}'
+                        '${widget.review.aggregatedItems > 0 ? ' · ${widget.review.aggregatedItems} ${t('size-only entries', 'mục chỉ có tổng dung lượng', 'yalnızca boyut toplamı olan girdi', '只有大小合计的条目')}' : ''}'
+                        '${widget.coverageIssueCount > 0 ? ' · ${widget.coverageIssueCount} ${t('paths with scan limits', 'đường dẫn chưa quét đầy đủ', 'tarama sınırlı yol', '扫描受限的路径')}' : ''}',
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.labelSmall?.copyWith(

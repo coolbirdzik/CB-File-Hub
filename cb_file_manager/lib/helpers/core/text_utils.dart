@@ -33,6 +33,10 @@ class TextUtils {
     ).replaceAll(_combiningDiacritics, '');
   }
 
+  /// Persistable search key with the same separator rules as [matchesSearch].
+  static String searchKey(String value) =>
+      _cleanString(normalizeForSearch(value));
+
   /// Fuzzy Unicode search used by every user-facing search surface.
   /// Supports partial matching, word order independence, and special characters
   ///
@@ -43,12 +47,8 @@ class TextUtils {
   /// - "hello world" matches "world hello" (word order)
   /// - "test_file" matches "test file" (special chars)
   static bool matchesSearch(String text, String query) {
-    final normalizedText = normalizeForSearch(text);
-    final normalizedQuery = normalizeForSearch(query);
-
-    // Remove special characters for better matching
-    final cleanText = _cleanString(normalizedText);
-    final cleanQuery = _cleanString(normalizedQuery);
+    final cleanText = searchKey(text);
+    final cleanQuery = searchKey(query);
 
     // Split query into words for flexible matching
     final queryWords = cleanQuery

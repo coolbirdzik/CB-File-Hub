@@ -319,6 +319,9 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
     if (path == '#home') return context.tr.homeTab;
     if (path == '#gallery') return context.tr.imageGallery;
     if (path == '#video') return context.tr.videoHubTitle;
+    if (path == '#torrents' || path.startsWith('#torrents?')) {
+      return context.tr.torrents;
+    }
     // The album/library screen renames the tab once its name has loaded.
     if (path == '#albums' || path.startsWith('#album/')) {
       return context.tr.albums;
@@ -349,11 +352,16 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
       final activeTab = state.activeTab;
       if (activeTab == null) return;
 
-      final path = activeTab.path.trim();
+      final path = activeTab.path.startsWith('#torrents?')
+          ? '#torrents'
+          : activeTab.path.trim();
 
       // Save all open tabs
       final allPaths = state.tabs
-          .map((t) => t.path.trim())
+          .map(
+            (t) =>
+                t.path.startsWith('#torrents?') ? '#torrents' : t.path.trim(),
+          )
           .where((p) => p.isNotEmpty)
           .toList();
       await prefs.setLastOpenedTabsList(allPaths);

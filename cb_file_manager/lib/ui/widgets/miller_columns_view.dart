@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'file_drag_drop_item.dart';
+import '../components/common/file_entry_presentation.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -742,17 +743,19 @@ class _MillerFileRowState extends State<_MillerFileRow> {
     return SizedBox(
       width: 20,
       height: 20,
-      child: FutureBuilder<Widget>(
-        future: _iconFuture,
-        builder: (context, snapshot) {
-          if (snapshot.hasData) return snapshot.data!;
-          return Icon(
-            PhosphorIconsLight.file,
-            size: 18,
-            color: theme.colorScheme.onSurfaceVariant,
-          );
-        },
-      ),
+      child:
+          FileIconHelper.getCachedIconForFile(widget.file, size: 20) ??
+          FutureBuilder<Widget>(
+            future: _iconFuture,
+            builder: (context, snapshot) {
+              if (snapshot.hasData) return snapshot.data!;
+              return Icon(
+                PhosphorIconsLight.file,
+                size: 18,
+                color: theme.colorScheme.onSurfaceVariant,
+              );
+            },
+          ),
     );
   }
 
@@ -764,7 +767,11 @@ class _MillerFileRowState extends State<_MillerFileRow> {
         renameController != null &&
         renameController.renamingPath == widget.file.path;
     final bool isBeingCut = ItemInteractionStyle.isBeingCut(widget.file.path);
-    final String name = FileTypeUtils.getFileName(widget.file.path);
+    final String name = FileEntryPresentation.nameOf(
+      context,
+      widget.file.path,
+      fallback: FileTypeUtils.getFileName(widget.file.path),
+    );
 
     return ValueListenableBuilder<bool>(
       valueListenable: _isHovering,

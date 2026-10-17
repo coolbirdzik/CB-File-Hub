@@ -24,6 +24,7 @@ import 'package:cb_file_manager/helpers/files/file_icon_helper.dart';
 import 'package:cb_file_manager/ui/utils/route.dart';
 import 'package:cb_file_manager/ui/widgets/tag_chip.dart'; // Import the new TagChip widget
 import '../../../components/common/shared_file_context_menu.dart';
+import '../../../components/common/file_entry_presentation.dart';
 import 'package:cb_file_manager/ui/widgets/thumbnail_loader.dart'; // Import ThumbnailLoader
 import 'package:flutter/services.dart'; // Import for keyboard key detection
 // Import for RepaintBoundary
@@ -39,6 +40,7 @@ import 'package:cb_file_manager/services/network_browsing/ftp_service.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/ui/controllers/inline_rename_controller.dart';
 import 'package:cb_file_manager/ui/widgets/inline_rename_field.dart';
+import '../../../utils/torrent_open_actions.dart';
 
 // Add this class to disable ripple effects
 class NoSplashFactory extends InteractiveInkFeatureFactory {
@@ -260,6 +262,8 @@ class _FileItemState extends State<FileItem> {
     AppBusyCursor.pulse();
     if (widget.onFileTap != null) {
       widget.onFileTap!(widget.file, isVideo);
+    } else if (TorrentOpenActions.tryOpen(context, widget.file.path)) {
+      return;
     } else {
       // Video: default in-app player; only system default when user enabled in Settings
       if (isVideo) {
@@ -658,6 +662,8 @@ class _FileItemContentState extends State<_FileItemContent> {
 
   Future<FileStat> _getFileStatLazy() async {
     final path = widget.file.path;
+    final indexedStat = widget.state.fileStatsCache[path];
+    if (indexedStat != null) return indexedStat;
 
     // Check cache first
     if (_fileStatCache.containsKey(path)) {
@@ -686,7 +692,9 @@ class _FileItemContentState extends State<_FileItemContent> {
   @override
   void didUpdateWidget(_FileItemContent oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.file.path != oldWidget.file.path) {
+    if (widget.file.path != oldWidget.file.path ||
+        widget.state.fileStatsCache[widget.file.path] !=
+            oldWidget.state.fileStatsCache[widget.file.path]) {
       _iconFuture = FileIconHelper.getIconForFile(widget.file);
 
       // Skip file stat for network files completely to avoid lag
@@ -768,6 +776,10 @@ class _FileItemContentState extends State<_FileItemContent> {
             : FutureBuilder<Widget>(
                 future: _iconFuture,
                 builder: (context, snapshot) {
+                  final cached = FileIconHelper.getCachedIconForFile(
+                    widget.file,
+                  );
+                  if (cached != null) return cached;
                   if (snapshot.hasData) {
                     return snapshot.data!;
                   }
@@ -1012,6 +1024,10 @@ class _FileItemContentState extends State<_FileItemContent> {
   }
 
   String _getDisplayName(File file) {
+    final names = context
+        .dependOnInheritedWidgetOfExactType<FileEntryPresentation>()
+        ?.names;
+    if (names?.containsKey(file.path) ?? false) return names![file.path]!;
     // Archive entries live behind a virtual path; show the entry name.
     final archiveEntryName = ArchivePathUtils.entryDisplayName(file.path);
     if (archiveEntryName != null) return archiveEntryName;

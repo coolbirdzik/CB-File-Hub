@@ -77,7 +77,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _useSystemDefaultForVideo = false;
   bool _openVideoInNewWindow = true;
   bool _isThemeExpanded = false;
-  bool _isLanguageExpanded = false;
   String _appVersion = '';
   bool _updatesSupported = false;
 
@@ -2196,36 +2195,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Widget _buildLanguageCollapseTile() {
     final l10n = AppLocalizations.of(context)!;
-    final languageLabel = _currentLanguageCode == 'vi'
-        ? l10n.vietnameseLanguage
-        : l10n.englishLanguage;
 
-    return CbExpander(
-      expanded: _isLanguageExpanded,
-      onExpansionChanged: (expanded) => _isLanguageExpanded = expanded,
-      leading: const Icon(PhosphorIconsLight.globe),
-      title: Text(l10n.language),
-      subtitle: Text(languageLabel),
-      children: [
-        RadioGroup<String>(
-          groupValue: _currentLanguageCode,
-          onChanged: (value) {
-            if (value != null) _updateLanguage(value);
-          },
-          child: Column(
-            children: [
-              _buildRadioOption<String>(
-                value: LanguageController.vietnamese,
-                title: Text('🇻🇳  ${l10n.vietnameseLanguage}'),
-              ),
-              _buildRadioOption<String>(
-                value: LanguageController.english,
-                title: Text('🇬🇧  ${l10n.englishLanguage}'),
-              ),
-            ],
-          ),
-        ),
-      ],
+    // Each language is listed by its own name so it can be found without
+    // reading the current one; the localized names stay searchable.
+    String keywordsFor(String code) => switch (code) {
+      LanguageController.vietnamese =>
+        'vi vietnamese ${l10n.vietnameseLanguage} viet nam',
+      LanguageController.turkish => 'tr turkish ${l10n.turkishLanguage} turkce',
+      LanguageController.chinese =>
+        'zh chinese ${l10n.chineseLanguage} 中文 汉语 trung quoc china',
+      _ => 'en english ${l10n.englishLanguage}',
+    };
+
+    return _buildCompactSettingTile(
+      title: l10n.language,
+      subtitle: l10n.selectLanguage,
+      icon: PhosphorIconsLight.globe,
+      trailing: CbSelect<String>(
+        width: 200,
+        value: _currentLanguageCode,
+        onChanged: _updateLanguage,
+        searchable: true,
+        searchPlaceholder: l10n.search,
+        searchEmptyText: l10n.albumNoMatchingResults,
+        searchIcon: PhosphorIconsLight.magnifyingGlass,
+        items: [
+          for (final code in _languageController.supportedLanguages)
+            CbSelectItem(
+              value: code,
+              label: _languageController.getLanguageName(code),
+              keywords: keywordsFor(code),
+            ),
+        ],
+      ),
     );
   }
 

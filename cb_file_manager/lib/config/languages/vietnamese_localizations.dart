@@ -2,6 +2,250 @@ import 'app_localizations.dart';
 
 class VietnameseLocalizations implements AppLocalizations {
   @override
+  String get torrentOpeningOptions => 'Khi mở torrent';
+  @override
+  String get torrentShowDownloadDialog =>
+      'Hiện hộp thoại tùy chọn tải khi mở torrent';
+  @override
+  String get torrentShowDownloadDialogHint =>
+      'Khi tắt, dùng thư mục tải và lựa chọn tải ngay đã lưu. Nếu chưa có thư mục tải, ứng dụng vẫn hỏi để chọn.';
+  @override
+  String get torrentImportMenu => 'Nhập';
+  @override
+  String torrentImportFrom(String app) => 'Nhập từ $app';
+  @override
+  String get torrentClientImportHint =>
+      'Nhập các file .torrent từ hồ sơ tìm được hoặc chọn thư mục khác. Áp dụng chế độ lưu trữ đang chọn, giữ nguyên nội dung đã tải.';
+  @override
+  String get torrentClientNotFound =>
+      'Chưa tìm thấy hồ sơ. Chọn thư mục ứng dụng này lưu các file .torrent.';
+  @override
+  String get torrentClientSourceRequired =>
+      'Chọn thư mục có sẵn chứa các file .torrent.';
+  @override
+  String get torrentAddLink => 'Thêm torrent bằng link';
+  @override
+  String get torrentLinkHint =>
+      'Dán URL torrent HTTP/HTTPS hoặc liên kết magnet.';
+  @override
+  String get torrentRefreshImport => 'Import torrent mới (F5)';
+  @override
+  String get torrentStartImmediately => 'Bắt đầu tải ngay';
+  @override
+  String get torrentDestinationRequired =>
+      'Chọn hoặc nhập đường dẫn đầy đủ đến thư mục tải.';
+  @override
+  String get torrentDestinationLocked =>
+      'Dừng tác vụ trước khi đổi thư mục tải.';
+  @override
+  String torrentColumn(String column) =>
+      const {
+        'status': 'Trạng thái tải',
+        'progress': 'Tiến độ',
+        'downSpeed': 'Tốc độ tải',
+        'upSpeed': 'Tốc độ tải lên',
+        'seeds': 'Seed',
+        'peers': 'Peer',
+        'eta': 'Thời gian còn lại',
+        'downloaded': 'Đã tải',
+        'uploaded': 'Đã tải lên',
+        'ratio': 'Tỷ lệ chia sẻ',
+        'files': 'Số file',
+        'group': 'Nhóm',
+        'destination': 'Thư mục tải',
+        'hash': 'Info hash',
+        'remaining': 'Còn lại',
+        'tracker': 'Tracker',
+        'trackerCount': 'Số tracker',
+        'torrentCreated': 'Ngày tạo torrent',
+        'createdBy': 'Tạo bằng',
+        'comment': 'Ghi chú',
+        'private': 'Quyền riêng tư',
+        'privateYes': 'Riêng tư',
+        'privateNo': 'Công khai',
+        'pieceSize': 'Kích thước mảnh',
+        'pieceCount': 'Số mảnh',
+        'metainfoSize': 'Dung lượng file torrent',
+        'torrentFile': 'File torrent',
+        'source': 'Nguồn',
+        'error': 'Lỗi',
+        'taskId': 'ID tác vụ',
+        'filters': 'Lọc torrent',
+        'seedsHint': 'Số seed đang kết nối với lượt tải này.',
+        'peersHint': 'Tổng số peer đang kết nối, gồm cả seed và web seed.',
+      }[column] ??
+      column;
+  @override
+  String get torrentStatusLabel => 'Trạng thái';
+  @override
+  String get torrents => 'Torrent';
+  @override
+  String get torrentDuplicateTitle => 'Torrent đã tồn tại';
+  @override
+  String get torrentDuplicateHint =>
+      'Hợp nhất tracker và nguồn với torrent này? Giữ nguyên trạng thái tải, thư mục tải và các file đang có.';
+  @override
+  String get torrentMerge => 'Hợp nhất';
+  @override
+  String get torrentReveal => 'Hiện trong danh sách';
+  @override
+  String torrentSaved(String name) => 'Đã lưu: $name';
+  @override
+  String get torrentCopyMagnet => 'Sao chép liên kết magnet';
+  @override
+  String get torrentAddMagnet => 'Thêm link magnet';
+  @override
+  String get torrentDefaultApps => 'Chọn mặc định trên Windows';
+  @override
+  String get torrentDefaultAppsHint =>
+      'Chọn CB File Hub cho file .torrent và liên kết MAGNET trong Default apps của Windows.';
+  @override
+  String get torrentOrganize => 'Sắp xếp file torrent';
+  @override
+  String torrentStorageMode(String mode) =>
+      const {
+        'index': 'Chỉ index, giữ file gốc',
+        'copy': 'Sao chép về thư mục đã chọn',
+        'move': 'Di chuyển về thư mục đã chọn',
+      }[mode] ??
+      mode;
+  @override
+  String get torrentSubtitle => 'Một thư viện chung, file lưu ở nơi bạn chọn.';
+  @override
+  String get torrentStorage => 'Thư mục lưu file torrent';
+  @override
+  String get torrentStorageHint =>
+      'Sao chép xếp file torrent trong index theo hash. Di chuyển sẽ hỏi xác nhận trước khi dọn bản gốc đã có bản sao hợp lệ. Các lần nhập sau dùng chế độ đã chọn. Nơi tải nội dung được chọn riêng.';
+  @override
+  String get torrentMoveConfirmTitle => 'Di chuyển torrent và dọn nguồn?';
+  @override
+  String torrentMoveConfirmHint(int count) =>
+      'Có $count file .torrent nguồn trong danh sách bên dưới. Chỉ xóa bản gốc sau khi xác minh bản lưu hợp lệ. Giữ nguyên nội dung đã tải và các file khác trong nguồn. Các lần nhập sau sẽ dùng chế độ Di chuyển.';
+  @override
+  String get torrentMoveConfirm => 'Xác nhận dọn nguồn';
+  @override
+  String get torrentImport => 'Nhập .torrent';
+  @override
+  String get qbittorrentImport => 'Nhập từ qBittorrent';
+  @override
+  String get qbittorrentImportHint =>
+      'Tự tìm thư mục BT_backup trên Windows hoặc chọn thư mục của bản portable. Bản torrent và .fastresume được sao lưu vào nơi bạn chọn. Mục thiếu .torrent được nhập bằng magnet; metadata sẽ được lấy khi bạn chọn tải.';
+  @override
+  String get qbittorrentChooseSource => 'Chọn BT_backup';
+  @override
+  String get qbittorrentRemoveSources =>
+      'Xóa torrent khỏi qBittorrent sau khi nhập';
+  @override
+  String get qbittorrentRemoveHint =>
+      'Dọn trực tiếp .torrent và .fastresume tương ứng. Cần tắt qBittorrent trước khi dọn; giữ nguyên dữ liệu tải về.';
+  @override
+  String get qbittorrentConfirmTitle => 'Dọn các torrent này khỏi qBittorrent?';
+  @override
+  String qbittorrentConfirmHint(int count) =>
+      'Chỉ dọn $count file nguồn bên dưới sau khi torrent hoặc magnet cùng bản sao .fastresume đã được lưu và xác minh trong CB File Hub. Giữ nguyên nội dung đã tải và các file khác. qBittorrent cần được tắt.';
+  @override
+  String get qbittorrentConfirm => 'Xác nhận nhập và dọn';
+  @override
+  String qbittorrentFound(int torrents, int files) =>
+      'Tìm thấy $torrents torrent · $files file nguồn';
+  @override
+  String qbittorrentProgress(int completed, int total) =>
+      'Đang nhập $completed / $total torrent';
+  @override
+  String qbittorrentResult(int stored, int cleaned, int failed) =>
+      'Đã lưu: $stored · Đã dọn nguồn: $cleaned · Lỗi: $failed';
+  @override
+  String qbittorrentProblem(String problem) =>
+      const {
+        'running':
+            'Hãy tắt qBittorrent hoàn toàn rồi thử lại. Có thể bỏ chọn dọn nguồn để chỉ sao chép khi qBittorrent đang chạy.',
+        'sqlite':
+            'Profile này có torrents.db. Dọn file BT_backup không gỡ được dữ liệu trong SQLite; app giữ nguyên nguồn. Hãy chọn profile dùng Fastresume.',
+        'changed':
+            'File nguồn đã thay đổi từ lúc xem danh sách; giữ nguyên nguồn và tải lại danh sách.',
+        'destination':
+            'Chọn nơi lưu torrent bên ngoài thư mục BT_backup nguồn.',
+        'missingMetainfo':
+            'Không tìm thấy file .torrent hoặc bản torrent hợp lệ trong index. Giữ nguyên .fastresume của qBittorrent.',
+        'noSources':
+            'Chưa tìm thấy BT_backup. Hãy chọn thư mục dữ liệu của qBittorrent.',
+      }[problem] ??
+      problem;
+  @override
+  String get torrentScanFolder => 'Quét thư mục';
+  @override
+  String get torrentScanSystem => 'Quét tất cả ổ đĩa cục bộ';
+  @override
+  String get torrentAutoImport => 'Tự nhập thư mục nguồn mỗi 5 phút';
+  @override
+  String get torrentSources => 'Thư mục nguồn';
+  @override
+  String get torrentEngine => 'Chọn chương trình aria2c';
+  @override
+  String get torrentDownload => 'Tải về…';
+  @override
+  String get torrentPause => 'Tạm dừng';
+  @override
+  String get torrentResume => 'Tiếp tục';
+  @override
+  String get torrentStop => 'Dừng tải';
+  @override
+  String get torrentGroup => 'Nhóm';
+  @override
+  String get torrentRemove => 'Gỡ khỏi index';
+  @override
+  String get torrentRemoveHint =>
+      'Lượt tải sẽ dừng. File torrent, bản gốc và nội dung đã tải vẫn được giữ trên ổ đĩa. Lần quét sau có thể nhập lại torrent này.';
+  @override
+  String get torrentEmpty =>
+      'Chưa có torrent. Nhập file hoặc quét thư mục để bắt đầu.';
+  @override
+  String get torrentScanHint =>
+      'Tìm file .torrent trên tất cả ổ đĩa cục bộ, bao gồm bản lưu của các ứng dụng torrent. Tự phân loại và gộp bản trùng. Không nhập phiên tải và vị trí nội dung từ ứng dụng khác.';
+  @override
+  String get torrentScanLog => 'Mở nhật ký lỗi quét';
+  @override
+  String get torrentNoStorage =>
+      'Chọn thư mục lưu metainfo torrent trước khi nhập.';
+  @override
+  String get torrentOpenFolder => 'Mở thư mục tải';
+  @override
+  String get torrentDesktopOnly =>
+      'Tải torrent cần aria2 trên máy tính. Có thể index các thư mục cục bộ được phép truy cập.';
+  @override
+  String torrentStatus(String status) =>
+      const {
+        'library': 'Thư viện',
+        'active': 'Đang tải',
+        'waiting': 'Chờ tải',
+        'paused': 'Tạm dừng',
+        'complete': 'Hoàn tất',
+        'error': 'Lỗi',
+      }[status] ??
+      status;
+  @override
+  String torrentCategory(String category) =>
+      const {
+        'video': 'Video',
+        'audio': 'Âm thanh',
+        'documents': 'Tài liệu',
+        'other': 'Khác',
+      }[category] ??
+      category;
+  @override
+  String torrentScanSummary(
+    int visited,
+    int imported,
+    int duplicates,
+    int failed,
+  ) =>
+      'Đã kiểm tra $visited torrent · Nhập $imported · Trùng $duplicates · Lỗi $failed';
+  @override
+  String get torrentFilesPerPage => 'Số file mỗi trang';
+  @override
+  String torrentPageSummary(int first, int last, int total) =>
+      '$first–$last / $total torrent';
+  @override
   String get galleryNsfwLabel => 'Nội dung NSFW';
   @override
   String get galleryNsfwDescription =>
@@ -777,6 +1021,15 @@ class VietnameseLocalizations implements AppLocalizations {
   String get vietnameseLanguage => 'Tiếng Việt';
   @override
   String get englishLanguage => 'Tiếng Anh';
+  @override
+  String get turkishLanguage => 'Tiếng Thổ Nhĩ Kỳ';
+  @override
+  String get chineseLanguage => 'Tiếng Trung (Giản thể)';
+  @override
+  String get languageOnboardingTitle => 'Chọn ngôn ngữ của bạn';
+  @override
+  String get languageOnboardingDescription =>
+      'Chọn ngôn ngữ CB File Hub sẽ sử dụng. Bạn có thể đổi lại trong Cài đặt.';
 
   // Messages
   @override
@@ -4523,4 +4776,1097 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String unexpectedFileOpenError(String error) =>
       'Lỗi không mong muốn khi mở file: $error';
+  @override
+  String get enterPath => 'Nhập đường dẫn...';
+  @override
+  String get clearCompleted => 'Xóa mục đã hoàn tất';
+  @override
+  String get running => 'Đang chạy';
+  @override
+  String get notifications => 'Thông báo';
+  @override
+  String get dismiss => 'Bỏ qua';
+  @override
+  String get openFileLocation => 'Mở vị trí tệp';
+  @override
+  String get minimize => 'Thu nhỏ';
+  @override
+  String get maximize => 'Phóng to';
+  @override
+  String get tabInactiveTooltip =>
+      'Không hoạt động (tự động tạm dừng sau 60 phút)';
+  @override
+  String get closeSplitView => 'Đóng chế độ chia đôi';
+  @override
+  String get nothingToShow => 'Không có gì để hiển thị';
+  @override
+  String get albumNotFound => 'Không tìm thấy album';
+  @override
+  String get invalidAlbumId => 'ID album không hợp lệ';
+  @override
+  String get videoLibraryNotFound => 'Không tìm thấy thư viện video';
+  @override
+  String get invalidVideoLibraryId => 'ID thư viện video không hợp lệ';
+  @override
+  String get vpAdvancedControls => 'Điều khiển nâng cao';
+  @override
+  String get vpAudioTracks => 'Rãnh âm thanh';
+  @override
+  String get vpAudioTracksStub =>
+      'Tính năng chọn rãnh âm thanh sẽ được thêm vào đây.';
+  @override
+  String get vpSubtitles => 'Phụ đề';
+  @override
+  String get vpPlaybackSpeed => 'Tốc độ phát';
+  @override
+  String vpPlaybackSpeedValue(String speed) => 'Tốc độ phát (${speed}x)';
+  @override
+  String get vpPictureInPicture => 'Hình trong hình';
+  @override
+  String get vpExitPip => 'Thoát PiP';
+  @override
+  String get vpVideoFilters => 'Bộ lọc video';
+  @override
+  String get vpSleepTimer => 'Hẹn giờ tắt';
+  @override
+  String get vpSleepTimerActive => 'Hẹn giờ tắt (Đang bật)';
+  @override
+  String get vpVideoSettings => 'Cài đặt video';
+  @override
+  String get vpReset => 'Đặt lại';
+  @override
+  String get vpResetToDefault => 'Đặt lại mặc định';
+  @override
+  String get vpOff => 'Tắt';
+  @override
+  String vpHoursOption(int hours) => '$hours giờ';
+  @override
+  String vpMinutesOption(int minutes) => '$minutes phút';
+  @override
+  String get vpBrightness => 'Độ sáng';
+  @override
+  String get vpContrast => 'Độ tương phản';
+  @override
+  String get vpSaturation => 'Độ bão hòa';
+  @override
+  String get vpStreamSpeed => 'Tốc độ luồng';
+  @override
+  String get vpBufferInfo => 'Thông tin bộ đệm';
+  @override
+  String get vpRewind10 => 'Tua lại 10 giây';
+  @override
+  String get vpForward10 => 'Tua tới 10 giây';
+  @override
+  String get vpCodec => 'Codec:';
+  @override
+  String get vpAuto => 'Tự động';
+  @override
+  String get vpScaleMode => 'Chế độ co giãn video:';
+  @override
+  String get vpScaleContain => 'Vừa cửa sổ (giữ tỉ lệ, không cắt)';
+  @override
+  String get vpScaleCover => 'Phủ kín (lấp đầy và cắt)';
+  @override
+  String get vpScaleFill => 'Lấp đầy (kéo giãn)';
+  @override
+  String get vpScaleFitWidth => 'Vừa chiều rộng';
+  @override
+  String get vpScaleFitHeight => 'Vừa chiều cao';
+  @override
+  String get vpScaleNone => 'Không (kích thước gốc)';
+  @override
+  String get vpScaleDown => 'Thu nhỏ';
+  @override
+  String get vpAudioDecoder => 'Bộ giải mã âm thanh:';
+  @override
+  String get vpSoftware => 'Phần mềm';
+  @override
+  String get vpHardware => 'Phần cứng';
+  @override
+  String vpBufferSize(int mb) => 'Kích thước bộ đệm: ${mb}MB';
+  @override
+  String vpNetworkTimeout(int seconds) => 'Thời gian chờ mạng: ${seconds}s';
+  @override
+  String get vpSubtitleEncoding => 'Mã hóa phụ đề:';
+  @override
+  String get vpOutputFormat => 'Định dạng đầu ra video:';
+  @override
+  String get remove => 'Gỡ bỏ';
+  @override
+  String get cancelSelection => 'Hủy chọn';
+  @override
+  String get deselectAll => 'Bỏ chọn tất cả';
+  @override
+  String albumRemoveImagesTitle(int count) => 'Gỡ $count ảnh?';
+  @override
+  String get albumRemoveImagesBody =>
+      'Gỡ các ảnh đã chọn khỏi album này? Tệp gốc sẽ không bị xóa.';
+  @override
+  String get albumNever => 'Chưa bao giờ';
+  @override
+  String albumSmartStatus(int rules, int sources, String last) =>
+      '$rules quy tắc • $sources nguồn • Lần cuối: $last';
+  @override
+  String get albumScanningFiles => 'Đang quét tệp...';
+  @override
+  String albumAddingFiles(int current, int total) =>
+      'Đang thêm tệp... ($current/$total)';
+  @override
+  String get albumCompleted => 'Hoàn tất!';
+  @override
+  String get albumScanning => 'Đang quét...';
+  @override
+  String get albumNoScanLocations => 'Chưa cấu hình vị trí quét';
+  @override
+  String albumScanningFound(int count) => 'Đang quét... tìm thấy $count';
+  @override
+  String albumCompletedFound(int count) => 'Hoàn tất! Tìm thấy $count tệp';
+  @override
+  String get albumCanceled => 'Đã hủy';
+  @override
+  String get albumScanLocations => 'Vị trí quét';
+  @override
+  String get albumNoLocationsSelected =>
+      'Chưa chọn vị trí nào. Hãy thêm thư mục để quét cho album này.';
+  @override
+  String get albumAddFolder => 'Thêm thư mục';
+  @override
+  String get albumEditAlbum => 'Sửa album';
+  @override
+  String get albumManageRules => 'Quản lý quy tắc';
+  @override
+  String get albumShuffle => 'Xáo trộn';
+  @override
+  String get albumUnshuffle => 'Bỏ xáo trộn';
+  @override
+  String get albumAddImagesTooltip => 'Thêm ảnh';
+  @override
+  String get albumRemoveFromAlbum => 'Gỡ khỏi album';
+  @override
+  String get albumMoveSelectedToTrash => 'Chuyển các tệp đã chọn vào Thùng rác';
+  @override
+  String albumSearchImagesIn(String name) => 'Tìm ảnh trong $name';
+  @override
+  String get albumSmartLabel => 'Album thông minh (động theo quy tắc)';
+  @override
+  String get albumSources => 'Nguồn';
+  @override
+  String get albumRescan => 'Quét lại';
+  @override
+  String get albumRules => 'Quy tắc';
+  @override
+  String get albumNoImages => 'Album này chưa có ảnh';
+  @override
+  String get albumNoImagesMatch => 'Không có ảnh nào khớp với tìm kiếm';
+  @override
+  String get albumAddImagesHint => 'Thêm ảnh để bắt đầu xây dựng album';
+  @override
+  String get albumAddImages => 'Thêm ảnh';
+  @override
+  String albumDeleteOneConfirm(String name) =>
+      'Bạn có chắc muốn xóa album "$name"? Hành động này không thể hoàn tác.';
+  @override
+  String albumDeleteManyConfirm(int count) =>
+      'Bạn có chắc muốn xóa $count album? Hành động này không thể hoàn tác.';
+  @override
+  String get albumDeletedOne => 'Đã xóa album thành công';
+  @override
+  String albumDeletedMany(int count) => 'Đã xóa $count album thành công';
+  @override
+  String albumDeleteFailedCount(int count) => 'Không thể xóa $count album';
+  @override
+  String albumImageCount(int count) => '$count ảnh';
+  @override
+  String get albumColumnPrivacy => 'Riêng tư';
+  @override
+  String get albumPublic => 'Công khai';
+  @override
+  String albumSourceCount(int count) => '$count nguồn';
+  @override
+  String get albumSourceSettings => 'Cài đặt nguồn';
+  @override
+  String get albumEditAlbumLower => 'Sửa album';
+  @override
+  String get albumSetCover => 'Đặt ảnh bìa…';
+  @override
+  String get albumRandomCover => 'Ảnh bìa ngẫu nhiên';
+  @override
+  String get albumOptions => 'Tùy chọn album';
+  @override
+  String get albumSearchSources => 'Tìm nguồn ảnh';
+  @override
+  String get albumSearchAlbums => 'Tìm album';
+  @override
+  String get albumNoMatchingResults => 'Không có kết quả phù hợp';
+  @override
+  String get albumNoSourcesYet => 'Chưa có nguồn ảnh nào';
+  @override
+  String get albumNoAlbumsYet => 'Chưa có album nào';
+  @override
+  String get albumAddSourceHint =>
+      'Thêm nguồn để duyệt ảnh từ các thư mục của nó';
+  @override
+  String get albumCreateFirstHint =>
+      'Tạo album đầu tiên để sắp xếp ảnh của bạn';
+  @override
+  String get albumCreateImageSource => 'Tạo nguồn ảnh';
+  @override
+  String get albumCreateAlbum => 'Tạo album';
+  @override
+  String get albumBadgeSource => 'Nguồn';
+  @override
+  String get albumNoImagesForCover => 'Không có ảnh nào để chọn làm ảnh bìa';
+  @override
+  String get albumChooseCover => 'Chọn ảnh bìa';
+  @override
+  String get ruleDeleteTitle => 'Xóa quy tắc';
+  @override
+  String ruleDeleteConfirm(String name) =>
+      'Bạn có chắc muốn xóa quy tắc "$name"?';
+  @override
+  String get ruleCreateNew => 'Tạo quy tắc mới';
+  @override
+  String get ruleEmptyTitle => 'Quy tắc album tự động';
+  @override
+  String get ruleEmptyBody =>
+      'Tự động sắp xếp ảnh bằng cách tạo quy tắc\nkhớp với mẫu tên tệp';
+  @override
+  String get ruleCreateFirst => 'Tạo quy tắc đầu tiên';
+  @override
+  String get ruleExScreenshots => 'Ảnh chụp màn hình';
+  @override
+  String get ruleExScreenshotsDesc =>
+      'Tệp chứa "screenshot" → album Ảnh chụp màn hình';
+  @override
+  String get ruleExCamera => 'Ảnh từ máy ảnh';
+  @override
+  String get ruleExCameraDesc => 'Tệp bắt đầu bằng "IMG_" → album Máy ảnh';
+  @override
+  String get ruleExEdited => 'Ảnh đã chỉnh sửa';
+  @override
+  String get ruleExEditedDesc =>
+      'Tệp kết thúc bằng "_edited" → album Đã chỉnh sửa';
+  @override
+  String get rulePopularExamples => 'Ví dụ quy tắc phổ biến';
+  @override
+  String ruleAlbumLabel(String name) => 'Album: $name';
+  @override
+  String ruleConditionLabel(String name) => 'Điều kiện: $name';
+  @override
+  String rulePatternLabel(String pattern) => 'Mẫu: "$pattern"';
+  @override
+  String get ruleMatches => 'Số khớp';
+  @override
+  String get ruleLastTriggered => 'Kích hoạt gần nhất';
+  @override
+  String ruleDaysAgo(int n) => '$n ngày trước';
+  @override
+  String ruleHoursAgo(int n) => '$n giờ trước';
+  @override
+  String ruleMinutesAgo(int n) => '$n phút trước';
+  @override
+  String get ruleJustNow => 'Vừa xong';
+  @override
+  String get ruleCreateAutoRule => 'Tạo quy tắc tự động';
+  @override
+  String get ruleCreate => 'Tạo quy tắc';
+  @override
+  String get ruleQuickTemplates => 'Mẫu nhanh';
+  @override
+  String get ruleQuickTemplatesHint => 'Chọn một mẫu có sẵn để bắt đầu nhanh';
+  @override
+  String get ruleExamples => 'Ví dụ:';
+  @override
+  String get ruleCustom => 'Quy tắc tùy chỉnh';
+  @override
+  String get ruleName => 'Tên quy tắc';
+  @override
+  String get ruleNameHint =>
+      'VD: Ảnh chụp màn hình vào album Ảnh chụp màn hình';
+  @override
+  String get ruleTargetAlbum => 'Album đích';
+  @override
+  String get ruleCondition => 'Điều kiện';
+  @override
+  String get rulePattern => 'Mẫu';
+  @override
+  String get rulePreview => 'Xem trước';
+  @override
+  String get rulePreviewHint => 'Xem những tệp nào sẽ khớp với quy tắc';
+  @override
+  String get rulePreviewUpdatedHint =>
+      'Xem những tệp nào sẽ khớp với quy tắc đã cập nhật';
+  @override
+  String get ruleTestResults => 'Kết quả kiểm tra:';
+  @override
+  String get ruleCondContains => 'Chứa';
+  @override
+  String get ruleCondStartsWith => 'Bắt đầu bằng';
+  @override
+  String get ruleCondEndsWith => 'Kết thúc bằng';
+  @override
+  String get ruleCondEquals => 'Bằng';
+  @override
+  String get ruleCondRegex => 'Mẫu regex';
+  @override
+  String get ruleHintContains => 'VD: screenshot';
+  @override
+  String get ruleHintStartsWith => 'VD: IMG_';
+  @override
+  String get ruleHintEndsWith => 'VD: _edited';
+  @override
+  String get ruleHintEquals => 'VD: photo';
+  @override
+  String get ruleHintRegex => r'VD: ^IMG_\d{4}$';
+  @override
+  String get ruleEditAutoRule => 'Sửa quy tắc tự động';
+  @override
+  String get ruleSaveChanges => 'Lưu thay đổi';
+  @override
+  String get ruleDetails => 'Chi tiết quy tắc';
+  @override
+  String errorWithDetail(String error) => 'Lỗi: $error';
+  @override
+  String get albumSelectingFiles => 'Đang chọn tệp...';
+  @override
+  String get albumAddingSelectedFiles => 'Đang thêm các tệp đã chọn...';
+  @override
+  String get albumAddTo => 'Thêm vào album';
+  @override
+  String get albumAddFromFolder => 'Thêm từ thư mục';
+  @override
+  String get albumAddFromFolderDesc => 'Thêm tất cả ảnh từ thư mục đã chọn';
+  @override
+  String get albumAddSelectedPhotos => 'Thêm ảnh đã chọn';
+  @override
+  String get albumAddSelectedPhotosDesc => 'Chọn các tệp ảnh cụ thể để thêm';
+  @override
+  String get albumColorOptional => 'Màu album (Tùy chọn)';
+  @override
+  String get albumEditTitle => 'Sửa album';
+  @override
+  String get albumCreateTitle => 'Tạo album mới';
+  @override
+  String get albumNameRequiredLabel => 'Tên album *';
+  @override
+  String get albumNameHint => 'Nhập tên album';
+  @override
+  String get albumNameRequired => 'Cần nhập tên album';
+  @override
+  String get albumNameTooLong => 'Tên album tối đa 50 ký tự';
+  @override
+  String get albumDescriptionLabel => 'Mô tả (Tùy chọn)';
+  @override
+  String get albumDescriptionHint => 'Nhập mô tả album';
+  @override
+  String get albumDescriptionTooLong => 'Mô tả tối đa 200 ký tự';
+  @override
+  String get albumDynamicSmart => 'Album động (thông minh)';
+  @override
+  String get albumDynamicSmartDesc =>
+      'Nội dung được xác định bởi Quy tắc tự động. Không lưu tệp một cách cố định.';
+  @override
+  String get albumAddingFilesToAlbum => 'Đang thêm tệp vào album...';
+  @override
+  String get albumSearchAndSelect => 'Tìm và chọn ảnh';
+  @override
+  String get albumSearchForImages => 'Tìm ảnh...';
+  @override
+  String albumSelectedOfTotal(int selected, int total) =>
+      'Đã chọn $selected / $total';
+  @override
+  String get albumDeselectAllCaps => 'Bỏ chọn tất cả';
+  @override
+  String get albumLoadingImages => 'Đang tải ảnh...';
+  @override
+  String get albumNoImagesFound => 'Không tìm thấy ảnh';
+  @override
+  String get albumTryDifferentSearch => 'Thử một từ khóa khác';
+  @override
+  String albumAddNImages(int count) => 'Thêm $count ảnh';
+  @override
+  String get albumAddFolderToAlbum => 'Thêm thư mục vào album';
+  @override
+  String get albumAddAllFromFolder =>
+      'Thêm tất cả ảnh từ thư mục này vào album?';
+  @override
+  String albumFolderName(String name) => 'Thư mục: $name';
+  @override
+  String get albumIncludeSubfolders => 'Bao gồm ảnh từ thư mục con';
+  @override
+  String get albumAddFolderButton => 'Thêm thư mục';
+  @override
+  String get albumAddingFolder => 'Đang thêm thư mục vào album...';
+  @override
+  String albumImagesCountShort(int count) => '$count ảnh';
+  @override
+  String get albumNoImagesShort => 'Không có ảnh';
+  @override
+  String get albumCounting => 'Đang đếm...';
+  @override
+  String get albumGoUp => 'Lên một cấp';
+  @override
+  String get albumSelectFolderTitle => 'Chọn thư mục';
+  @override
+  String get albumNoFoldersFound => 'Không tìm thấy thư mục';
+  @override
+  String albumCurrentFolder(String name) => 'Hiện tại: $name';
+  @override
+  String get albumAddThisFolder => 'Thêm thư mục này';
+  @override
+  String ivShareFailed(String error) => 'Không thể chia sẻ ảnh: $error';
+  @override
+  String get ivPrintSent => 'Đã gửi ảnh tới máy in';
+  @override
+  String get ivPrintFailed => 'Không thể bắt đầu in ảnh này';
+  @override
+  String get ivDisplayFailed => 'Không thể hiển thị ảnh';
+  @override
+  String get ivNoImages => 'Không có ảnh để hiển thị';
+  @override
+  String get previous => 'Trước';
+  @override
+  String get next => 'Tiếp';
+  @override
+  String get ivInfo => 'Thông tin (I)';
+  @override
+  String get ivMore => 'Thêm';
+  @override
+  String get ivZoomOut => 'Thu nhỏ';
+  @override
+  String get ivZoomIn => 'Phóng to';
+  @override
+  String get ivRotateLeft => 'Xoay trái';
+  @override
+  String get ivRotateRight => 'Xoay phải';
+  @override
+  String get ivEditImage => 'Chỉnh sửa ảnh';
+  @override
+  String get ivPauseSlideshow => 'Tạm dừng trình chiếu';
+  @override
+  String get ivPlaySlideshow => 'Phát trình chiếu';
+  @override
+  String get ivExitFullscreen => 'Thoát toàn màn hình';
+  @override
+  String get ivFullscreen => 'Toàn màn hình';
+  @override
+  String get ivPrint => 'In (Ctrl+P)';
+  @override
+  String get ivResetZoom => 'Đặt lại thu phóng (0)';
+  @override
+  String get ivCopyPath => 'Sao chép đường dẫn tệp';
+  @override
+  String get ivHideThumbnails => 'Ẩn ảnh thu nhỏ';
+  @override
+  String get ivShowThumbnails => 'Hiện ảnh thu nhỏ';
+  @override
+  String get edDiscardTitle => 'Hủy các thay đổi?';
+  @override
+  String get edDiscardBody => 'Các chỉnh sửa của bạn chưa được lưu.';
+  @override
+  String get edDiscard => 'Hủy bỏ';
+  @override
+  String get edSaveDialogTitle => 'Lưu bản sao đã chỉnh sửa';
+  @override
+  String get edSavedCopy => 'Đã lưu bản sao đã chỉnh sửa';
+  @override
+  String edSaveFailed(String error) => 'Không thể lưu ảnh: $error';
+  @override
+  String edEraseFailed(String error) => 'Không thể xóa vùng chọn: $error';
+  @override
+  String get edAddText => 'Thêm văn bản';
+  @override
+  String get edTypeSomething => 'Nhập nội dung';
+  @override
+  String get add => 'Thêm';
+  @override
+  String get edCloseEditor => 'Đóng trình chỉnh sửa (Esc)';
+  @override
+  String get edTitle => 'Chỉnh sửa';
+  @override
+  String get edUndo => 'Hoàn tác (Ctrl+Z)';
+  @override
+  String get edRedo => 'Làm lại (Ctrl+Y)';
+  @override
+  String get edHoldToCompare => 'Giữ để so sánh';
+  @override
+  String get edSaving => 'Đang lưu...';
+  @override
+  String get edSaveCopy => 'Lưu bản sao';
+  @override
+  String get edToolCrop => 'Cắt';
+  @override
+  String get edToolAdjust => 'Điều chỉnh';
+  @override
+  String get edToolFilters => 'Bộ lọc';
+  @override
+  String get edToolMarkup => 'Chú thích';
+  @override
+  String get edToolErase => 'Xóa vật thể';
+  @override
+  String get edAspectRatio => 'Tỉ lệ khung hình';
+  @override
+  String get edAspectFree => 'Tự do';
+  @override
+  String get edAspectOriginal => 'Gốc';
+  @override
+  String get edRotateFlip => 'Xoay và lật';
+  @override
+  String get edFlipHorizontal => 'Lật ngang';
+  @override
+  String get edFlipVertical => 'Lật dọc';
+  @override
+  String get edLightColour => 'Ánh sáng và màu sắc';
+  @override
+  String get edExposure => 'Độ phơi sáng';
+  @override
+  String get edWarmth => 'Độ ấm';
+  @override
+  String get edTint => 'Sắc thái';
+  @override
+  String get edVignette => 'Làm tối viền';
+  @override
+  String get edStrength => 'Cường độ';
+  @override
+  String get edFilterVivid => 'Rực rỡ';
+  @override
+  String get edFilterWarm => 'Ấm';
+  @override
+  String get edFilterCool => 'Lạnh';
+  @override
+  String get edFilterFade => 'Phai màu';
+  @override
+  String get edFilterDramatic => 'Kịch tính';
+  @override
+  String get edFilterMono => 'Đơn sắc';
+  @override
+  String get edFilterNoir => 'Đen trắng cổ điển';
+  @override
+  String get edFilterSepia => 'Nâu cổ điển';
+  @override
+  String get edTool => 'Công cụ';
+  @override
+  String get edPen => 'Bút';
+  @override
+  String get edHighlighter => 'Bút dạ quang';
+  @override
+  String get edArrow => 'Mũi tên';
+  @override
+  String get edLine => 'Đường thẳng';
+  @override
+  String get edRectangle => 'Hình chữ nhật';
+  @override
+  String get edEllipse => 'Hình elip';
+  @override
+  String get edText => 'Văn bản';
+  @override
+  String get edEraseMarkup => 'Xóa chú thích';
+  @override
+  String get edColour => 'Màu';
+  @override
+  String get edTextSize => 'Cỡ chữ';
+  @override
+  String get edSize => 'Kích thước';
+  @override
+  String get edTextHint => 'Nhấp vào ảnh nơi bạn muốn đặt văn bản.';
+  @override
+  String get edEraseTitle => 'Xóa vật thể';
+  @override
+  String get edEraseHint =>
+      'Tô lên phần bạn muốn xóa. Vùng đó sẽ được lấp đầy từ xung quanh. Hiệu quả nhất với vật nhỏ và vết xước.';
+  @override
+  String get edBrush => 'Cọ';
+  @override
+  String edOpenFailed(String error) =>
+      'Không thể mở ảnh này để chỉnh sửa.\n$error';
+  @override
+  String get edErasing => 'Đang xóa...';
+  @override
+  String get edOriginal => 'Gốc';
+  @override
+  String get edDoubleClickReset => 'Nhấp đúp để đặt lại';
+  @override
+  String get cachePhotoThumbs => 'Ảnh thu nhỏ của ảnh';
+  @override
+  String get cachePhotoThumbsDesc =>
+      'Bản xem trước JPEG được tạo cho lưới ảnh và trình xem ảnh';
+  @override
+  String get cacheVideoThumbs => 'Ảnh thu nhỏ của video';
+  @override
+  String get cacheVideoThumbsDesc =>
+      'Khung hình xem trước của video được lưu đệm';
+  @override
+  String get cacheNetworkThumbs => 'Ảnh thu nhỏ mạng';
+  @override
+  String get cacheNetworkThumbsDesc =>
+      'Bộ nhớ đệm ảnh thu nhỏ SMB / FTP / WebDAV';
+  @override
+  String get cacheLibrary => 'Bộ nhớ đệm thư viện video';
+  @override
+  String get cacheLibraryDesc =>
+      'Siêu dữ liệu thư viện video và dữ liệu đã lưu đệm';
+  @override
+  String get cacheTempFiles => 'Tệp tạm';
+  @override
+  String get cacheTempFilesDesc => 'Tệp tải xuống tạm thời và tệp làm việc';
+  @override
+  String cacheLoadFailed(String error) =>
+      'Không thể tải thông tin bộ nhớ đệm: $error';
+  @override
+  String get cacheOpenFolderFailed =>
+      'Không thể mở thư mục trong trình quản lý tệp của hệ thống';
+  @override
+  String cacheEntryCleared(String name) => 'Đã xóa $name';
+  @override
+  String cacheEntryClearFailed(String name, String error) =>
+      'Không thể xóa $name: $error';
+  @override
+  String get cacheAllCleared => 'Đã xóa toàn bộ bộ nhớ đệm';
+  @override
+  String cacheClearFailed(String error) => 'Không thể xóa bộ nhớ đệm: $error';
+  @override
+  String get cacheTotalSize => 'Tổng dung lượng';
+  @override
+  String get cacheFilesLabel => 'Tệp';
+  @override
+  String get cacheBuckets => 'Nhóm';
+  @override
+  String cacheFilesCount(int count) => '$count tệp';
+  @override
+  String cachePercentOfTotal(String percent) => '$percent% tổng bộ nhớ đệm';
+  @override
+  String dbLoadPrefsFailed(String error) =>
+      'Lỗi khi tải tùy chọn cơ sở dữ liệu: $error';
+  @override
+  String get dbClearAllWarning =>
+      'Thao tác này sẽ xóa mọi cài đặt ứng dụng gồm giao diện, ngôn ngữ và tùy chọn hiển thị. Ứng dụng có thể khởi động lại.';
+  @override
+  String get dbNoPrefs => 'Chưa có tùy chọn nào được lưu.';
+  @override
+  String dbRowsCount(int count) => '$count dòng';
+  @override
+  String dbRangeOfTotal(int start, int end, int total) =>
+      '$start-$end / $total';
+  @override
+  String get dbRowsPerPage => 'Số dòng mỗi trang';
+  @override
+  String dbPageOf(int page, int total) => 'Trang $page / $total';
+  @override
+  String get faNoData => 'Không có dữ liệu';
+  @override
+  String get faShowInHub => 'Hiện album nổi bật trong Trung tâm thư viện ảnh';
+  @override
+  String get faAutoSelect => 'Tự động chọn album gần đây';
+  @override
+  String get faAutoSelectDesc => 'Tự động làm nổi bật các album gần đây nhất';
+  @override
+  String get faMax => 'Số album nổi bật tối đa';
+  @override
+  String get faManual => 'Chọn album nổi bật thủ công';
+  @override
+  String get laNoTokenInClipboard => 'Không tìm thấy token trong bộ nhớ tạm';
+  @override
+  String get laRemoveModelConfirm => 'Gỡ mô hình này khỏi thiết bị?';
+  @override
+  String laOpenLocationFailed(String error) => 'Không thể mở vị trí: $error';
+  @override
+  String get laRuntimePending => 'Chờ môi trường chạy';
+  @override
+  String get laRequiresGguf => 'Cần định dạng GGUF';
+  @override
+  String get laInstallFailed => 'Cài đặt thất bại';
+  @override
+  String get laDownloading => 'Đang tải xuống...';
+  @override
+  String tagTabName(String tag) => 'Tag: $tag';
+  @override
+  String tagThumbnailSet(String tag) => 'Đã đặt ảnh thu nhỏ cho "$tag"';
+  @override
+  String get tagThumbnailSetFailed => 'Không thể đặt ảnh thu nhỏ';
+  @override
+  String tagThumbnailRemoved(String tag) => 'Đã gỡ ảnh thu nhỏ của "$tag"';
+  @override
+  String get tagThumbnailRemoveFailed => 'Không thể gỡ ảnh thu nhỏ';
+  @override
+  String tagHasChildren(int count, String children) =>
+      'Tag này có $count tag con: $children';
+  @override
+  String get tagWhatToDo => 'Bạn muốn làm gì?';
+  @override
+  String get tagDeleteParentOnly => 'Chỉ xóa tag cha';
+  @override
+  String get tagDeleteParentAndChildren => 'Xóa tag cha và tag con';
+  @override
+  String tagsDeletedList(int count, String tags) => 'Đã xóa $count tag: $tags';
+  @override
+  String tagCannotAddChild(String name) =>
+      'Không thể thêm "$name" - tham chiếu vòng hoặc lỗi';
+  @override
+  String tagCannotSetParent(String name) =>
+      'Không thể đặt "$name" làm tag cha - tham chiếu vòng hoặc lỗi';
+  @override
+  String tagHierarchyTitle(String tag) => 'Phân cấp: "$tag"';
+  @override
+  String get tagNoParents => 'Không có tag cha';
+  @override
+  String get tagNoChildren => 'Không có tag con';
+  @override
+  String get tagAddParentHint => 'Thêm tag cha...';
+  @override
+  String get tagAddChildHint => 'Thêm tag con... (phân tách bằng dấu phẩy)';
+  @override
+  String get tagQuickPicks => 'Chọn nhanh';
+  @override
+  String get tagQuickPicksDesc => 'Chọn từ các tag phổ biến và dùng gần đây';
+  @override
+  String get tagBrowseTreeDesc =>
+      'Duyệt cây tag — mở rộng tag cha để chọn tag con.';
+  @override
+  String get tagSearchTitle => 'Tìm kiếm theo tag';
+  @override
+  String get tagSearchInputLabel => 'Nhập tag để tìm kiếm';
+  @override
+  String get tagSearchInputHint => 'Ví dụ: important, work, personal';
+  @override
+  String get tagSearchGlobal => 'Tìm kiếm toàn cục';
+  @override
+  String get tagSearchGlobalDesc => 'Tìm kiếm bất kỳ đâu trên thiết bị của bạn';
+  @override
+  String get tagSearchNoTags => 'Không có tag nào hiện có';
+  @override
+  String get newMenu => 'Mới';
+  @override
+  String get customizeMenu => 'Tùy chỉnh...';
+  @override
+  String get fileCreateFailedDetail =>
+      'Tệp có thể đã tồn tại hoặc không thể ghi vào đích';
+  @override
+  String get customizeNewMenuTitle => 'Tùy chỉnh menu Mới';
+  @override
+  String folderFilesFolders(int files, int folders) =>
+      '$files tệp, $folders thư mục';
+  @override
+  String dndMoved(int count) => 'Đã di chuyển $count mục';
+  @override
+  String get dndFolderIntoItself => 'Không thể di chuyển thư mục vào chính nó';
+  @override
+  String get dndLocalOnly => 'Kéo thả chỉ hỗ trợ đường dẫn cục bộ';
+  @override
+  String get dndDestinationMissing => 'Thư mục đích không khả dụng';
+  @override
+  String get dndMoveFailed => 'Di chuyển thất bại';
+  @override
+  String get toggleView => 'Chuyển chế độ xem';
+  @override
+  String get folderNameLabelShort => 'Tên thư mục';
+  @override
+  String get vfPickFrame => 'Chọn khung hình từ video';
+  @override
+  String get vfExtractFailed =>
+      'Không thể trích xuất khung hình. Hãy thử vị trí khác.';
+  @override
+  String get pause => 'Tạm dừng';
+  @override
+  String get play => 'Phát';
+  @override
+  String vfPreviewAt(String time) => 'Xem trước tại $time';
+  @override
+  String get preview => 'Xem trước';
+  @override
+  String get vfUseFrame => 'Dùng khung hình này';
+  @override
+  String get cfCsvSpreadsheet => 'Bảng tính CSV';
+  @override
+  String get cfNoTemplates => 'Không có mẫu nào';
+  @override
+  String cfNoResultsFor(String query) => 'Không có kết quả cho "$query"';
+  @override
+  String cfExtension(String ext) => 'Phần mở rộng: $ext';
+  @override
+  String cfCreatesFile(String ext) => 'Tạo tệp $ext';
+  @override
+  String mpDriveSystem(String letter) => '$letter (Hệ thống)';
+  @override
+  String mpDriveOther(String letter) => '$letter (Ổ đĩa)';
+  @override
+  String get tagManageHierarchy => 'Quản lý phân cấp';
+  @override
+  String get tagFilterParent => 'Tag cha';
+  @override
+  String get tagFilterChild => 'Tag con';
+  @override
+  String get tagFilterStandalone => 'Độc lập';
+  @override
+  String get tagFilterHasThumb => 'Có ảnh thu nhỏ';
+  @override
+  String get tagFilterNoThumb => 'Không có ảnh thu nhỏ';
+  @override
+  String get tagFilterAll => 'Tất cả';
+  @override
+  String get tagFilterTitle => 'Lọc tag';
+  @override
+  String get tagManageHierarchyTooltip => 'Quản lý phân cấp (cha/con)';
+  @override
+  String get tagDoubleClickChildren => 'Nhấp đúp để mở các tag con';
+  @override
+  String get tagDoubleClickFiles => 'Nhấp đúp để mở các tệp';
+  @override
+  String get tagHierarchyFormatHelp =>
+      'Dùng định dạng cha:con để tạo phân cấp\nVD: Actress:Hung hoặc Actress:Hung,Van';
+  @override
+  String get tagInvalidFormat =>
+      'Định dạng không hợp lệ. Dùng cha:con hoặc cha:con1,con2';
+  @override
+  String get tagNoChildSpecified => 'Chưa chỉ định tag con';
+  @override
+  String tagRelationFailed(String parent, String child) =>
+      'Không thể tạo quan hệ: $parent -> $child (tham chiếu vòng?)';
+  @override
+  String tagHierarchyCreated(String parent, String children, int count) =>
+      'Đã tạo phân cấp: $parent -> $children ($count quan hệ)';
+  @override
+  String get tagCircularHierarchy => 'Không thể tạo phân cấp tag vòng';
+  @override
+  String tagMovedUnder(String child, String parent) =>
+      'Đã chuyển "$child" vào dưới "$parent"';
+  @override
+  String get aiViewRawPayload => 'Xem payload thô';
+  @override
+  String get aiViewPayload => 'Xem payload';
+  @override
+  String get aiProviderError => 'Lỗi nhà cung cấp';
+  @override
+  String get aiToolActivity => 'Hoạt động công cụ';
+  @override
+  String aiContextInfo(int messages, String chars) =>
+      '$messages tin nhắn · $chars ký tự\nNgữ cảnh bắt đầu bị cắt bớt từ ~24K ký tự';
+  @override
+  String get aiAllDrives => 'Tất cả ổ đĩa';
+  @override
+  String get aiThinking => 'Đang suy nghĩ...';
+  @override
+  String get aiDropToMention => 'Thả để nhắc đến';
+  @override
+  String aiFilesAttached(int count) => 'Đã đính kèm $count tệp';
+  @override
+  String get aiStopGeneration => 'Dừng tạo';
+  @override
+  String aiLinkCopied(String href) => 'Đã sao chép liên kết: $href';
+  @override
+  String get aiJustNow => 'Vừa xong';
+  @override
+  String aiMinutesAgo(int n) => '$n phút trước';
+  @override
+  String aiHoursAgo(int n) => '$n giờ trước';
+  @override
+  String aiDaysAgo(int n) => '$n ngày trước';
+  @override
+  String get aiFileNotFound => 'Không tìm thấy tệp';
+  @override
+  String get aiOpenFolderTooltip => 'Mở thư mục';
+  @override
+  String get aiOpenFileTooltip => 'Mở tệp';
+  @override
+  String get aiNoPayload =>
+      'Chưa ghi nhận payload nào. Hãy gửi một tin nhắn để xem yêu cầu.';
+  @override
+  String get aiRawApiPayload => 'Payload API thô';
+  @override
+  String get aiCopiedToClipboard => 'Đã sao chép vào bộ nhớ tạm';
+  @override
+  String get aiStreaming => 'truyền trực tuyến';
+  @override
+  String get aiNonStreaming => 'không truyền trực tuyến';
+  @override
+  String get aiLoadingContent => 'Đang tải nội dung...';
+  @override
+  String aiMoreLines(int count) => '... (còn $count dòng)';
+  @override
+  String get aiToolOk => 'OK';
+  @override
+  String get aiToolFailed => 'THẤT BẠI';
+  @override
+  String foErrorCopying(String error) => 'Lỗi khi sao chép: $error';
+  @override
+  String foErrorCutting(String error) => 'Lỗi khi cắt: $error';
+  @override
+  String foErrorPasting(String error) => 'Lỗi khi dán: $error';
+  @override
+  String foErrorRenaming(String error) => 'Lỗi khi đổi tên: $error';
+  @override
+  String get foNothingToPaste => 'Không có gì để dán — bộ nhớ tạm trống';
+  @override
+  String foMovingOne(String name) => 'Đang di chuyển "$name"';
+  @override
+  String foCopyingOne(String name) => 'Đang sao chép "$name"';
+  @override
+  String foMovingMany(int count) => 'Đang di chuyển $count mục';
+  @override
+  String foCopyingMany(int count) => 'Đang sao chép $count mục';
+  @override
+  String foMoveProgress(int done, int total, String dest) =>
+      'Đang di chuyển mục $done / $total tới $dest';
+  @override
+  String foCopyProgress(int done, int total, String dest) =>
+      'Đang sao chép mục $done / $total tới $dest';
+  @override
+  String foMovedItems(int count, String dest) =>
+      'Đã di chuyển $count mục tới $dest';
+  @override
+  String foCopiedItems(int count, String dest) =>
+      'Đã sao chép $count mục tới $dest';
+  @override
+  String get foMovingVerb => 'Đang di chuyển';
+  @override
+  String get foCopyingVerb => 'Đang sao chép';
+  @override
+  String foPasteDetailNoSource(String action, int count, String dest) =>
+      '$action $count mục tới $dest';
+  @override
+  String foPasteDetail(
+    String action,
+    String source,
+    String from,
+    String dest,
+  ) => '$action $source từ $from tới $dest';
+  @override
+  String foAndMore(String name, int more) => '$name và $more mục khác';
+  @override
+  String foDeleteDetail(String action, String item, String parent) =>
+      '$action: $item từ $parent';
+  @override
+  String get foActionPermanentDelete => 'Xóa vĩnh viễn';
+  @override
+  String get foActionMoveToTrash => 'Chuyển vào Thùng rác';
+  @override
+  String foDeletingOnePerm(String name) => 'Đang xóa vĩnh viễn "$name"';
+  @override
+  String foDeletingOneTrash(String name) => 'Đang chuyển "$name" vào Thùng rác';
+  @override
+  String foDeletingFilesPerm(int count) => 'Đang xóa vĩnh viễn $count tệp';
+  @override
+  String foDeletingFilesTrash(int count) =>
+      'Đang chuyển $count tệp vào Thùng rác';
+  @override
+  String foDeletingItemsPerm(int count) => 'Đang xóa vĩnh viễn $count mục';
+  @override
+  String foMovingOneTrash(String name) => 'Đang chuyển "$name" vào Thùng rác';
+  @override
+  String foMovingItemsTrash(int count) =>
+      'Đang chuyển $count mục vào Thùng rác';
+  @override
+  String foPermDeletedProgress(int done, int total) =>
+      'Đã xóa vĩnh viễn $done / $total';
+  @override
+  String foTrashedProgress(int done, int total) =>
+      'Đã chuyển vào Thùng rác $done / $total';
+  @override
+  String foPermDeletedFiles(int count) => 'Đã xóa vĩnh viễn $count tệp';
+  @override
+  String foTrashedFiles(int count) => 'Đã chuyển $count tệp vào Thùng rác';
+  @override
+  String foPermDeletedItems(int count) => 'Đã xóa vĩnh viễn $count mục';
+  @override
+  String foTrashedItems(int count) => 'Đã chuyển $count mục vào Thùng rác';
+  @override
+  String foAdminDeletingOne(String name) =>
+      'Đang xóa "$name" với quyền quản trị';
+  @override
+  String foAdminDeletingMany(int count) =>
+      'Đang xóa $count mục với quyền quản trị';
+  @override
+  String get foAdminWaiting => 'Đang chờ Windows cấp quyền quản trị';
+  @override
+  String foAdminDeletedOne(String path) => 'Đã xóa "$path" với quyền quản trị.';
+  @override
+  String foAdminDeletedMany(int count) =>
+      'Đã xóa $count mục với quyền quản trị.';
+  @override
+  String foAdminFailedOne(String path) =>
+      'Xóa với quyền quản trị đã bị hủy hoặc thất bại với "$path".';
+  @override
+  String foAdminFailedMany(int count) =>
+      'Xóa với quyền quản trị đã bị hủy hoặc thất bại với $count mục.';
+  @override
+  String get foDeleteFailed => 'Xóa thất bại';
+  @override
+  String foFirstFailureItems(int count, String path) =>
+      '$count mục; lỗi đầu tiên: "$path"';
+  @override
+  String foCouldNotDeleteAccessDenied(String item) =>
+      'Không thể xóa $item: Truy cập bị từ chối. Hãy kiểm tra quyền thư mục hoặc chạy ứng dụng với quyền quản trị.';
+  @override
+  String foCouldNotDeleteReason(String item, String reason) =>
+      'Không thể xóa $item: $reason.';
+  @override
+  String foCouldNotDelete(String item) => 'Không thể xóa $item.';
+  @override
+  String get fnDirNotExist => 'Thư mục không tồn tại';
+  @override
+  String get fnStoragePermission => 'Cần quyền truy cập bộ nhớ';
+  @override
+  String fnErrorSorting(String error) => 'Lỗi khi sắp xếp: $error';
+  @override
+  String fnInvalidRegex(String error) => 'Regex không hợp lệ: $error';
+  @override
+  String get fnAccessDeniedAdmin =>
+      'Truy cập bị từ chối. Hãy thử chạy với quyền quản trị.';
+  @override
+  String tsErrorLoadingTags(String error) => 'Lỗi khi tải tag: $error';
+  @override
+  String tsErrorAddingTag(String error) => 'Lỗi khi thêm tag: $error';
+  @override
+  String tsErrorRemovingTag(String error) => 'Lỗi khi gỡ tag: $error';
+  @override
+  String tsErrorBatchAdding(String error) =>
+      'Lỗi khi thêm tag hàng loạt: $error';
+  @override
+  String tsTagSearchError(String error) => 'Lỗi tìm kiếm theo tag: $error';
+  @override
+  String tsGlobalTagSearchError(String error) =>
+      'Lỗi tìm kiếm tag toàn cục: $error';
+  @override
+  String tsMultiTagSearchError(String error) =>
+      'Lỗi tìm kiếm nhiều tag: $error';
+  @override
+  String tsGlobalMultiTagSearchError(String error) =>
+      'Lỗi tìm kiếm nhiều tag toàn cục: $error';
+  @override
+  String get jlTemp => 'TẠM';
+  @override
+  String get jlBrowser => 'TRÌNH DUYỆT';
+  @override
+  String get jlRecycle => 'THÙNG RÁC';
+  @override
+  String get jlThumbs => 'ẢNH NHỎ';
+  @override
+  String get jlAppCache => 'CACHE ỨNG DỤNG';
+  @override
+  String get jlCrashLog => 'LỖI/LOG';
+  @override
+  String get jlWinUpdate => 'CẬP NHẬT WIN';
+  @override
+  String get jlPrefetch => 'KHỞI CHẠY';
+  @override
+  String get jlDelivery => 'PHÂN PHỐI';
+  @override
+  String get jlDevCache => 'CACHE DEV';
+  @override
+  String get jlJunk => 'RÁC';
+  @override
+  String get treeLoadFailedRetry => 'Không tải được. Chạm để thử lại.';
+  @override
+  String cleanerRefreshFailed(String error) => 'Làm mới thất bại: $error';
+  @override
+  String cleanerLoadPropsFailed(String error) =>
+      'Không thể tải thuộc tính: $error';
+  @override
+  String get aiProviderNameHint => 'OpenAI của tôi';
+  @override
+  String get aiSystemPromptHint =>
+      'Lời nhắc hệ thống tùy chỉnh (không bắt buộc)...';
+  @override
+  String get vlNameHint => 'Phim của tôi';
+  @override
+  String get vlDescriptionHint => 'Bộ sưu tập phim cá nhân';
 }

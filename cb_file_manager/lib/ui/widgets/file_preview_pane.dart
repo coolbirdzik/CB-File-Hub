@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:ui';
+import '../components/common/file_entry_presentation.dart';
 
 import 'package:cb_file_manager/bloc/selection/selection_state.dart';
 import 'package:cb_file_manager/design_system/cb_tokens.dart';
@@ -45,7 +46,7 @@ class FilePreviewPane extends StatelessWidget {
     final file = _resolvePreviewFile(selectedPath);
     final hasFile = file != null;
     final displayName = hasFile
-        ? path.basename(file.path)
+        ? FileEntryPresentation.nameOf(context, file.path)
         : l10n.previewSelectFile;
 
     final panelTint = isDark

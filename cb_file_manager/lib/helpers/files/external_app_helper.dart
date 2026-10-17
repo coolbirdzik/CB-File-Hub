@@ -623,6 +623,9 @@ class ExternalAppHelper {
       exePath: Platform.resolvedExecutable,
       extensions: extensions,
     );
+    if (!await WindowsAppIcon.registerTorrentAssociations()) {
+      _windowsAssociationsEnsured = false;
+    }
   }
 
   // ─── Brand Detection (for create-file dialog) ────────────────────────────────

@@ -5,6 +5,7 @@ import 'package:path/path.dart' as p;
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../helpers/files/file_type_registry.dart';
+import '../components/common/file_entry_presentation.dart';
 import '../components/common/optimized_interaction_handler.dart';
 import '../controllers/inline_rename_controller.dart';
 import 'inline_rename_field.dart';
@@ -27,7 +28,7 @@ class CompactFileListContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = displayName ?? p.basename(path);
+    final name = displayName ?? FileEntryPresentation.nameOf(context, path);
     final rename = InlineRenameScope.maybeOf(context);
     final isRenaming = rename != null && rename.renamingPath == path;
     final style = Theme.of(context).textTheme.bodyMedium;

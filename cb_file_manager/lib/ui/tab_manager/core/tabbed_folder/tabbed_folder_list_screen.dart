@@ -707,23 +707,23 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
         _selectionBloc.add(ClearSelection());
         _folderListBloc.add(FolderListRemovePaths(sources.toSet()));
         _folderListBloc.add(FolderListRefresh(_currentPath));
-        AppToast.success(context, 'Moved ${sources.length} item(s)');
+        AppToast.success(context, context.tr.dndMoved(sources.length));
         return;
       case FileDragDropMoveRejection.sameParent:
         return;
       case FileDragDropMoveRejection.selfDrop:
       case FileDragDropMoveRejection.descendantDrop:
-        AppToast.warning(context, 'Cannot move a folder into itself');
+        AppToast.warning(context, context.tr.dndFolderIntoItself);
         return;
       case FileDragDropMoveRejection.nonLocalPath:
-        AppToast.warning(context, 'Drag and drop supports local paths only');
+        AppToast.warning(context, context.tr.dndLocalOnly);
         return;
       case FileDragDropMoveRejection.destinationMissing:
-        AppToast.warning(context, 'Destination folder is not available');
+        AppToast.warning(context, context.tr.dndDestinationMissing);
         return;
       case FileDragDropMoveRejection.empty:
       case FileDragDropMoveRejection.moveFailed:
-        AppToast.error(context, 'Move failed');
+        AppToast.error(context, context.tr.dndMoveFailed);
         return;
     }
   }
@@ -2210,7 +2210,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
         if (isGridView)
           IconButton(
             icon: const Icon(PhosphorIconsLight.squaresFour),
-            tooltip: 'Adjust grid size',
+            tooltip: context.tr.adjustGridSizeTooltip,
             onPressed: () => SharedActionBar.showGridSizeDialog(
               context,
               currentGridSize: _folderListBloc.state.gridZoomLevel,
@@ -2220,12 +2220,12 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
           ),
         IconButton(
           icon: const Icon(PhosphorIconsLight.eye),
-          tooltip: 'Toggle view',
+          tooltip: context.tr.toggleView,
           onPressed: _toggleDrivesViewMode,
         ),
         IconButton(
           icon: const Icon(PhosphorIconsLight.arrowsClockwise),
-          tooltip: 'Refresh',
+          tooltip: context.tr.refresh,
           onPressed: _refreshFileList,
         ),
       ];

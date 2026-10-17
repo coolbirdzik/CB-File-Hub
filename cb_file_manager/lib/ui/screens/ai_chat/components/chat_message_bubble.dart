@@ -8,6 +8,7 @@ import '../../../../config/languages/app_localizations.dart';
 import '../../../../models/ai/ai_message.dart';
 import '../../../../services/ai/assistant_response_text.dart';
 import 'referenced_file_card.dart';
+import 'package:cb_file_manager/config/translation_helper.dart';
 
 /// A single chat message bubble (user or assistant).
 ///
@@ -400,7 +401,7 @@ class _ChatMessageBubbleState extends State<ChatMessageBubble> {
           Clipboard.setData(ClipboardData(text: href));
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Link copied: $href'),
+              content: Text(context.tr.aiLinkCopied(href)),
               duration: const Duration(seconds: 2),
               behavior: SnackBarBehavior.floating,
             ),

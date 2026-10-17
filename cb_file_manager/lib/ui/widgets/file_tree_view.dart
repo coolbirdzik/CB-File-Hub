@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'file_drag_drop_item.dart';
+import '../components/common/file_entry_presentation.dart';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -9,6 +10,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/bloc/selection/selection.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:cb_file_manager/ui/widgets/tree_view/tree_view.dart';
+import 'package:cb_file_manager/config/translation_helper.dart';
 
 /// Tree view for the local file browser.
 ///
@@ -160,20 +162,16 @@ class _FileTreeViewState extends State<FileTreeView> {
         onTap: _onTap,
         onDoubleTap: _onDoubleTap,
         onSecondary: (node, pos) => widget.showContextMenu(context, pos),
-        emptyState: const Center(
+        emptyState: Center(
           child: Padding(
-            padding: EdgeInsets.all(16),
-            child: Text('Empty folder'),
+            padding: const EdgeInsets.all(16),
+            child: Text(context.tr.emptyFolder),
           ),
         ),
         itemBuilder: (context, node, depth) {
           final entity = node.data;
           final isDir = entity is Directory;
-          final segments = entity.path
-              .split(Platform.pathSeparator)
-              .where((s) => s.isNotEmpty)
-              .toList();
-          final name = segments.isEmpty ? entity.path : segments.last;
+          final name = FileEntryPresentation.nameOf(context, entity.path);
           final theme = Theme.of(context);
           final row = Row(
             children: [

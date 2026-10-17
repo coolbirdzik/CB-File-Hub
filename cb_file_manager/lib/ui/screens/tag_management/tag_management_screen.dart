@@ -43,6 +43,7 @@ import 'package:cb_file_manager/ui/utils/grid_zoom_constraints.dart';
 import 'package:cb_file_manager/ui/utils/view_mode_spectrum.dart';
 import 'package:cb_file_manager/ui/widgets/ctrl_scroll_zoom.dart';
 import '../../utils/route.dart';
+import 'package:cb_file_manager/config/translation_helper.dart';
 
 /// Tag view modes (cycled by the toolbar icon button).
 enum _TagViewMode { list, grid, tree }
@@ -904,11 +905,17 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
       if (activeTabId != null && activeTabId.isNotEmpty) {
         // Navigate the current tab in place, like opening a folder.
         tabManagerBloc.add(UpdateTabPath(activeTabId, tagSearchPath));
-        tabManagerBloc.add(UpdateTabName(activeTabId, 'Tag: $tag'));
+        tabManagerBloc.add(
+          UpdateTabName(activeTabId, context.tr.tagTabName(tag)),
+        );
       } else {
         // No active tab to reuse: open one.
         tabManagerBloc.add(
-          AddTab(path: tagSearchPath, name: 'Tag: $tag', switchToTab: true),
+          AddTab(
+            path: tagSearchPath,
+            name: context.tr.tagTabName(tag),
+            switchToTab: true,
+          ),
         );
       }
     } catch (e) {
@@ -932,7 +939,11 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
         tabManagerBloc.add(SwitchToTab(existingTab.id));
       } else {
         tabManagerBloc.add(
-          AddTab(path: tagSearchPath, name: 'Tag: $tag', switchToTab: true),
+          AddTab(
+            path: tagSearchPath,
+            name: context.tr.tagTabName(tag),
+            switchToTab: true,
+          ),
         );
       }
     } catch (e) {
@@ -1194,11 +1205,14 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'This tag has ${children.length} child tag${children.length > 1 ? "s" : ""}: ${children.join(", ")}',
+                localizations.tagHasChildren(
+                  children.length,
+                  children.join(", "),
+                ),
               ),
               const SizedBox(height: 16),
-              const Text(
-                'What would you like to do?',
+              Text(
+                localizations.tagWhatToDo,
                 style: TextStyle(fontWeight: FontWeight.w600),
               ),
             ],
@@ -1210,12 +1224,12 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
             ),
             TextButton(
               onPressed: () => Navigator.of(context).pop('keep_children'),
-              child: const Text('Delete parent only'),
+              child: Text(localizations.tagDeleteParentOnly),
             ),
             TextButton(
               onPressed: () => Navigator.of(context).pop('delete_all'),
               child: Text(
-                'Delete parent and children',
+                localizations.tagDeleteParentAndChildren,
                 style: TextStyle(color: theme.colorScheme.error),
               ),
             ),
@@ -1239,7 +1253,10 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
         if (mounted) {
           AppToast.success(
             context,
-            'Deleted ${tagsToDelete.length} tags: ${tagsToDelete.join(", ")}',
+            context.tr.tagsDeletedList(
+              tagsToDelete.length,
+              tagsToDelete.join(", "),
+            ),
           );
         }
       }
@@ -2533,7 +2550,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
             ),
           ContextMenuAction(
             id: 'hierarchy',
-            label: 'Manage Hierarchy',
+            label: context.tr.tagManageHierarchy,
             icon: PhosphorIconsLight.treeStructure,
             onSelected: (_) => _showManageHierarchyDialog(tag),
           ),
@@ -2806,7 +2823,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                 ? theme.colorScheme.primary
                 : theme.colorScheme.onSurfaceVariant,
           ),
-          tooltip: 'Filter tags',
+          tooltip: context.tr.tagFilterTitle,
           onPressed: _showFilterDialog,
         ),
         if (hasActive)
@@ -2844,15 +2861,15 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
       IconData icon;
       switch (_hierarchyFilter) {
         case 'parents':
-          label = 'Parent tags';
+          label = context.tr.tagFilterParent;
           icon = PhosphorIconsLight.treeStructure;
           break;
         case 'children':
-          label = 'Child tags';
+          label = context.tr.tagFilterChild;
           icon = PhosphorIconsLight.arrowBendUpLeft;
           break;
         case 'standalone':
-          label = 'Standalone';
+          label = context.tr.tagFilterStandalone;
           icon = PhosphorIconsLight.tag;
           break;
         default:
@@ -2876,7 +2893,9 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
       chips.add(
         _buildFilterChip(
           theme,
-          label: _thumbnailFilter == 'with' ? 'Has thumbnail' : 'No thumbnail',
+          label: _thumbnailFilter == 'with'
+              ? context.tr.tagFilterHasThumb
+              : context.tr.tagFilterNoThumb,
           icon: PhosphorIconsLight.image,
           onRemove: () {
             setState(() => _thumbnailFilter = 'all');
@@ -2916,7 +2935,10 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               visualDensity: VisualDensity.compact,
             ),
-            child: const Text('Clear all', style: TextStyle(fontSize: 12)),
+            child: Text(
+              context.tr.clearAll,
+              style: const TextStyle(fontSize: 12),
+            ),
           ),
         ],
       ),
@@ -2960,7 +2982,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                     color: theme.colorScheme.primary,
                   ),
                   const SizedBox(width: 8),
-                  const Text('Filter tags'),
+                  Text(context.tr.tagFilterTitle),
                 ],
               ),
               content: SizedBox(
@@ -2984,14 +3006,14 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                       children: [
                         _buildFilterOption(
                           theme,
-                          label: 'All',
+                          label: context.tr.tagFilterAll,
                           selected: _hierarchyFilter == 'all',
                           onTap: () =>
                               setDialogState(() => _hierarchyFilter = 'all'),
                         ),
                         _buildFilterOption(
                           theme,
-                          label: 'Parent tags',
+                          label: context.tr.tagFilterParent,
                           icon: PhosphorIconsLight.treeStructure,
                           selected: _hierarchyFilter == 'parents',
                           onTap: () => setDialogState(
@@ -3000,7 +3022,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                         ),
                         _buildFilterOption(
                           theme,
-                          label: 'Child tags',
+                          label: context.tr.tagFilterChild,
                           icon: PhosphorIconsLight.arrowBendUpLeft,
                           selected: _hierarchyFilter == 'children',
                           onTap: () => setDialogState(
@@ -3009,7 +3031,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                         ),
                         _buildFilterOption(
                           theme,
-                          label: 'Standalone',
+                          label: context.tr.tagFilterStandalone,
                           icon: PhosphorIconsLight.tag,
                           selected: _hierarchyFilter == 'standalone',
                           onTap: () => setDialogState(
@@ -3034,14 +3056,14 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                       children: [
                         _buildFilterOption(
                           theme,
-                          label: 'All',
+                          label: context.tr.tagFilterAll,
                           selected: _thumbnailFilter == 'all',
                           onTap: () =>
                               setDialogState(() => _thumbnailFilter = 'all'),
                         ),
                         _buildFilterOption(
                           theme,
-                          label: 'Has thumbnail',
+                          label: context.tr.tagFilterHasThumb,
                           icon: PhosphorIconsLight.image,
                           selected: _thumbnailFilter == 'with',
                           onTap: () =>
@@ -3049,7 +3071,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                         ),
                         _buildFilterOption(
                           theme,
-                          label: 'No thumbnail',
+                          label: context.tr.tagFilterNoThumb,
                           icon: PhosphorIconsLight.imageBroken,
                           selected: _thumbnailFilter == 'without',
                           onTap: () => setDialogState(
@@ -3069,14 +3091,14 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                       _thumbnailFilter = 'all';
                     });
                   },
-                  child: const Text('Reset'),
+                  child: Text(context.tr.vpReset),
                 ),
                 ElevatedButton(
                   onPressed: () {
                     Navigator.of(dialogContext).pop();
                     _filterTags();
                   },
-                  child: const Text('Apply'),
+                  child: Text(context.tr.apply),
                 ),
               ],
             );
@@ -3522,7 +3544,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                     onPressed: isEditing
                         ? null
                         : () => _showThumbnailPicker(tag),
-                    tooltip: 'Set thumbnail',
+                    tooltip: context.tr.setThumbnail,
                     visualDensity: VisualDensity.compact,
                   ),
                   IconButton(
@@ -3539,7 +3561,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                     onPressed: isEditing
                         ? null
                         : () => _showManageHierarchyDialog(tag),
-                    tooltip: 'Manage hierarchy (parent/child)',
+                    tooltip: context.tr.tagManageHierarchyTooltip,
                     visualDensity: VisualDensity.compact,
                   ),
                   IconButton(
@@ -4328,8 +4350,12 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                                                   message:
                                                       _tagHierarchyManager
                                                           .isParent(tag)
-                                                      ? 'Double click to open child tags'
-                                                      : 'Double click to open files',
+                                                      ? context
+                                                            .tr
+                                                            .tagDoubleClickChildren
+                                                      : context
+                                                            .tr
+                                                            .tagDoubleClickFiles,
                                                   child: Column(
                                                     children: [
                                                       Text(
@@ -4701,8 +4727,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                 decoration: InputDecoration(
                   hintText: AppLocalizations.of(context)!.enterTagName,
                   prefixIcon: const Icon(PhosphorIconsLight.hash),
-                  helperText:
-                      'Use parent:child format for hierarchy\ne.g. Actress:Hung or Actress:Hung,Van',
+                  helperText: context.tr.tagHierarchyFormatHelp,
                   helperMaxLines: 3,
                   helperStyle: TextStyle(
                     fontSize: 11,
@@ -4836,10 +4861,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
 
     if (parentName.isEmpty || childrenPart.isEmpty) {
       if (mounted) {
-        AppToast.warning(
-          context,
-          'Invalid format. Use parent:child or parent:child1,child2',
-        );
+        AppToast.warning(context, context.tr.tagInvalidFormat);
       }
       return;
     }
@@ -4852,7 +4874,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
 
     if (childNames.isEmpty) {
       if (mounted) {
-        AppToast.warning(context, 'No child tags specified');
+        AppToast.warning(context, context.tr.tagNoChildSpecified);
       }
       return;
     }
@@ -4885,7 +4907,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
           if (mounted) {
             AppToast.warning(
               context,
-              'Could not create relationship: $parentName -> $childName (circular reference?)',
+              context.tr.tagRelationFailed(parentName, childName),
             );
           }
         }
@@ -4913,7 +4935,11 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
       if (mounted) {
         AppToast.success(
           context,
-          'Created hierarchy: $parentName -> ${childNames.join(", ")} ($createdCount relationships)',
+          context.tr.tagHierarchyCreated(
+            parentName,
+            childNames.join(", "),
+            createdCount,
+          ),
         );
       }
     } catch (e) {
@@ -4957,7 +4983,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     required String parentTag,
   }) async {
     if (!_canDropTagOnParent(childTag, parentTag)) {
-      AppToast.warning(context, 'Cannot create circular tag hierarchy');
+      AppToast.warning(context, context.tr.tagCircularHierarchy);
       return;
     }
 
@@ -4970,7 +4996,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     final added = await _tagHierarchyManager.addChild(parentTag, childTag);
     if (!mounted) return;
     if (!added) {
-      AppToast.warning(context, 'Cannot create circular tag hierarchy');
+      AppToast.warning(context, context.tr.tagCircularHierarchy);
       return;
     }
 
@@ -4988,7 +5014,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
         ..add(childTag);
     });
     _filterTags();
-    AppToast.success(context, 'Moved "$childTag" under "$parentTag"');
+    AppToast.success(context, context.tr.tagMovedUnder(childTag, parentTag));
   }
 
   void _openContainingFolder(String folderPath) {
@@ -5144,11 +5170,7 @@ class _ManageHierarchyDialogState extends State<_ManageHierarchyDialog> {
       if (mounted) setState(() => _childSuggestions = []);
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Cannot add "$childName" — circular reference or error',
-          ),
-        ),
+        SnackBar(content: Text(context.tr.tagCannotAddChild(childName))),
       );
     }
   }
@@ -5181,11 +5203,7 @@ class _ManageHierarchyDialogState extends State<_ManageHierarchyDialog> {
       if (mounted) setState(() => _parentSuggestions = []);
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Cannot set "$parentName" as parent — circular reference or error',
-          ),
-        ),
+        SnackBar(content: Text(context.tr.tagCannotSetParent(parentName))),
       );
     }
   }
@@ -5212,7 +5230,7 @@ class _ManageHierarchyDialogState extends State<_ManageHierarchyDialog> {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              'Hierarchy: "${widget.tag}"',
+              context.tr.tagHierarchyTitle(widget.tag),
               style: const TextStyle(fontSize: 18),
             ),
           ),
@@ -5239,7 +5257,7 @@ class _ManageHierarchyDialogState extends State<_ManageHierarchyDialog> {
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Text(
-                    'No parent tags',
+                    context.tr.tagNoParents,
                     style: TextStyle(
                       fontSize: 13,
                       color: theme.colorScheme.onSurfaceVariant.withValues(
@@ -5281,7 +5299,7 @@ class _ManageHierarchyDialogState extends State<_ManageHierarchyDialog> {
               // Add parent input
               _buildAutocompleteInput(
                 controller: _setParentController,
-                hint: 'Add parent...',
+                hint: context.tr.tagAddParentHint,
                 suggestions: _parentSuggestions,
                 onChanged: _updateParentSuggestions,
                 onSubmit: _addParent,
@@ -5307,7 +5325,7 @@ class _ManageHierarchyDialogState extends State<_ManageHierarchyDialog> {
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Text(
-                    'No child tags',
+                    context.tr.tagNoChildren,
                     style: TextStyle(
                       fontSize: 13,
                       color: theme.colorScheme.onSurfaceVariant.withValues(
@@ -5349,7 +5367,7 @@ class _ManageHierarchyDialogState extends State<_ManageHierarchyDialog> {
               // Add child input
               _buildAutocompleteInput(
                 controller: _addChildController,
-                hint: 'Add child... (comma-separated)',
+                hint: context.tr.tagAddChildHint,
                 suggestions: _childSuggestions,
                 onChanged: _updateChildSuggestions,
                 onSubmit: (value) async {
@@ -5370,7 +5388,7 @@ class _ManageHierarchyDialogState extends State<_ManageHierarchyDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Done'),
+          child: Text(context.tr.done),
         ),
       ],
     );

@@ -22,7 +22,9 @@
   </tr>
 </table>
 
-CB File Hub is a cross-platform file manager for large media libraries. It combines fast visual browsing, tabs, tags, network and SSH access, disk cleanup, and an AI assistant so photos, videos, downloads, remote servers, and messy folders are easier to search, review, and maintain.
+[English](README.md) | [Tiếng Việt](README.vi.md)
+
+CB File Hub is a cross-platform file manager for large media libraries. It combines visual browsing, tabs, tags, albums, torrent management and downloads, media viewing and editing, network and SSH access, settings/tag backups, disk cleanup, and an AI assistant in one workspace.
 
 Website: [coolbird.net](https://coolbird.net)
 
@@ -35,6 +37,8 @@ Website: [coolbird.net](https://coolbird.net)
 - **Tags, smart albums, and discovery tools**: Organize large libraries beyond folder names.
 - **Local, network, and SSH access**: Work with local storage, SMB, FTP, WebDAV, SFTP, and saved SSH hosts from one app.
 - **SSH workspace**: Keep SSH hosts and keys organized, open an in-app terminal, or browse the same host through SFTP.
+- **Torrent library and downloads**: Index torrents wherever you store them, import client libraries, merge duplicates, and choose when and where to download.
+- **Backups and personalization**: Back up settings and tags locally or to available cloud integrations; choose themes, accents, views, and thumbnail preferences.
 
 ## Preview
 
@@ -91,6 +95,21 @@ Website: [coolbird.net](https://coolbird.net)
   </tr>
 </table>
 
+### Torrent library and downloads
+
+<table>
+  <tr>
+    <td width="50%"><img src="screenshots/features/torrents/en/qbittorrent.png" alt="Import qBittorrent backups with an optional confirmed cleanup of source files" /><p>Import qBittorrent backups and review optional source cleanup.</p></td>
+    <td width="50%"><img src="screenshots/features/torrents/en/client-import.png" alt="Import saved torrent files from a Transmission profile or custom folder" /><p>Import other clients from a detected profile or a custom folder.</p></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="screenshots/features/torrents/en/add-link.png" alt="Add a torrent link with a valid clipboard magnet filled in" /><p>Open Add link with a valid clipboard magnet filled in.</p></td>
+    <td width="50%"><img src="screenshots/features/torrents/en/download.png" alt="Choose a torrent download folder and whether to start immediately" /><p>Choose the download folder and whether to start immediately.</p></td>
+  </tr>
+</table>
+
+These images render the production Flutter dialogs with sample data. [Vietnamese previews](README.vi.md#thư-viện-torrent-và-tải-xuống) are also available.
+
 ### Mobile workflow
 
 <table>
@@ -137,6 +156,9 @@ In the disk cleaner, you can right-click any file or folder and ask CB Agent whe
 - Use the same tab-oriented workflow across desktop and mobile.
 - Pin folders, drives, or favorite locations to the sidebar.
 - Restore the last opened tab workspace when returning to the app.
+- Split a tab into two panes; use list, tiles, grid, details, tree, or column views.
+- Search with optional regular expressions, sort, select multiple items, and use keyboard shortcuts and drag and drop.
+- Follow file operations and supported app updates in the Status Center.
 
 ### AI file agent
 
@@ -180,6 +202,23 @@ In the disk cleaner, you can right-click any file or folder and ask CB Agent whe
 - Browse dedicated image and video gallery views.
 - Use the built-in video player for local and supported network files.
 - Support desktop-oriented media workflows such as external opening and focused playback.
+- Edit images with crop, rotation, flip, tonal adjustments, filters, and markup.
+- Play supported audio/video, choose audio tracks and subtitles, capture video frames, and use desktop picture-in-picture or a separate playback window.
+
+### Torrent library and downloads
+
+- Keep a shared index while storing `.torrent` files in user-selected locations, or organize metainfo with Copy/Move modes.
+- Browse large libraries with lazy loading, configurable files per page, familiar views, search, sorting, and detailed torrent columns.
+- Press F5 to discover new torrents from configured sources and quickly skip files already indexed.
+- Add local `.torrent` files, magnets, or HTTP/HTTPS torrent URLs. Add link prefills a valid magnet from the clipboard.
+- Choose a payload destination and whether to start immediately; remember that choice and pause/resume/stop downloads.
+- In Torrent settings, optionally skip download options and use the saved folder/start preference; choose a folder once if none is saved.
+- Reuse an existing Torrent tab for magnet/file activations; queue consecutive requests and show their dialogs in order.
+- Confirm a merge for duplicate info hashes, combining trackers and sources while retaining the existing download task and destination.
+- Import qBittorrent backups, with optional source cleanup after explicit confirmation and while qBittorrent is closed; keep downloaded content.
+- Import saved `.torrent` files from µTorrent, BitTorrent, Transmission, and Deluge, with profile discovery and manual folder selection.
+- Copy magnet links from the context menu for single or multiple selections. Track progress, speeds, seeds, peers, trackers, and more.
+- Desktop downloads use aria2 and support BitTorrent v1/hybrid torrents. See the [Torrent guide](docs/features/10-torrent-library.md) for platform details.
 
 ### Network access
 
@@ -210,6 +249,14 @@ In the disk cleaner, you can right-click any file or folder and ask CB Agent whe
 - Create smart albums driven by dynamic rules.
 - Match files into albums automatically based on filename patterns.
 - Scope rules to selected source folders so albums stay relevant instead of noisy.
+
+### Backups, appearance, and updates
+
+- Export and restore settings and tags with ZIP backups.
+- Back up to available Google Drive, Dropbox, and OneDrive integrations using your own accounts, including multiple connected drives.
+- Choose light/dark appearance, accent colors, default views, preview settings, and thumbnail fitting.
+- Use English or Vietnamese; optional AI providers, cloud integrations, and local models depend on your configuration.
+- Use the Microsoft Store update path for Store installations and the supported update flow for other distribution types.
 
 ## Platforms
 
@@ -401,6 +448,18 @@ python scripts\make_promo_images.py
 ```
 
 The generated artwork is written to `screenshots/promo/desktop/`, `screenshots/promo/mobile/`, `screenshots/promo/tablet7/`, and the matching Vietnamese folders under `screenshots/promo/vi/`.
+
+Render the English/Vietnamese Torrent dialog images with sample data from `cb_file_manager/`:
+
+```bash
+flutter test --no-pub tool/capture_torrent_screenshots_test.dart --dart-define=CB_CAPTURE_SCREENSHOTS=true
+```
+
+This opt-in widget capture writes `screenshots/features/torrents/en/` and `vi/`. It does not launch the desktop app or use the user's torrent library.
+
+### Microsoft Store and Google Play descriptions
+
+Both stores use the same concise English/Vietnamese descriptions in [`store/listings/`](store/listings/). Edit each language's `.txt` once; its bullet points also generate Microsoft Store features. The sibling `.json` holds the short description and Google Play language code. CI checks character limits and uploads a `store-listings-en-vi` preview. MSIX submissions apply the text in Partner Center; AAB submissions include it in the same Google Play edit as the app bundle. See the [content guide](store/README.md).
 
 ## Testing
 

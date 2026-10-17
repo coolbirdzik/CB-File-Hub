@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/design_system/tokens/cb_geometry_tokens.dart';
 import 'address_bar_menu.dart';
+import 'package:cb_file_manager/config/translation_helper.dart';
 
 class PathNavigationBar extends StatefulWidget {
   final String currentPath;
@@ -74,8 +75,8 @@ class _PathNavigationBarState extends State<PathNavigationBar> {
         child: Container(
           alignment: Alignment.centerLeft,
           padding: const EdgeInsets.symmetric(horizontal: 8.0),
-          child: const Text(
-            'This PC',
+          child: Text(
+            context.tr.thisPC,
             style: TextStyle(fontSize: 16.0),
             overflow: TextOverflow.ellipsis,
           ),
@@ -153,7 +154,7 @@ class _PathNavigationBarState extends State<PathNavigationBar> {
             vertical: 8.0,
           ),
           border: InputBorder.none,
-          hintText: 'Enter path...',
+          hintText: context.tr.enterPath,
           hintStyle: TextStyle(
             color: Theme.of(
               context,

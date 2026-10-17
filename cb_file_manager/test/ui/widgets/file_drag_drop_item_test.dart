@@ -1,10 +1,48 @@
 import 'dart:ui' show PointerDeviceKind;
 import 'package:cb_file_manager/ui/widgets/file_drag_drop_item.dart';
+import 'package:cb_file_manager/ui/components/common/file_entry_presentation.dart';
 import 'package:cb_file_manager/ui/widgets/thumbnail_loader.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  testWidgets('virtual index entries cannot become filesystem drag sources', (
+    tester,
+  ) async {
+    const virtual = '#torrents/magnet.torrent';
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: FileEntryPresentation(
+          names: {},
+          virtualPaths: {virtual},
+          child: Column(
+            children: [
+              FileDragDropItem(
+                path: virtual,
+                isFolder: false,
+                selectedPaths: {virtual},
+                child: Text('magnet'),
+              ),
+              FileDragDropItem(
+                path: '/real.torrent',
+                isFolder: false,
+                selectedPaths: {virtual, '/real.torrent'},
+                child: Text('file'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    final sources = tester
+        .widgetList<Draggable<List<String>>>(
+          find.byType(Draggable<List<String>>),
+        )
+        .toList();
+    expect(sources, hasLength(1));
+    expect(sources.single.data, ['/real.torrent']);
+  });
+
   testWidgets('leaving the view hands all selected files to native drag once', (
     tester,
   ) async {

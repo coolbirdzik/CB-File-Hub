@@ -6,6 +6,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import '../../../../models/ai/referenced_file.dart';
+import 'package:cb_file_manager/config/translation_helper.dart';
 
 /// A card displayed in the chat showing a file referenced (dropped) by the user.
 /// For text files, shows a content preview. For other files, shows file info.
@@ -150,7 +151,7 @@ class ReferencedFileCard extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.all(8),
               decoration: CbDecorations.card(context, radius: 6),
-              child: _buildContentPreview(file, theme, isDark),
+              child: _buildContentPreview(context, file, theme, isDark),
             ),
           ],
           // Error state
@@ -184,6 +185,7 @@ class ReferencedFileCard extends StatelessWidget {
   }
 
   Widget _buildContentPreview(
+    BuildContext context,
     ReferencedFile file,
     ThemeData theme,
     bool isDark,
@@ -201,7 +203,7 @@ class ReferencedFileCard extends StatelessWidget {
           ),
           const SizedBox(width: 6),
           Text(
-            'Loading content...',
+            context.tr.aiLoadingContent,
             style: TextStyle(
               fontSize: 10,
               color: isDark
@@ -237,7 +239,7 @@ class ReferencedFileCard extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(top: 4),
             child: Text(
-              '... (${lines.length - 12} more lines)',
+              context.tr.aiMoreLines(lines.length - 12),
               style: TextStyle(
                 fontSize: 9,
                 fontStyle: FontStyle.italic,

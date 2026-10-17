@@ -11,6 +11,7 @@ import '../../../config/languages/app_localizations.dart';
 import 'address_bar_menu.dart';
 import '../../../helpers/files/archive_path_utils.dart';
 import '../../../ui/components/common/breadcrumb_address_bar.dart';
+import 'package:cb_file_manager/config/translation_helper.dart';
 
 /// Navigation bar component that includes back/forward buttons and path input field
 class PathNavigationBar extends StatefulWidget {
@@ -120,8 +121,8 @@ class _PathNavigationBarState extends State<PathNavigationBar> {
     final path = widget.currentPath;
     if (path.isEmpty) {
       return [
-        const BreadcrumbSegment(
-          label: 'This PC',
+        BreadcrumbSegment(
+          label: context.tr.thisPC,
           icon: PhosphorIconsLight.desktopTower,
         ),
       ];

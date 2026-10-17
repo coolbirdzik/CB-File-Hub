@@ -21,6 +21,9 @@ import 'helpers/ui/frame_timing_optimizer.dart';
 import 'helpers/tags/batch_tag_manager.dart';
 import 'models/database/database_manager.dart';
 import 'services/network_credentials_service.dart';
+import 'services/torrent/torrent_service.dart';
+import 'services/torrent/torrent_launch_request.dart';
+import 'services/windowing/desktop_windowing_service.dart';
 import 'providers/theme_provider.dart';
 import 'config/theme_config.dart';
 import 'config/fluent_theme_config.dart';
@@ -228,6 +231,20 @@ Future<void> runCbFileApp() async {
     navigatorKey = GlobalKey<NavigatorState>();
   }
   final env = Platform.environment;
+  final torrentSources = Platform.isWindows
+      ? TorrentLaunchRequest.takeArguments(_launchPaths)
+      : <String>[];
+  if (!kCbE2E &&
+      torrentSources.isNotEmpty &&
+      await DesktopWindowingService().openTorrentSourcesInExistingWindow(
+        torrentSources,
+      )) {
+    try {
+      await windowManager.ensureInitialized();
+      await windowManager.destroy();
+    } catch (_) {}
+    exit(0);
+  }
   final isDesktopPlatform =
       Platform.isWindows || Platform.isLinux || Platform.isMacOS;
   final environmentVideoPath = VideoWindowService.startupVideoPath();
@@ -438,8 +455,12 @@ Future<void> runCbFileApp() async {
             if (!kCbE2E) {
               await windowManager.maximize();
             }
-            await windowManager.show();
-            unawaited(windowManager.focus());
+            if (torrentSources.isNotEmpty) {
+              await DesktopWindowingService.focusTorrentWindow();
+            } else {
+              await windowManager.show();
+              unawaited(windowManager.focus());
+            }
             unawaited(windowManager.setResizable(true));
             unawaited(windowManager.setPreventClose(false));
             unawaited(windowManager.setSkipTaskbar(false));
@@ -513,6 +534,15 @@ Future<void> runCbFileApp() async {
 
   await setupServiceLocator();
   debugPrint('Service locator initialized successfully');
+
+  // One download owner per app, never a player/spare window or E2E sandbox.
+  if (!isSecondaryWindow && !isPip && !isDedicatedVideoWindow && !kCbE2E) {
+    unawaited(
+      locator<TorrentService>().initialize().catchError((Object error) {
+        debugPrint('Torrent initialization failed: $error');
+      }),
+    );
+  }
 
   // Initialize preferences first for theme and language.
   if (isSecondaryWindow && !isPip) {
@@ -651,8 +681,17 @@ Future<void> runCbFileApp() async {
     AppUpdateService.instance.scheduleStartupCheck(_announceAppUpdate);
   }
 
-  final WindowStartupPayload? startupPayload =
-      kCbE2E && CbE2EConfig.startupPayload != null
+  final WindowStartupPayload? startupPayload = torrentSources.isNotEmpty
+      ? WindowStartupPayload(
+          tabs: [
+            for (final source in torrentSources)
+              WindowTabPayload(
+                path: TorrentLaunchRequest.pathFor(source),
+                name: 'Torrent',
+              ),
+          ],
+        )
+      : kCbE2E && CbE2EConfig.startupPayload != null
       ? CbE2EConfig.startupPayload
       : WindowStartupPayload.fromEnvironment();
   runApp(
@@ -1089,7 +1128,12 @@ class _CBFileAppState extends State<CBFileApp>
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      supportedLocales: const [Locale('vi', ''), Locale('en', '')],
+      supportedLocales: const [
+        Locale('vi', ''),
+        Locale('en', ''),
+        Locale('tr', ''),
+        Locale('zh', ''),
+      ],
       builder: (context, child) {
         final wrappedChild = AppBusyCursorOverlay(
           child: child ?? const SizedBox.shrink(),
@@ -1120,7 +1164,12 @@ class _CBFileAppState extends State<CBFileApp>
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      supportedLocales: const [Locale('vi', ''), Locale('en', '')],
+      supportedLocales: const [
+        Locale('vi', ''),
+        Locale('en', ''),
+        Locale('tr', ''),
+        Locale('zh', ''),
+      ],
       builder: (context, child) {
         // FluentApp does not insert [ScaffoldMessenger]; MaterialApp does. Several
         // screens (e.g. [TabbedFolderListScreen]) and [NavigationController] use

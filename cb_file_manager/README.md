@@ -1,8 +1,13 @@
 # cb_file_manager
 
-CB File Hub is a Flutter-based cross-platform file manager for local, network, and remote-server files.
+CB File Hub is a Flutter-based cross-platform file manager for local, network, and remote-server files, with media tools, a torrent library and downloads, tags/albums, AI assistance, disk cleanup, and settings/tag backups.
+
+Full product descriptions and screenshots: [English](../README.md) · [Tiếng Việt](../README.vi.md).
 
 ## Feature Overview
+
+- Manage a lazy-loaded torrent index with user-selected storage, client imports, duplicate merge confirmation, clipboard magnets, and destination/start controls for desktop downloads.
+- Export settings/tag backups and connect available Google Drive, Dropbox, and OneDrive integrations.
 
 - Browse local folders in tabs, pin common locations, manage tags and smart albums, and use dedicated image/video views.
 - Connect to SMB, FTP, WebDAV, and SFTP locations; stream supported media and retain saved network credentials for quicker reconnects.

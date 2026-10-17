@@ -19,6 +19,7 @@ import 'package:cb_file_manager/services/video_library_cache_service.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';
 import 'package:cb_file_manager/ui/utils/base_screen.dart';
 import 'package:cb_file_manager/ui/utils/format_utils.dart';
+import 'package:cb_file_manager/config/translation_helper.dart';
 
 class CacheManagementScreen extends StatefulWidget {
   const CacheManagementScreen({super.key, this.embedded = false});
@@ -77,8 +78,8 @@ class _CacheManagementScreenState extends State<CacheManagementScreen> {
         _rootPath = root.path;
         _photoThumbs = _CacheEntry(
           key: 'photo',
-          title: 'Photo thumbnails',
-          subtitle: 'Generated JPEG previews for image grids and viewers',
+          title: context.tr.cachePhotoThumbs,
+          subtitle: context.tr.cachePhotoThumbsDesc,
           icon: PhosphorIconsLight.image,
           directory: photoDir,
           bytes: photoStats.totalBytes,
@@ -87,8 +88,8 @@ class _CacheManagementScreenState extends State<CacheManagementScreen> {
         );
         _videoThumbs = _CacheEntry(
           key: 'video',
-          title: 'Video thumbnails',
-          subtitle: 'Cached frame previews for videos',
+          title: context.tr.cacheVideoThumbs,
+          subtitle: context.tr.cacheVideoThumbsDesc,
           icon: PhosphorIconsLight.videoCamera,
           directory: videoDir,
           bytes: videoStats.totalBytes,
@@ -97,8 +98,8 @@ class _CacheManagementScreenState extends State<CacheManagementScreen> {
         );
         _networkThumbs = _CacheEntry(
           key: 'network',
-          title: 'Network thumbnails',
-          subtitle: 'SMB / FTP / WebDAV thumbnail cache',
+          title: context.tr.cacheNetworkThumbs,
+          subtitle: context.tr.cacheNetworkThumbsDesc,
           icon: PhosphorIconsLight.cloud,
           directory: networkDir,
           bytes: (networkStats['totalSize'] as int?) ?? 0,
@@ -107,8 +108,8 @@ class _CacheManagementScreenState extends State<CacheManagementScreen> {
         );
         _videoLibrary = _CacheEntry(
           key: 'library',
-          title: 'Video library cache',
-          subtitle: 'Video library metadata and cached artifacts',
+          title: context.tr.cacheLibrary,
+          subtitle: context.tr.cacheLibraryDesc,
           icon: PhosphorIconsLight.filmStrip,
           directory: videoLibDir,
           bytes: videoLibStats.totalBytes,
@@ -117,8 +118,8 @@ class _CacheManagementScreenState extends State<CacheManagementScreen> {
         );
         _tempFiles = _CacheEntry(
           key: 'temp',
-          title: 'Temporary files',
-          subtitle: 'Transient downloads and working files',
+          title: context.tr.cacheTempFiles,
+          subtitle: context.tr.cacheTempFilesDesc,
           icon: PhosphorIconsLight.folderMinus,
           directory: tempDir,
           bytes: tempStats.totalBytes,
@@ -143,9 +144,9 @@ class _CacheManagementScreenState extends State<CacheManagementScreen> {
       });
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Failed to load cache info: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.tr.cacheLoadFailed(e.toString()))),
+      );
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -186,11 +187,9 @@ class _CacheManagementScreenState extends State<CacheManagementScreen> {
   Future<void> _openInSystem(String path) async {
     final ok = await ExternalAppHelper.openWithSystemDefault(path);
     if (!ok && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Could not open folder in system explorer'),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(context.tr.cacheOpenFolderFailed)));
     }
   }
 
@@ -221,15 +220,19 @@ class _CacheManagementScreenState extends State<CacheManagementScreen> {
           break;
       }
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('${entry.title} cleared')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(context.tr.cacheEntryCleared(entry.title))),
+        );
       }
       await _load();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to clear ${entry.title}: $e')),
+        SnackBar(
+          content: Text(
+            context.tr.cacheEntryClearFailed(entry.title, e.toString()),
+          ),
+        ),
       );
     } finally {
       if (mounted) setState(() => _clearingKeys.remove(entry.key));
@@ -249,14 +252,14 @@ class _CacheManagementScreenState extends State<CacheManagementScreen> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('All cache cleared')));
+        ).showSnackBar(SnackBar(content: Text(context.tr.cacheAllCleared)));
       }
       await _load();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Failed to clear cache: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.tr.cacheClearFailed(e.toString()))),
+      );
     } finally {
       if (mounted) setState(() => _isClearingAll = false);
     }
@@ -613,11 +616,19 @@ class _CacheManagementScreenState extends State<CacheManagementScreen> {
             children: [
               _buildMetricChip(
                 theme,
-                'Total size',
+                context.tr.cacheTotalSize,
                 FormatUtils.formatFileSize(_totalBytes),
               ),
-              _buildMetricChip(theme, 'Files', _totalFiles.toString()),
-              _buildMetricChip(theme, 'Buckets', _entries.length.toString()),
+              _buildMetricChip(
+                theme,
+                context.tr.cacheFilesLabel,
+                _totalFiles.toString(),
+              ),
+              _buildMetricChip(
+                theme,
+                context.tr.cacheBuckets,
+                _entries.length.toString(),
+              ),
             ],
           ),
         ],
@@ -747,7 +758,7 @@ class _CacheManagementScreenState extends State<CacheManagementScreen> {
                       ),
                     ),
                     Text(
-                      '${entry.files} files',
+                      context.tr.cacheFilesCount(entry.files),
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -771,8 +782,10 @@ class _CacheManagementScreenState extends State<CacheManagementScreen> {
               const SizedBox(height: 8),
               Text(
                 totalBytes <= 0
-                    ? '0% of total cache'
-                    : '${(ratio * 100).toStringAsFixed(1)}% of total cache',
+                    ? context.tr.cachePercentOfTotal('0')
+                    : context.tr.cachePercentOfTotal(
+                        (ratio * 100).toStringAsFixed(1),
+                      ),
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),

@@ -11,6 +11,7 @@ import 'package:cb_file_manager/ui/utils/route.dart';
 import 'package:cb_file_manager/services/smart_album_service.dart';
 import 'package:cb_file_manager/ui/screens/video_library/widgets/directory_list_widget.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:cb_file_manager/config/translation_helper.dart';
 
 class CreateAlbumDialog extends StatefulWidget {
   final Album? editingAlbum;
@@ -220,7 +221,7 @@ class _CreateAlbumDialogState extends State<CreateAlbumDialog> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Album Color (Optional)',
+          context.tr.albumColorOptional,
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w500,
@@ -275,7 +276,9 @@ class _CreateAlbumDialogState extends State<CreateAlbumDialog> {
             ? (widget.editingAlbum != null
                   ? l10n.editImageSource
                   : l10n.createImageSource)
-            : (widget.editingAlbum != null ? 'Edit Album' : 'Create New Album'),
+            : (widget.editingAlbum != null
+                  ? l10n.albumEditTitle
+                  : l10n.albumCreateTitle),
       ),
       content: SingleChildScrollView(
         child: SizedBox(
@@ -288,16 +291,16 @@ class _CreateAlbumDialogState extends State<CreateAlbumDialog> {
               children: [
                 TextFormField(
                   controller: _nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Album Name *',
-                    hintText: 'Enter album name',
+                  decoration: InputDecoration(
+                    labelText: l10n.albumNameRequiredLabel,
+                    hintText: l10n.albumNameHint,
                   ),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
-                      return 'Album name is required';
+                      return l10n.albumNameRequired;
                     }
                     if (value.trim().length > 50) {
-                      return 'Album name must be 50 characters or less';
+                      return l10n.albumNameTooLong;
                     }
                     return null;
                   },
@@ -307,15 +310,15 @@ class _CreateAlbumDialogState extends State<CreateAlbumDialog> {
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _descriptionController,
-                  decoration: const InputDecoration(
-                    labelText: 'Description (Optional)',
-                    hintText: 'Enter album description',
+                  decoration: InputDecoration(
+                    labelText: l10n.albumDescriptionLabel,
+                    hintText: l10n.albumDescriptionHint,
                   ),
                   maxLines: 3,
                   maxLength: 200,
                   validator: (value) {
                     if (value != null && value.trim().length > 200) {
-                      return 'Description must be 200 characters or less';
+                      return l10n.albumDescriptionTooLong;
                     }
                     return null;
                   },
@@ -367,10 +370,8 @@ class _CreateAlbumDialogState extends State<CreateAlbumDialog> {
                   ),
                 ] else
                   SwitchListTile(
-                    title: const Text('Dynamic (Smart) Album'),
-                    subtitle: const Text(
-                      'Content is defined by Auto Rules. No files are stored explicitly.',
-                    ),
+                    title: Text(l10n.albumDynamicSmart),
+                    subtitle: Text(l10n.albumDynamicSmartDesc),
                     value: _isSmartAlbum,
                     onChanged: (val) {
                       setState(() => _isSmartAlbum = val);
@@ -396,7 +397,7 @@ class _CreateAlbumDialogState extends State<CreateAlbumDialog> {
                   height: 16,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : Text(widget.editingAlbum != null ? 'Update' : 'Create'),
+              : Text(widget.editingAlbum != null ? l10n.update : l10n.create),
         ),
       ],
     );

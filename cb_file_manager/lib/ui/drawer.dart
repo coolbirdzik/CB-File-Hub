@@ -453,6 +453,16 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
                         ),
                       ),
 
+                      DrawerNavigationItem(
+                        icon: PhosphorIconsLight.downloadSimple,
+                        title: context.tr.torrents,
+                        onTap: () => _navigateTo(
+                          context,
+                          '#torrents',
+                          context.tr.torrents,
+                        ),
+                      ),
+
                       const SizedBox(height: 8),
 
                       // Tags section
@@ -693,8 +703,22 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
                             context.tr.videoHubTitle,
                           ),
                         ),
+                        _fluentNavigationItem(
+                          context,
+                          icon: PhosphorIconsLight.downloadSimple,
+                          title: context.tr.torrents,
+                          semanticLabel: context.tr.torrents,
+                          selected: _isFluentPathSelected(
+                            activePath,
+                            '#torrents',
+                          ),
+                          onPressed: () => _navigateTo(
+                            context,
+                            '#torrents',
+                            context.tr.torrents,
+                          ),
+                        ),
                         const SizedBox(height: _FluentDrawerTokens.groupGap),
-
                         _fluentNavigationItem(
                           context,
                           icon: PhosphorIconsLight.tag,
@@ -1077,6 +1101,9 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
   bool _isFluentPathSelected(String? activePath, String targetPath) {
     if (activePath == null || activePath.isEmpty) return false;
     if (targetPath == kAiChatPath) return isAiChatPath(activePath);
+    if (targetPath == '#torrents') {
+      return activePath == '#torrents' || activePath.startsWith('#torrents?');
+    }
     if (targetPath.startsWith('#')) return activePath == targetPath;
 
     final current = _normalizeFluentPath(activePath);

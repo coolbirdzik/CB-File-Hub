@@ -27,6 +27,7 @@ import 'components/conversation_list_panel.dart';
 import 'components/file_result_card.dart';
 import 'components/model_selector_button.dart';
 import 'components/shimmer_thinking_text.dart';
+import 'package:cb_file_manager/config/translation_helper.dart';
 
 /// AI Chat screen that opens as a tab in the tab manager.
 ///
@@ -356,7 +357,7 @@ class _AiChatBodyState extends State<_AiChatBody> {
             // Debug: view raw payload sent to provider
             IconButton(
               icon: const Icon(PhosphorIconsLight.code, size: 14),
-              tooltip: 'View raw payload',
+              tooltip: context.tr.aiViewRawPayload,
               visualDensity: VisualDensity.compact,
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
@@ -594,7 +595,7 @@ class _AiChatBodyState extends State<_AiChatBody> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Provider error',
+                  context.tr.aiProviderError,
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -636,13 +637,13 @@ class _AiChatBodyState extends State<_AiChatBody> {
           if (state.lastApiPayload != null)
             TextButton.icon(
               icon: const Icon(PhosphorIconsLight.code, size: 14),
-              label: const Text('View payload'),
+              label: Text(context.tr.aiViewPayload),
               onPressed: () => RawPayloadDialog.show(context, state),
             ),
           IconButton(
             icon: const Icon(PhosphorIconsLight.x, size: 14),
             visualDensity: VisualDensity.compact,
-            tooltip: 'Dismiss',
+            tooltip: context.tr.dismiss,
             onPressed: () =>
                 context.read<AiAgentBloc>().add(const ClearError()),
           ),
@@ -1131,7 +1132,7 @@ class _ToolActivityLogState extends State<_ToolActivityLog> {
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    'Tool activity',
+                    context.tr.aiToolActivity,
                     style: TextStyle(
                       fontSize: 11,
                       color: theme.colorScheme.onSurfaceVariant,
@@ -1237,9 +1238,10 @@ class _ContextSizeIndicator extends StatelessWidget {
     }
 
     return Tooltip(
-      message:
-          '${contextInfo.messageCount} messages · $chars chars\n'
-          'Context trimming starts at ~24K chars',
+      message: context.tr.aiContextInfo(
+        contextInfo.messageCount,
+        chars.toString(),
+      ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [

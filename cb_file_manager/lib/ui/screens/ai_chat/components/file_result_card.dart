@@ -3,6 +3,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:path/path.dart' as pathlib;
 
 import '../../../../models/ai/ai_search_result.dart';
+import 'package:cb_file_manager/config/translation_helper.dart';
 
 /// Compact card showing an AI search result with file info and relevance.
 ///
@@ -101,7 +102,7 @@ class FileResultCard extends StatelessWidget {
                     ],
                     if (!result.verified)
                       Text(
-                        'File not found',
+                        context.tr.aiFileNotFound,
                         style: TextStyle(
                           fontSize: 10,
                           color: colorScheme.error,
@@ -123,7 +124,7 @@ class FileResultCard extends StatelessWidget {
                         size: 16,
                         color: colorScheme.onSurfaceVariant,
                       ),
-                      tooltip: 'Open folder',
+                      tooltip: context.tr.aiOpenFolderTooltip,
                       onPressed: onOpenFolder,
                       visualDensity: VisualDensity.compact,
                       padding: EdgeInsets.zero,
@@ -140,7 +141,7 @@ class FileResultCard extends StatelessWidget {
                         size: 16,
                         color: colorScheme.onSurfaceVariant,
                       ),
-                      tooltip: 'Open file',
+                      tooltip: context.tr.aiOpenFileTooltip,
                       onPressed: onOpenExternal,
                       visualDensity: VisualDensity.compact,
                       padding: EdgeInsets.zero,

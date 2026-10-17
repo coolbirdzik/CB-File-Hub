@@ -64,7 +64,7 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
     RouteUtils.showAcrylicDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Subtitles'),
+        title: Text(context.tr.vpSubtitles),
         content: SubtitleDialogContent(
           tracks: _subtitleTracks,
           selected: _selectedSubtitleTrack,
@@ -73,7 +73,7 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
         actions: [
           TextButton(
             onPressed: () => RouteUtils.safePopDialog(context),
-            child: const Text('Cancel'),
+            child: Text(context.tr.cancel),
           ),
         ],
       ),
@@ -84,7 +84,7 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
     RouteUtils.showAcrylicDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Playback Speed'),
+        title: Text(context.tr.vpPlaybackSpeed),
         content: PlaybackSpeedDialogContent(
           current: _playbackSpeed,
           onSelect: (v) {
@@ -95,7 +95,7 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
         actions: [
           TextButton(
             onPressed: () => RouteUtils.safePopDialog(context),
-            child: const Text('Cancel'),
+            child: Text(context.tr.cancel),
           ),
         ],
       ),
@@ -107,7 +107,7 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Video Filters'),
+          title: Text(context.tr.vpVideoFilters),
           content: VideoFiltersDialogContent(
             brightness: _brightness,
             contrast: _contrast,
@@ -135,11 +135,11 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
                 });
                 setDialogState(() {});
               },
-              child: const Text('Reset'),
+              child: Text(context.tr.vpReset),
             ),
             TextButton(
               onPressed: () => RouteUtils.safePopDialog(context),
-              child: const Text('Close'),
+              child: Text(context.tr.close),
             ),
           ],
         ),
@@ -151,7 +151,7 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
     RouteUtils.showAcrylicDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Sleep Timer'),
+        title: Text(context.tr.vpSleepTimer),
         content: SleepTimerDialogContent(
           selected: _sleepDuration,
           onSelect: (v) {
@@ -165,7 +165,7 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
         actions: [
           TextButton(
             onPressed: () => RouteUtils.safePopDialog(context),
-            child: const Text('Cancel'),
+            child: Text(context.tr.cancel),
           ),
         ],
       ),
@@ -188,22 +188,22 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
                     .withValues(alpha: 0.82);
             return AlertDialog(
               backgroundColor: acrylicBg,
-              title: const Text('Video Settings'),
+              title: Text(context.tr.vpVideoSettings),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Codec Selection
-                    const Text(
-                      'Codec:',
+                    Text(
+                      context.tr.vpCodec,
                       style: TextStyle(fontWeight: FontWeight.bold),
                     ),
                     CbSelect<String>(
                       value: _selectedCodec,
                       expand: true,
-                      items: const [
-                        CbSelectItem(value: 'auto', label: 'Auto'),
+                      items: [
+                        CbSelectItem(value: 'auto', label: context.tr.vpAuto),
                         CbSelectItem(value: 'h264', label: 'H.264'),
                         CbSelectItem(value: 'h265', label: 'H.265/HEVC'),
                         CbSelectItem(value: 'vp9', label: 'VP9'),
@@ -218,30 +218,42 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
                     const SizedBox(height: 16),
 
                     // Video Scale Mode
-                    const Text(
-                      'Video Scale Mode:',
+                    Text(
+                      context.tr.vpScaleMode,
                       style: TextStyle(fontWeight: FontWeight.bold),
                     ),
                     CbSelect<String>(
                       value: _videoScaleMode,
                       expand: true,
-                      items: const [
+                      items: [
                         CbSelectItem(
                           value: 'contain',
-                          label: 'Fit to Window (Keep Ratio, No Crop)',
+                          label: context.tr.vpScaleContain,
                         ),
                         CbSelectItem(
                           value: 'cover',
-                          label: 'Cover (Fill & Crop)',
+                          label: context.tr.vpScaleCover,
                         ),
-                        CbSelectItem(value: 'fill', label: 'Fill (Stretch)'),
-                        CbSelectItem(value: 'fitWidth', label: 'Fit Width'),
-                        CbSelectItem(value: 'fitHeight', label: 'Fit Height'),
+                        CbSelectItem(
+                          value: 'fill',
+                          label: context.tr.vpScaleFill,
+                        ),
+                        CbSelectItem(
+                          value: 'fitWidth',
+                          label: context.tr.vpScaleFitWidth,
+                        ),
+                        CbSelectItem(
+                          value: 'fitHeight',
+                          label: context.tr.vpScaleFitHeight,
+                        ),
                         CbSelectItem(
                           value: 'none',
-                          label: 'None (Original Size)',
+                          label: context.tr.vpScaleNone,
                         ),
-                        CbSelectItem(value: 'scaleDown', label: 'Scale Down'),
+                        CbSelectItem(
+                          value: 'scaleDown',
+                          label: context.tr.vpScaleDown,
+                        ),
                       ],
                       onChanged: (value) {
                         setDialogState(() => _videoScaleMode = value);
@@ -255,17 +267,23 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
                     const SizedBox(height: 16),
 
                     // Audio Decoder
-                    const Text(
-                      'Audio Decoder:',
+                    Text(
+                      context.tr.vpAudioDecoder,
                       style: TextStyle(fontWeight: FontWeight.bold),
                     ),
                     CbSelect<String>(
                       value: _audioDecoder,
                       expand: true,
-                      items: const [
-                        CbSelectItem(value: 'auto', label: 'Auto'),
-                        CbSelectItem(value: 'software', label: 'Software'),
-                        CbSelectItem(value: 'hardware', label: 'Hardware'),
+                      items: [
+                        CbSelectItem(value: 'auto', label: context.tr.vpAuto),
+                        CbSelectItem(
+                          value: 'software',
+                          label: context.tr.vpSoftware,
+                        ),
+                        CbSelectItem(
+                          value: 'hardware',
+                          label: context.tr.vpHardware,
+                        ),
                       ],
                       onChanged: (value) {
                         setDialogState(() => _audioDecoder = value);
@@ -277,7 +295,7 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
 
                     // Buffer Size
                     VideoPlayerLabeledSlider(
-                      label: 'Buffer Size: ${_bufferSize}MB',
+                      label: context.tr.vpBufferSize(_bufferSize),
                       value: _bufferSize.toDouble(),
                       min: 1,
                       max: 100,
@@ -291,7 +309,7 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
 
                     // Network Timeout
                     VideoPlayerLabeledSlider(
-                      label: 'Network Timeout: ${_networkTimeout}s',
+                      label: context.tr.vpNetworkTimeout(_networkTimeout),
                       value: _networkTimeout.toDouble(),
                       min: 5,
                       max: 120,
@@ -304,14 +322,14 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
                     ),
 
                     // Subtitle Encoding
-                    const Text(
-                      'Subtitle Encoding:',
+                    Text(
+                      context.tr.vpSubtitleEncoding,
                       style: TextStyle(fontWeight: FontWeight.bold),
                     ),
                     CbSelect<String>(
                       value: _subtitleEncoding,
                       expand: true,
-                      items: const [
+                      items: [
                         CbSelectItem(value: 'utf-8', label: 'UTF-8'),
                         CbSelectItem(value: 'utf-16', label: 'UTF-16'),
                         CbSelectItem(value: 'iso-8859-1', label: 'ISO-8859-1'),
@@ -329,15 +347,15 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
                     const SizedBox(height: 16),
 
                     // Video Output Format
-                    const Text(
-                      'Video Output Format:',
+                    Text(
+                      context.tr.vpOutputFormat,
                       style: TextStyle(fontWeight: FontWeight.bold),
                     ),
                     CbSelect<String>(
                       value: _videoOutputFormat,
                       expand: true,
-                      items: const [
-                        CbSelectItem(value: 'auto', label: 'Auto'),
+                      items: [
+                        CbSelectItem(value: 'auto', label: context.tr.vpAuto),
                         CbSelectItem(value: 'yuv420p', label: 'YUV420P'),
                         CbSelectItem(value: 'rgb24', label: 'RGB24'),
                       ],
@@ -388,11 +406,11 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
                     _resetSettings();
                     setDialogState(() {});
                   },
-                  child: const Text('Reset to Default'),
+                  child: Text(context.tr.vpResetToDefault),
                 ),
                 TextButton(
                   onPressed: () => RouteUtils.safePopDialog(context),
-                  child: const Text('Close'),
+                  child: Text(context.tr.close),
                 ),
               ],
             );

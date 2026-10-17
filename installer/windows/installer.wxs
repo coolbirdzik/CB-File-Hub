@@ -25,6 +25,7 @@
       <ComponentGroupRef Id="ProductComponents" />
       <ComponentRef Id="ApplicationShortcut" />
       <ComponentRef Id="DesktopShortcut" />
+      <ComponentRef Id="TorrentAssociations" />
     </Feature>
 
     <!-- UI -->
@@ -57,6 +58,23 @@
 
   <Fragment>
     <!-- ProductComponents is generated at build time from the Windows Release bundle. -->
+    <DirectoryRef Id="INSTALLFOLDER">
+      <Component Id="TorrentAssociations" Guid="*">
+        <RegistryValue Root="HKLM" Key="Software\Classes\CBFileHub.File.torrent" Type="string" Value="CB File Hub Torrent" KeyPath="yes" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\CBFileHub.File.torrent\DefaultIcon" Type="string" Value="&quot;[INSTALLFOLDER]cb_file_hub.exe&quot;,0" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\CBFileHub.File.torrent\shell\open\command" Type="string" Value="&quot;[INSTALLFOLDER]cb_file_hub.exe&quot; --open-torrent &quot;%1&quot;" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\.torrent\OpenWithProgids" Name="CBFileHub.File.torrent" Type="string" Value="" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\CBFileHub.Magnet" Type="string" Value="CB File Hub Magnet Link" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\CBFileHub.Magnet" Name="URL Protocol" Type="string" Value="" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\CBFileHub.Magnet\DefaultIcon" Type="string" Value="&quot;[INSTALLFOLDER]cb_file_hub.exe&quot;,0" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\CBFileHub.Magnet\shell\open\command" Type="string" Value="&quot;[INSTALLFOLDER]cb_file_hub.exe&quot; --open-torrent &quot;%1&quot;" />
+        <RegistryValue Root="HKLM" Key="Software\COOLBIRDZIK\CB File Hub\Capabilities" Name="ApplicationName" Type="string" Value="CB File Hub" />
+        <RegistryValue Root="HKLM" Key="Software\COOLBIRDZIK\CB File Hub\Capabilities" Name="ApplicationDescription" Type="string" Value="Torrent library and file manager" />
+        <RegistryValue Root="HKLM" Key="Software\COOLBIRDZIK\CB File Hub\Capabilities\FileAssociations" Name=".torrent" Type="string" Value="CBFileHub.File.torrent" />
+        <RegistryValue Root="HKLM" Key="Software\COOLBIRDZIK\CB File Hub\Capabilities\URLAssociations" Name="magnet" Type="string" Value="CBFileHub.Magnet" />
+        <RegistryValue Root="HKLM" Key="Software\RegisteredApplications" Name="CB File Hub" Type="string" Value="Software\COOLBIRDZIK\CB File Hub\Capabilities" />
+      </Component>
+    </DirectoryRef>
 
     <!-- Start Menu Shortcut -->
     <DirectoryRef Id="ApplicationProgramsFolder">

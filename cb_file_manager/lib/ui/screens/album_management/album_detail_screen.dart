@@ -51,6 +51,7 @@ import 'package:cb_file_manager/bloc/selection/selection_state.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tabbed_folder/tabbed_folder_drag_selection_controller.dart';
 import 'album_image_tile.dart';
 import 'package:cb_file_manager/ui/widgets/slim_progress_bar.dart';
+import 'package:cb_file_manager/config/translation_helper.dart';
 
 class AlbumDetailScreen extends StatefulWidget {
   final Album album;
@@ -245,10 +246,8 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
             builder: (_) => dialog,
           ),
       dialog: AlertDialog(
-        title: Text('Remove $count ${count == 1 ? 'image' : 'images'}?'),
-        content: const Text(
-          'Remove selected images from this album? The original files will not be deleted.',
-        ),
+        title: Text(context.tr.albumRemoveImagesTitle(count)),
+        content: Text(context.tr.albumRemoveImagesBody),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -259,7 +258,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
             style: TextButton.styleFrom(
               foregroundColor: Theme.of(context).colorScheme.error,
             ),
-            child: const Text('Remove'),
+            child: Text(context.tr.remove),
           ),
         ],
       ),
@@ -378,8 +377,12 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
   String _smartStatusText() {
     final last = _lastScanTime != null
         ? DateFormat('HH:mm dd/MM').format(_lastScanTime!)
-        : 'Never';
-    return '$_activeRulesCount rules • $_sourceFoldersCount sources • Last: $last';
+        : context.tr.albumNever;
+    return context.tr.albumSmartStatus(
+      _activeRulesCount,
+      _sourceFoldersCount,
+      last,
+    );
   }
 
   Future<void> _loadViewPreferences() async {
@@ -425,14 +428,16 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
         _totalProgress = progress['total'] ?? 0;
         switch (progress['status']) {
           case 'scanning':
-            _progressStatus = 'Scanning files...';
+            _progressStatus = context.tr.albumScanningFiles;
             break;
           case 'processing':
-            _progressStatus =
-                'Adding files... ($_currentProgress/$_totalProgress)';
+            _progressStatus = context.tr.albumAddingFiles(
+              _currentProgress,
+              _totalProgress,
+            );
             break;
           case 'completed':
-            _progressStatus = 'Completed!';
+            _progressStatus = context.tr.albumCompleted;
             Future.delayed(const Duration(seconds: 2), () {
               if (mounted) setState(() => _isBackgroundProcessing = false);
             });
@@ -505,7 +510,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
         _cancelSmartScan = false;
         _isBackgroundProcessing = true;
         _isLoading = false;
-        _progressStatus = 'Scanning...';
+        _progressStatus = context.tr.albumScanning;
         _currentProgress = 0;
         _totalProgress = 0;
       });
@@ -518,7 +523,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
       if (mounted) {
         setState(() {
           _isBackgroundProcessing = false;
-          _progressStatus = 'No scan locations configured';
+          _progressStatus = context.tr.albumNoScanLocations;
         });
       }
       return;
@@ -547,7 +552,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                   if (matched % 10 == 0 || processed % 100 == 0) {
                     setState(() {
                       _applyFiltersAndOrder();
-                      _progressStatus = 'Scanning... found $matched';
+                      _progressStatus = context.tr.albumScanningFound(matched);
                     });
                   }
                 }
@@ -570,7 +575,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
         _applyFiltersAndOrder();
         _isLoading = false;
         _isBackgroundProcessing = false;
-        _progressStatus = 'Completed! Found $matched files';
+        _progressStatus = context.tr.albumCompletedFound(matched);
       });
       _updateThumbnailPriorityMap();
       // Open the gate: scan done, thumbnails can start generating.
@@ -639,7 +644,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
         List<String> localRoots = List.from(roots);
         return StatefulBuilder(
           builder: (context, setState) => AlertDialog(
-            title: const Text('Scan Locations'),
+            title: Text(context.tr.albumScanLocations),
             content: SizedBox(
               width: 420,
               child: Column(
@@ -649,7 +654,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                     Padding(
                       padding: const EdgeInsets.only(bottom: 8.0),
                       child: Text(
-                        'No locations selected. Add folders to scan for this album.',
+                        context.tr.albumNoLocationsSelected,
                         style: TextStyle(
                           color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
@@ -694,7 +699,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                         }
                       },
                       icon: const Icon(PhosphorIconsLight.plus),
-                      label: const Text('Add folder'),
+                      label: Text(context.tr.albumAddFolder),
                     ),
                   ),
                 ],
@@ -703,7 +708,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
+                child: Text(context.tr.cancel),
               ),
               ElevatedButton(
                 onPressed: () async {
@@ -719,7 +724,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                     _scanSmartAlbumImages();
                   }
                 },
-                child: const Text('Save'),
+                child: Text(context.tr.save),
               ),
             ],
           ),
@@ -979,35 +984,35 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
       onGridZoomChanged: _applyGridSize,
       onSelectionModeToggled: _toggleSelectionMode,
       additionalMoreOptions: [
-        const PopupMenuItem(
+        PopupMenuItem(
           value: 'edit_album',
           child: Row(
             children: [
               Icon(PhosphorIconsLight.pencilSimple),
               SizedBox(width: 8),
-              Text('Edit Album'),
+              Text(context.tr.albumEditAlbum),
             ],
           ),
         ),
         if (_searchQuery?.isNotEmpty ?? false)
-          const PopupMenuItem(
+          PopupMenuItem(
             value: 'clear_album_search',
             child: Row(
               children: [
                 Icon(PhosphorIconsLight.x),
                 SizedBox(width: 8),
-                Text('Clear Search'),
+                Text(context.tr.clearSearch),
               ],
             ),
           ),
         if (_isSmartAlbum)
-          const PopupMenuItem(
+          PopupMenuItem(
             value: 'manage_album_rules',
             child: Row(
               children: [
                 Icon(PhosphorIconsLight.faders),
                 SizedBox(width: 8),
-                Text('Manage Rules'),
+                Text(context.tr.albumManageRules),
               ],
             ),
           ),
@@ -1020,7 +1025,9 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
       IconButton(
         icon: const Icon(PhosphorIconsLight.shuffle),
         color: _isShuffled ? Theme.of(context).colorScheme.primary : null,
-        tooltip: _isShuffled ? 'Unshuffle' : 'Shuffle',
+        tooltip: _isShuffled
+            ? context.tr.albumUnshuffle
+            : context.tr.albumShuffle,
         onPressed: _toggleShuffle,
       ),
     );
@@ -1029,7 +1036,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
       IconButton(
         icon: const Icon(PhosphorIconsLight.plus),
         onPressed: _showAddFilesMenu,
-        tooltip: 'Add images',
+        tooltip: context.tr.albumAddImagesTooltip,
       ),
     );
     return [
@@ -1039,13 +1046,13 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
       if (isDesktop && hasSelection)
         IconButton(
           icon: const Icon(PhosphorIconsLight.minusCircle),
-          tooltip: 'Remove from album',
+          tooltip: context.tr.albumRemoveFromAlbum,
           onPressed: () => _removeSelectedFiles(sel.selectedFilePaths),
         ),
       if (isDesktop && hasSelection)
         IconButton(
           icon: const Icon(PhosphorIconsLight.trash),
-          tooltip: 'Move selected files to Trash Bin',
+          tooltip: context.tr.albumMoveSelectedToTrash,
           onPressed: () => _deleteSelectedFilesFromDisk(sel.selectedFilePaths),
         ),
       ...commonActions,
@@ -1088,21 +1095,21 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
     return [
       IconButton(
         icon: const Icon(PhosphorIconsLight.minusCircle),
-        tooltip: 'Remove from album',
+        tooltip: context.tr.albumRemoveFromAlbum,
         onPressed: count == 0
             ? null
             : () => _removeSelectedFiles(sel.selectedFilePaths),
       ),
       IconButton(
         icon: const Icon(PhosphorIconsLight.trash),
-        tooltip: 'Move selected files to Trash Bin',
+        tooltip: context.tr.albumMoveSelectedToTrash,
         onPressed: count == 0
             ? null
             : () => _deleteSelectedFilesFromDisk(sel.selectedFilePaths),
       ),
       IconButton(
         icon: const Icon(PhosphorIconsLight.checkSquare),
-        tooltip: count == total ? 'Deselect all' : 'Select all',
+        tooltip: count == total ? context.tr.deselectAll : context.tr.selectAll,
         onPressed: () {
           if (count == total) {
             _clearSelection();
@@ -1113,7 +1120,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
       ),
       IconButton(
         icon: const Icon(PhosphorIconsLight.x),
-        tooltip: 'Cancel selection',
+        tooltip: context.tr.cancelSelection,
         onPressed: _clearSelection,
       ),
     ];
@@ -1154,7 +1161,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
               currentPath: '#album/${widget.album.id}',
               tabId: widget.tabId,
               initialQuery: _searchQuery,
-              hintText: 'Search images in ${widget.album.name}',
+              hintText: context.tr.albumSearchImagesIn(widget.album.name),
               onQueryChanged: _setSearchQuery,
               onClearSearch: () => _setSearchQuery(''),
               onCloseSearch: _closeSearchBar,
@@ -1218,9 +1225,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Text(
-                                      'Smart Album (dynamic by rules)',
-                                    ),
+                                    Text(context.tr.albumSmartLabel),
                                     const SizedBox(height: 2),
                                     Text(
                                       _smartStatusText(),
@@ -1234,17 +1239,17 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                               TextButton.icon(
                                 onPressed: _showManageSourcesDialog,
                                 icon: const Icon(PhosphorIconsLight.folderOpen),
-                                label: const Text('Sources'),
+                                label: Text(context.tr.albumSources),
                               ),
                               if (_isBackgroundProcessing)
                                 TextButton.icon(
                                   onPressed: () => setState(() {
                                     _cancelSmartScan = true;
                                     _isBackgroundProcessing = false;
-                                    _progressStatus = 'Canceled';
+                                    _progressStatus = context.tr.albumCanceled;
                                   }),
                                   icon: const Icon(PhosphorIconsLight.x),
-                                  label: const Text('Cancel'),
+                                  label: Text(context.tr.cancel),
                                 ),
                               const SizedBox(width: 8),
                               TextButton.icon(
@@ -1257,7 +1262,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                                 icon: const Icon(
                                   PhosphorIconsLight.arrowsClockwise,
                                 ),
-                                label: const Text('Rescan'),
+                                label: Text(context.tr.albumRescan),
                               ),
                               TextButton.icon(
                                 onPressed: () async {
@@ -1277,7 +1282,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                                   }
                                 },
                                 icon: const Icon(PhosphorIconsLight.faders),
-                                label: const Text('Rules'),
+                                label: Text(context.tr.albumRules),
                               ),
                             ],
                           ),
@@ -1396,7 +1401,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                 ? null
                 : FloatingActionButton(
                     onPressed: _showAddFilesMenu,
-                    tooltip: 'Add images',
+                    tooltip: context.tr.albumAddImagesTooltip,
                     child: const Icon(PhosphorIconsLight.plus),
                   ),
           );
@@ -1447,10 +1452,10 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
       color: Theme.of(context).colorScheme.surfaceContainerLow,
       child: Row(
         children: [
-          Expanded(flex: 5, child: Text('Name', style: style)),
-          Expanded(flex: 2, child: Text('Type', style: style)),
-          Expanded(flex: 2, child: Text('Size', style: style)),
-          Expanded(flex: 3, child: Text('Modified', style: style)),
+          Expanded(flex: 5, child: Text(context.tr.columnName, style: style)),
+          Expanded(flex: 2, child: Text(context.tr.columnType, style: style)),
+          Expanded(flex: 2, child: Text(context.tr.columnSize, style: style)),
+          Expanded(flex: 3, child: Text(context.tr.fileModified, style: style)),
         ],
       ),
     );
@@ -1739,8 +1744,8 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
           const SizedBox(height: 16),
           Text(
             _searchQuery == null || _searchQuery!.isEmpty
-                ? 'No images in this album'
-                : 'No images match your search',
+                ? context.tr.albumNoImages
+                : context.tr.albumNoImagesMatch,
             style: TextStyle(
               fontSize: 18,
               color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -1748,7 +1753,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Add images to start building your album',
+            context.tr.albumAddImagesHint,
             style: TextStyle(
               fontSize: 14,
               color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -1759,7 +1764,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
           ElevatedButton.icon(
             onPressed: _showAddFilesMenu,
             icon: const Icon(PhosphorIconsLight.images),
-            label: const Text('Add Images'),
+            label: Text(context.tr.albumAddImages),
             style: ElevatedButton.styleFrom(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
             ),

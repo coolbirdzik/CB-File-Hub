@@ -5,6 +5,7 @@ import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../../models/ai/ai_message.dart';
+import 'package:cb_file_manager/config/translation_helper.dart';
 
 /// Collapsible chip rendering a single [AiToolCall] in the chat stream.
 ///
@@ -168,7 +169,9 @@ class _ToolCallChipState extends State<ToolCallChip> {
                             borderRadius: BorderRadius.circular(3),
                           ),
                           child: Text(
-                            isSuccess ? 'OK' : 'FAILED',
+                            isSuccess
+                                ? context.tr.aiToolOk
+                                : context.tr.aiToolFailed,
                             style: TextStyle(
                               fontSize: 9,
                               fontWeight: FontWeight.w700,

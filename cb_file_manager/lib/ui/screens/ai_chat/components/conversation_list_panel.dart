@@ -6,6 +6,7 @@ import '../../../../bloc/ai_agent/ai_agent.dart';
 import '../../../../config/languages/app_localizations.dart';
 import '../../../../design_system/primitives/cb_tooltip.dart';
 import '../../../../models/ai/ai_conversation.dart';
+import 'package:cb_file_manager/config/translation_helper.dart';
 
 /// Side drawer listing saved conversations.
 ///
@@ -251,7 +252,7 @@ class _ConversationTileState extends State<_ConversationTile> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        _subtitle(widget.conversation),
+                        _subtitle(context, widget.conversation),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -282,18 +283,18 @@ class _ConversationTileState extends State<_ConversationTile> {
     );
   }
 
-  static String _subtitle(AiConversationSummary conv) {
-    final date = _relativeDate(conv.updatedAt);
+  static String _subtitle(BuildContext context, AiConversationSummary conv) {
+    final date = _relativeDate(context, conv.updatedAt);
     if (conv.initialPath.isEmpty) return date;
     return '${conv.initialPathShort} · $date';
   }
 
-  static String _relativeDate(DateTime dt) {
+  static String _relativeDate(BuildContext context, DateTime dt) {
     final diff = DateTime.now().difference(dt);
-    if (diff.inSeconds < 60) return 'Just now';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-    if (diff.inHours < 24) return '${diff.inHours}h ago';
-    if (diff.inDays < 7) return '${diff.inDays}d ago';
+    if (diff.inSeconds < 60) return context.tr.aiJustNow;
+    if (diff.inMinutes < 60) return context.tr.aiMinutesAgo(diff.inMinutes);
+    if (diff.inHours < 24) return context.tr.aiHoursAgo(diff.inHours);
+    if (diff.inDays < 7) return context.tr.aiDaysAgo(diff.inDays);
     return '${dt.day}/${dt.month}/${dt.year}';
   }
 }

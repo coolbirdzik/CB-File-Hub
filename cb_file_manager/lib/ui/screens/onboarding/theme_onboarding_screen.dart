@@ -5,6 +5,7 @@ import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
 
+import '../../../config/language_controller.dart';
 import '../../../config/translation_helper.dart';
 import '../../../config/theme_config.dart';
 import '../../../providers/theme_provider.dart';
@@ -24,6 +25,7 @@ class ThemeOnboardingScreen extends StatefulWidget {
 }
 
 class _ThemeOnboardingScreenState extends State<ThemeOnboardingScreen> {
+  final LanguageController _languageController = LanguageController();
   AppThemeType? _selectedTheme;
   bool _saving = false;
   bool _showContent = false;
@@ -51,6 +53,15 @@ class _ThemeOnboardingScreenState extends State<ThemeOnboardingScreen> {
 
     setState(() => _selectedTheme = themeType);
     await context.read<ThemeProvider>().setTheme(themeType);
+  }
+
+  Future<void> _selectLanguage(String languageCode) async {
+    if (_saving ||
+        _languageController.currentLocale.languageCode == languageCode) {
+      return;
+    }
+    await _languageController.changeLanguage(languageCode);
+    if (mounted) setState(() {});
   }
 
   Future<void> _continue() async {
@@ -101,6 +112,45 @@ class _ThemeOnboardingScreenState extends State<ThemeOnboardingScreen> {
                 ],
               ),
       ),
+    );
+  }
+
+  Widget _buildLanguagePicker(BuildContext context) {
+    final theme = Theme.of(context);
+    final current = _languageController.currentLocale.languageCode;
+    return Column(
+      children: [
+        Text(
+          context.tr.languageOnboardingTitle,
+          textAlign: TextAlign.center,
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          context.tr.languageOnboardingDescription,
+          textAlign: TextAlign.center,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+            height: 1.3,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          alignment: WrapAlignment.center,
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final code in _languageController.supportedLanguages)
+              ChoiceChip(
+                label: Text(_languageController.getLanguageName(code)),
+                selected: current == code,
+                onSelected: (_) => _selectLanguage(code),
+              ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -194,7 +244,9 @@ class _ThemeOnboardingScreenState extends State<ThemeOnboardingScreen> {
                               height: 1.35,
                             ),
                           ),
-                          const SizedBox(height: 36),
+                          const SizedBox(height: 28),
+                          _buildLanguagePicker(context),
+                          const SizedBox(height: 28),
                           Column(
                             children: [
                               _ThemeCardOption(

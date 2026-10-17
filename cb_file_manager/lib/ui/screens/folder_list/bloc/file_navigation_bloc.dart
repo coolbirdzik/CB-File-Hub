@@ -1,6 +1,7 @@
 import 'package:cb_file_manager/helpers/core/search_request_guard.dart';
 import 'package:cb_file_manager/helpers/core/search_query.dart';
 import 'dart:async';
+import 'package:cb_file_manager/config/languages/current_localizations.dart';
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart' show compute;
@@ -248,7 +249,7 @@ class FileNavigationBloc
         emit(
           state.copyWith(
             isLoading: false,
-            error: 'Directory does not exist: ${event.path}',
+            error: currentL10n.directoryDoesNotExist(event.path),
           ),
         );
         return;
@@ -262,7 +263,7 @@ class FileNavigationBloc
           emit(
             state.copyWith(
               isLoading: false,
-              error: 'Storage permission required',
+              error: currentL10n.fnStoragePermission,
             ),
           );
           return;
@@ -447,10 +448,7 @@ class FileNavigationBloc
       final directory = Directory(event.path);
       if (!await directory.exists()) {
         emit(
-          state.copyWith(
-            isRefreshing: false,
-            error: 'Directory does not exist',
-          ),
+          state.copyWith(isRefreshing: false, error: currentL10n.fnDirNotExist),
         );
         return;
       }
@@ -658,7 +656,7 @@ class FileNavigationBloc
       emit(
         state.copyWith(
           isLoading: false,
-          error: 'Error sorting: ${e.toString()}',
+          error: currentL10n.fnErrorSorting(e.toString()),
         ),
       );
     }
@@ -703,7 +701,7 @@ class FileNavigationBloc
           emit(
             state.copyWith(
               isLoading: false,
-              error: 'Invalid regex: ${e.message}',
+              error: currentL10n.fnInvalidRegex(e.message),
             ),
           );
           return;
@@ -756,7 +754,7 @@ class FileNavigationBloc
       emit(
         state.copyWith(
           isLoading: false,
-          error: 'Search error: ${e.toString()}',
+          error: currentL10n.searchError(e.toString()),
         ),
       );
     }
@@ -1014,7 +1012,7 @@ class FileNavigationBloc
         state.copyWith(
           isLoading: false,
           isRefreshing: false,
-          error: 'Access denied. Try running as administrator.',
+          error: currentL10n.fnAccessDeniedAdmin,
           folders: [],
           files: [],
         ),

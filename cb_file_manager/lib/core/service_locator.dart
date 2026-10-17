@@ -23,6 +23,7 @@ import '../services/tab_activity/tab_activity_manager.dart';
 import '../services/tab_activity/tab_cache_release_helper.dart';
 import '../services/file_metadata_service.dart';
 import '../services/archive/archive_service.dart';
+import '../services/torrent/torrent_service.dart';
 
 /// Global service locator instance
 final GetIt locator = GetIt.instance;
@@ -136,6 +137,7 @@ Future<void> setupServiceLocator() async {
   );
 
   locator.registerLazySingleton<ArchiveService>(() => ArchiveService());
+  locator.registerLazySingleton<TorrentService>(() => TorrentService.instance);
 
   // Disk cleaner skill — Windows-only, used both by the AI agent's
   // disk_cleaner tools and the companion CB Agent Cleaner screen.

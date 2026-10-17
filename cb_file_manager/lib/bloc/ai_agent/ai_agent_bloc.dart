@@ -736,11 +736,12 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
 
     CleanerReviewRun? run;
     try {
-      showProgress(
-        event.cleanerReviewLanguageCode == 'vi'
-            ? 'Đang nhận diện nhanh dữ liệu từ kết quả quét…'
-            : 'Preparing a quick overview from scan metadata…',
-      );
+      showProgress(switch (event.cleanerReviewLanguageCode) {
+        'vi' => 'Đang nhận diện nhanh dữ liệu từ kết quả quét…',
+        'tr' => 'Tarama meta verilerinden hızlı bir genel bakış hazırlanıyor…',
+        'zh' => '正在根据扫描元数据准备快速概览…',
+        _ => 'Preparing a quick overview from scan metadata…',
+      });
       run = CleanerReviewRun(
         _toolExecutor.ownerTabId,
         languageCode: event.cleanerReviewLanguageCode,
@@ -963,7 +964,12 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
           ? ''
           : '\n${run.review.reviewed} / ${run.review.total}';
       showProgress(
-        '${event.cleanerReviewLanguageCode == 'vi' ? 'Phân tích chưa hoàn tất' : 'Review incomplete'}$progress',
+        '${switch (event.cleanerReviewLanguageCode) {
+          'vi' => 'Phân tích chưa hoàn tất',
+          'tr' => 'Analiz tamamlanmadı',
+          'zh' => '分析未完成',
+          _ => 'Review incomplete',
+        }}$progress',
         loading: false,
         error: error.toString(),
       );

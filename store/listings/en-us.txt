@@ -1,0 +1,16 @@
+CB File Hub brings your files, media and remote storage into one app.
+
+- Browse folders in tabs, use split view, pin locations and restore your workspace.
+- Choose list, grid, details, tree or column views. Search, sort and select multiple files, with on-demand loading for large folders.
+- View photos, edit images and browse video libraries. Play media with subtitles and audio tracks; use picture-in-picture on desktop.
+- Organize collections with tags, albums and automatic album rules.
+- Connect to SMB, FTP, SFTP and WebDAV storage. Manage SSH connections and use the built-in terminal.
+- Keep .torrent files and magnet links in one searchable library. Merge duplicates, copy magnet links and choose where files are stored.
+- On desktop, download torrents, choose a destination, pause and resume. Import saved torrents from other clients, including qBittorrent backups on Windows.
+- Ask CB Agent to find and organize files. Compatible local GGUF models are optional on desktop.
+- Review and remove unwanted files with the Windows disk cleaner.
+- Browse and extract ZIP and other supported archives. Additional 7z/RAR tools use an installed 7-Zip on Windows.
+- Back up settings and tags, with available Google Drive, Dropbox and OneDrive integrations.
+- Choose light or dark themes, accent colors and your interface language.
+
+Features vary by platform. Network, cloud backup and AI services may require accounts or additional setup.

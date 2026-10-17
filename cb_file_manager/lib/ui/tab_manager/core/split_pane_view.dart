@@ -9,6 +9,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import 'tab_manager.dart';
 import 'tabbed_folder/tabbed_folder_list_screen.dart';
+import 'package:cb_file_manager/config/translation_helper.dart';
 
 /// Which pane is currently focused in a split-pane view.
 enum SplitPaneFocus { left, right }
@@ -308,7 +309,7 @@ class _CloseSplitButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return IconButton(
       icon: const Icon(PhosphorIconsLight.columns),
-      tooltip: 'Close split view',
+      tooltip: context.tr.closeSplitView,
       onPressed: () {
         context.read<TabManagerBloc>().add(CloseSplitPane(tabId: tabId));
       },

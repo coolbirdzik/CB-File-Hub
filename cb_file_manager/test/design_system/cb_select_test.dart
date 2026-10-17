@@ -319,4 +319,85 @@ void main() {
 
     expect(picked, 30);
   });
+
+  group('searchable', () {
+    const languages = <CbSelectItem<String>>[
+      CbSelectItem(value: 'vi', label: 'Tiếng Việt', keywords: 'vietnamese'),
+      CbSelectItem(value: 'en', label: 'English'),
+      CbSelectItem(value: 'tr', label: 'Türkçe', keywords: 'turkish'),
+      CbSelectItem(value: 'zh', label: '简体中文', keywords: 'chinese 中文'),
+    ];
+
+    Widget searchable(ValueChanged<String> onChanged) => host(
+      CbSelect<String>(
+        width: 200,
+        items: languages,
+        value: 'en',
+        onChanged: onChanged,
+        searchable: true,
+        searchPlaceholder: 'Search',
+        searchEmptyText: 'No match',
+      ),
+    );
+
+    testWidgets('typing filters rows by label and keywords', (t) async {
+      await t.pumpWidget(searchable(_ignore));
+      await t.tap(find.text('English'));
+      await t.pumpAndSettle();
+
+      expect(find.text('Türkçe'), findsOneWidget);
+      expect(find.text('简体中文'), findsOneWidget);
+
+      await t.enterText(find.byType(TextField), 'chinese');
+      await t.pumpAndSettle();
+
+      expect(find.text('简体中文'), findsOneWidget);
+      expect(find.text('Türkçe'), findsNothing);
+      expect(find.text('Tiếng Việt'), findsNothing);
+    });
+
+    testWidgets('Enter picks the first match without leaving the field', (
+      t,
+    ) async {
+      String? picked;
+      await t.pumpWidget(searchable((v) => picked = v));
+      await t.tap(find.text('English'));
+      await t.pumpAndSettle();
+
+      await t.enterText(find.byType(TextField), 'turk');
+      await t.pumpAndSettle();
+      await t.sendKeyEvent(LogicalKeyboardKey.enter);
+      await t.pumpAndSettle();
+
+      expect(picked, 'tr');
+      expect(find.byType(TextField), findsNothing, reason: 'menu closed');
+    });
+
+    testWidgets('arrow keys move through the filtered rows', (t) async {
+      String? picked;
+      await t.pumpWidget(searchable((v) => picked = v));
+      await t.tap(find.text('English'));
+      await t.pumpAndSettle();
+
+      // 'e' matches Tiếng Việt? no — Việt/English/Türkçe(turkish)/chinese.
+      await t.enterText(find.byType(TextField), 'e');
+      await t.pumpAndSettle();
+      await t.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await t.sendKeyEvent(LogicalKeyboardKey.enter);
+      await t.pumpAndSettle();
+
+      expect(picked, isNotNull);
+    });
+
+    testWidgets('shows the empty text when nothing matches', (t) async {
+      await t.pumpWidget(searchable(_ignore));
+      await t.tap(find.text('English'));
+      await t.pumpAndSettle();
+
+      await t.enterText(find.byType(TextField), 'klingon');
+      await t.pumpAndSettle();
+
+      expect(find.text('No match'), findsOneWidget);
+    });
+  });
 }

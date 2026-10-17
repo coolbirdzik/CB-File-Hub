@@ -21,6 +21,7 @@ import '../../../components/common/optimized_interaction_handler.dart';
 import '../../../components/common/shared_file_context_menu.dart';
 import '../../../utils/item_interaction_style.dart';
 import 'thumbnail_only.dart';
+import '../../../components/common/file_entry_presentation.dart';
 
 class FileGridItem extends StatefulWidget {
   final FileSystemEntity file;
@@ -287,7 +288,11 @@ class _FileGridItemState extends State<FileGridItem> {
 
   Widget _buildItem(BuildContext context, bool isVisuallySelected) {
     final ThemeData theme = Theme.of(context);
-    final String fileName = FileTypeUtils.getFileName(widget.file.path);
+    final String fileName = FileEntryPresentation.nameOf(
+      context,
+      widget.file.path,
+      fallback: FileTypeUtils.getFileName(widget.file.path),
+    );
     final bool isBeingCut = ItemInteractionStyle.isBeingCut(widget.file.path);
 
     // Check if this item is being renamed inline (desktop only)

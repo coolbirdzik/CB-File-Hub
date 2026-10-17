@@ -23,6 +23,7 @@ class SearchBar extends StatefulWidget {
   final void Function(String query, bool useRegex)? onSearchWithOptions;
   final void Function(List<String> tags, bool isGlobalSearch)? onTagSearch;
   final ValueChanged<String>? onQueryChanged;
+  final ValueChanged<bool>? onRegexChanged;
   final VoidCallback? onClearSearch;
   final String? hintText;
   final bool showTipsButton;
@@ -48,6 +49,7 @@ class SearchBar extends StatefulWidget {
     this.onSearchWithOptions,
     this.onTagSearch,
     this.onQueryChanged,
+    this.onRegexChanged,
     this.onClearSearch,
     this.hintText,
     this.showTipsButton = true,
@@ -937,6 +939,7 @@ class _SearchBarState extends State<SearchBar> {
                       setState(() {
                         _useRegex = !_useRegex;
                       });
+                      widget.onRegexChanged?.call(_useRegex);
                       final messenger = ScaffoldMessenger.maybeOf(context);
                       messenger?.showSnackBar(
                         SnackBar(

@@ -9,6 +9,7 @@ import '../../../config/languages/app_localizations.dart';
 import '../../../models/ai/ai_provider_model.dart';
 import '../../../services/ai/ai_provider_service.dart';
 import '../../../services/ai/providers/codex_cli_provider.dart';
+import 'package:cb_file_manager/config/translation_helper.dart';
 
 /// AI Settings section widget for the settings screen.
 ///
@@ -564,7 +565,7 @@ class _ProviderFormDialogState extends State<_ProviderFormDialog> {
                   controller: _nameController,
                   decoration: InputDecoration(
                     labelText: l.providerName,
-                    hintText: 'My OpenAI',
+                    hintText: l.aiProviderNameHint,
                   ),
                   validator: (v) =>
                       v == null || v.trim().isEmpty ? 'Required' : null,
@@ -906,7 +907,7 @@ class _ProviderFormDialogState extends State<_ProviderFormDialog> {
                     controller: _systemPromptController,
                     decoration: InputDecoration(
                       labelText: l.systemPrompt,
-                      hintText: 'Optional custom system prompt...',
+                      hintText: l.aiSystemPromptHint,
                     ),
                     maxLines: 3,
                   ),
@@ -1051,7 +1052,7 @@ class _ProviderFormDialogState extends State<_ProviderFormDialog> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: $e'),
+            content: Text(context.tr.errorWithDetail(e.toString())),
             backgroundColor: Theme.of(context).colorScheme.error,
             behavior: SnackBarBehavior.floating,
           ),
@@ -1081,7 +1082,7 @@ class _ProviderFormDialogState extends State<_ProviderFormDialog> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error: $e'),
+          content: Text(context.tr.errorWithDetail(e.toString())),
           backgroundColor: Theme.of(context).colorScheme.error,
           behavior: SnackBarBehavior.floating,
         ),

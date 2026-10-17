@@ -45,6 +45,7 @@ import 'video_player_seek_preview.dart';
 import 'video_player_seek_slider.dart';
 import 'video_player_utils.dart';
 import 'video_playlist.dart';
+import 'package:cb_file_manager/config/translation_helper.dart';
 
 part 'video_player.volume.dart';
 part 'video_player.settings.dart';
@@ -1483,9 +1484,15 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
       right: 16,
       child: Column(
         children: [
-          StreamSpeedIndicator(stream: _currentStream, label: 'Stream Speed'),
+          StreamSpeedIndicator(
+            stream: _currentStream,
+            label: context.tr.vpStreamSpeed,
+          ),
           const SizedBox(height: 12),
-          BufferInfoWidget(stream: _currentStream, label: 'Buffer Info'),
+          BufferInfoWidget(
+            stream: _currentStream,
+            label: context.tr.vpBufferInfo,
+          ),
           const SizedBox(height: 12),
           Container(
             width: 200,
@@ -2055,7 +2062,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
                     VideoPlayerControlButton(
                       icon: PhosphorIconsLight.skipBack,
                       onPressed: () => _seekBackward(10),
-                      tooltip: 'Rewind 10s',
+                      tooltip: context.tr.vpRewind10,
                     ),
                     const SizedBox(width: 4),
                     _buildPlayPauseButton(),
@@ -2063,7 +2070,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
                     VideoPlayerControlButton(
                       icon: PhosphorIconsLight.skipForward,
                       onPressed: () => _seekForward(10),
-                      tooltip: 'Forward 10s',
+                      tooltip: context.tr.vpForward10,
                     ),
                     const Spacer(),
                     if (_hasPlaylist) ...[
@@ -2409,12 +2416,12 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
     RouteUtils.showAcrylicDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Audio Tracks'),
-        content: const Text('Audio track selection will be implemented here.'),
+        title: Text(context.tr.vpAudioTracks),
+        content: Text(context.tr.vpAudioTracksStub),
         actions: [
           TextButton(
             onPressed: () => RouteUtils.safePopDialog(context),
-            child: const Text('Close'),
+            child: Text(context.tr.close),
           ),
         ],
       ),

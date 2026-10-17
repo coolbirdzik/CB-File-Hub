@@ -10,6 +10,7 @@ import '../../../config/languages/app_localizations.dart';
 import '../../../models/local_ai/local_ai_advisor_model.dart';
 import '../../../services/local_ai/local_ai_advisor_service.dart';
 import '../../tab_manager/core/tab_main_screen.dart';
+import 'package:cb_file_manager/config/translation_helper.dart';
 
 /// Settings section for the Local AI Advisor.
 ///
@@ -489,7 +490,7 @@ class _LocalAiAdvisorSettingsSectionState
     if (token == null || token.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No token found in clipboard')),
+          SnackBar(content: Text(context.tr.laNoTokenInClipboard)),
         );
       }
       return;
@@ -520,7 +521,7 @@ class _LocalAiAdvisorSettingsSectionState
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(AppLocalizations.of(context)!.uninstallModel),
-        content: const Text('Remove this model from your device?'),
+        content: Text(context.tr.laRemoveModelConfirm),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
@@ -595,9 +596,11 @@ class _LocalAiAdvisorSettingsSectionState
       TabMainScreen.openPath(context, directory);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Failed to open location: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(context.tr.laOpenLocationFailed(e.toString())),
+          ),
+        );
       }
     }
   }
@@ -722,7 +725,7 @@ class _ModelCatalogTile extends StatelessWidget {
                 OutlinedButton.icon(
                   onPressed: null,
                   icon: const Icon(PhosphorIconsLight.warningCircle, size: 14),
-                  label: const Text('Runtime pending'),
+                  label: Text(context.tr.laRuntimePending),
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 12,
@@ -766,7 +769,8 @@ class _ModelCatalogTile extends StatelessWidget {
                   '${(entry.sizeBytes! / (1024 * 1024)).toStringAsFixed(0)} MB',
                 ),
               if (entry.license != null) _buildChip(context, entry.license!),
-              if (!entry.compatible) _buildChip(context, 'Requires GGUF'),
+              if (!entry.compatible)
+                _buildChip(context, context.tr.laRequiresGguf),
             ],
           ),
         ],
@@ -862,7 +866,7 @@ class _InstallProgressDialogState extends State<_InstallProgressDialog> {
 
     if (_error != null) {
       return AlertDialog(
-        title: const Text('Installation Failed'),
+        title: Text(context.tr.laInstallFailed),
         content: Text(_error!),
         actions: [
           TextButton(
@@ -906,7 +910,7 @@ class _InstallProgressDialogState extends State<_InstallProgressDialog> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  hasTotal ? '$percent%' : 'Downloading...',
+                  hasTotal ? '$percent%' : context.tr.laDownloading,
                   style: theme.textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                     color: theme.colorScheme.primary,

@@ -19,6 +19,16 @@ env:
   ONEDRIVE_CLIENT_ID: ${{ secrets.ONEDRIVE_CLIENT_ID }}
 
 jobs:
+  store-listings:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: '22'
+      - name: Validate shared Store descriptions and submission scripts
+        run: node --test scripts/tests/store_listings.test.mjs scripts/tests/google_play_listings.test.mjs
+
   # Analyze and test
   analyze:
     runs-on: ubuntu-latest
@@ -66,9 +76,11 @@ jobs:
       # The llama.cpp runtime (Vulkan DLLs + llama-server.exe) is not committed
       # to git. The integration test build runs CMake's INSTALL target, which
       # bundles these DLLs, so they must be present before the app is built.
-      - name: Fetch llama.cpp runtime
+      - name: Fetch llama.cpp and aria2 runtimes
         shell: bash
-        run: bash scripts/fetch_llama_runtime.sh
+        run: |
+          bash scripts/fetch_llama_runtime.sh
+          bash scripts/fetch_aria2_runtime.sh
 
       - name: Stop stray cb_file_hub.exe
         shell: cmd
@@ -191,9 +203,11 @@ jobs:
 
       # The llama.cpp runtime (Vulkan DLLs + llama-server.exe) is not committed
       # to git; fetch it before building so CMake can bundle it.
-      - name: Fetch llama.cpp runtime
+      - name: Fetch llama.cpp and aria2 runtimes
         shell: bash
-        run: bash scripts/fetch_llama_runtime.sh
+        run: |
+          bash scripts/fetch_llama_runtime.sh
+          bash scripts/fetch_aria2_runtime.sh
 
       - name: Build Windows
         shell: bash

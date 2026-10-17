@@ -31,6 +31,9 @@ class SelectionTagEditor extends StatefulWidget {
 }
 
 class _SelectionTagEditorState extends State<SelectionTagEditor> {
+  /// Chips shown per quick-pick group; they wrap, so more fit than one row.
+  static const _quickPickLimit = 16;
+
   final _inputKey = GlobalKey<ChipsInputState<String>>();
   final _hierarchy = TagHierarchyManager.instance;
   final _thumbnails = TagThumbnailManager.instance;
@@ -57,8 +60,8 @@ class _SelectionTagEditorState extends State<SelectionTagEditor> {
 
   void _loadQuickPicks() {
     _quickPicksRevision++;
-    _recentTags = TagManager.getRecentTags(limit: 6);
-    _popularTags = TagManager.instance.getPopularTags(limit: 6);
+    _recentTags = TagManager.getRecentTags(limit: _quickPickLimit);
+    _popularTags = TagManager.instance.getPopularTags(limit: _quickPickLimit);
   }
 
   @override
@@ -233,7 +236,7 @@ class _SelectionTagEditorState extends State<SelectionTagEditor> {
               ),
               const SizedBox(height: CbSpacing.md),
               RecentTagsWidget(
-                limit: 6,
+                limit: _quickPickLimit,
                 compact: true,
                 onTagSelected: _add,
                 loadRecentTags: (_) => _recentTags,
@@ -241,7 +244,7 @@ class _SelectionTagEditorState extends State<SelectionTagEditor> {
               ),
               const SizedBox(height: CbSpacing.md),
               PopularTagsWidget(
-                limit: 6,
+                limit: _quickPickLimit,
                 compact: true,
                 onTagSelected: _add,
                 loadPopularTags: (_) => _popularTags,

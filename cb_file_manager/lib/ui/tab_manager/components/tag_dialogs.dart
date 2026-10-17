@@ -531,9 +531,8 @@ class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
                         const SizedBox(height: 18),
                         _buildSectionCard(
                           icon: PhosphorIconsLight.sparkle,
-                          title: 'Quick Picks',
-                          subtitle:
-                              'Choose from popular and recently used tags',
+                          title: l10n.tagQuickPicks,
+                          subtitle: l10n.tagQuickPicksDesc,
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -552,8 +551,7 @@ class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
                   child: _buildSectionCard(
                     icon: PhosphorIconsLight.treeStructure,
                     title: l10n.allTags,
-                    subtitle:
-                        'Browse the tag tree — expand a parent to pick its children.',
+                    subtitle: l10n.tagBrowseTreeDesc,
                     expandChild: true,
                     child: TagBrowseSection(
                       selectedTags: _selectedTags,

@@ -7,6 +7,7 @@ import 'package:cb_file_manager/ui/components/app_update/app_update_dialog.dart'
 import 'package:cb_file_manager/ui/controllers/operation_progress_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:cb_file_manager/config/translation_helper.dart';
 
 class OperationProgressOverlay extends StatefulWidget {
   const OperationProgressOverlay({super.key});
@@ -517,7 +518,7 @@ class _StatusCenterPanelState extends State<StatusCenterPanel> {
                     if (finished.isNotEmpty)
                       TextButton(
                         onPressed: controller.dismissFinished,
-                        child: const Text('Clear completed'),
+                        child: Text(context.tr.clearCompleted),
                       ),
                   ],
                 ),
@@ -536,7 +537,7 @@ class _StatusCenterPanelState extends State<StatusCenterPanel> {
                       const AppUpdateStatusCard(),
                     ],
                     if (running.isNotEmpty) ...[
-                      const _SectionHeader(title: 'Running'),
+                      _SectionHeader(title: context.tr.running),
                       for (final entry in running)
                         _StatusCenterTaskTile(
                           entry: entry,
@@ -544,7 +545,7 @@ class _StatusCenterPanelState extends State<StatusCenterPanel> {
                         ),
                     ],
                     if (finished.isNotEmpty) ...[
-                      const _SectionHeader(title: 'Notifications'),
+                      _SectionHeader(title: context.tr.notifications),
                       for (final entry in finished)
                         _StatusCenterTaskTile(
                           entry: entry,
@@ -636,7 +637,7 @@ class _StatusCenterTaskTile extends StatelessWidget {
                 ),
                 if (entry.isFinished)
                   IconButton(
-                    tooltip: 'Dismiss',
+                    tooltip: context.tr.dismiss,
                     visualDensity: VisualDensity.compact,
                     onPressed: () => controller.dismiss(entry.id),
                     icon: const Icon(PhosphorIconsLight.x, size: 16),

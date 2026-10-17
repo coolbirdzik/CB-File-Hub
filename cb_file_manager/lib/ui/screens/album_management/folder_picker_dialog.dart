@@ -7,6 +7,7 @@ import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:cb_file_manager/ui/utils/route.dart';
 import 'package:path/path.dart' as path;
 import 'package:cb_file_manager/helpers/core/filesystem_utils.dart';
+import 'package:cb_file_manager/config/translation_helper.dart';
 
 class FolderPickerDialog extends StatefulWidget {
   final int albumId;
@@ -95,15 +96,15 @@ class _FolderPickerDialogState extends State<FolderPickerDialog> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Add Folder to Album'),
+        title: Text(context.tr.albumAddFolderToAlbum),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Add all images from this folder to the album?'),
+            Text(context.tr.albumAddAllFromFolder),
             const SizedBox(height: 8),
             Text(
-              'Folder: ${path.basename(_currentPath)}',
+              context.tr.albumFolderName(path.basename(_currentPath)),
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
@@ -117,7 +118,7 @@ class _FolderPickerDialogState extends State<FolderPickerDialog> {
                     });
                   },
                 ),
-                const Expanded(child: Text('Include images from subfolders')),
+                Expanded(child: Text(context.tr.albumIncludeSubfolders)),
               ],
             ),
           ],
@@ -125,11 +126,11 @@ class _FolderPickerDialogState extends State<FolderPickerDialog> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+            child: Text(context.tr.cancel),
           ),
           ElevatedButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Add Folder'),
+            child: Text(context.tr.albumAddFolderButton),
           ),
         ],
       ),
@@ -143,12 +144,12 @@ class _FolderPickerDialogState extends State<FolderPickerDialog> {
         // ignore: use_build_context_synchronously
         context: context,
         barrierDismissible: false,
-        builder: (context) => const AlertDialog(
+        builder: (context) => AlertDialog(
           content: Row(
             children: [
-              CircularProgressIndicator(),
-              SizedBox(width: 16),
-              Text('Adding folder to album...'),
+              const CircularProgressIndicator(),
+              const SizedBox(width: 16),
+              Text(context.tr.albumAddingFolder),
             ],
           ),
         ),
@@ -191,14 +192,14 @@ class _FolderPickerDialogState extends State<FolderPickerDialog> {
               final count = snapshot.data!;
               return Text(
                 count > 0
-                    ? '$count ${count == 1 ? 'image' : 'images'}'
-                    : 'No images',
+                    ? context.tr.albumImagesCountShort(count)
+                    : context.tr.albumNoImagesShort,
                 style: TextStyle(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               );
             }
-            return const Text('Counting...');
+            return Text(context.tr.albumCounting);
           },
         ),
         trailing: const Icon(PhosphorIconsLight.caretRight),
@@ -241,9 +242,9 @@ class _FolderPickerDialogState extends State<FolderPickerDialog> {
                     color: Colors.white,
                   ),
                   const SizedBox(width: 8),
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      'Select Folder',
+                      context.tr.albumSelectFolderTitle,
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 18,
@@ -273,7 +274,7 @@ class _FolderPickerDialogState extends State<FolderPickerDialog> {
                         onPressed: path.dirname(_currentPath) != _currentPath
                             ? _navigateUp
                             : null,
-                        tooltip: 'Go up',
+                        tooltip: context.tr.albumGoUp,
                       ),
                       Expanded(
                         child: Text(
@@ -298,9 +299,7 @@ class _FolderPickerDialogState extends State<FolderPickerDialog> {
                           });
                         },
                       ),
-                      const Expanded(
-                        child: Text('Include images from subfolders'),
-                      ),
+                      Expanded(child: Text(context.tr.albumIncludeSubfolders)),
                     ],
                   ),
                 ],
@@ -324,7 +323,7 @@ class _FolderPickerDialogState extends State<FolderPickerDialog> {
                           ),
                           const SizedBox(height: 16),
                           Text(
-                            'No folders found',
+                            context.tr.albumNoFoldersFound,
                             style: TextStyle(
                               fontSize: 16,
                               color: Theme.of(
@@ -349,7 +348,7 @@ class _FolderPickerDialogState extends State<FolderPickerDialog> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Current: ${path.basename(_currentPath)}',
+                    context.tr.albumCurrentFolder(path.basename(_currentPath)),
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                       fontSize: 14,
@@ -359,12 +358,12 @@ class _FolderPickerDialogState extends State<FolderPickerDialog> {
                     children: [
                       TextButton(
                         onPressed: () => RouteUtils.safePopDialog(context),
-                        child: const Text('Cancel'),
+                        child: Text(context.tr.cancel),
                       ),
                       const SizedBox(width: 8),
                       ElevatedButton(
                         onPressed: _addFolderToAlbum,
-                        child: const Text('Add This Folder'),
+                        child: Text(context.tr.albumAddThisFolder),
                       ),
                     ],
                   ),

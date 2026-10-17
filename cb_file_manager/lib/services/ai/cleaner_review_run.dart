@@ -56,6 +56,81 @@ class CleanerReviewRun {
     'downloads': 'Dữ liệu đã tải về',
     'personal_files': 'File cá nhân',
   };
+  static const _trCauseLabels = {
+    'hibernation_file': 'Windows hazırda bekletme dosyası',
+    'page_file': 'Windows sanal belleği',
+    'restore_points': 'Sistem geri yükleme noktaları',
+    'previous_windows': 'Geri dönmek için önceki Windows sürümü',
+    'recycle_bin': 'Geri Dönüşüm Kutusu',
+    'component_store': 'Windows sistem bileşenleri (WinSxS)',
+    'installer_cache':
+        'Uygulamaları onarmak/kaldırmak için yükleyici önbelleği',
+    'windows_update_download': 'İndirilen Windows güncelleme paketleri',
+    'crash_dumps': 'Uygulama çökme dökümleri ve kayıtları',
+    'temp_files': 'Geçici dosyalar',
+    'wsl_disk': 'WSL Linux diski',
+    'docker_data': 'Docker verileri',
+    'virtual_machine_disk': 'Sanal makine diski',
+    'android_dev': 'Android SDK ve emülatörler',
+    'ai_models': 'İndirilen yapay zeka modelleri',
+    'dev_package_cache': 'Geliştirme paketi önbelleği',
+    'node_modules': 'Proje JavaScript kütüphaneleri',
+    'game_library': 'Yüklü oyunlar',
+    'cloud_sync': 'Bulut senkronizasyon verileri',
+    'phone_backup': 'iPhone/iPad yedekleri',
+    'mail_data': 'Outlook posta verileri',
+    'downloads': 'İndirilen veriler',
+    'personal_files': 'Kişisel dosyalar',
+  };
+  static const _trCategoryLabels = {
+    'windows_temp': 'Windows/uygulama geçici dosyaları',
+    'browser_cache': 'Tarayıcı önbelleği',
+    'recycle_bin': 'Geri Dönüşüm Kutusu',
+    'thumbnail_cache': 'Küçük resim önbelleği',
+    'app_cache': 'Uygulama önbelleği',
+    'crash_dumps_logs': 'Çökme dökümleri ve günlükler',
+    'windows_update_cache': 'Windows Update önbelleği',
+    'prefetch': 'Uygulama başlatma önbelleği',
+    'delivery_optimization': 'Güncelleme dağıtım önbelleği',
+    'dev_cache': 'Geliştirici araçları önbelleği',
+  };
+  static const _zhCauseLabels = {
+    'hibernation_file': 'Windows 休眠文件',
+    'page_file': 'Windows 虚拟内存',
+    'restore_points': '系统还原点',
+    'previous_windows': '用于回退的旧版 Windows',
+    'recycle_bin': '回收站',
+    'component_store': 'Windows 系统组件 (WinSxS)',
+    'installer_cache': '用于修复/卸载应用的安装程序缓存',
+    'windows_update_download': '已下载的 Windows 更新包',
+    'crash_dumps': '应用崩溃转储和记录',
+    'temp_files': '临时文件',
+    'wsl_disk': 'WSL Linux 磁盘',
+    'docker_data': 'Docker 数据',
+    'virtual_machine_disk': '虚拟机磁盘',
+    'android_dev': 'Android SDK 和模拟器',
+    'ai_models': '已下载的 AI 模型',
+    'dev_package_cache': '开发软件包缓存',
+    'node_modules': '项目的 JavaScript 依赖库',
+    'game_library': '已安装的游戏',
+    'cloud_sync': '云同步数据',
+    'phone_backup': 'iPhone/iPad 备份',
+    'mail_data': 'Outlook 邮件数据',
+    'downloads': '已下载的数据',
+    'personal_files': '个人文件',
+  };
+  static const _zhCategoryLabels = {
+    'windows_temp': 'Windows/应用临时文件',
+    'browser_cache': '浏览器缓存',
+    'recycle_bin': '回收站',
+    'thumbnail_cache': '缩略图缓存',
+    'app_cache': '应用缓存',
+    'crash_dumps_logs': '崩溃转储和日志',
+    'windows_update_cache': 'Windows 更新缓存',
+    'prefetch': '应用启动缓存',
+    'delivery_optimization': '更新分发缓存',
+    'dev_cache': '开发工具缓存',
+  };
   static const _viCategoryLabels = {
     'windows_temp': 'File tạm của Windows/ứng dụng',
     'browser_cache': 'Bộ nhớ đệm trình duyệt',
@@ -86,34 +161,98 @@ class CleanerReviewRun {
     return candidates.take(maxAiGroups).toList();
   }
 
+  /// Picks the text for the active language; unknown codes fall back to English.
+  String _t(String en, String vi, String tr, String zh) =>
+      switch (languageCode) {
+        'vi' => vi,
+        'tr' => tr,
+        'zh' => zh,
+        _ => en,
+      };
+
   CleanerItemAnalysis scanAssessmentFor(CleanerReviewGroup group) {
-    final vi = languageCode == 'vi';
+    final causeLabels = switch (languageCode) {
+      'vi' => _viCauseLabels,
+      'tr' => _trCauseLabels,
+      'zh' => _zhCauseLabels,
+      _ => null,
+    };
+    final categoryLabels = switch (languageCode) {
+      'vi' => _viCategoryLabels,
+      'tr' => _trCategoryLabels,
+      'zh' => _zhCategoryLabels,
+      _ => null,
+    };
     final category = CleanerCategories.byId(group.categoryId ?? '');
     final label =
-        (vi ? _viCauseLabels[group.cause?.id] : null) ??
+        causeLabels?[group.cause?.id] ??
         group.cause?.label ??
-        (vi ? _viCategoryLabels[group.categoryId] : null) ??
+        categoryLabels?[group.categoryId] ??
         category?.displayName ??
         switch (group.type) {
-          'video' => vi ? 'Video' : 'Videos',
-          'audio' => vi ? 'Âm thanh' : 'Audio files',
-          'image_raw' => vi ? 'Ảnh và ảnh gốc' : 'Photos and raw images',
-          'archive' => vi ? 'File nén' : 'Archives',
-          'installer' =>
-            vi ? 'Chương trình hoặc bộ cài' : 'Programs or installers',
-          'disk_image' =>
-            vi ? 'Ảnh đĩa hoặc ổ đĩa ảo' : 'Disk or virtual drive images',
-          'ai_model' => vi ? 'Mô hình AI' : 'AI models',
-          'database_mail' =>
-            vi ? 'Cơ sở dữ liệu hoặc thư' : 'Databases or mail',
-          'dump_log' =>
-            vi
-                ? 'Log, báo lỗi hoặc file tạm'
-                : 'Logs, crash dumps or temporary files',
-          'game_data' => vi ? 'Dữ liệu game' : 'Game data',
-          'folder' => vi ? 'Thư mục chứa dữ liệu' : 'Folder with data',
-          'empty_folder' => vi ? 'Thư mục rỗng' : 'Empty folder',
-          _ => vi ? 'File chưa rõ công dụng' : 'Files of unknown purpose',
+          'video' => _t('Videos', 'Video', 'Videolar', '视频'),
+          'audio' => _t('Audio files', 'Âm thanh', 'Ses dosyaları', '音频文件'),
+          'image_raw' => _t(
+            'Photos and raw images',
+            'Ảnh và ảnh gốc',
+            'Fotoğraflar ve ham görüntüler',
+            '照片和原始图像',
+          ),
+          'archive' => _t('Archives', 'File nén', 'Arşivler', '压缩文件'),
+          'installer' => _t(
+            'Programs or installers',
+            'Chương trình hoặc bộ cài',
+            'Programlar veya yükleyiciler',
+            '程序或安装程序',
+          ),
+          'disk_image' => _t(
+            'Disk or virtual drive images',
+            'Ảnh đĩa hoặc ổ đĩa ảo',
+            'Disk veya sanal sürücü görüntüleri',
+            '磁盘或虚拟驱动器映像',
+          ),
+          'ai_model' => _t(
+            'AI models',
+            'Mô hình AI',
+            'Yapay zeka modelleri',
+            'AI 模型',
+          ),
+          'database_mail' => _t(
+            'Databases or mail',
+            'Cơ sở dữ liệu hoặc thư',
+            'Veritabanları veya posta',
+            '数据库或邮件',
+          ),
+          'dump_log' => _t(
+            'Logs, crash dumps or temporary files',
+            'Log, báo lỗi hoặc file tạm',
+            'Günlükler, çökme dökümleri veya geçici dosyalar',
+            '日志、崩溃转储或临时文件',
+          ),
+          'game_data' => _t(
+            'Game data',
+            'Dữ liệu game',
+            'Oyun verileri',
+            '游戏数据',
+          ),
+          'folder' => _t(
+            'Folder with data',
+            'Thư mục chứa dữ liệu',
+            'Veri içeren klasör',
+            '包含数据的文件夹',
+          ),
+          'empty_folder' => _t(
+            'Empty folder',
+            'Thư mục rỗng',
+            'Boş klasör',
+            '空文件夹',
+          ),
+          _ => _t(
+            'Files of unknown purpose',
+            'File chưa rõ công dụng',
+            'Amacı bilinmeyen dosyalar',
+            '用途不明的文件',
+          ),
         };
     final keep = group.cause?.verdict == 'KEEP';
     final decision = keep
@@ -122,38 +261,57 @@ class CleanerReviewRun {
         ? CleanerItemDecision.clean
         : CleanerItemDecision.review;
     final action = switch (group.cause?.id) {
-      'cloud_sync' =>
-        vi
-            ? 'Nên giữ; dùng chế độ chỉ lưu trực tuyến, xóa có thể mất cả bản trên đám mây.'
-            : 'Keep; use online-only mode, as deleting may remove the cloud copy too.',
-      'wsl_disk' || 'docker_data' || 'virtual_machine_disk' =>
-        vi
-            ? 'Chứa dữ liệu máy ảo; dọn hoặc thu gọn bằng công cụ quản lý, không xóa trực tiếp.'
-            : 'Contains virtual machine data; clean or compact through its manager, avoid direct deletion.',
-      'component_store' || 'previous_windows' || 'restore_points' =>
-        vi
-            ? 'Dọn qua cài đặt lưu trữ/khôi phục của Windows; không xóa trực tiếp.'
-            : 'Use Windows storage/restore cleanup controls; avoid direct deletion.',
-      'game_library' || 'android_dev' =>
-        vi
-            ? 'Gỡ mục không còn dùng qua ứng dụng quản lý; không xóa thư mục trực tiếp.'
-            : 'Uninstall unused items through their manager; avoid deleting folders directly.',
-      'node_modules' =>
-        vi
-            ? 'Chỉ dọn ở dự án không còn dùng; cần cài lại thư viện để chạy dự án.'
-            : 'Remove only from inactive projects; reinstall dependencies before using them again.',
+      'cloud_sync' => _t(
+        'Keep; use online-only mode, as deleting may remove the cloud copy too.',
+        'Nên giữ; dùng chế độ chỉ lưu trực tuyến, xóa có thể mất cả bản trên đám mây.',
+        'Saklayın; yalnızca çevrimiçi modunu kullanın, silmek bulut kopyasını da kaldırabilir.',
+        '建议保留；请使用仅在线模式，因为删除可能会同时移除云端副本。',
+      ),
+      'wsl_disk' || 'docker_data' || 'virtual_machine_disk' => _t(
+        'Contains virtual machine data; clean or compact through its manager, avoid direct deletion.',
+        'Chứa dữ liệu máy ảo; dọn hoặc thu gọn bằng công cụ quản lý, không xóa trực tiếp.',
+        'Sanal makine verileri içerir; yöneticisi üzerinden temizleyin veya sıkıştırın, doğrudan silmeyin.',
+        '包含虚拟机数据；请通过其管理工具清理或压缩，避免直接删除。',
+      ),
+      'component_store' || 'previous_windows' || 'restore_points' => _t(
+        'Use Windows storage/restore cleanup controls; avoid direct deletion.',
+        'Dọn qua cài đặt lưu trữ/khôi phục của Windows; không xóa trực tiếp.',
+        'Windows depolama/geri yükleme temizleme denetimlerini kullanın; doğrudan silmeyin.',
+        '请使用 Windows 的存储/还原清理功能；避免直接删除。',
+      ),
+      'game_library' || 'android_dev' => _t(
+        'Uninstall unused items through their manager; avoid deleting folders directly.',
+        'Gỡ mục không còn dùng qua ứng dụng quản lý; không xóa thư mục trực tiếp.',
+        'Kullanılmayan öğeleri yöneticileri üzerinden kaldırın; klasörleri doğrudan silmeyin.',
+        '请通过对应的管理工具卸载不再使用的项目；避免直接删除文件夹。',
+      ),
+      'node_modules' => _t(
+        'Remove only from inactive projects; reinstall dependencies before using them again.',
+        'Chỉ dọn ở dự án không còn dùng; cần cài lại thư viện để chạy dự án.',
+        'Yalnızca etkin olmayan projelerden kaldırın; yeniden kullanmadan önce bağımlılıkları tekrar yükleyin.',
+        '仅从不再使用的项目中删除；再次使用前需要重新安装依赖库。',
+      ),
       _ =>
         keep
-            ? (vi
-                  ? 'Nên giữ; xóa trực tiếp có thể ảnh hưởng hệ thống, ứng dụng hoặc dữ liệu.'
-                  : 'Keep; direct deletion may affect the system, apps or data.')
+            ? _t(
+                'Keep; direct deletion may affect the system, apps or data.',
+                'Nên giữ; xóa trực tiếp có thể ảnh hưởng hệ thống, ứng dụng hoặc dữ liệu.',
+                'Saklayın; doğrudan silmek sistemi, uygulamaları veya verileri etkileyebilir.',
+                '建议保留；直接删除可能会影响系统、应用或数据。',
+              )
             : group.canClean
-            ? (vi
-                  ? 'Có thể dọn theo phân loại quét; kiểm tra trước khi xóa.'
-                  : 'Can be cleaned based on the scan category; check before deleting.')
-            : (vi
-                  ? 'Chỉ xóa khi bạn xác nhận không còn cần; dung lượng lớn không có nghĩa là rác.'
-                  : 'Remove only if you no longer need it; size alone does not mean junk.'),
+            ? _t(
+                'Can be cleaned based on the scan category; check before deleting.',
+                'Có thể dọn theo phân loại quét; kiểm tra trước khi xóa.',
+                'Tarama kategorisine göre temizlenebilir; silmeden önce kontrol edin.',
+                '可根据扫描类别进行清理；删除前请先检查。',
+              )
+            : _t(
+                'Remove only if you no longer need it; size alone does not mean junk.',
+                'Chỉ xóa khi bạn xác nhận không còn cần; dung lượng lớn không có nghĩa là rác.',
+                'Yalnızca artık gerekmiyorsa kaldırın; büyük boyut tek başına gereksiz olduğu anlamına gelmez.',
+                '仅在确认不再需要时才删除；体积大并不意味着是垃圾。',
+              ),
     };
     return CleanerItemAnalysis(
       decision: decision,
@@ -207,7 +365,7 @@ class CleanerReviewRun {
     List<CleanerReviewGroup> groups, {
     bool repair = false,
   }) =>
-      'Assess these ${groups.length} groups in ${languageCode == 'vi' ? 'Vietnamese' : 'English'}. '
+      'Assess these ${groups.length} groups in ${_t('English', 'Vietnamese', 'Turkish', 'Simplified Chinese')}. '
       'Explain what each group appears to contain and whether to keep or remove it. '
       'Recommendations only; the user chooses files. '
       '${repair ? 'The previous response missed valid assessments for these groups. ' : ''}'
@@ -357,26 +515,38 @@ class CleanerReviewRun {
   }
 
   String batchProgressText(List<CleanerReviewGroup> groups) =>
-      '${progressText(null)}\n${groups.length} ${languageCode == 'vi' ? 'nhóm đang được đánh giá' : 'groups being assessed'}';
+      '${progressText(null)}\n${groups.length} ${_t('groups being assessed', 'nhóm đang được đánh giá', 'grup değerlendiriliyor', '个分组正在评估')}';
 
   CleanerItemAnalysis fallbackFor(
     CleanerReviewGroup group,
   ) => CleanerItemAnalysis(
     decision: CleanerItemDecision.review,
-    reason: languageCode == 'vi'
-        ? 'Đã phân loại ${group.nodes.length} mục trong ${group.scope} theo dữ liệu quét. '
-              'AI không trả được đánh giá hợp lệ cho nhóm này; cần bạn xem lại trước khi dọn. '
-              'Không có mục nào trong nhóm được tự chọn để xóa.'
-        : '${group.nodes.length} entries in ${group.scope} were classified from scan evidence. '
-              'AI did not return a valid assessment for this group; review it before cleanup. '
-              'No entries in this group were automatically selected.',
+    reason: _t(
+      '${group.nodes.length} entries in ${group.scope} were classified from scan evidence. '
+          'AI did not return a valid assessment for this group; review it before cleanup. '
+          'No entries in this group were automatically selected.',
+      'Đã phân loại ${group.nodes.length} mục trong ${group.scope} theo dữ liệu quét. '
+          'AI không trả được đánh giá hợp lệ cho nhóm này; cần bạn xem lại trước khi dọn. '
+          'Không có mục nào trong nhóm được tự chọn để xóa.',
+      '${group.scope} içindeki ${group.nodes.length} girdi tarama verilerine göre sınıflandırıldı. '
+          'Yapay zeka bu grup için geçerli bir değerlendirme döndürmedi; temizlemeden önce gözden geçirin. '
+          'Bu gruptaki hiçbir girdi otomatik olarak seçilmedi.',
+      '已根据扫描依据对 ${group.scope} 中的 ${group.nodes.length} 个条目进行分类。'
+          'AI 没有为该分组返回有效的评估；清理前请先查看。'
+          '该分组中的条目均未被自动选中。',
+    ),
   );
 
-  String progressText(CleanerReviewGroup? group) => languageCode == 'vi'
-      ? 'Đang nhận diện nhanh ${review.reviewed} / ${review.total} mục'
-            '${group == null ? '…' : '\n${group.scope} — ${group.nodes.length} mục cùng nhóm'}'
-      : 'Quick overview: ${review.reviewed} / ${review.total} entries'
-            '${group == null ? '…' : '\n${group.scope} — ${group.nodes.length} entries in this group'}';
+  String progressText(CleanerReviewGroup? group) => _t(
+    'Quick overview: ${review.reviewed} / ${review.total} entries'
+        '${group == null ? '…' : '\n${group.scope} — ${group.nodes.length} entries in this group'}',
+    'Đang nhận diện nhanh ${review.reviewed} / ${review.total} mục'
+        '${group == null ? '…' : '\n${group.scope} — ${group.nodes.length} mục cùng nhóm'}',
+    'Hızlı genel bakış: ${review.reviewed} / ${review.total} girdi'
+        '${group == null ? '…' : '\n${group.scope} — bu grupta ${group.nodes.length} girdi'}',
+    '正在快速分析：${review.reviewed} / ${review.total} 个条目'
+        '${group == null ? '…' : '\n${group.scope} — 该分组共 ${group.nodes.length} 个条目'}',
+  );
 
   String summary() {
     final context = requireActiveContext();
@@ -392,33 +562,44 @@ class CleanerReviewRun {
               !group.usedFallback,
         )
         .length;
-    final base = languageCode == 'vi'
-        ? '${review.isComplete ? 'Đã nhận diện nhanh' : 'Nhận diện nhanh chưa hoàn tất'}: $scanGroups nhóm từ dữ liệu quét, $aiGroups nhóm có gợi ý AI. '
-              'Xem loại dữ liệu và gợi ý giữ/xóa bên cạnh; bạn tự chọn mục cần dọn. Không đọc nội dung file.'
-        : '${review.isComplete ? 'Quick overview ready' : 'Quick overview incomplete'}: $scanGroups groups explained from scan metadata, $aiGroups with AI recommendations. '
-              'See the data types and keep/remove advice beside the results; choose what to clean. File contents were not read.';
+    final base = _t(
+      '${review.isComplete ? 'Quick overview ready' : 'Quick overview incomplete'}: $scanGroups groups explained from scan metadata, $aiGroups with AI recommendations. '
+          'See the data types and keep/remove advice beside the results; choose what to clean. File contents were not read.',
+      '${review.isComplete ? 'Đã nhận diện nhanh' : 'Nhận diện nhanh chưa hoàn tất'}: $scanGroups nhóm từ dữ liệu quét, $aiGroups nhóm có gợi ý AI. '
+          'Xem loại dữ liệu và gợi ý giữ/xóa bên cạnh; bạn tự chọn mục cần dọn. Không đọc nội dung file.',
+      '${review.isComplete ? 'Hızlı genel bakış hazır' : 'Hızlı genel bakış tamamlanmadı'}: $scanGroups grup tarama meta verileriyle açıklandı, $aiGroups grupta yapay zeka önerisi var. '
+          'Veri türlerini ve sakla/kaldır önerilerini sonuçların yanında görün; neyin temizleneceğini siz seçin. Dosya içerikleri okunmadı.',
+      '${review.isComplete ? '快速分析已完成' : '快速分析未完成'}：根据扫描元数据说明了 $scanGroups 个分组，其中 $aiGroups 个分组有 AI 建议。'
+          '请在结果旁查看数据类型和保留/删除建议；由您自己选择要清理的内容。未读取文件内容。',
+    );
     final fallback = fallbackItems == 0
         ? ''
-        : languageCode == 'vi'
-        ? '\n$fallbackItems mục trong ${review.unresolvedGroupCount} nhóm chưa có đánh giá AI hợp lệ và còn trong hàng chờ. Chạy lại để tiếp tục riêng phần này; các mục này không được tự chọn.'
-        : '\n$fallbackItems entries in ${review.unresolvedGroupCount} groups still need valid AI assessments and remain pending. Retry resumes only these groups; they were not automatically selected.';
+        : _t(
+            '\n$fallbackItems entries in ${review.unresolvedGroupCount} groups still need valid AI assessments and remain pending. Retry resumes only these groups; they were not automatically selected.',
+            '\n$fallbackItems mục trong ${review.unresolvedGroupCount} nhóm chưa có đánh giá AI hợp lệ và còn trong hàng chờ. Chạy lại để tiếp tục riêng phần này; các mục này không được tự chọn.',
+            '\n${review.unresolvedGroupCount} gruptaki $fallbackItems girdi için hâlâ geçerli yapay zeka değerlendirmesi gerekiyor ve beklemede. Yeniden dene yalnızca bu grupları sürdürür; bunlar otomatik olarak seçilmedi.',
+            '\n${review.unresolvedGroupCount} 个分组中的 $fallbackItems 个条目仍需要有效的 AI 评估，目前处于待处理状态。重试只会继续处理这些分组；它们没有被自动选中。',
+          );
     final counts = <FullDiskScanCoverageIssueReason, int>{};
     for (final issue in context.coverageIssues) {
       counts.update(issue.reason, (count) => count + 1, ifAbsent: () => 1);
     }
     final limits = <String>[
       if (review.aggregatedItems > 0)
-        languageCode == 'vi'
-            ? '${review.aggregatedItems} mục chỉ có tổng dung lượng'
-            : '${review.aggregatedItems} entries have size totals only',
+        _t(
+          '${review.aggregatedItems} entries have size totals only',
+          '${review.aggregatedItems} mục chỉ có tổng dung lượng',
+          '${review.aggregatedItems} girdide yalnızca boyut toplamı var',
+          '${review.aggregatedItems} 个条目只有大小合计',
+        ),
       for (final reason in FullDiskScanCoverageIssueReason.values)
         if ((counts[reason] ?? 0) > 0)
           '${counts[reason]} ${_coverageLabel(reason)}',
     ];
     final gaps = limits.isEmpty
         ? ''
-        : '\n${languageCode == 'vi' ? 'Phạm vi quét còn giới hạn' : 'Scan scope limits'}: ${limits.join('; ')}. '
-              '${languageCode == 'vi' ? 'Gợi ý sơ bộ theo dữ liệu quét.' : 'Preliminary advice based on scan metadata.'}';
+        : '\n${_t('Scan scope limits', 'Phạm vi quét còn giới hạn', 'Tarama kapsamı sınırları', '扫描范围的限制')}: ${limits.join('; ')}. '
+              '${_t('Preliminary advice based on scan metadata.', 'Gợi ý sơ bộ theo dữ liệu quét.', 'Tarama meta verilerine dayalı ön öneri.', '基于扫描元数据的初步建议。')}';
     final attention = CleanerReviewSummary(
       review,
       languageCode: languageCode,
@@ -427,17 +608,31 @@ class CleanerReviewRun {
   }
 
   String _coverageLabel(FullDiskScanCoverageIssueReason reason) => switch ((
-    languageCode == 'vi',
+    languageCode,
     reason,
   )) {
-    (true, FullDiskScanCoverageIssueReason.inaccessible) =>
+    ('tr', FullDiskScanCoverageIssueReason.inaccessible) => 'okunamayan yol',
+    ('tr', FullDiskScanCoverageIssueReason.maxDepthReached) =>
+      'tarama derinliği sınırına ulaşan yol',
+    ('tr', FullDiskScanCoverageIssueReason.reparsePoint) =>
+      'bilinçli olarak atlanan yeniden ayrıştırma noktası',
+    ('tr', FullDiskScanCoverageIssueReason.cancelled) =>
+      'iptal edilen tarama bölgesi',
+    ('tr', FullDiskScanCoverageIssueReason.scanInProgress) =>
+      'hâlâ taranmakta olan bölge',
+    ('zh', FullDiskScanCoverageIssueReason.inaccessible) => '无法读取的路径',
+    ('zh', FullDiskScanCoverageIssueReason.maxDepthReached) => '达到扫描深度上限的路径',
+    ('zh', FullDiskScanCoverageIssueReason.reparsePoint) => '有意跳过的重解析点',
+    ('zh', FullDiskScanCoverageIssueReason.cancelled) => '已取消的扫描区域',
+    ('zh', FullDiskScanCoverageIssueReason.scanInProgress) => '仍在扫描中的区域',
+    ('vi', FullDiskScanCoverageIssueReason.inaccessible) =>
       'đường dẫn không đọc được',
-    (true, FullDiskScanCoverageIssueReason.maxDepthReached) =>
+    ('vi', FullDiskScanCoverageIssueReason.maxDepthReached) =>
       'đường dẫn chạm giới hạn độ sâu',
-    (true, FullDiskScanCoverageIssueReason.reparsePoint) =>
+    ('vi', FullDiskScanCoverageIssueReason.reparsePoint) =>
       'đường dẫn liên kết/đặc biệt được bỏ qua',
-    (true, FullDiskScanCoverageIssueReason.cancelled) => 'phần quét bị hủy',
-    (true, FullDiskScanCoverageIssueReason.scanInProgress) =>
+    ('vi', FullDiskScanCoverageIssueReason.cancelled) => 'phần quét bị hủy',
+    ('vi', FullDiskScanCoverageIssueReason.scanInProgress) =>
       'phần quét chưa kết thúc',
     (_, FullDiskScanCoverageIssueReason.inaccessible) => 'unreadable paths',
     (_, FullDiskScanCoverageIssueReason.maxDepthReached) =>

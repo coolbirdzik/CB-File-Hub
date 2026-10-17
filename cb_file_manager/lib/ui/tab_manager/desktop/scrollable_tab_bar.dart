@@ -9,6 +9,7 @@ import 'package:window_manager/window_manager.dart'; // Import window_manager
 import 'dart:io'; // Import dart:io for Platform check
 import '../../components/common/window_caption_buttons.dart';
 import 'desktop_tab_drag_data.dart';
+import 'package:cb_file_manager/config/translation_helper.dart';
 
 /// A custom TabBar wrapper that translates vertical mouse wheel scrolling
 /// to horizontal scrolling of the tab bar, with modern styling.
@@ -814,7 +815,7 @@ class _ModernTabBarState extends State<_ModernTabBar> {
                     child: Material(
                       color: Colors.transparent,
                       child: CbTooltip(
-                        message: 'Add new tab',
+                        message: context.tr.addNewTab,
                         child: Container(
                           margin: const EdgeInsets.only(left: 4, right: 4),
                           child: MouseRegion(

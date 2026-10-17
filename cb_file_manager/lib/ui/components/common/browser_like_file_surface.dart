@@ -17,6 +17,7 @@ class BrowserLikeFileSurface extends StatefulWidget {
   final SelectionState selectionState;
   final ViewMode viewMode;
   final bool isDesktop;
+  final int? selectionTotalSize;
   final Iterable<String> visiblePaths;
   final Widget Function(
     BuildContext context,
@@ -83,6 +84,7 @@ class BrowserLikeFileSurface extends StatefulWidget {
     required this.selectionState,
     required this.viewMode,
     required this.isDesktop,
+    this.selectionTotalSize,
     required this.visiblePaths,
     required this.bodyBuilder,
     required this.onClearSelection,
@@ -305,6 +307,7 @@ class _BrowserLikeFileSurfaceState extends State<BrowserLikeFileSurface> {
                 left: 0,
                 right: 0,
                 child: SelectionSummaryTooltip(
+                  totalSizeOverride: widget.selectionTotalSize,
                   selectedFileCount:
                       widget.selectionState.selectedFilePaths.length,
                   selectedFolderCount:

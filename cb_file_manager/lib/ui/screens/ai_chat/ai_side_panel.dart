@@ -21,6 +21,7 @@ import 'components/tool_call_chip.dart';
 import 'components/file_result_card.dart';
 import 'components/model_selector_button.dart';
 import 'components/shimmer_thinking_text.dart';
+import 'package:cb_file_manager/config/translation_helper.dart';
 
 /// A right-side AI chat panel that sits beside the main file browser content.
 ///
@@ -331,7 +332,7 @@ class _AiSidePanelState extends State<AiSidePanel> {
           const SizedBox(width: 5),
           Expanded(
             child: Text(
-              folderName ?? 'All Drives',
+              folderName ?? context.tr.aiAllDrives,
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w500,
@@ -360,7 +361,7 @@ class _AiSidePanelState extends State<AiSidePanel> {
             // Debug: view raw payload sent to provider
             IconButton(
               icon: const Icon(PhosphorIconsLight.code, size: 12),
-              tooltip: 'View raw payload',
+              tooltip: context.tr.aiViewRawPayload,
               visualDensity: VisualDensity.compact,
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
@@ -400,7 +401,7 @@ class _AiSidePanelState extends State<AiSidePanel> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Provider error',
+                  context.tr.aiProviderError,
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
@@ -441,7 +442,7 @@ class _AiSidePanelState extends State<AiSidePanel> {
           if (state.lastApiPayload != null)
             IconButton(
               icon: const Icon(PhosphorIconsLight.code, size: 12),
-              tooltip: 'View payload',
+              tooltip: context.tr.aiViewPayload,
               visualDensity: VisualDensity.compact,
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
@@ -449,7 +450,7 @@ class _AiSidePanelState extends State<AiSidePanel> {
             ),
           IconButton(
             icon: const Icon(PhosphorIconsLight.x, size: 12),
-            tooltip: 'Dismiss',
+            tooltip: context.tr.dismiss,
             visualDensity: VisualDensity.compact,
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
@@ -476,9 +477,7 @@ class _AiSidePanelState extends State<AiSidePanel> {
     }
 
     return Tooltip(
-      message:
-          '$messageCount messages · $totalChars chars\n'
-          'Context trimming starts at ~24K chars',
+      message: context.tr.aiContextInfo(messageCount, totalChars.toString()),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -816,7 +815,9 @@ class _AiSidePanelState extends State<AiSidePanel> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            ShimmerThinkingText(text: state.thinkingText ?? 'Thinking...'),
+            ShimmerThinkingText(
+              text: state.thinkingText ?? context.tr.aiThinking,
+            ),
             if (state.currentToolCalls.isNotEmpty) ...[
               const SizedBox(height: 6),
               ...state.currentToolCalls.map((tc) => ToolCallChip(toolCall: tc)),

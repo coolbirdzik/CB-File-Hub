@@ -22,6 +22,7 @@ import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'mobile_file_actions_controller.dart';
 import '../components/tab_inactive_indicator.dart';
 import '../components/tab_always_active_indicator.dart';
+import 'package:cb_file_manager/config/translation_helper.dart';
 
 /// Giao diện kiểu Chrome cho thiết bị di động, hiển thị thanh địa chỉ ở trên
 /// và một nút hiển thị số lượng tab bên cạnh
@@ -643,6 +644,9 @@ class MobileTabView extends StatelessWidget {
         return PhosphorIconsLight.image;
       }
       if (path == '#video') return PhosphorIconsLight.videoCamera;
+      if (path == '#torrents' || path.startsWith('#torrents?')) {
+        return PhosphorIconsLight.downloadSimple;
+      }
       if (path == '#tags') return PhosphorIconsLight.tag;
       if (path == '#network' || path.startsWith('#network/')) {
         return PhosphorIconsLight.hardDrives;
@@ -779,7 +783,9 @@ class MobileTabView extends StatelessWidget {
           key: ValueKey(
             '${activeTab.id}_unknown_system_path_${activeTab.path}',
           ),
-          child: Center(child: Text('Unknown system path: ${activeTab.path}')),
+          child: Center(
+            child: Text('${context.tr.unknownSystemPath}: ${activeTab.path}'),
+          ),
         );
       }
     } else {

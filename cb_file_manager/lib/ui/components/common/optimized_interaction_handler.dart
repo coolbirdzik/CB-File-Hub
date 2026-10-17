@@ -244,7 +244,8 @@ class OptimizedFileIconState extends State<OptimizedFileIcon>
     // Only refresh future if file path or type changes
     if (widget.file.path != oldWidget.file.path ||
         widget.isVideo != oldWidget.isVideo ||
-        widget.isImage != oldWidget.isImage) {
+        widget.isImage != oldWidget.isImage ||
+        widget.size != oldWidget.size) {
       if (!widget.isVideo && !widget.isImage) {
         _iconFuture = FileIconHelper.getIconForFile(
           widget.file,

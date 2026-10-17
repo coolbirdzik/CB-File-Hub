@@ -53,6 +53,7 @@ import 'cleaner_apps_view.dart';
 import 'cleaner_suggestions_view.dart';
 import '../../../services/disk_cleaner/cleaner_suggestions.dart';
 import 'cleaner_utilities_shell.dart';
+import 'package:cb_file_manager/config/translation_helper.dart';
 
 /// Full disk analyzer + cleaner screen (TreeSize-style).
 ///
@@ -6479,9 +6480,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       _replaceTreeTargets(DiskTreeSelection.collectDeletionTargets(root));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Refresh failed: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.tr.cleanerRefreshFailed(e.toString()))),
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -6581,9 +6582,11 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Failed to load properties: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(context.tr.cleanerLoadPropsFailed(e.toString())),
+        ),
+      );
     }
   }
 
@@ -6666,7 +6669,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
           if (node.isFile && isDesktopPlatform)
             ContextMenuAction(
               id: 'open_file_location',
-              label: 'Open file location',
+              label: context.tr.openFileLocation,
               icon: PhosphorIconsLight.folderOpen,
               onSelected: (_) => EntityOpenActions.openInNewTab(
                 context,
@@ -7003,7 +7006,7 @@ class _TreeRowState extends State<_TreeRow> {
                                 borderRadius: BorderRadius.circular(3),
                               ),
                               child: Text(
-                                _junkLabel(categoryId),
+                                _junkLabel(context, categoryId),
                                 style: TextStyle(
                                   fontSize: 9,
                                   fontWeight: FontWeight.w600,
@@ -7124,30 +7127,30 @@ class _TreeRowState extends State<_TreeRow> {
     return rows;
   }
 
-  static String _junkLabel(String categoryId) {
+  static String _junkLabel(BuildContext context, String categoryId) {
     switch (categoryId) {
       case 'windows_temp':
-        return 'TEMP';
+        return context.tr.jlTemp;
       case 'browser_cache':
-        return 'BROWSER';
+        return context.tr.jlBrowser;
       case 'recycle_bin':
-        return 'RECYCLE';
+        return context.tr.jlRecycle;
       case 'thumbnail_cache':
-        return 'THUMBS';
+        return context.tr.jlThumbs;
       case 'app_cache':
-        return 'APP CACHE';
+        return context.tr.jlAppCache;
       case 'crash_dumps_logs':
-        return 'CRASH/LOG';
+        return context.tr.jlCrashLog;
       case 'windows_update_cache':
-        return 'WIN UPDATE';
+        return context.tr.jlWinUpdate;
       case 'prefetch':
-        return 'PREFETCH';
+        return context.tr.jlPrefetch;
       case 'delivery_optimization':
-        return 'DELIVERY';
+        return context.tr.jlDelivery;
       case 'dev_cache':
-        return 'DEV CACHE';
+        return context.tr.jlDevCache;
       default:
-        return 'JUNK';
+        return context.tr.jlJunk;
     }
   }
 }
@@ -7520,7 +7523,7 @@ class _FlatTreeRowWidgetState extends State<_FlatTreeRowWidget> {
                                   borderRadius: BorderRadius.circular(3),
                                 ),
                                 child: Text(
-                                  _junkLabel(categoryId),
+                                  _junkLabel(context, categoryId),
                                   style: TextStyle(
                                     fontSize: 9,
                                     fontWeight: FontWeight.w600,
@@ -7612,30 +7615,30 @@ class _FlatTreeRowWidgetState extends State<_FlatTreeRowWidget> {
     );
   }
 
-  static String _junkLabel(String categoryId) {
+  static String _junkLabel(BuildContext context, String categoryId) {
     switch (categoryId) {
       case 'windows_temp':
-        return 'TEMP';
+        return context.tr.jlTemp;
       case 'browser_cache':
-        return 'BROWSER';
+        return context.tr.jlBrowser;
       case 'recycle_bin':
-        return 'RECYCLE';
+        return context.tr.jlRecycle;
       case 'thumbnail_cache':
-        return 'THUMBS';
+        return context.tr.jlThumbs;
       case 'app_cache':
-        return 'APP CACHE';
+        return context.tr.jlAppCache;
       case 'crash_dumps_logs':
-        return 'CRASH/LOG';
+        return context.tr.jlCrashLog;
       case 'windows_update_cache':
-        return 'WIN UPDATE';
+        return context.tr.jlWinUpdate;
       case 'prefetch':
-        return 'PREFETCH';
+        return context.tr.jlPrefetch;
       case 'delivery_optimization':
-        return 'DELIVERY';
+        return context.tr.jlDelivery;
       case 'dev_cache':
-        return 'DEV CACHE';
+        return context.tr.jlDevCache;
       default:
-        return 'JUNK';
+        return context.tr.jlJunk;
     }
   }
 }

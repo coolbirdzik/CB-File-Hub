@@ -40,6 +40,7 @@ import 'package:cb_file_manager/ui/widgets/selection_rectangle_painter.dart';
 import 'package:cb_file_manager/ui/widgets/selection_summary_tooltip.dart';
 import 'package:cb_file_manager/helpers/files/windows_shell_context_menu.dart';
 import 'widgets/widgets.dart';
+import 'package:cb_file_manager/config/translation_helper.dart';
 
 /// Trash Bin screen - displays deleted items with restore/delete functionality.
 /// This is essentially a file browsing screen with different data source and actions.
@@ -1582,7 +1583,7 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
           if (!item.isFolder && isDesktopPlatform)
             ContextMenuAction(
               id: 'open_file_location',
-              label: 'Open file location',
+              label: context.tr.openFileLocation,
               icon: PhosphorIconsLight.folderOpen,
               onSelected: (_) => EntityOpenActions.openInNewTab(
                 context,

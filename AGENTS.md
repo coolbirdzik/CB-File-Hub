@@ -32,6 +32,7 @@ Run from repo root via `just` (requires Git Bash on Windows):
 | Show all recipes         | `just`                                              |
 | Install deps             | `just deps`                                         |
 | Fetch llama.cpp runtime  | `just fetch-llama`                                  |
+| Fetch aria2 torrent runtime | `just fetch-aria2`                               |
 | Run macOS dev build      | `just macos-dev` (own permissions + hot reload)     |
 | Unit/widget tests        | `just test`                                         |
 | E2E tests (parallel)     | `just e2e-parallel`                                 |
@@ -91,6 +92,7 @@ analyze job runs on Ubuntu, so platform-specific failures still need a Linux run
 - **Streaming:** Built-in HTTP media server via `shelf` (`lib/services/streaming/`).
 - **Network browsing:** SMB/CIFS via local `mobile_smb_native` FFI plugin, plus FTP support.
 - **Windows native:** Uses `win32` FFI, acrylic backdrop, native tab drag-drop, PiP windowing.
+- **Torrent library:** `lib/services/torrent/` indexes metainfo in the shared SQLite DB; `#torrents` supports index/copy/move storage modes and per-torrent payload destinations. aria2 runs as an authenticated loopback subprocess. Windows builds bundle its pinned runtime from `windows/aria2/` (git-ignored); run `just fetch-aria2` before direct Flutter Windows builds on a clean checkout. Other desktop platforms use an installed or user-selected aria2c. See `docs/features/10-torrent-library.md`.
 
 ## Feature flags (compile-time)
 

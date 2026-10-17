@@ -9,6 +9,7 @@ import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:cb_file_manager/ui/utils/route.dart';
 import 'package:path/path.dart' as path;
 import 'dart:async';
+import 'package:cb_file_manager/config/translation_helper.dart';
 
 class FileSearchDialog extends StatefulWidget {
   final int albumId;
@@ -139,12 +140,12 @@ class _FileSearchDialogState extends State<FileSearchDialog> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const AlertDialog(
+      builder: (context) => AlertDialog(
         content: Row(
           children: [
-            CircularProgressIndicator(),
-            SizedBox(width: 16),
-            Text('Adding files to album...'),
+            const CircularProgressIndicator(),
+            const SizedBox(width: 16),
+            Text(context.tr.albumAddingFilesToAlbum),
           ],
         ),
       ),
@@ -248,9 +249,9 @@ class _FileSearchDialogState extends State<FileSearchDialog> {
                     color: Colors.white,
                   ),
                   const SizedBox(width: 8),
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      'Search and Select Images',
+                      context.tr.albumSearchAndSelect,
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 18,
@@ -272,7 +273,7 @@ class _FileSearchDialogState extends State<FileSearchDialog> {
                 controller: _searchController,
                 onSubmitted: (query) => _performSearch(query.trim()),
                 decoration: InputDecoration(
-                  hintText: 'Search for images...',
+                  hintText: context.tr.albumSearchForImages,
                   prefixIcon: const Icon(PhosphorIconsLight.magnifyingGlass),
                   suffixIcon: _searchController.text.isNotEmpty
                       ? IconButton(
@@ -293,7 +294,10 @@ class _FileSearchDialogState extends State<FileSearchDialog> {
                 child: Row(
                   children: [
                     Text(
-                      '${_selectedFiles.length} of ${_searchResults.length} selected',
+                      context.tr.albumSelectedOfTotal(
+                        _selectedFiles.length,
+                        _searchResults.length,
+                      ),
                       style: TextStyle(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                         fontSize: 14,
@@ -304,8 +308,8 @@ class _FileSearchDialogState extends State<FileSearchDialog> {
                       onPressed: _selectAll,
                       child: Text(
                         _selectedFiles.length == _searchResults.length
-                            ? 'Deselect All'
-                            : 'Select All',
+                            ? context.tr.albumDeselectAllCaps
+                            : context.tr.selectAll,
                       ),
                     ),
                   ],
@@ -330,8 +334,8 @@ class _FileSearchDialogState extends State<FileSearchDialog> {
                           const SizedBox(height: 16),
                           Text(
                             _currentSearchQuery?.isEmpty == true
-                                ? 'Loading images...'
-                                : 'No images found',
+                                ? context.tr.albumLoadingImages
+                                : context.tr.albumNoImagesFound,
                             style: TextStyle(
                               fontSize: 16,
                               color: Theme.of(
@@ -341,7 +345,7 @@ class _FileSearchDialogState extends State<FileSearchDialog> {
                           ),
                           if (_currentSearchQuery?.isNotEmpty == true)
                             Text(
-                              'Try a different search term',
+                              context.tr.albumTryDifferentSearch,
                               style: TextStyle(
                                 fontSize: 14,
                                 color: Theme.of(
@@ -367,7 +371,7 @@ class _FileSearchDialogState extends State<FileSearchDialog> {
                 children: [
                   TextButton(
                     onPressed: () => RouteUtils.safePopDialog(context),
-                    child: const Text('Cancel'),
+                    child: Text(context.tr.cancel),
                   ),
                   const SizedBox(width: 8),
                   ElevatedButton(
@@ -375,7 +379,7 @@ class _FileSearchDialogState extends State<FileSearchDialog> {
                         ? null
                         : _addSelectedFiles,
                     child: Text(
-                      'Add ${_selectedFiles.length} ${_selectedFiles.length == 1 ? 'Image' : 'Images'}',
+                      context.tr.albumAddNImages(_selectedFiles.length),
                     ),
                   ),
                 ],

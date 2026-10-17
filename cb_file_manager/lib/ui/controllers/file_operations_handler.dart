@@ -26,6 +26,7 @@ import 'package:cb_file_manager/ui/utils/route.dart';
 import 'package:cb_file_manager/ui/widgets/file_preview_pane.dart';
 import 'package:cb_file_manager/design_system/primitives/cb_inline_rename.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import '../utils/torrent_open_actions.dart';
 
 /// Handles file operations such as opening files with appropriate viewers
 class FileOperationsHandler {
@@ -502,6 +503,8 @@ class FileOperationsHandler {
       );
       return;
     }
+
+    if (TorrentOpenActions.tryOpen(context, file.path)) return;
 
     // Check file type using utility
     final isVideo = FileTypeUtils.isVideoFile(file.path);

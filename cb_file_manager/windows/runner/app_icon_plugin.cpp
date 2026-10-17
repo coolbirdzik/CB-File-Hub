@@ -70,6 +70,7 @@ static std::string ResolveExeViaApplicationsKey(const std::string& exeName);
 static std::string ResolveProgIdToExe(const std::wstring& progId);
 
 static bool SetSelfAsDefaultForVideo(const std::string& exePath);
+static bool RegisterTorrentAssociations(const std::string& exePath);
 static bool RegisterFileAssociations(const std::string& exePath,
                                      const std::vector<std::string>& extensions,
                                      bool setAsDefault);
@@ -205,6 +206,24 @@ void AppIconPlugin::HandleMethodCall(
       }
     }
     result->Error("INVALID_ARGUMENTS", "Invalid or missing exePath/extensions");
+    return;
+  } else if (method_call.method_name() == "registerTorrentAssociations") {
+    const auto* arguments = std::get_if<flutter::EncodableMap>(method_call.arguments());
+    if (arguments) {
+      auto it = arguments->find(flutter::EncodableValue("exePath"));
+      if (it != arguments->end() && std::holds_alternative<std::string>(it->second)) {
+        result->Success(flutter::EncodableValue(
+            RegisterTorrentAssociations(std::get<std::string>(it->second))));
+        return;
+      }
+    }
+    result->Error("INVALID_ARGUMENTS", "Missing exePath");
+    return;
+  } else if (method_call.method_name() == "openTorrentDefaultSettings") {
+    const auto launched = reinterpret_cast<INT_PTR>(ShellExecuteW(
+        nullptr, L"open", L"ms-settings:defaultapps?registeredAppUser=CB%20File%20Hub",
+        nullptr, nullptr, SW_SHOWNORMAL));
+    result->Success(flutter::EncodableValue(launched > 32));
     return;
   } else if (method_call.method_name().compare("setSelfAsDefaultForVideo") == 0) {
     const auto* arguments = std::get_if<flutter::EncodableMap>(method_call.arguments());
@@ -922,6 +941,39 @@ static bool RegisterFileAssociations(const std::string& exePathUtf8,
   SetRegString(HKEY_CURRENT_USER, L"Software\\RegisteredApplications",
                L"CB File Hub", capsKey);
   return any;
+}
+
+static bool RegisterTorrentAssociations(const std::string& exePathUtf8) {
+  // Capabilities advertise handlers; Windows owns the protected UserChoice.
+  // Do not replace another client's magnet command or current defaults.
+  if (!RegisterFileAssociations(exePathUtf8, {".torrent"}, false)) return false;
+  const int size = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+                                     exePathUtf8.c_str(), -1, nullptr, 0);
+  if (size <= 0) return false;
+  std::vector<wchar_t> wide(size);
+  if (!MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+                          exePathUtf8.c_str(), -1, wide.data(), size)) return false;
+  const std::wstring exe(wide.data());
+  const std::wstring command = L"\"" + exe + L"\" --open-torrent \"%1\"";
+  const std::wstring base = L"Software\\Classes\\CBFileHub.Magnet";
+  const std::wstring caps = L"Software\\COOLBIRDZIK\\CB File Hub\\Capabilities";
+  bool ok = SetRegString(HKEY_CURRENT_USER, base, nullptr, L"CB File Hub Magnet Link");
+  ok = SetRegString(HKEY_CURRENT_USER, base, L"URL Protocol", L"") && ok;
+  ok = SetRegString(HKEY_CURRENT_USER, base + L"\\DefaultIcon", nullptr,
+                    L"\"" + exe + L"\",0") && ok;
+  ok = SetRegString(HKEY_CURRENT_USER, base + L"\\shell\\open\\command",
+                    nullptr, command) && ok;
+  ok = SetRegString(HKEY_CURRENT_USER,
+                    L"Software\\Classes\\CBFileHub.File.torrent\\shell\\open\\command",
+                    nullptr, command) && ok;
+  ok = SetRegString(HKEY_CURRENT_USER, L"Software\\Classes\\.torrent",
+                    L"Content Type", L"application/x-bittorrent") && ok;
+  ok = SetRegString(HKEY_CURRENT_USER, L"Software\\Classes\\magnet",
+                    L"URL Protocol", L"") && ok;
+  ok = SetRegString(HKEY_CURRENT_USER, caps + L"\\URLAssociations", L"magnet",
+                    L"CBFileHub.Magnet") && ok;
+  SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, nullptr, nullptr);
+  return ok;
 }
 
 static bool SetSelfAsDefaultForVideo(const std::string& exePath) {

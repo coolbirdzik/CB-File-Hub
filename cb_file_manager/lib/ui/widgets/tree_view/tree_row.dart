@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import 'tree_node.dart';
+import 'package:cb_file_manager/config/translation_helper.dart';
 
 /// Internal flat-row record used by [GenericTreeView].
 ///
@@ -211,7 +212,7 @@ class TreePlaceholderRow extends StatelessWidget {
             const SizedBox(width: 6),
             Expanded(
               child: Text(
-                'Failed to load. Tap to retry.',
+                context.tr.treeLoadFailedRetry,
                 style: TextStyle(fontSize: 12, color: theme.colorScheme.error),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,

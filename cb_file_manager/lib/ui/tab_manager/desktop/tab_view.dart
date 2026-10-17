@@ -23,7 +23,7 @@ class TabView extends StatelessWidget {
         return Column(
           children: [
             _buildTabBar(context, state),
-            Expanded(child: _buildTabContent(state)),
+            Expanded(child: _buildTabContent(context, state)),
           ],
         );
       },
@@ -139,11 +139,11 @@ class TabView extends StatelessWidget {
     );
   }
 
-  Widget _buildTabContent(TabManagerState state) {
+  Widget _buildTabContent(BuildContext context, TabManagerState state) {
     final activeTab = state.activeTab;
 
     if (activeTab == null) {
-      return const Center(child: Text('No active tab'));
+      return Center(child: Text(context.tr.noActiveTab));
     }
 
     // Use Navigator with a unique key to maintain navigation state per tab

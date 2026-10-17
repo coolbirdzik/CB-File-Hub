@@ -6,6 +6,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../../config/design_system_config.dart';
 import '../../../design_system/fluent_surface_tokens.dart';
 import '../../../design_system/tokens/cb_geometry_tokens.dart';
+import 'package:cb_file_manager/config/translation_helper.dart';
 
 /// A single item in a [BreadcrumbAddressBar].
 class BreadcrumbSegment {
@@ -260,7 +261,7 @@ class _BreadcrumbAddressBarState extends State<BreadcrumbAddressBar> {
           _stopEditing();
         },
         onTapOutside: (_) => _stopEditing(),
-        placeholder: 'Enter path...',
+        placeholder: context.tr.enterPath,
         style: TextStyle(fontSize: 13, color: surfaces.textPrimary),
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: const WidgetStatePropertyAll(
@@ -285,7 +286,7 @@ class _BreadcrumbAddressBarState extends State<BreadcrumbAddressBar> {
         isDense: true,
         contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
         border: InputBorder.none,
-        hintText: 'Enter path...',
+        hintText: context.tr.enterPath,
         hintStyle: TextStyle(
           fontSize: 13,
           color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),

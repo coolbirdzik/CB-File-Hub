@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../utils/route.dart';
 import 'video_player_models.dart';
+import 'package:cb_file_manager/config/translation_helper.dart';
 
 /// One option for [VideoPlayerRadioListContent].
 class VideoPlayerRadioOption<T> {
@@ -126,11 +127,11 @@ class VideoPlayerFilterSlider extends StatelessWidget {
   }
 }
 
-String _formatDurationOption(Duration d) {
+String _formatDurationOption(BuildContext context, Duration d) {
   if (d.inHours > 0) {
-    return '${d.inHours} hour${d.inHours > 1 ? 's' : ''}';
+    return context.tr.vpHoursOption(d.inHours);
   }
-  return '${d.inMinutes} minutes';
+  return context.tr.vpMinutesOption(d.inMinutes);
 }
 
 /// Content for the subtitles selection dialog.
@@ -149,7 +150,7 @@ class SubtitleDialogContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final options = <VideoPlayerRadioOption<int>>[
-      const VideoPlayerRadioOption<int>(null, 'Off'),
+      VideoPlayerRadioOption<int>(null, context.tr.vpOff),
       ...tracks.asMap().entries.map(
         (e) => VideoPlayerRadioOption<int>(e.key, e.value.language),
       ),
@@ -215,17 +216,17 @@ class VideoFiltersDialogContent extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         VideoPlayerFilterSlider(
-          label: 'Brightness',
+          label: context.tr.vpBrightness,
           value: brightness,
           onChanged: onBrightnessChanged,
         ),
         VideoPlayerFilterSlider(
-          label: 'Contrast',
+          label: context.tr.vpContrast,
           value: contrast,
           onChanged: onContrastChanged,
         ),
         VideoPlayerFilterSlider(
-          label: 'Saturation',
+          label: context.tr.vpSaturation,
           value: saturation,
           onChanged: onSaturationChanged,
         ),
@@ -255,9 +256,12 @@ class SleepTimerDialogContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final options = <VideoPlayerRadioOption<Duration>>[
-      const VideoPlayerRadioOption<Duration>(null, 'Off'),
+      VideoPlayerRadioOption<Duration>(null, context.tr.vpOff),
       ...durations.map(
-        (d) => VideoPlayerRadioOption<Duration>(d, _formatDurationOption(d)),
+        (d) => VideoPlayerRadioOption<Duration>(
+          d,
+          _formatDurationOption(context, d),
+        ),
       ),
     ];
     return VideoPlayerRadioListContent<Duration>(

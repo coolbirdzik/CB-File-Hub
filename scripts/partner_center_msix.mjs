@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { applyStoreListings, loadStoreListings, defaultListingsDirectory } from './store_listings.mjs';
 
 const TOKEN_RESOURCE = 'https://manage.devcenter.microsoft.com';
 const API_ROOT = 'https://manage.devcenter.microsoft.com/v1.0/my';
@@ -265,6 +266,11 @@ async function submitPackage() {
     throw new Error(`Package archive not found: ${archivePath}`);
   }
 
+  // Validate checked-in English/Vietnamese copy before changing a Store draft.
+  const listingContent = loadStoreListings(
+    optionalEnv('PARTNER_CENTER_LISTINGS_DIR') || defaultListingsDirectory,
+  );
+
   const accessToken = await getAccessToken();
   const app = await apiRequest(
     accessToken,
@@ -366,6 +372,9 @@ async function submitPackage() {
     submission.targetPublishDate = '1601-01-01T00:00:00Z';
   }
   console.error(`Partner Center targetPublishMode: ${publishMode}`);
+
+  submission = applyStoreListings(submission, listingContent);
+  console.error(`Partner Center listing text updated: ${Object.keys(listingContent).join(', ')}`);
 
   submission.applicationPackages = [
     ...(submission.applicationPackages || []).map(packageForDeletion),

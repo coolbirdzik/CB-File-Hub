@@ -30,14 +30,17 @@ class SharedActionBar {
             color: isActive ? theme.colorScheme.primary : null,
           ),
           const SizedBox(width: 10),
-          Text(
-            label,
-            style: TextStyle(
-              fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-              color: isActive ? theme.colorScheme.primary : null,
+          Expanded(
+            child: Text(
+              label,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                color: isActive ? theme.colorScheme.primary : null,
+              ),
             ),
           ),
-          const Spacer(),
           if (isActive)
             Icon(
               _isAscendingSortOption(option)
@@ -340,6 +343,9 @@ class SharedActionBar {
     BuildContext context, {
     required ColumnVisibility currentVisibility,
     required Function(ColumnVisibility) onApply,
+    Map<String, String> additionalColumns = const {},
+    Set<String> visibleAdditionalColumns = const {},
+    ValueChanged<Set<String>>? onApplyAdditionalColumns,
   }) {
     final l10n = AppLocalizations.of(context)!;
     // Create a mutable copy of the current visibility
@@ -355,6 +361,7 @@ class SharedActionBar {
     bool dimensions = currentVisibility.dimensions;
     bool duration = currentVisibility.duration;
     bool itemCount = currentVisibility.itemCount;
+    final additional = Set<String>.of(visibleAdditionalColumns);
 
     RouteUtils.showAcrylicDialog(
       context: context,
@@ -542,6 +549,21 @@ class SharedActionBar {
                       secondary: const Icon(PhosphorIconsLight.listNumbers),
                       dense: true,
                     ),
+                    for (final column in additionalColumns.entries) ...[
+                      const Divider(height: 1),
+                      CheckboxListTile(
+                        title: Text(column.value),
+                        value: additional.contains(column.key),
+                        onChanged: (value) => setState(() {
+                          if (value == true) {
+                            additional.add(column.key);
+                          } else {
+                            additional.remove(column.key);
+                          }
+                        }),
+                        dense: true,
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -571,6 +593,7 @@ class SharedActionBar {
                       itemCount: itemCount,
                     );
                     onApply(newVisibility);
+                    onApplyAdditionalColumns?.call(additional);
                     Navigator.pop(context);
                   },
                 ),
@@ -697,6 +720,7 @@ class SharedActionBar {
     required ViewMode viewMode,
     required VoidCallback onViewModeToggled,
     required VoidCallback onRefresh,
+    String? refreshTooltip,
     @Deprecated('Use currentGridZoomLevel + onGridZoomChanged instead')
     VoidCallback? onGridSizePressed,
     int? currentGridZoomLevel,
@@ -715,11 +739,15 @@ class SharedActionBar {
     bool isPreviewPaneVisible = true,
     bool showDesktopViewModes = false,
     Set<SortOption>? allowedSortOptions,
+    Set<ViewMode>? allowedViewModes,
+    bool showMoreOptions = true,
     List<PopupMenuEntry<String>>? additionalMoreOptions,
     Function(String)? onAdditionalMoreOptionSelected,
   }) {
     final l10n = AppLocalizations.of(context)!;
     List<Widget> actions = [];
+    bool allowsViewMode(ViewMode mode) =>
+        allowedViewModes?.contains(mode) ?? true;
 
     // Add search button
     actions.add(
@@ -839,139 +867,143 @@ class SharedActionBar {
         offset: const Offset(0, 50),
         initialValue: viewMode,
         itemBuilder: (context) => [
-          PopupMenuItem<ViewMode>(
-            value: ViewMode.list,
-            child: Row(
-              children: [
-                Icon(
-                  PhosphorIconsLight.list,
-                  size: 20,
-                  color: viewMode == ViewMode.list
-                      ? Theme.of(context).colorScheme.primary
-                      : null,
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  l10n.viewModeList,
-                  style: TextStyle(
-                    fontWeight: viewMode == ViewMode.list
-                        ? FontWeight.bold
-                        : FontWeight.normal,
+          if (allowsViewMode(ViewMode.list))
+            PopupMenuItem<ViewMode>(
+              value: ViewMode.list,
+              child: Row(
+                children: [
+                  Icon(
+                    PhosphorIconsLight.list,
+                    size: 20,
                     color: viewMode == ViewMode.list
                         ? Theme.of(context).colorScheme.primary
                         : null,
                   ),
-                ),
-                const Spacer(),
-                if (viewMode == ViewMode.list)
-                  Icon(
-                    PhosphorIconsLight.check,
-                    color: Theme.of(context).colorScheme.primary,
-                    size: 20,
+                  const SizedBox(width: 10),
+                  Text(
+                    l10n.viewModeList,
+                    style: TextStyle(
+                      fontWeight: viewMode == ViewMode.list
+                          ? FontWeight.bold
+                          : FontWeight.normal,
+                      color: viewMode == ViewMode.list
+                          ? Theme.of(context).colorScheme.primary
+                          : null,
+                    ),
                   ),
-              ],
+                  const Spacer(),
+                  if (viewMode == ViewMode.list)
+                    Icon(
+                      PhosphorIconsLight.check,
+                      color: Theme.of(context).colorScheme.primary,
+                      size: 20,
+                    ),
+                ],
+              ),
             ),
-          ),
-          PopupMenuItem<ViewMode>(
-            value: ViewMode.tiles,
-            child: Row(
-              children: [
-                Icon(
-                  PhosphorIconsLight.gridNine,
-                  size: 20,
-                  color: viewMode == ViewMode.tiles
-                      ? Theme.of(context).colorScheme.primary
-                      : null,
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  l10n.viewModeTiles,
-                  style: TextStyle(
-                    fontWeight: viewMode == ViewMode.tiles
-                        ? FontWeight.bold
-                        : FontWeight.normal,
+          if (allowsViewMode(ViewMode.tiles))
+            PopupMenuItem<ViewMode>(
+              value: ViewMode.tiles,
+              child: Row(
+                children: [
+                  Icon(
+                    PhosphorIconsLight.gridNine,
+                    size: 20,
                     color: viewMode == ViewMode.tiles
                         ? Theme.of(context).colorScheme.primary
                         : null,
                   ),
-                ),
-                const Spacer(),
-                if (viewMode == ViewMode.tiles)
-                  Icon(
-                    PhosphorIconsLight.check,
-                    color: Theme.of(context).colorScheme.primary,
-                    size: 20,
+                  const SizedBox(width: 10),
+                  Text(
+                    l10n.viewModeTiles,
+                    style: TextStyle(
+                      fontWeight: viewMode == ViewMode.tiles
+                          ? FontWeight.bold
+                          : FontWeight.normal,
+                      color: viewMode == ViewMode.tiles
+                          ? Theme.of(context).colorScheme.primary
+                          : null,
+                    ),
                   ),
-              ],
+                  const Spacer(),
+                  if (viewMode == ViewMode.tiles)
+                    Icon(
+                      PhosphorIconsLight.check,
+                      color: Theme.of(context).colorScheme.primary,
+                      size: 20,
+                    ),
+                ],
+              ),
             ),
-          ),
-          PopupMenuItem<ViewMode>(
-            value: ViewMode.grid,
-            child: Row(
-              children: [
-                Icon(
-                  PhosphorIconsLight.squaresFour,
-                  size: 20,
-                  color: viewMode == ViewMode.grid
-                      ? Theme.of(context).colorScheme.primary
-                      : null,
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  l10n.viewModeGrid,
-                  style: TextStyle(
-                    fontWeight: viewMode == ViewMode.grid
-                        ? FontWeight.bold
-                        : FontWeight.normal,
+          if (allowsViewMode(ViewMode.grid))
+            PopupMenuItem<ViewMode>(
+              value: ViewMode.grid,
+              child: Row(
+                children: [
+                  Icon(
+                    PhosphorIconsLight.squaresFour,
+                    size: 20,
                     color: viewMode == ViewMode.grid
                         ? Theme.of(context).colorScheme.primary
                         : null,
                   ),
-                ),
-                const Spacer(),
-                if (viewMode == ViewMode.grid)
-                  Icon(
-                    PhosphorIconsLight.check,
-                    color: Theme.of(context).colorScheme.primary,
-                    size: 20,
+                  const SizedBox(width: 10),
+                  Text(
+                    l10n.viewModeGrid,
+                    style: TextStyle(
+                      fontWeight: viewMode == ViewMode.grid
+                          ? FontWeight.bold
+                          : FontWeight.normal,
+                      color: viewMode == ViewMode.grid
+                          ? Theme.of(context).colorScheme.primary
+                          : null,
+                    ),
                   ),
-              ],
+                  const Spacer(),
+                  if (viewMode == ViewMode.grid)
+                    Icon(
+                      PhosphorIconsLight.check,
+                      color: Theme.of(context).colorScheme.primary,
+                      size: 20,
+                    ),
+                ],
+              ),
             ),
-          ),
-          PopupMenuItem<ViewMode>(
-            value: ViewMode.details,
-            child: Row(
-              children: [
-                Icon(
-                  PhosphorIconsLight.listBullets,
-                  size: 20,
-                  color: viewMode == ViewMode.details
-                      ? Theme.of(context).colorScheme.primary
-                      : null,
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  l10n.viewModeDetails,
-                  style: TextStyle(
-                    fontWeight: viewMode == ViewMode.details
-                        ? FontWeight.bold
-                        : FontWeight.normal,
+          if (allowsViewMode(ViewMode.details))
+            PopupMenuItem<ViewMode>(
+              value: ViewMode.details,
+              child: Row(
+                children: [
+                  Icon(
+                    PhosphorIconsLight.listBullets,
+                    size: 20,
                     color: viewMode == ViewMode.details
                         ? Theme.of(context).colorScheme.primary
                         : null,
                   ),
-                ),
-                const Spacer(),
-                if (viewMode == ViewMode.details)
-                  Icon(
-                    PhosphorIconsLight.check,
-                    color: Theme.of(context).colorScheme.primary,
-                    size: 20,
+                  const SizedBox(width: 10),
+                  Text(
+                    l10n.viewModeDetails,
+                    style: TextStyle(
+                      fontWeight: viewMode == ViewMode.details
+                          ? FontWeight.bold
+                          : FontWeight.normal,
+                      color: viewMode == ViewMode.details
+                          ? Theme.of(context).colorScheme.primary
+                          : null,
+                    ),
                   ),
-              ],
+                  const Spacer(),
+                  if (viewMode == ViewMode.details)
+                    Icon(
+                      PhosphorIconsLight.check,
+                      color: Theme.of(context).colorScheme.primary,
+                      size: 20,
+                    ),
+                ],
+              ),
             ),
-          ),
-          if (showDesktopViewModes)
+          if (showDesktopViewModes && allowsViewMode(ViewMode.columns))
             PopupMenuItem<ViewMode>(
               value: ViewMode.columns,
               child: Row(
@@ -1005,39 +1037,40 @@ class SharedActionBar {
                 ],
               ),
             ),
-          PopupMenuItem<ViewMode>(
-            value: ViewMode.tree,
-            child: Row(
-              children: [
-                Icon(
-                  PhosphorIconsLight.treeView,
-                  size: 20,
-                  color: viewMode == ViewMode.tree
-                      ? Theme.of(context).colorScheme.primary
-                      : null,
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  l10n.viewModeTree,
-                  style: TextStyle(
-                    fontWeight: viewMode == ViewMode.tree
-                        ? FontWeight.bold
-                        : FontWeight.normal,
+          if (allowsViewMode(ViewMode.tree))
+            PopupMenuItem<ViewMode>(
+              value: ViewMode.tree,
+              child: Row(
+                children: [
+                  Icon(
+                    PhosphorIconsLight.treeView,
+                    size: 20,
                     color: viewMode == ViewMode.tree
                         ? Theme.of(context).colorScheme.primary
                         : null,
                   ),
-                ),
-                const Spacer(),
-                if (viewMode == ViewMode.tree)
-                  Icon(
-                    PhosphorIconsLight.check,
-                    color: Theme.of(context).colorScheme.primary,
-                    size: 20,
+                  const SizedBox(width: 10),
+                  Text(
+                    l10n.viewModeTree,
+                    style: TextStyle(
+                      fontWeight: viewMode == ViewMode.tree
+                          ? FontWeight.bold
+                          : FontWeight.normal,
+                      color: viewMode == ViewMode.tree
+                          ? Theme.of(context).colorScheme.primary
+                          : null,
+                    ),
                   ),
-              ],
+                  const Spacer(),
+                  if (viewMode == ViewMode.tree)
+                    Icon(
+                      PhosphorIconsLight.check,
+                      color: Theme.of(context).colorScheme.primary,
+                      size: 20,
+                    ),
+                ],
+              ),
             ),
-          ),
         ],
         onSelected: (ViewMode selectedMode) {
           if (selectedMode != viewMode) {
@@ -1056,25 +1089,26 @@ class SharedActionBar {
       IconButton(
         key: const ValueKey('shared-refresh-action'),
         icon: const Icon(PhosphorIconsLight.arrowsClockwise),
-        tooltip: l10n.refreshTooltip,
+        tooltip: refreshTooltip ?? l10n.refreshTooltip,
         onPressed: onRefresh,
       ),
     );
 
     // Add more options menu
-    actions.add(
-      buildMoreOptionsMenu(
-        onSelectionModeToggled: onSelectionModeToggled,
-        onManageTagsPressed: onManageTagsPressed,
-        allowFileExtensionRename: allowFileExtensionRename,
-        onAllowFileExtensionRenameChanged: onAllowFileExtensionRenameChanged,
-        onGallerySelected: onGallerySelected,
-        currentPath: currentPath,
-        additionalMoreOptions: additionalMoreOptions,
-        onAdditionalMoreOptionSelected: onAdditionalMoreOptionSelected,
-      ),
-    );
-
+    if (showMoreOptions) {
+      actions.add(
+        buildMoreOptionsMenu(
+          onSelectionModeToggled: onSelectionModeToggled,
+          onManageTagsPressed: onManageTagsPressed,
+          allowFileExtensionRename: allowFileExtensionRename,
+          onAllowFileExtensionRenameChanged: onAllowFileExtensionRenameChanged,
+          onGallerySelected: onGallerySelected,
+          currentPath: currentPath,
+          additionalMoreOptions: additionalMoreOptions,
+          onAdditionalMoreOptionSelected: onAdditionalMoreOptionSelected,
+        ),
+      );
+    }
     return actions;
   }
 }

@@ -3,6 +3,7 @@ import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:cb_file_manager/services/featured_albums_service.dart';
 import 'package:cb_file_manager/services/album_service.dart';
 import 'package:cb_file_manager/models/objectbox/album.dart';
+import 'package:cb_file_manager/config/translation_helper.dart';
 
 class FeaturedAlbumsSettingsScreen extends StatefulWidget {
   const FeaturedAlbumsSettingsScreen({super.key});
@@ -48,11 +49,15 @@ class _FeaturedAlbumsSettingsScreenState
           }
 
           if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
+            return Center(
+              child: Text(
+                context.tr.errorWithDetail(snapshot.error.toString()),
+              ),
+            );
           }
 
           if (!snapshot.hasData) {
-            return const Center(child: Text('No data available'));
+            return Center(child: Text(context.tr.faNoData));
           }
 
           _currentConfig ??= snapshot.data![0] as FeaturedAlbumsConfig;
@@ -73,7 +78,7 @@ class _FeaturedAlbumsSettingsScreenState
       padding: const EdgeInsets.all(16),
       children: [
         SwitchListTile(
-          title: const Text('Show Featured Albums in Gallery Hub'),
+          title: Text(context.tr.faShowInHub),
           value: config.showInGalleryHub,
           onChanged: (value) {
             final newConfig = FeaturedAlbumsConfig.fromJson(config.toJson())
@@ -82,8 +87,8 @@ class _FeaturedAlbumsSettingsScreenState
           },
         ),
         SwitchListTile(
-          title: const Text('Auto-select recent albums'),
-          subtitle: const Text('Automatically feature your most recent albums'),
+          title: Text(context.tr.faAutoSelect),
+          subtitle: Text(context.tr.faAutoSelectDesc),
           value: config.autoSelectRecent,
           onChanged: (value) {
             final newConfig = FeaturedAlbumsConfig.fromJson(config.toJson())
@@ -92,7 +97,7 @@ class _FeaturedAlbumsSettingsScreenState
           },
         ),
         ListTile(
-          title: const Text('Max featured albums'),
+          title: Text(context.tr.faMax),
           trailing: CbSelect.fromValues<int>(
             values: const [2, 4, 6, 8, 10],
             value: config.maxFeaturedAlbums,
@@ -105,10 +110,10 @@ class _FeaturedAlbumsSettingsScreenState
           ),
         ),
         const Divider(),
-        const Padding(
-          padding: EdgeInsets.symmetric(vertical: 8.0),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8.0),
           child: Text(
-            'Manually select featured albums',
+            context.tr.faManual,
             style: TextStyle(fontWeight: FontWeight.bold),
           ),
         ),

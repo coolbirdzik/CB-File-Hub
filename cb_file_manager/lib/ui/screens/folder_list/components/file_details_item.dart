@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/ui/components/common/file_details_columns.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -21,6 +22,7 @@ import 'package:cb_file_manager/services/file_metadata_service.dart';
 import 'package:cb_file_manager/core/service_locator.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
+import '../../../components/common/file_entry_presentation.dart';
 
 class FileDetailsItem extends StatefulWidget {
   final File file;
@@ -86,7 +88,9 @@ class _FileDetailsItemState extends State<FileDetailsItem> {
       });
     }
 
-    if (widget.file.path != oldWidget.file.path) {
+    if (widget.file.path != oldWidget.file.path ||
+        widget.state.fileStatsCache[widget.file.path] !=
+            oldWidget.state.fileStatsCache[widget.file.path]) {
       _loadFileStats();
       _checkFileType();
       // We don't need to update the thumbnail key here since file path changed
@@ -95,6 +99,11 @@ class _FileDetailsItemState extends State<FileDetailsItem> {
   }
 
   Future<void> _loadFileStats() async {
+    final indexedStat = widget.state.fileStatsCache[widget.file.path];
+    if (indexedStat != null) {
+      _fileStat = indexedStat;
+      return;
+    }
     try {
       final stat = await widget.file.stat();
       if (mounted) {
@@ -265,6 +274,11 @@ class _FileDetailsItemState extends State<FileDetailsItem> {
                         ),
                       ),
                     ),
+
+                    for (final column
+                        in FileDetailsColumns.maybeOf(context)?.visible ??
+                            <FileDetailsColumn>[])
+                      column.cell(context, widget.file.path),
 
                     // Type column
                     if (widget.columnVisibility.type)
@@ -587,7 +601,11 @@ class _FileDetailsItemState extends State<FileDetailsItem> {
         renameController.renamingPath == widget.file.path;
 
     final textWidget = Text(
-      FileTypeUtils.getFileName(widget.file.path),
+      FileEntryPresentation.nameOf(
+        context,
+        widget.file.path,
+        fallback: FileTypeUtils.getFileName(widget.file.path),
+      ),
       overflow: TextOverflow.ellipsis,
       style: TextStyle(
         fontWeight: _visuallySelected ? FontWeight.bold : FontWeight.normal,

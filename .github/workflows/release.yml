@@ -33,6 +33,22 @@ env:
   ONEDRIVE_CLIENT_ID: ${{ secrets.ONEDRIVE_CLIENT_ID }}
 
 jobs:
+  validate-store-listings:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: "22"
+      - name: Validate shared Microsoft Store and Google Play descriptions
+        run: |
+          node --test scripts/tests/store_listings.test.mjs scripts/tests/google_play_listings.test.mjs
+          node scripts/store_listings.mjs > store-listings-preview.json
+      - uses: actions/upload-artifact@v7.0.1
+        with:
+          name: store-listings-en-vi
+          path: store-listings-preview.json
+
   # Generate release notes from commits
   generate-release-notes:
     runs-on: ubuntu-latest
@@ -359,7 +375,7 @@ jobs:
   # Build Windows MSIX
   build-windows-msix:
     runs-on: windows-latest
-    needs: generate-release-notes
+    needs: [generate-release-notes, validate-store-listings]
     environment: Production
     steps:
       - name: Checkout code
@@ -469,6 +485,7 @@ jobs:
           PARTNER_CENTER_CLIENT_ID: ${{ secrets.PARTNER_CENTER_CLIENT_ID }}
           PARTNER_CENTER_CLIENT_SECRET: ${{ secrets.PARTNER_CENTER_CLIENT_SECRET }}
           PARTNER_CENTER_APP_ID: ${{ vars.PARTNER_CENTER_APP_ID }}
+          PARTNER_CENTER_LISTINGS_DIR: store/listings
           # Release builds always submit for certification and publish once approved.
           PARTNER_CENTER_COMMIT_SUBMISSION: "true"
           PARTNER_CENTER_TARGET_PUBLISH_MODE: "Immediate"
@@ -613,10 +630,16 @@ jobs:
     needs:
       - generate-release-notes
       - resolve-android-version-code
+      - validate-store-listings
     environment: Production
     steps:
       - name: Checkout code
         uses: actions/checkout@v7.0.1
+
+      - name: Setup Node for Store descriptions
+        uses: actions/setup-node@v7.0.0
+        with:
+          node-version: "22"
 
       - name: Setup Java
         uses: actions/setup-java@v6.0.0
@@ -691,7 +714,19 @@ jobs:
           name: android-aab
           path: ${{ env.PROJECT_DIR }}/build/app/outputs/bundle/release/*.aab
 
-      - name: Submit AAB to Google Play
+      - name: Prepare Google Play descriptions in the release edit
+        id: play_listing
+        if: (github.event.inputs.play_track || vars.GOOGLE_PLAY_TRACK || 'internal') != 'internalsharing'
+        env:
+          GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          GOOGLE_PLAY_PACKAGE_NAME: ${{ vars.GOOGLE_PLAY_PACKAGE_NAME || 'com.cbv.filehub' }}
+          STORE_LISTINGS_DIR: store/listings
+        run: |
+          EDIT_ID="$(node scripts/google_play_listings.mjs prepare)"
+          echo "edit_id=$EDIT_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Submit AAB and descriptions to Google Play
+        id: submit_play
         uses: r0adkll/upload-google-play@v1.1.5
         with:
           serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
@@ -700,6 +735,15 @@ jobs:
           tracks: ${{ github.event.inputs.play_track || vars.GOOGLE_PLAY_TRACK || 'internal' }}
           status: ${{ github.event.inputs.play_status || vars.GOOGLE_PLAY_STATUS || 'completed' }}
           releaseName: ${{ needs.generate-release-notes.outputs.version_tag }}
+          existingEditId: ${{ steps.play_listing.outputs.edit_id }}
+
+      - name: Discard uncommitted Google Play edit after a failed upload
+        if: always() && steps.play_listing.outputs.edit_id != '' && steps.submit_play.outcome != 'success'
+        env:
+          GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          GOOGLE_PLAY_PACKAGE_NAME: ${{ vars.GOOGLE_PLAY_PACKAGE_NAME || 'com.cbv.filehub' }}
+          GOOGLE_PLAY_EDIT_ID: ${{ steps.play_listing.outputs.edit_id }}
+        run: node scripts/google_play_listings.mjs discard
 
   # Create GitHub Release
   create-release:
