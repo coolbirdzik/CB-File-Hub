@@ -778,23 +778,26 @@ void main() {
         find.byKey(const ValueKey('torrent-import-files-action')),
         findsOneWidget,
       );
-      for (final client in [
-        'utorrent',
-        'bittorrent',
-        'transmission',
-        'deluge',
-      ]) {
+      for (final client in ['transmission', 'deluge']) {
         expect(
           find.byKey(ValueKey('torrent-import-$client-action')),
           findsOneWidget,
         );
       }
+      // These backup/profile integrations are Windows-only in the actual UI.
+      // Linux CI must verify their absence rather than skip the import test.
+      for (final client in ['utorrent', 'bittorrent']) {
+        expect(
+          find.byKey(ValueKey('torrent-import-$client-action')),
+          Platform.isWindows ? findsOneWidget : findsNothing,
+        );
+      }
       expect(
         find.byKey(const ValueKey('torrent-qbittorrent-import-action')),
-        findsOneWidget,
+        Platform.isWindows ? findsOneWidget : findsNothing,
       );
       await tester.tap(
-        find.byKey(const ValueKey('torrent-import-utorrent-action')),
+        find.byKey(const ValueKey('torrent-import-transmission-action')),
       );
       await tester.pump();
       for (var attempt = 0; attempt < 100; attempt++) {
@@ -812,7 +815,7 @@ void main() {
       }
       await tester.pumpAndSettle();
       expect(find.byType(TorrentClientImportDialog), findsOneWidget);
-      expect(find.text('Import from µTorrent'), findsOneWidget);
+      expect(find.text('Import from Transmission'), findsOneWidget);
       expect(
         find.byKey(const ValueKey('torrent-qbittorrent-import-action')),
         findsNothing,
