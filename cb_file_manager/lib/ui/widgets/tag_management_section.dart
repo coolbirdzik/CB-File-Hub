@@ -864,7 +864,7 @@ class _AnimatedTagChipState extends State<AnimatedTagChip>
     final Color textColor = foregroundColor;
     final Color iconColor = foregroundColor.withValues(alpha: 0.92);
 
-    return MouseRegion(
+    final chip = MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) {
         setState(() => _isHovered = true);
@@ -894,33 +894,25 @@ class _AnimatedTagChipState extends State<AnimatedTagChip>
                     isDark: isDark,
                     hovered: _isHovered,
                   ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
-                  ),
+                  padding: TagChipStyle.padding,
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      _buildLeadingWidget(iconColor, tagColor),
+                      SizedBox.square(
+                        dimension: TagChipStyle.iconExtent,
+                        child: Center(
+                          child: _buildLeadingWidget(iconColor, tagColor),
+                        ),
+                      ),
                       const SizedBox(width: 4),
                       Flexible(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              widget.displayText,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: textColor,
-                                fontSize: 13,
-                                fontWeight: _isHovered
-                                    ? FontWeight.bold
-                                    : FontWeight.normal,
-                              ),
-                            ),
-                            _buildHierarchyLabel(textColor),
-                          ],
+                        child: Text(
+                          widget.displayText,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TagChipStyle.labelStyle(
+                            context,
+                          ).copyWith(color: textColor),
                         ),
                       ),
                       if (_isHovered) ...[
@@ -940,6 +932,14 @@ class _AnimatedTagChipState extends State<AnimatedTagChip>
         ),
       ),
     );
+    final parents = _hierarchyManager.getParents(widget.tag);
+    return parents.isEmpty
+        ? chip
+        : Tooltip(
+            message:
+                '${widget.displayText}\n${AppLocalizations.of(context)!.parentTagLabel}: ${parents.join(', ')}',
+            child: chip,
+          );
   }
 
   /// Builds thumbnail image or tag icon as the leading widget.
@@ -950,11 +950,14 @@ class _AnimatedTagChipState extends State<AnimatedTagChip>
         borderRadius: BorderRadius.circular(4),
         child: Image.file(
           File(thumbnailPath),
-          width: 20,
-          height: 20,
+          width: TagChipStyle.iconExtent,
+          height: TagChipStyle.iconExtent,
           fit: BoxFit.cover,
-          errorBuilder: (_, _, _) =>
-              Icon(PhosphorIconsLight.tag, size: 14, color: iconColor),
+          errorBuilder: (_, _, _) => Icon(
+            PhosphorIconsLight.tag,
+            size: TagChipStyle.iconSize,
+            color: iconColor,
+          ),
         ),
       );
     }
@@ -962,24 +965,8 @@ class _AnimatedTagChipState extends State<AnimatedTagChip>
       _hierarchyManager.isParent(widget.tag)
           ? PhosphorIconsLight.treeStructure
           : PhosphorIconsLight.tag,
-      size: 14,
+      size: TagChipStyle.iconSize,
       color: iconColor,
-    );
-  }
-
-  /// Builds a small hierarchy label if tag has parents.
-  Widget _buildHierarchyLabel(Color textColor) {
-    final parents = _hierarchyManager.getParents(widget.tag);
-    if (parents.isEmpty) return const SizedBox.shrink();
-    return Text(
-      parents.join(', '),
-      style: TextStyle(
-        fontSize: 10,
-        color: textColor.withValues(alpha: 0.6),
-        fontStyle: FontStyle.italic,
-      ),
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
     );
   }
 }

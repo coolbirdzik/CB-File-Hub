@@ -874,7 +874,11 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
           ? widget.style
           : Theme.of(context).textTheme.bodyMedium!
                 .merge(widget.style)
-                .copyWith(fontSize: 13, color: childColor),
+                .copyWith(
+                  fontSize: TagChipStyle.fontSize,
+                  height: TagChipStyle.lineHeight,
+                  color: childColor,
+                ),
       strutStyle: parent == null
           ? widget.strutStyle ??
                 const StrutStyle(
@@ -1172,7 +1176,7 @@ class TagScopeChip extends StatelessWidget {
     final color = TagChipStyle.readableOn(
       TagChipStyle.background(tagColor, isDark: isDark),
     );
-    final textStyle = theme.textTheme.bodyMedium!.copyWith(fontSize: 13);
+    final textStyle = TagChipStyle.labelStyle(context);
     double measure(String text, TextStyle style) {
       final painter = TextPainter(
         text: TextSpan(text: text, style: style),
@@ -1200,13 +1204,13 @@ class TagScopeChip extends StatelessWidget {
     final inputWidth =
         measure(draft.isEmpty ? l10n.childTagInputHint : draft, textStyle) + 16;
     final width =
-        (labelWidth + parentWidth + inputWidth.clamp(80.0, maxWidth) + 52)
+        (labelWidth + parentWidth + inputWidth.clamp(80.0, maxWidth) + 60)
             .clamp(0.0, maxWidth);
 
     return Container(
       width: width,
-      constraints: const BoxConstraints(minHeight: 36),
-      padding: const EdgeInsets.only(left: 8, right: 4),
+      constraints: BoxConstraints(minHeight: TagChipStyle.height(context)),
+      padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: TagChipStyle.decoration(tagColor, isDark: isDark),
       child: Row(
         children: [
@@ -1346,10 +1350,7 @@ class _TagInputChipState extends State<TagInputChip>
                         ? null
                         : () => widget.onSelected(widget.tag),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
-                      ),
+                      padding: TagChipStyle.padding,
                       decoration: TagChipStyle.decoration(
                         tagColor,
                         isDark: isDark,
@@ -1358,10 +1359,13 @@ class _TagInputChipState extends State<TagInputChip>
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(
-                            PhosphorIconsLight.tag,
-                            size: 14,
-                            color: contentColor,
+                          SizedBox.square(
+                            dimension: TagChipStyle.iconExtent,
+                            child: Icon(
+                              PhosphorIconsLight.tag,
+                              size: TagChipStyle.iconSize,
+                              color: contentColor,
+                            ),
                           ),
                           const SizedBox(width: 4),
                           Flexible(
@@ -1369,11 +1373,9 @@ class _TagInputChipState extends State<TagInputChip>
                               widget.label ?? widget.tag,
                               overflow: TextOverflow.ellipsis,
                               maxLines: 1,
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                                color: contentColor,
-                              ),
+                              style: TagChipStyle.labelStyle(
+                                context,
+                              ).copyWith(color: contentColor),
                             ),
                           ),
                           const SizedBox(width: 6),

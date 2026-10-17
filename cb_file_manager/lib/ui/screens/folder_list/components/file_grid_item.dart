@@ -20,6 +20,7 @@ import '../../../../bloc/selection/selection_event.dart';
 import '../../../components/common/optimized_interaction_handler.dart';
 import '../../../components/common/shared_file_context_menu.dart';
 import '../../../utils/item_interaction_style.dart';
+import 'grid_tag_strip.dart';
 import 'thumbnail_only.dart';
 import '../../../components/common/file_entry_presentation.dart';
 
@@ -323,9 +324,7 @@ class _FileGridItemState extends State<FileGridItem> {
     );
 
     // Windows Explorer style: transparent background, icon + name layout
-    final double nameAreaHeight = (widget.showFileTags && widget.state != null)
-        ? GridZoomConstraints.gridItemNameAreaHeightWithTags
-        : GridZoomConstraints.gridItemNameAreaHeight;
+    final bool showTags = widget.showFileTags && widget.state != null;
 
     return RepaintBoundary(
       child: Opacity(
@@ -388,36 +387,52 @@ class _FileGridItemState extends State<FileGridItem> {
                   ),
                 ),
                 // Filename (and optional tags) below icon - fixed height so thumbnail is always the same size
-                SizedBox(
-                  height: nameAreaHeight,
-                  child: Padding(
-                    padding: const EdgeInsets.only(
-                      top: 4.0,
-                      left: 4.0,
-                      right: 4.0,
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Flexible, not fixed: the band's height is budgeted
-                        // for the plain label, and the inline editor's border
-                        // and padding make it taller than that.
-                        Flexible(
-                          child: _buildNameWidget(
-                            context,
-                            theme,
-                            fileName,
-                            isBeingRenamed,
-                            renameController,
-                          ),
+                // The tag strip scales with the tile width, so the band's
+                // height is derived from it.
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final double tileWidth = constraints.maxWidth;
+                    final double bandHeight = showTags
+                        ? GridZoomConstraints.nameAreaHeightWithTagsForWidth(
+                            tileWidth,
+                          )
+                        : GridZoomConstraints.gridItemNameAreaHeight;
+                    return SizedBox(
+                      height: bandHeight,
+                      child: Padding(
+                        padding: const EdgeInsets.only(
+                          top: 4.0,
+                          left: 4.0,
+                          right: 4.0,
                         ),
-                        if (widget.showFileTags && widget.state != null) ...[
-                          const SizedBox(height: 2),
-                          _buildTagsDisplay(context),
-                        ],
-                      ],
-                    ),
-                  ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Flexible, not fixed: the band's height is
+                            // budgeted for the plain label, and the inline
+                            // editor's border and padding make it taller than
+                            // that.
+                            Flexible(
+                              child: _buildNameWidget(
+                                context,
+                                theme,
+                                fileName,
+                                isBeingRenamed,
+                                renameController,
+                              ),
+                            ),
+                            if (showTags) ...[
+                              const SizedBox(height: 2),
+                              GridTagStrip(
+                                tags: _fileTags,
+                                tileWidth: tileWidth,
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ],
             ),
@@ -470,63 +485,6 @@ class _FileGridItemState extends State<FileGridItem> {
         textAlign: TextAlign.center,
         maxLines: cbInlineRenameMaxLines,
       ),
-    );
-  }
-
-  Widget _buildTagsDisplay(BuildContext context) {
-    if (widget.state == null) return const SizedBox.shrink();
-
-    final List<String> fileTags = _fileTags;
-    if (fileTags.isEmpty) return const SizedBox.shrink();
-
-    final List<String> tagsToShow = fileTags.take(2).toList();
-    final bool hasMoreTags = fileTags.length > 2;
-
-    return Wrap(
-      alignment: WrapAlignment.center,
-      spacing: 2,
-      runSpacing: 2,
-      children: [
-        ...tagsToShow.map(
-          (tag) => Container(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-            decoration: BoxDecoration(
-              color: Theme.of(
-                context,
-              ).colorScheme.primary.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(16.0),
-            ),
-            child: Text(
-              tag,
-              style: TextStyle(
-                fontSize: 8,
-                color: Theme.of(context).colorScheme.primary,
-                fontWeight: FontWeight.w500,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ),
-        if (hasMoreTags)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-            decoration: BoxDecoration(
-              color: Theme.of(
-                context,
-              ).colorScheme.primary.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(16.0),
-            ),
-            child: Text(
-              '+${fileTags.length - 2}',
-              style: TextStyle(
-                fontSize: 8,
-                color: Theme.of(context).colorScheme.primary,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-      ],
     );
   }
 }

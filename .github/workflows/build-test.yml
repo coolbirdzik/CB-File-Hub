@@ -137,7 +137,17 @@ jobs:
       - name: Run integration tests - media_kit_playback_e2e_test
         run: |
           cd ${{ env.PROJECT_DIR }}
-          flutter test integration_test/media_kit_playback_e2e_test.dart -d windows --dart-define=CB_E2E=true
+          flutter test integration_test/media_kit_playback_e2e_test.dart -d windows --dart-define=CB_E2E=true --reporter expanded --file-reporter json:build/e2e-media-kit-ci.jsonl
+
+      - name: Upload Media Kit E2E diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: media-kit-e2e-diagnostics-${{ github.run_attempt }}
+          if-no-files-found: warn
+          path: |
+            ${{ env.PROJECT_DIR }}/build/e2e-media-kit-ci.jsonl
+            ${{ env.PROJECT_DIR }}/build/e2e-media-kit/
 
       - name: Stop stray cb_file_hub.exe (after media_kit_playback_e2e_test)
         if: always()

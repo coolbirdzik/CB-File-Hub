@@ -5,6 +5,42 @@ import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 
 enum GridSizeMode { columns, referenceWidth }
 
+/// How the tag strip under a grid tile scales with the tile's width: tiny
+/// tiles get coloured dots (text would be unreadable), then one row of small
+/// chips, then progressively more rows with a larger font.
+class GridTagTier {
+  final bool dotsOnly;
+  final int maxRows;
+  final double fontSize;
+  final double chipHeight;
+
+  const GridTagTier._(
+    this.dotsOnly,
+    this.maxRows,
+    this.fontSize,
+    this.chipHeight,
+  );
+
+  static const double rowGap = 3.0;
+  static const double dotSize = 8.0;
+
+  static const _dots = GridTagTier._(true, 1, 0, dotSize);
+  static const _small = GridTagTier._(false, 1, 10, 16);
+  static const _medium = GridTagTier._(false, 1, 11, 17);
+  static const _large = GridTagTier._(false, 2, 11, 17);
+  static const _xLarge = GridTagTier._(false, 2, 12, 19);
+
+  static GridTagTier forWidth(double tileWidth) {
+    if (tileWidth < 84) return _dots;
+    if (tileWidth < 140) return _small;
+    if (tileWidth < 200) return _medium;
+    if (tileWidth < 280) return _large;
+    return _xLarge;
+  }
+
+  double get height => maxRows * chipHeight + (maxRows - 1) * rowGap;
+}
+
 class GridZoomConstraints {
   static const double defaultGridSpacing = 8.0;
   static const double defaultReferenceWidth = 960.0;
@@ -32,6 +68,12 @@ class GridZoomConstraints {
   // Font size used for grid item filenames (kept here so label height above
   // stays consistent if the font size ever changes).
   static const double gridItemFilenameFontSize = 12.0;
+
+  /// Height of the name band (filename + tag strip) for a tile that is
+  /// [tileWidth] wide and shows tags. Grows with the tile because larger tiles
+  /// show more, bigger tag rows (see [GridTagTier]).
+  static double nameAreaHeightWithTagsForWidth(double tileWidth) =>
+      gridItemNameAreaHeight + 2 + GridTagTier.forWidth(tileWidth).height;
 
   /// Returns the ideal item width for [zoomLevel] using the canonical
   /// file-browser formula.  Same calculation as
