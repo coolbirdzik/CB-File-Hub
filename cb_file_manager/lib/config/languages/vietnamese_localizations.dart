@@ -1638,6 +1638,20 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get seekSpeedFast => 'Nhanh';
   @override
+  String get videoWheelAction => 'Cuộn chuột trên video';
+  @override
+  String get videoWheelActionDescription =>
+      'Chức năng khi cuộn chuột trên trình phát. Nhấn chuột giữa vào video để chuyển đổi.';
+  @override
+  String get videoWheelVolume => 'Âm lượng';
+  @override
+  String get videoWheelSeek => 'Tua video';
+  @override
+  String videoWheelModeSwitched(String mode) => 'Cuộn chuột: $mode';
+  @override
+  String videoWheelSwitchHint(String mode) =>
+      'Nhấn chuột giữa để chuyển sang $mode';
+  @override
   String get videoDecoding => 'Giải mã video';
   @override
   String get videoDecodingAuto => 'Tự động (khuyên dùng)';

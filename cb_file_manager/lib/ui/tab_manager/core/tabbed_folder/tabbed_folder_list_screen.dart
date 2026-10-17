@@ -59,6 +59,7 @@ import 'package:cb_file_manager/ui/controllers/lazy_loading_manager.dart';
 import 'package:cb_file_manager/utils/app_logger.dart';
 import 'package:cb_file_manager/ui/menus/folder_background_context_menu.dart';
 import 'package:cb_file_manager/ui/mixins/preferences_manager_mixin.dart';
+import 'package:cb_file_manager/ui/tab_manager/core/tab_pane_state.dart';
 import 'package:cb_file_manager/ui/controllers/search_filter_manager.dart';
 import 'package:cb_file_manager/ui/controllers/refresh_controller.dart';
 import 'package:cb_file_manager/ui/controllers/navigation_controller.dart';
@@ -195,6 +196,15 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
   @override
   String get preferencePath => _currentPath;
 
+  // Preview pane visibility follows the tab, not the folder.
+  @override
+  bool? get sessionPreviewPaneVisible =>
+      TabPaneState.previewVisible(widget.tabId);
+
+  @override
+  void onPreviewPaneVisibilityChanged(bool visible) =>
+      TabPaneState.setPreviewVisible(widget.tabId, visible);
+
   // Global search toggle for tag search
   bool isGlobalSearch = false;
 
@@ -321,6 +331,12 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
     );
     _keyboardController = TabbedFolderKeyboardController();
     _previewPaneWidthNotifier = ValueNotifier<double>(previewPaneWidth);
+    // Restore this tab's pane toggles right away so a rebuilt screen (e.g.
+    // back from a system path) doesn't flash the defaults first.
+    isPreviewPaneVisible =
+        TabPaneState.previewVisible(widget.tabId) ?? isPreviewPaneVisible;
+    _propertiesPaneVisible =
+        TabPaneState.propertiesVisible(widget.tabId) ?? _propertiesPaneVisible;
     _inlineRenameController = InlineRenameController();
     FileBrowserHelper.setInlineRenameController(_inlineRenameController);
     FileBrowserHelper.setAfterFileCreatedCallback(_handleCreatedFile);
@@ -505,7 +521,11 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
 
   Future<void> _loadPropertiesPanePreferences() async {
     final prefs = UserPreferences.instance;
-    final visible = await prefs.getPropertiesPaneVisible();
+    // Visibility follows the tab; the stored value is only the default for a
+    // new tab. The height stays a global preference.
+    final visible =
+        TabPaneState.propertiesVisible(widget.tabId) ??
+        await prefs.getPropertiesPaneVisible();
     final height = await prefs.getPropertiesPaneHeight();
     if (!mounted || _propertiesPaneTouched) return;
     setState(() {
@@ -517,9 +537,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
   void _togglePropertiesPane() {
     _propertiesPaneTouched = true;
     setState(() => _propertiesPaneVisible = !_propertiesPaneVisible);
-    unawaited(
-      UserPreferences.instance.setPropertiesPaneVisible(_propertiesPaneVisible),
-    );
+    TabPaneState.setPropertiesVisible(widget.tabId, _propertiesPaneVisible);
   }
 
   Widget _buildBodyWithProperties(
@@ -1235,12 +1253,8 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
       final savedShowFileTags =
           await folderSortManager.getFolderShowFileTags(path) ??
           await prefs.getShowFileTags();
-      final savedPreviewPaneVisible =
-          await folderSortManager.getFolderPreviewPaneVisible(path) ??
-          await prefs.getPreviewPaneVisible();
-      final savedPreviewPaneWidth =
-          await folderSortManager.getFolderPreviewPaneWidth(path) ??
-          await prefs.getPreviewPaneWidth();
+      // Preview/properties panes are deliberately left alone here: they
+      // follow the tab, not the folder.
       if (!mounted || _currentPath != path) return;
       final maxZoom = GridZoomConstraints.maxGridSizeForContext(
         context,
@@ -1255,10 +1269,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
         gridZoomLevel = resolvedGridZoom;
         columnVisibility = savedColumnVisibility;
         showFileTags = savedShowFileTags;
-        isPreviewPaneVisible = savedPreviewPaneVisible;
-        previewPaneWidth = savedPreviewPaneWidth;
       });
-      _previewPaneWidthNotifier.value = savedPreviewPaneWidth;
       _folderListBloc.add(SetViewMode(effectiveViewMode));
       _folderListBloc.add(SetSortOption(savedSortOption, persist: false));
       _folderListBloc.add(SetGridZoom(resolvedGridZoom));

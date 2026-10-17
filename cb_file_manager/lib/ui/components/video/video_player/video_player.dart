@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -44,6 +45,7 @@ import 'video_player_models.dart';
 import 'video_player_seek_preview.dart';
 import 'video_player_seek_slider.dart';
 import 'video_player_utils.dart';
+import 'video_player_osd.dart';
 import 'video_playlist.dart';
 import 'package:cb_file_manager/config/translation_helper.dart';
 
@@ -476,6 +478,22 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
   Timer? _fastSeekTimer;
   int _fastSeekSeconds = 5; // Current seek amount, increases over time
   int _fastSeekTicks = 0; // Count of seek ticks to accelerate
+
+  // Centered OSD (volume level, wheel seek offset, wheel mode switch)
+  bool _osdVisible = false;
+  IconData? _osdIcon;
+  String _osdLabel = '';
+  double? _osdProgress;
+  String? _osdHint;
+  Timer? _osdTimer;
+
+  // Mouse wheel over the video: volume or seek; middle-click toggles
+  @override
+  VideoWheelAction _videoWheelAction = VideoWheelAction.volume;
+  static const int _wheelSeekStepSeconds = 5;
+  Duration _wheelSeekOrigin = Duration.zero;
+  Timer? _wheelSeekCommitTimer;
+
   // Seek speed: 0=slow, 1=medium, 2=fast — loaded from preferences
   @override
   int _videoSeekSpeed = 1;
@@ -575,6 +593,8 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
     WidgetsBinding.instance.removeObserver(this);
     VideoUiState.notifyPlayerDisposed();
     _disposeResources();
+    _osdTimer?.cancel();
+    _wheelSeekCommitTimer?.cancel();
     _keyboardFocusNode.dispose();
     super.dispose();
   }
@@ -1211,7 +1231,8 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
               if (!focused) _stopFastSeeking();
             },
             child: Listener(
-              onPointerDown: (_) => _keyboardFocusNode.requestFocus(),
+              onPointerDown: _handlePointerDown,
+              onPointerSignal: _handlePointerSignal,
               child: MouseRegion(
                 onHover: (_) {
                   _showControlsWithTimer();
@@ -1236,6 +1257,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
                           widget.showControls &&
                           _showControls)
                         _buildCustomControls(),
+                      _buildOsd(),
                     ],
                   ),
                 ),
@@ -1270,7 +1292,8 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
         if (!focused) _stopFastSeeking();
       },
       child: Listener(
-        onPointerDown: (_) => _keyboardFocusNode.requestFocus(),
+        onPointerDown: _handlePointerDown,
+        onPointerSignal: _handlePointerSignal,
         child: _buildPlayerBody(),
       ),
     );
@@ -1319,6 +1342,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
             _buildSpeedIndicatorOverlay(),
           _buildFastSeekGestureOverlay(),
           _buildFastSeekIndicator(),
+          _buildOsd(),
         ],
       ),
     );
@@ -1383,6 +1407,61 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
       isFastSeeking: _isFastSeeking,
       fastSeekSeconds: _fastSeekSeconds,
       fastSeekingForward: _fastSeekingForward,
+    );
+  }
+
+  Widget _buildOsd() {
+    return VideoPlayerOsd(
+      visible: _osdVisible,
+      icon: _osdIcon,
+      label: _osdLabel,
+      progress: _osdProgress,
+      hint: _osdHint,
+    );
+  }
+
+  void _flashOsd({
+    required IconData icon,
+    required String label,
+    double? progress,
+    String? hint,
+  }) {
+    if (!mounted) return;
+    _osdTimer?.cancel();
+    setState(() {
+      _osdVisible = true;
+      _osdIcon = icon;
+      _osdLabel = label;
+      _osdProgress = progress;
+      _osdHint = hint;
+    });
+    // Linger a bit longer when there is a hint to read.
+    _osdTimer = Timer(Duration(milliseconds: hint != null ? 2000 : 1200), () {
+      if (mounted) setState(() => _osdVisible = false);
+    });
+  }
+
+  void _flashVolumeOsd({String? hint}) {
+    final v = _currentEffectiveVolume0to100();
+    _flashOsd(
+      icon: v <= 0.1
+          ? PhosphorIconsLight.speakerSlash
+          : v < 50
+          ? PhosphorIconsLight.speakerLow
+          : PhosphorIconsLight.speakerHigh,
+      label: '${v.round()}%',
+      progress: v / 100.0,
+      hint: hint,
+    );
+  }
+
+  /// "Middle-click to switch to `other mode`" for wheel-driven OSDs.
+  String _wheelSwitchHint() {
+    final l10n = AppLocalizations.of(context)!;
+    return l10n.videoWheelSwitchHint(
+      _videoWheelAction == VideoWheelAction.volume
+          ? l10n.videoWheelSeek
+          : l10n.videoWheelVolume,
     );
   }
 
@@ -1945,18 +2024,133 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
     }
   }
 
-  void _increaseVolume() async {
-    final current = (_player?.state.volume ?? _savedVolume);
-    await _setVolumeFromUser((current + 5).clamp(0.0, 100.0));
+  void _handlePointerDown(PointerDownEvent event) {
+    _keyboardFocusNode.requestFocus();
+    if (event.kind == PointerDeviceKind.mouse &&
+        (event.buttons & kMiddleMouseButton) != 0) {
+      _toggleVideoWheelAction();
+    }
   }
 
-  void _decreaseVolume() async {
+  // Mouse wheel over the player adjusts volume or seeks, per
+  // [_videoWheelAction]. Registering with the resolver lets nested
+  // scrollables (e.g. playlist) keep their own scroll and stops ancestors
+  // from scrolling the page.
+  void _handlePointerSignal(PointerSignalEvent event) {
+    if (event is! PointerScrollEvent) return;
+    final dy = event.scrollDelta.dy;
+    if (dy == 0) return;
+    if (_videoWheelAction == VideoWheelAction.volume && !widget.allowMuting) {
+      return;
+    }
+    GestureBinding.instance.pointerSignalResolver.register(event, (_) {
+      // Wheel up = louder / forward.
+      final up = dy < 0;
+      switch (_videoWheelAction) {
+        case VideoWheelAction.volume:
+          if (up) {
+            _increaseVolume(fromWheel: true);
+          } else {
+            _decreaseVolume(fromWheel: true);
+          }
+          _showControlsWithTimer();
+        case VideoWheelAction.seek:
+          _wheelSeek(forward: up);
+      }
+    });
+  }
+
+  Future<void> _toggleVideoWheelAction() async {
+    final next = _videoWheelAction == VideoWheelAction.volume
+        ? VideoWheelAction.seek
+        : VideoWheelAction.volume;
+    setState(() => _videoWheelAction = next);
+    final l10n = AppLocalizations.of(context)!;
+    _flashOsd(
+      icon: PhosphorIconsLight.mouseScroll,
+      label: l10n.videoWheelModeSwitched(
+        next == VideoWheelAction.volume
+            ? l10n.videoWheelVolume
+            : l10n.videoWheelSeek,
+      ),
+      hint: _wheelSwitchHint(),
+    );
+    try {
+      await UserPreferences.instance.setVideoWheelAction(next);
+    } catch (_) {
+      // Best-effort.
+    }
+  }
+
+  // Wheel notches accumulate into one paused seek drag (same path as holding
+  // an arrow key) and land on the exact frame shortly after the last notch.
+  void _wheelSeek({required bool forward}) {
+    final player = _player;
+    if (player == null || _isFastSeeking) return;
+    final duration = player.state.duration;
+    if (duration <= Duration.zero) return;
+
+    if (_wheelSeekCommitTimer == null) {
+      _startSeekDrag();
+      _wheelSeekOrigin = player.state.position;
+      _seekDragPosition = _wheelSeekOrigin;
+    }
+
+    final current = _seekDragPosition ?? player.state.position;
+    final delta = Duration(
+      seconds: forward ? _wheelSeekStepSeconds : -_wheelSeekStepSeconds,
+    );
+    final maxMs = (duration.inMilliseconds - 1000).clamp(
+      0,
+      duration.inMilliseconds,
+    );
+    final targetMs = (current + delta).inMilliseconds.clamp(0, maxMs);
+    _seekDuringDrag(targetMs.toDouble());
+
+    final offset = Duration(milliseconds: targetMs) - _wheelSeekOrigin;
+    _flashOsd(
+      icon: offset.isNegative
+          ? PhosphorIconsLight.rewind
+          : PhosphorIconsLight.fastForward,
+      label: _formatSeekOffset(offset),
+      progress: targetMs / duration.inMilliseconds,
+      hint: _wheelSwitchHint(),
+    );
+
+    _wheelSeekCommitTimer?.cancel();
+    _wheelSeekCommitTimer = Timer(const Duration(milliseconds: 400), () {
+      _wheelSeekCommitTimer = null;
+      if (!mounted) return;
+      _finishSeekDrag();
+      _showControlsWithTimer();
+    });
+  }
+
+  String _formatSeekOffset(Duration offset) {
+    final sign = offset.isNegative ? '-' : '+';
+    final seconds = offset.inSeconds.abs();
+    if (seconds < 60) return '$sign${seconds}s';
+    final rest = (seconds % 60).toString().padLeft(2, '0');
+    return '$sign${seconds ~/ 60}:$rest';
+  }
+
+  void _increaseVolume({bool fromWheel = false}) async {
+    final current = (_player?.state.volume ?? _savedVolume);
+    await _setVolumeFromUser((current + 5).clamp(0.0, 100.0));
+    if (!mounted) return;
+    _flashVolumeOsd(hint: fromWheel ? _wheelSwitchHint() : null);
+  }
+
+  void _decreaseVolume({bool fromWheel = false}) async {
     final current = (_player?.state.volume ?? _savedVolume);
     await _setVolumeFromUser((current - 5).clamp(0.0, 100.0));
+    if (!mounted) return;
+    _flashVolumeOsd(hint: fromWheel ? _wheelSwitchHint() : null);
   }
 
   void _toggleMute() async {
     await _toggleMuteFromUser();
+    _flashVolumeOsd();
   }
 
   // Custom Controls

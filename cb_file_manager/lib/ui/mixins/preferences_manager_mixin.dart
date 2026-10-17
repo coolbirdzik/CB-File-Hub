@@ -57,6 +57,14 @@ mixin PreferencesManagerMixin<T extends StatefulWidget> on State<T> {
   /// Width of the preview pane in grid preview mode
   double previewPaneWidth = UserPreferences.defaultPreviewPaneWidth;
 
+  /// Preview visibility the host keeps for its session (e.g. per tab).
+  /// When non-null it wins over the stored default on load.
+  bool? get sessionPreviewPaneVisible => null;
+
+  /// Called when the user toggles the preview pane, so the host can keep the
+  /// choice for its session. Visibility is not persisted.
+  void onPreviewPaneVisibilityChanged(bool visible) {}
+
   /// Load all preferences from storage
   Future<void> loadPreferences() async {
     try {
@@ -86,16 +94,11 @@ mixin PreferencesManagerMixin<T extends StatefulWidget> on State<T> {
       final loadedShowFileTags =
           await folderSortManager.getFolderShowFileTags(folderPreferencePath) ??
           await prefs.getShowFileTags();
+      // Preview pane state is not per folder: visibility comes from the host
+      // session (e.g. the tab) and falls back to the stored default.
       final loadedPreviewPaneVisible =
-          await folderSortManager.getFolderPreviewPaneVisible(
-            folderPreferencePath,
-          ) ??
-          await prefs.getPreviewPaneVisible();
-      final loadedPreviewPaneWidth =
-          await folderSortManager.getFolderPreviewPaneWidth(
-            folderPreferencePath,
-          ) ??
-          await prefs.getPreviewPaneWidth();
+          sessionPreviewPaneVisible ?? await prefs.getPreviewPaneVisible();
+      final loadedPreviewPaneWidth = await prefs.getPreviewPaneWidth();
       final effectiveViewMode = ViewModeUtils.normalize(
         !isDesktopPlatform && loadedViewMode == ViewMode.gridPreview
             ? ViewMode.grid
@@ -289,7 +292,7 @@ mixin PreferencesManagerMixin<T extends StatefulWidget> on State<T> {
     setState(() {
       isPreviewPaneVisible = !isPreviewPaneVisible;
     });
-    savePreviewPaneVisibilitySetting(isPreviewPaneVisible);
+    onPreviewPaneVisibilityChanged(isPreviewPaneVisible);
   }
 
   /// Update preview pane width without persisting
@@ -299,29 +302,13 @@ mixin PreferencesManagerMixin<T extends StatefulWidget> on State<T> {
     });
   }
 
-  /// Persist preview pane width to storage
+  /// Persist preview pane width (one width for every folder)
   Future<void> savePreviewPaneWidthSetting(double width) async {
     try {
       await UserPreferences.instance.init();
-      await FolderSortManager().saveFolderPreviewPaneWidth(
-        preferencePath,
-        width,
-      );
+      await UserPreferences.instance.setPreviewPaneWidth(width);
     } catch (e) {
       debugPrint('Error saving preview pane width: $e');
-    }
-  }
-
-  /// Persist preview pane visibility to storage
-  Future<void> savePreviewPaneVisibilitySetting(bool visible) async {
-    try {
-      await UserPreferences.instance.init();
-      await FolderSortManager().saveFolderPreviewPaneVisible(
-        preferencePath,
-        visible,
-      );
-    } catch (e) {
-      debugPrint('Error saving preview pane visibility: $e');
     }
   }
 

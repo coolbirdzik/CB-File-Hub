@@ -76,6 +76,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   // Use system default app for video (false = in-app player by default)
   bool _useSystemDefaultForVideo = false;
   bool _openVideoInNewWindow = true;
+  VideoWheelAction _videoWheelAction = VideoWheelAction.volume;
   bool _isThemeExpanded = false;
   String _appVersion = '';
   bool _updatesSupported = false;
@@ -153,6 +154,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final useSystemDefaultForVideo = await _preferences
           .getUseSystemDefaultForVideo();
       final openVideoInNewWindow = await _preferences.getOpenVideoInNewWindow();
+      final videoWheelAction = await _preferences.getVideoWheelAction();
       final tabInactiveMinutes = await _preferences
           .getTabInactiveThresholdMinutes();
       _preferences.isUsingDatabaseStorage();
@@ -170,6 +172,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _rememberTabWorkspace = rememberTabWorkspace;
           _useSystemDefaultForVideo = useSystemDefaultForVideo;
           _openVideoInNewWindow = openVideoInNewWindow;
+          _videoWheelAction = videoWheelAction;
           _tabInactiveThresholdMinutes = tabInactiveMinutes;
           _isLoading = false;
         });
@@ -318,6 +321,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _tabInactiveThresholdMinutes = clamped;
       });
     }
+  }
+
+  Future<void> _updateVideoWheelAction(VideoWheelAction value) async {
+    await _preferences.setVideoWheelAction(value);
+    if (mounted) setState(() => _videoWheelAction = value);
   }
 
   Future<void> _updateOpenVideoInNewWindow(bool value) async {
@@ -776,6 +784,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
             trailing: Switch(
               value: _openVideoInNewWindow,
               onChanged: _updateOpenVideoInNewWindow,
+            ),
+          ),
+        if (Platform.isWindows || Platform.isLinux || Platform.isMacOS)
+          _buildCompactSettingTile(
+            title: AppLocalizations.of(context)!.videoWheelAction,
+            subtitle: AppLocalizations.of(context)!.videoWheelActionDescription,
+            icon: PhosphorIconsLight.mouseScroll,
+            trailing: CbSelect<VideoWheelAction>(
+              value: _videoWheelAction,
+              onChanged: _updateVideoWheelAction,
+              items: [
+                CbSelectItem(
+                  value: VideoWheelAction.volume,
+                  label: AppLocalizations.of(context)!.videoWheelVolume,
+                ),
+                CbSelectItem(
+                  value: VideoWheelAction.seek,
+                  label: AppLocalizations.of(context)!.videoWheelSeek,
+                ),
+              ],
             ),
           ),
         // Thumbnail Mode Selection

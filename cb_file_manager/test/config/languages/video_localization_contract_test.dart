@@ -31,6 +31,33 @@ void main() {
     );
   });
 
+  test('video mouse wheel setting has complete localized copy', () {
+    final localizations = <AppLocalizations>[
+      EnglishLocalizations(),
+      VietnameseLocalizations(),
+    ];
+
+    for (final l10n in localizations) {
+      expect(l10n.videoWheelAction, isNotEmpty);
+      expect(l10n.videoWheelActionDescription, isNotEmpty);
+      expect(l10n.videoWheelVolume, isNotEmpty);
+      expect(l10n.videoWheelSeek, isNotEmpty);
+      expect(
+        l10n.videoWheelModeSwitched(l10n.videoWheelSeek),
+        contains(l10n.videoWheelSeek),
+      );
+      expect(
+        l10n.videoWheelSwitchHint(l10n.videoWheelVolume),
+        contains(l10n.videoWheelVolume),
+      );
+    }
+
+    expect(
+      EnglishLocalizations().videoWheelAction,
+      isNot(VietnameseLocalizations().videoWheelAction),
+    );
+  });
+
   test('file thumbnail fit setting has complete localized copy', () {
     final localizations = <AppLocalizations>[
       EnglishLocalizations(),

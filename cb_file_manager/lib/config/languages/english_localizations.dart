@@ -1619,6 +1619,19 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get seekSpeedFast => 'Fast';
   @override
+  String get videoWheelAction => 'Mouse wheel over video';
+  @override
+  String get videoWheelActionDescription =>
+      'What scrolling over the player does. Middle-click the video to switch.';
+  @override
+  String get videoWheelVolume => 'Volume';
+  @override
+  String get videoWheelSeek => 'Seek';
+  @override
+  String videoWheelModeSwitched(String mode) => 'Mouse wheel: $mode';
+  @override
+  String videoWheelSwitchHint(String mode) => 'Middle-click to switch to $mode';
+  @override
   String get videoDecoding => 'Video decoding';
   @override
   String get videoDecodingAuto => 'Automatic (recommended)';

@@ -1638,6 +1638,20 @@ class TurkishLocalizations implements AppLocalizations {
   @override
   String get seekSpeedFast => 'Hızlı';
   @override
+  String get videoWheelAction => 'Video üzerinde fare tekerleği';
+  @override
+  String get videoWheelActionDescription =>
+      'Oynatıcı üzerinde kaydırmanın yaptığı işlem. Değiştirmek için videoya orta tıklayın.';
+  @override
+  String get videoWheelVolume => 'Ses';
+  @override
+  String get videoWheelSeek => 'Atlama';
+  @override
+  String videoWheelModeSwitched(String mode) => 'Fare tekerleği: $mode';
+  @override
+  String videoWheelSwitchHint(String mode) =>
+      '$mode moduna geçmek için orta tıklayın';
+  @override
   String get videoDecoding => 'Video kod çözme';
   @override
   String get videoDecodingAuto => 'Otomatik (önerilen)';

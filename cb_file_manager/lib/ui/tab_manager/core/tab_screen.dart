@@ -13,6 +13,7 @@ import 'tab_data.dart';
 import 'tab_paths.dart';
 import 'tab_content_overlay.dart';
 import 'tab_focus_gate.dart';
+import 'tab_pane_state.dart';
 import '../../drawer.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'tabbed_folder/tabbed_folder_list_screen.dart';
@@ -1393,6 +1394,8 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
   void _syncTabContentCache(List<TabData> tabs) {
     final currentIds = tabs.map((tab) => tab.id).toSet();
     _tabContentCache.removeWhere((id, _) => !currentIds.contains(id));
+    // Closing a tab forgets its preview/properties pane toggles.
+    TabPaneState.retainTabs(currentIds);
 
     // Focus scopes of closed tabs are dropped here, but only disposed after the
     // frame: their FocusScope widget is still mounted while this build runs.

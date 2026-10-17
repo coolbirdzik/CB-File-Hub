@@ -1537,6 +1537,18 @@ class ChineseLocalizations implements AppLocalizations {
   @override
   String get seekSpeedFast => '快';
   @override
+  String get videoWheelAction => '视频上的鼠标滚轮';
+  @override
+  String get videoWheelActionDescription => '在播放器上滚动鼠标滚轮的功能。在视频上单击鼠标中键可切换。';
+  @override
+  String get videoWheelVolume => '音量';
+  @override
+  String get videoWheelSeek => '快进快退';
+  @override
+  String videoWheelModeSwitched(String mode) => '鼠标滚轮：$mode';
+  @override
+  String videoWheelSwitchHint(String mode) => '单击鼠标中键切换为$mode';
+  @override
   String get videoDecoding => '视频解码';
   @override
   String get videoDecodingAuto => '自动（推荐）';

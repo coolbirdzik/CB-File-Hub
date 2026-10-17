@@ -48,6 +48,8 @@ abstract class _VideoPlayerSettingsHost extends _VideoPlayerVolumeHost {
   set _videoOutputFormat(String v);
   int get _videoSeekSpeed;
   set _videoSeekSpeed(int v);
+  VideoWheelAction get _videoWheelAction;
+  set _videoWheelAction(VideoWheelAction v);
 
   // Methods from main state that the mixin delegates to
   void _cancelSleepTimer();
@@ -397,6 +399,37 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
                         ),
                       ],
                     ),
+                    const SizedBox(height: 16),
+
+                    // Mouse wheel action
+                    Text(
+                      AppLocalizations.of(context)!.videoWheelAction,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    CbSelect<VideoWheelAction>(
+                      value: _videoWheelAction,
+                      expand: true,
+                      items: [
+                        CbSelectItem(
+                          value: VideoWheelAction.volume,
+                          label: AppLocalizations.of(context)!.videoWheelVolume,
+                        ),
+                        CbSelectItem(
+                          value: VideoWheelAction.seek,
+                          label: AppLocalizations.of(context)!.videoWheelSeek,
+                        ),
+                      ],
+                      onChanged: (value) {
+                        setDialogState(() => _videoWheelAction = value);
+                        setState(() => _videoWheelAction = value);
+                        _saveSettings();
+                      },
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      AppLocalizations.of(context)!.videoWheelActionDescription,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
                   ],
                 ),
               ),
@@ -512,6 +545,7 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
       );
       await prefs.setVideoPlayerString('video_scale_mode', _videoScaleMode);
       await prefs.setVideoSeekSpeed(_videoSeekSpeed);
+      await prefs.setVideoWheelAction(_videoWheelAction);
       debugPrint('Video player settings saved successfully');
     } catch (e) {
       debugPrint('Error saving video player settings: $e');
@@ -547,7 +581,13 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
       // waits for these settings) is created sooner.
       final (
         (codec, videoDecoder, audioDecoder, videoOutputFormat, videoScaleMode),
-        (bufferSize, networkTimeout, subtitleEncoding, videoSeekSpeed),
+        (
+          bufferSize,
+          networkTimeout,
+          subtitleEncoding,
+          videoSeekSpeed,
+          videoWheelAction,
+        ),
       ) = await (
         (
           prefs.getVideoPlayerString('video_codec', defaultValue: 'auto'),
@@ -570,6 +610,7 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
             defaultValue: 'utf-8',
           ),
           prefs.getVideoSeekSpeed(),
+          prefs.getVideoWheelAction(),
         ).wait,
       ).wait;
       _selectedCodec = codec ?? 'auto';
@@ -581,6 +622,7 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
       _videoOutputFormat = videoOutputFormat ?? 'auto';
       _videoScaleMode = videoScaleMode ?? 'contain';
       _videoSeekSpeed = videoSeekSpeed;
+      _videoWheelAction = videoWheelAction;
 
       debugPrint('Video player settings loaded successfully');
     } catch (e) {
@@ -599,6 +641,7 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
       _videoOutputFormat = 'auto';
       _videoScaleMode = 'contain';
       _videoSeekSpeed = 1;
+      _videoWheelAction = VideoWheelAction.volume;
     });
     _saveSettings();
   }

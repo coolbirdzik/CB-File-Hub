@@ -796,6 +796,12 @@ abstract class AppLocalizations {
   String get seekSpeedSlow;
   String get seekSpeedMedium;
   String get seekSpeedFast;
+  String get videoWheelAction;
+  String get videoWheelActionDescription;
+  String get videoWheelVolume;
+  String get videoWheelSeek;
+  String videoWheelModeSwitched(String mode);
+  String videoWheelSwitchHint(String mode);
   String get videoDecoding;
   String get videoDecodingAuto;
   String get videoDecodingGpu;

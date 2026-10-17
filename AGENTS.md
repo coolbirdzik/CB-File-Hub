@@ -75,6 +75,11 @@ flutter test integration_test -d windows --dart-define=CB_E2E=true  # E2E
 ## CI pipeline order
 
 CI runs: **format check -> analyze -> unit tests -> E2E (Windows) -> build**.
+Windows E2E is selective: `scripts/ci/e2e_select.mjs` maps changed paths to
+suites via `cb_file_manager/integration_test/e2e_impact.json` (`main` always runs
+every suite) and skips suites already passed on identical source. Preview with
+`just e2e-affected`; keep `e2e_impact.json` in sync when adding E2E files or new
+`lib/` areas (see `docs/quality/02-e2e-desktop-integration.md`).
 Run `just analyze` before pushing to match the CI analyze job (including
 unit/widget tests, excluding E2E). Both use `scripts/check_quality.sh` and stop
 on the first failure. `just verify` runs only format check and static analysis;

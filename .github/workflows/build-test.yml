@@ -5,6 +5,12 @@ on:
     branches: [ main, develop ]
   pull_request:
     branches: [ main, develop ]
+  workflow_dispatch:
+    inputs:
+      full_e2e:
+        description: 'Run every E2E suite and ignore recorded passes'
+        type: boolean
+        default: false
 
 env:
   FLUTTER_VERSION: '3.47.2'
@@ -28,6 +34,8 @@ jobs:
           node-version: '22'
       - name: Validate shared Store descriptions and submission scripts
         run: node --test scripts/tests/store_listings.test.mjs scripts/tests/google_play_listings.test.mjs
+      - name: Validate E2E suite selection rules
+        run: node --test scripts/tests/e2e_select.test.mjs
 
   # Analyze and test
   analyze:
@@ -41,15 +49,49 @@ jobs:
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: 'stable'
+          cache: true
 
       - name: Check formatting, analysis and unit/widget tests
         run: bash scripts/check_quality.sh
+
+  # Picks the E2E suites this change needs, so unrelated pushes skip the
+  # Windows E2E job. Pushes/PRs to main run every suite; develop diffs against
+  # its last green run. Suites that already passed on the same source
+  # fingerprint are skipped. Rules: cb_file_manager/integration_test/e2e_impact.json.
+  # Force a full run with workflow_dispatch (full_e2e), the `e2e:full` PR label
+  # or `[e2e full]` in the head commit message.
+  e2e-select:
+    name: Select E2E suites
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      run: ${{ steps.select.outputs.run }}
+      suites: ${{ steps.select.outputs.suites }}
+      fingerprint: ${{ steps.select.outputs.fingerprint }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: '22'
+
+      - name: Select suites
+        id: select
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/ci/e2e_select.mjs
 
   # Desktop E2E (integration_test on Windows; requires --dart-define=CB_E2E=true)
   e2e-windows:
     name: E2E integration tests (Windows)
     runs-on: windows-latest
-    needs: analyze
+    needs: [analyze, e2e-select]
+    if: needs.e2e-select.outputs.run == 'true'
     steps:
       - name: Checkout code
         uses: actions/checkout@v7.0.1
@@ -59,6 +101,7 @@ jobs:
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: 'stable'
+          cache: true
 
       - name: Install dependencies
         run: |
@@ -73,6 +116,15 @@ jobs:
             (Get-Content $_.FullName) -replace 'cmake_minimum_required\(VERSION [0-9.]+\)', 'cmake_minimum_required(VERSION 3.14)' | Set-Content $_.FullName
           }
 
+      # The fetch scripts verify SHA-256 and skip when the cached files match.
+      - name: Cache llama.cpp and aria2 runtimes
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.PROJECT_DIR }}/windows/llama
+            ${{ env.PROJECT_DIR }}/windows/aria2
+          key: windows-runtimes-${{ hashFiles('scripts/fetch_llama_runtime.sh', 'scripts/fetch_aria2_runtime.sh') }}
+
       # The llama.cpp runtime (Vulkan DLLs + llama-server.exe) is not committed
       # to git. The integration test build runs CMake's INSTALL target, which
       # bundles these DLLs, so they must be present before the app is built.
@@ -82,122 +134,49 @@ jobs:
           bash scripts/fetch_llama_runtime.sh
           bash scripts/fetch_aria2_runtime.sh
 
-      - name: Stop stray cb_file_hub.exe
-        shell: cmd
-        run: taskkill /F /IM cb_file_hub.exe /T 2>nul & exit /b 0
-
       # Flutter desktop integration_test does NOT support multiple test files
-      # in one `flutter test integration_test` invocation: each file launches
-      # its own cb_file_hub.exe and the second/third launch fails with
-      # "Error waiting for a debug connection: The log reader stopped
-      # unexpectedly, or never started." Run each test file in its own step
-      # and kill stray app processes between runs.
-      # See: cb_file_manager/integration_test/app_e2e_test.dart header,
-      #      cb_file_manager/tool/e2e_parallel.dart header.
+      # in one `flutter test integration_test` invocation, so e2e_run.mjs runs
+      # one process per suite and kills stray cb_file_hub.exe between them.
+      # It keeps going after a failure so every regression shows up in one run.
+      # showcase_screenshots_e2e_test (marketing screenshots) and the other
+      # files under "notInCi" in e2e_impact.json are intentionally not run here.
+      # See: cb_file_manager/integration_test/app_e2e_test.dart header.
+      - name: Run selected E2E suites
+        id: run
+        run: node scripts/ci/e2e_run.mjs --suites "${{ needs.e2e-select.outputs.suites }}"
 
-      - name: Run integration tests - app_e2e_test
-        run: |
-          cd ${{ env.PROJECT_DIR }}
-          # Keep the machine-readable test events after a failure. The default
-          # reporter only leaves GitHub with an aggregate count, which makes a
-          # Windows-only E2E regression impossible to diagnose from the job.
-          dart run tool/run_e2e_with_log.dart --json-report
-
-      - name: Upload app E2E diagnostics
+      # Keep the machine-readable test events after a failure. The default
+      # reporter only leaves GitHub with an aggregate count, which makes a
+      # Windows-only E2E regression impossible to diagnose from the job.
+      - name: Upload E2E diagnostics
         if: always()
         uses: actions/upload-artifact@v7.0.1
         with:
-          name: app-e2e-diagnostics-${{ github.run_attempt }}
+          name: e2e-diagnostics-${{ github.run_attempt }}
           if-no-files-found: warn
           path: |
             ${{ env.PROJECT_DIR }}/build/e2e_report.jsonl
             ${{ env.PROJECT_DIR }}/build/e2e_report/
             ${{ env.PROJECT_DIR }}/build/e2e_failed_tests.txt
-
-      - name: Stop stray cb_file_hub.exe (after app_e2e_test)
-        if: always()
-        shell: cmd
-        run: taskkill /F /IM cb_file_hub.exe /T 2>nul & exit /b 0
-
-      # showcase_screenshots_e2e_test is a marketing screenshot generator, not a
-      # functional test suite. It is intentionally skipped on CI -- run it
-      # locally with `flutter test integration_test/showcase_screenshots_e2e_test.dart`
-      # when refreshing marketing screenshots.
-
-      - name: Run integration tests - video_thumbnails_e2e_test
-        run: |
-          cd ${{ env.PROJECT_DIR }}
-          flutter test integration_test/video_thumbnails_e2e_test.dart -d windows --dart-define=CB_E2E=true
-
-      - name: Stop stray cb_file_hub.exe (after video_thumbnails_e2e_test)
-        if: always()
-        shell: cmd
-        run: taskkill /F /IM cb_file_hub.exe /T 2>nul & exit /b 0
-
-      - name: Run integration tests - media_kit_playback_e2e_test
-        run: |
-          cd ${{ env.PROJECT_DIR }}
-          flutter test integration_test/media_kit_playback_e2e_test.dart -d windows --dart-define=CB_E2E=true --reporter expanded --file-reporter json:build/e2e-media-kit-ci.jsonl
-
-      - name: Upload Media Kit E2E diagnostics
-        if: always()
-        uses: actions/upload-artifact@v7.0.1
-        with:
-          name: media-kit-e2e-diagnostics-${{ github.run_attempt }}
-          if-no-files-found: warn
-          path: |
             ${{ env.PROJECT_DIR }}/build/e2e-media-kit-ci.jsonl
             ${{ env.PROJECT_DIR }}/build/e2e-media-kit/
-
-      - name: Stop stray cb_file_hub.exe (after media_kit_playback_e2e_test)
-        if: always()
-        shell: cmd
-        run: taskkill /F /IM cb_file_hub.exe /T 2>nul & exit /b 0
-
-      - name: Run integration tests - ffmpeg_thumbnail_e2e_test
-        run: |
-          cd ${{ env.PROJECT_DIR }}
-          flutter test integration_test/ffmpeg_thumbnail_e2e_test.dart -d windows --dart-define=CB_E2E=true
-
-      - name: Stop stray cb_file_hub.exe (after ffmpeg_thumbnail_e2e_test)
-        if: always()
-        shell: cmd
-        run: taskkill /F /IM cb_file_hub.exe /T 2>nul & exit /b 0
-
-      - name: Run integration tests - file_drag_drop_e2e_test
-        run: |
-          cd ${{ env.PROJECT_DIR }}
-          flutter test integration_test/file_drag_drop_e2e_test.dart -d windows --dart-define=CB_E2E=true
-
-      - name: Stop stray cb_file_hub.exe (after file_drag_drop_e2e_test)
-        if: always()
-        shell: cmd
-        run: taskkill /F /IM cb_file_hub.exe /T 2>nul & exit /b 0
-
-      - name: Run integration tests - breadcrumb_address_bar_overflow_e2e_test
-        run: |
-          cd ${{ env.PROJECT_DIR }}
-          flutter test integration_test/breadcrumb_address_bar_overflow_e2e_test.dart -d windows --dart-define=CB_E2E=true
-
-      - name: Run integration tests - torrent_library_e2e_test
-        run: |
-          cd ${{ env.PROJECT_DIR }}
-          flutter test integration_test/torrent_library_e2e_test.dart --no-pub -d windows --dart-define=CB_E2E=true --reporter expanded --file-reporter json:build/e2e-torrent-ci.jsonl
-
-      - name: Upload Torrent E2E diagnostics
-        if: always()
-        uses: actions/upload-artifact@v7.0.1
-        with:
-          name: torrent-e2e-diagnostics-${{ github.run_attempt }}
-          if-no-files-found: warn
-          path: |
             ${{ env.PROJECT_DIR }}/build/e2e-torrent-ci.jsonl
-            ${{ env.PROJECT_DIR }}/build/e2e_report/
 
-      - name: Stop stray cb_file_hub.exe (cleanup)
-        if: always()
-        shell: cmd
-        run: taskkill /F /IM cb_file_hub.exe /T 2>nul & exit /b 0
+      # The cache key is the record: e2e_select.mjs lists `e2e-pass-<fingerprint>-*`
+      # keys and skips those suites when the same source is tested again.
+      - name: Write E2E pass marker
+        if: always() && steps.run.outputs.passed != ''
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/e2e-pass-marker"
+          echo "${{ steps.run.outputs.passed }} passed at ${{ github.sha }}" > "$RUNNER_TEMP/e2e-pass-marker/passed.txt"
+
+      - name: Record passed suites
+        if: always() && steps.run.outputs.passed != ''
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ runner.temp }}/e2e-pass-marker
+          key: e2e-pass-${{ needs.e2e-select.outputs.fingerprint }}-${{ steps.run.outputs.passed }}
 
   # Build Windows
   build-windows:
@@ -212,6 +191,7 @@ jobs:
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: 'stable'
+          cache: true
 
       - name: Install dependencies
         run: |
@@ -225,6 +205,14 @@ jobs:
           Get-ChildItem -Path $pdfxDir -Include "*.cmake","*.txt","*.in" -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
             (Get-Content $_.FullName) -replace 'cmake_minimum_required\(VERSION [0-9.]+\)', 'cmake_minimum_required(VERSION 3.14)' | Set-Content $_.FullName
           }
+
+      - name: Cache llama.cpp and aria2 runtimes
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.PROJECT_DIR }}/windows/llama
+            ${{ env.PROJECT_DIR }}/windows/aria2
+          key: windows-runtimes-${{ hashFiles('scripts/fetch_llama_runtime.sh', 'scripts/fetch_aria2_runtime.sh') }}
 
       # The llama.cpp runtime (Vulkan DLLs + llama-server.exe) is not committed
       # to git; fetch it before building so CMake can bundle it.
@@ -259,6 +247,7 @@ jobs:
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: 'stable'
+          cache: true
 
       - name: Install dependencies
         run: |
