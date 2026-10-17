@@ -655,13 +655,17 @@ class _StatusCenterTaskTile extends StatelessWidget {
                 ),
               ),
             ],
-            const SizedBox(height: 10),
-            LinearProgressIndicator(
-              value: entry.isIndeterminate ? null : entry.progressFraction,
-              minHeight: 7,
-              borderRadius: BorderRadius.circular(999),
-              color: color,
-            ),
+            // Finished tasks are history: the status icon/text already say
+            // done or failed, so a leftover bar just looks like it is loading.
+            if (entry.isRunning) ...[
+              const SizedBox(height: 10),
+              LinearProgressIndicator(
+                value: entry.isIndeterminate ? null : entry.progressFraction,
+                minHeight: 7,
+                borderRadius: BorderRadius.circular(999),
+                color: color,
+              ),
+            ],
             if (entry.canCancel && entry.isRunning) ...[
               const SizedBox(height: 8),
               Align(

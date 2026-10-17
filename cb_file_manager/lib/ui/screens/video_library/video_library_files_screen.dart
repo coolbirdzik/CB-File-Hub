@@ -11,6 +11,7 @@ import 'package:cb_file_manager/ui/utils/route.dart';
 
 import 'package:cb_file_manager/bloc/selection/selection.dart';
 import 'package:cb_file_manager/ui/components/common/browser_like_action_handlers.dart';
+import 'package:cb_file_manager/ui/controllers/file_operations_handler.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';
 import 'package:cb_file_manager/ui/tab_manager/components/search_bar.dart'
@@ -661,6 +662,29 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
     );
   }
 
+  /// Selected videos still on screen; keyboard focus here always selects, so
+  /// the selection covers the focused item too.
+  List<FileSystemEntity> _selectedVisibleFiles(FileNavigationState state) {
+    final selected = _selectionBloc.state.selectedFilePaths;
+    return _visibleFilesForState(
+      state,
+    ).where((entity) => selected.contains(entity.path)).toList();
+  }
+
+  void _handleCopy(FileNavigationState state) {
+    FileOperationsHandler.copyFilesToClipboard(
+      context: context,
+      entities: _selectedVisibleFiles(state),
+    );
+  }
+
+  void _handleCut(FileNavigationState state) {
+    FileOperationsHandler.cutFilesToClipboard(
+      context: context,
+      entities: _selectedVisibleFiles(state),
+    );
+  }
+
   Future<void> _handleDelete(
     TabbedFolderKeyboardController keyboardController,
     bool permanent,
@@ -823,6 +847,8 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
                       : null,
                   onSearch: _openOrFocusSearch,
                   onSelectAll: () => _selectAllVisible(state),
+                  onCopy: () => _handleCopy(state),
+                  onCut: () => _handleCut(state),
                   onDelete: (keyboardController, permanent) =>
                       _handleDelete(keyboardController, permanent),
                 );

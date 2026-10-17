@@ -32,7 +32,6 @@ import '../../dialogs/folder_thumbnail_picker_dialog.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../screens/folder_list/folder_list_bloc.dart';
 import '../../utils/route.dart';
-import '../../screens/folder_list/folder_list_event.dart';
 import '../../screens/folder_list/folder_list_state.dart';
 import '../../../helpers/files/windows_shell_context_menu.dart';
 import '../../../helpers/files/context_menu_layout_preferences.dart';
@@ -2929,26 +2928,21 @@ List<ContextMenuSection> _buildMultiSelectionContextMenuSections({
           id: 'copy',
           label: l10n.copy,
           icon: PhosphorIconsLight.copy,
-          isEnabled: bloc != null,
-          onSelected: (_) {
-            if (bloc == null) return;
-            bloc.add(CopyFiles(entitiesList));
-            AppToast.info(
-              context,
-              l10n.copiedToClipboard(l10n.itemsCount(count)),
-            );
-          },
+          onSelected: (_) => FileOperationsHandler.copyFilesToClipboard(
+            context: context,
+            entities: entitiesList,
+            folderListBloc: bloc,
+          ),
         ),
         ContextMenuAction(
           id: 'cut',
           label: l10n.cut,
           icon: PhosphorIconsLight.scissors,
-          isEnabled: bloc != null,
-          onSelected: (_) {
-            if (bloc == null) return;
-            bloc.add(CutFiles(entitiesList));
-            AppToast.info(context, l10n.cutToClipboard(l10n.itemsCount(count)));
-          },
+          onSelected: (_) => FileOperationsHandler.cutFilesToClipboard(
+            context: context,
+            entities: entitiesList,
+            folderListBloc: bloc,
+          ),
         ),
         ContextMenuAction(
           id: 'tags',
