@@ -173,7 +173,8 @@ class _TorrentScreenState extends State<TorrentScreen> {
     await _service.initialize();
     if (!mounted) return;
     setState(() => _ready = true);
-    await _load();
+    // Opening an association must not wait for a large/filtered library page.
+    unawaited(_load());
     _schedulePendingSources();
     if (mounted && widget.initialSource != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -458,8 +459,11 @@ class _TorrentScreenState extends State<TorrentScreen> {
     });
     // Refresh the full library, retaining explicit searches/filters. In the
     // default newest-first view, return to the first page to show new imports.
-    await _load();
-    if (mounted && showNewest && _scroll.hasClients) _scroll.jumpTo(0);
+    unawaited(
+      _load().then((_) {
+        if (mounted && showNewest && _scroll.hasClients) _scroll.jumpTo(0);
+      }),
+    );
     if (mounted) {
       if (_desktop) {
         await _download(entry, fromOpen: true);

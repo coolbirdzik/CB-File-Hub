@@ -836,10 +836,16 @@ class _AnimatedTagChipState extends State<AnimatedTagChip>
       begin: 1.0,
       end: 1.05,
     ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
+    _colorManager.addListener(_colorChanged);
+  }
+
+  void _colorChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
+    _colorManager.removeListener(_colorChanged);
     _controller.dispose();
     super.dispose();
   }
@@ -853,10 +859,7 @@ class _AnimatedTagChipState extends State<AnimatedTagChip>
     final tagColor = _colorManager.getTagColor(widget.tag);
 
     final Color foregroundColor = TagChipStyle.readableOn(
-      Color.alphaBlend(
-        TagChipStyle.tint(tagColor, isDark: isDark, hovered: _isHovered),
-        theme.colorScheme.surface,
-      ),
+      TagChipStyle.background(tagColor, isDark: isDark, hovered: _isHovered),
     );
     final Color textColor = foregroundColor;
     final Color iconColor = foregroundColor.withValues(alpha: 0.92);

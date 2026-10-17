@@ -34,6 +34,7 @@ private:
     HWND drop_target_hwnd_ = nullptr;
     IDropTarget *drop_target_ = nullptr;
     int window_proc_delegate_id_ = -1;
+    HWND torrent_launch_hwnd_ = nullptr;
     // Per-instance backdrop state (avoids cross-window pollution via shared globals).
     bool backdrop_active_ = false;
     bool backdrop_prefer_acrylic_ = true;

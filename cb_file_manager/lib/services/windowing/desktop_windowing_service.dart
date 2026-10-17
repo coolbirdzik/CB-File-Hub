@@ -101,6 +101,7 @@ class DesktopWindowingService {
   StreamSubscription<TabManagerState>? _tabStateSub;
 
   String _lastTitle = 'CB File Hub';
+  int? _torrentLaunchPriority;
 
   String get windowId => _windowId;
 
@@ -126,8 +127,16 @@ class DesktopWindowingService {
     await _ensureRegistryServerOrClient();
     _startHeartbeat();
     _listenToTabUpdates();
+    if (Platform.isWindows &&
+        !_allowE2EPeers &&
+        !const bool.fromEnvironment('CB_E2E')) {
+      WindowsNativeTabDragDropService.onTorrentSources = _openTorrentSources;
+      locator<TorrentService>().addListener(_updateTorrentLaunchRouting);
+      _updateTorrentLaunchRouting();
+    }
 
     if (!const bool.fromEnvironment('CB_E2E') &&
+        !_allowE2EPeers &&
         Platform.isWindows &&
         !_isSecondaryWindow &&
         _windowRole != 'spare') {
@@ -138,6 +147,12 @@ class DesktopWindowingService {
   }
 
   Future<void> dispose() async {
+    if (_torrentLaunchPriority != null) {
+      locator<TorrentService>().removeListener(_updateTorrentLaunchRouting);
+      WindowsNativeTabDragDropService.onTorrentSources = null;
+      await WindowsNativeTabDragDropService.setTorrentLaunchPriority(0);
+      _torrentLaunchPriority = null;
+    }
     _tabStateSub?.cancel();
     _tabStateSub = null;
     _heartbeat?.cancel();
@@ -201,7 +216,9 @@ class DesktopWindowingService {
     final windows = (await listWindows())
         .where((w) => w.role == 'normal')
         .toList();
-    for (final preference in ['engine', 'primary', 'any']) {
+    // With one shell there is no owner/primary arbitration to perform.
+    for (final preference
+        in windows.length == 1 ? ['any'] : ['engine', 'primary', 'any']) {
       for (final window in windows) {
         // The association process was launched by the user's click. Pass its
         // foreground permission to the existing shell before asking it to show.
@@ -222,6 +239,34 @@ class DesktopWindowingService {
       }
     }
     return false;
+  }
+
+  void _updateTorrentLaunchRouting() {
+    final priority = _windowRole != 'normal'
+        ? 0
+        : locator<TorrentService>().ownsEngine
+        ? 3
+        : _isSecondaryWindow
+        ? 1
+        : 2;
+    if (_torrentLaunchPriority == priority) return;
+    _torrentLaunchPriority = priority;
+    unawaited(
+      WindowsNativeTabDragDropService.setTorrentLaunchPriority(priority),
+    );
+  }
+
+  void _openTorrentSources(List<String> sources) {
+    final bloc = _tabBloc;
+    if (bloc == null || bloc.isClosed) return;
+    for (final source in sources) {
+      bloc.add(
+        AddTab(path: TorrentLaunchRequest.pathFor(source), name: 'Torrent'),
+      );
+    }
+    // Focus APIs can wait on the OS. Queue the tab switch first, and acknowledge
+    // receipt independently so a slow focus cannot trigger a duplicate launch.
+    unawaited(focusTorrentWindow());
   }
 
   /// Show the shell before opening a torrent dialog, preserving maximization.
@@ -328,6 +373,7 @@ class DesktopWindowingService {
   }
 
   Future<void> ensureSpareWindow() async {
+    if (_allowE2EPeers || const bool.fromEnvironment('CB_E2E')) return;
     if (!isDesktop) return;
     if (!Platform.isWindows) return;
     if (_isSecondaryWindow) return;
@@ -509,12 +555,7 @@ class DesktopWindowingService {
         _writeJsonLine(socket, {'type': 'unavailable'});
         return;
       }
-      await focusTorrentWindow();
-      for (final source in sources) {
-        _tabBloc!.add(
-          AddTab(path: TorrentLaunchRequest.pathFor(source), name: 'Torrent'),
-        );
-      }
+      _openTorrentSources(sources);
       _writeJsonLine(socket, {'type': 'ok'});
       return;
     }
@@ -544,6 +585,7 @@ class DesktopWindowingService {
         }
         if (consumeSpare && _windowRole == 'spare') {
           _windowRole = 'normal';
+          if (_torrentLaunchPriority != null) _updateTorrentLaunchRouting();
           unawaited(_registerSelf());
         }
         _writeJsonLine(socket, <String, dynamic>{'type': 'ok'});

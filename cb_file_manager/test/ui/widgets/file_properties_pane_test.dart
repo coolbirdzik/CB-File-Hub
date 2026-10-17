@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cb_file_manager/config/languages/app_localizations_delegate.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/helpers/tags/tag_manager.dart';
+import 'package:cb_file_manager/helpers/tags/tag_color_manager.dart';
 import 'package:cb_file_manager/helpers/tags/tag_hierarchy_manager.dart';
 import 'package:cb_file_manager/helpers/tags/tag_thumbnail_manager.dart';
 import 'package:cb_file_manager/models/database/database_manager.dart';
@@ -159,6 +161,37 @@ void main() {
     await tester.pumpWidget(const SizedBox());
     await settle(tester);
   });
+
+  testWidgets(
+    'Properties loads persisted tag colors before the tag library opens',
+    (tester) async {
+      const savedColor = Color(0xFF17314F);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        'tag_colors',
+        jsonEncode({'work': savedColor.toARGB32()}),
+      );
+      await tester.pumpWidget(app(pane(files: [first])));
+      await settle(tester);
+      expect(TagColorManager.instance.getTagColor('work'), savedColor);
+      final chipBackground = tester
+          .widgetList<Container>(
+            find.descendant(
+              of: find.byType(TagInputChip),
+              matching: find.byType(Container),
+            ),
+          )
+          .map((widget) => widget.decoration)
+          .whereType<BoxDecoration>()
+          .where((decoration) => decoration.color == savedColor);
+      expect(chipBackground, hasLength(1));
+      expect(tester.widget<Text>(find.text('work')).style!.color, Colors.white);
+      await tester.pumpWidget(const SizedBox());
+      await settle(tester);
+      await prefs.remove('tag_colors');
+      await TagColorManager.instance.initialize();
+    },
+  );
 
   testWidgets('mixed selection shows counts and applies tags only to files', (
     tester,

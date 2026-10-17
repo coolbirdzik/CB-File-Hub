@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 
 import 'window_startup_payload.dart';
 import 'windows_explorer_drag_drop_service.dart';
+import '../torrent/torrent_launch_request.dart';
 
 enum WindowsNativeTabDragResult { moved, detached, canceled }
 
@@ -18,6 +19,7 @@ class WindowsNativeTabDragDropService {
 
   static bool _initialized = false;
   static TabManagerBloc? _tabBloc;
+  static void Function(List<String>)? onTorrentSources;
   static final ValueNotifier<bool> isDragHoveringWindow = ValueNotifier<bool>(
     false,
   );
@@ -28,6 +30,19 @@ class WindowsNativeTabDragDropService {
     _initialized = true;
 
     _channel.setMethodCallHandler((call) async {
+      if (call.method == 'onNativeTorrentSources') {
+        final arguments = call.arguments;
+        if (arguments is List &&
+            arguments.isNotEmpty &&
+            arguments.length <= 100 &&
+            arguments.every(
+              (source) =>
+                  source is String && TorrentLaunchRequest.isSource(source),
+            )) {
+          onTorrentSources?.call(arguments.cast<String>().toList());
+        }
+        return;
+      }
       if (WindowsExplorerDragDropService.handleNativeMethodCall(call)) {
         return;
       }
@@ -143,6 +158,13 @@ class WindowsNativeTabDragDropService {
     if (!Platform.isWindows) return;
     try {
       await _channel.invokeMethod<bool>('forceActivateWindow');
+    } catch (_) {}
+  }
+
+  static Future<void> setTorrentLaunchPriority(int priority) async {
+    if (!Platform.isWindows) return;
+    try {
+      await _channel.invokeMethod<void>('setTorrentLaunchPriority', priority);
     } catch (_) {}
   }
 

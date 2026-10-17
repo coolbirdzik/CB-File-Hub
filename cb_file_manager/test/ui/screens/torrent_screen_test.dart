@@ -383,12 +383,20 @@ void main() {
     double width = 1100,
     String locale = 'en',
     String? initialSource,
+    bool tabbed = false,
+    bool settle = true,
   }) async {
     tester.view.physicalSize = Size(width, 900);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pump();
+    final torrentScreen = TorrentScreen(
+      tabId: tabs.state.activeTabId!,
+      service: service,
+      userPreferences: _Preferences(),
+      initialSource: initialSource,
+    );
     await tester.pumpWidget(
       BlocProvider.value(
         value: tabs,
@@ -409,16 +417,20 @@ void main() {
             ),
             child: child!,
           ),
-          home: TorrentScreen(
-            tabId: tabs.state.activeTabId!,
-            service: service,
-            userPreferences: _Preferences(),
-            initialSource: initialSource,
-          ),
+          home: tabbed
+              ? BlocBuilder<TabManagerBloc, TabManagerState>(
+                  builder: (context, state) => IndexedStack(
+                    index: TorrentLaunchRequest.isPath(state.activeTab!.path)
+                        ? 0
+                        : 1,
+                    children: [torrentScreen, const Text('Other tab')],
+                  ),
+                )
+              : torrentScreen,
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    if (settle) await tester.pumpAndSettle();
   }
 
   for (final source in [
@@ -1114,6 +1126,58 @@ void main() {
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
     expect(tabs.state.activeTab!.pendingTorrentSources, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('magnet switches from another tab without awaiting a slow page', (
+    tester,
+  ) async {
+    await tester.runAsync(() => tabs.close());
+    tabs = TabManagerBloc()..add(AddTab(path: '#torrents'));
+    await mount(tester, tabbed: true);
+    final torrentId = tabs.state.activeTabId;
+    tabs.add(AddTab(path: '#home'));
+    await tester.pumpAndSettle();
+    expect(find.text('Other tab'), findsOneWidget);
+    final slowPage = repo.held[''] = Completer<TorrentPage>();
+    const source =
+        'magnet:?xt=urn:btih:3333333333333333333333333333333333333333';
+    tabs.add(AddTab(path: TorrentLaunchRequest.pathFor(source)));
+    await tester.pump();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 350));
+    expect(tabs.state.activeTabId, torrentId);
+    expect(tabs.state.tabs, hasLength(2));
+    expect((service as _Service).opened, [source]);
+    expect(find.byType(TorrentDownloadDialog), findsOneWidget);
+    expect(slowPage.isCompleted, isFalse);
+    slowPage.complete(const TorrentPage([], 0));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('startup magnet dialog does not await the initial library page', (
+    tester,
+  ) async {
+    await tester.runAsync(() => tabs.close());
+    tabs = TabManagerBloc()..add(AddTab(path: '#torrents'));
+    final slowPage = repo.held[''] = Completer<TorrentPage>();
+    const source =
+        'magnet:?xt=urn:btih:4444444444444444444444444444444444444444';
+    tabs.add(AddTab(path: TorrentLaunchRequest.pathFor(source)));
+    await mount(tester, settle: false);
+    await tester.pump();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 350));
+    expect((service as _Service).opened, [source]);
+    expect(find.byType(TorrentDownloadDialog), findsOneWidget);
+    expect(slowPage.isCompleted, isFalse);
+    slowPage.complete(const TorrentPage([], 0));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
   });
 

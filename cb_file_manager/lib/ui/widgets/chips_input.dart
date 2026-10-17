@@ -1169,13 +1169,9 @@ class TagScopeChip extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final isDark = theme.brightness == Brightness.dark;
     final tagColor = TagColorManager.instance.getTagColor(parent);
-    final foreground = TagChipStyle.readableOn(
-      Color.alphaBlend(
-        TagChipStyle.tint(tagColor, isDark: isDark),
-        theme.colorScheme.surface,
-      ),
+    final color = TagChipStyle.readableOn(
+      TagChipStyle.background(tagColor, isDark: isDark),
     );
-    final color = foreground == Colors.white ? Colors.white : tagColor;
     final textStyle = theme.textTheme.bodyMedium!.copyWith(fontSize: 13);
     double measure(String text, TextStyle style) {
       final painter = TextPainter(
@@ -1326,15 +1322,9 @@ class _TagInputChipState extends State<TagInputChip>
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final tagColor = TagColorManager.instance.getTagColor(widget.tag);
-    final foregroundColor = TagChipStyle.readableOn(
-      Color.alphaBlend(
-        TagChipStyle.tint(tagColor, isDark: isDark),
-        Theme.of(context).colorScheme.surface,
-      ),
+    final contentColor = TagChipStyle.readableOn(
+      TagChipStyle.background(tagColor, isDark: isDark, hovered: isHovered),
     );
-    final contentColor = foregroundColor == Colors.white
-        ? Colors.white
-        : tagColor;
 
     final chip = AnimatedBuilder(
       animation: _controller,

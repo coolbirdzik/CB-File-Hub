@@ -336,6 +336,7 @@ Run from `cb_file_manager`:
 flutter test test/services/torrent
 flutter test test/ui/screens/torrent_screen_test.dart
 flutter test test/ui/tab_manager/torrent_tab_reuse_test.dart
+flutter test test/services/windowing/torrent_window_focus_test.dart
 flutter analyze
 ```
 
@@ -344,6 +345,17 @@ and a fake download engine. They cover original-byte identity, unsafe paths,
 deduplication, 5,000-row pagination/filtering, storage modes, cancellation, corrupt
 archives, restart intent, action/status races and retaining files on index removal.
 They do not download from public swarms. E2E requires explicit authorization.
+
+Windows association launches forward directly to a ready shell before starting
+another Flutter engine. The shell reuses its Torrent tab and opens the download
+dialog without waiting for the library page or OS focus calls. A standalone
+Win32 unit test covers cross-process forwarding, owner/primary selection,
+unready-window fallback and payload validation. Run it from Visual Studio
+Developer PowerShell at the repository root:
+
+```powershell
+./scripts/test_windows_torrent_launch.ps1
+```
 
 The Windows Torrent E2E suite runs the real app, SQLite index, window IPC and
 bundled aria2 subprocess. It covers file/magnet opening, destination and start

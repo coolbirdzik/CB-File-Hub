@@ -1,4 +1,5 @@
 #include "window_utils_plugin.h"
+#include "torrent_launch.h"
 
 #include <flutter/method_channel.h>
 #include <flutter/standard_method_codec.h>
@@ -1257,6 +1258,8 @@ WindowUtilsPlugin::WindowUtilsPlugin(flutter::PluginRegistrarWindows *registrar)
 
 WindowUtilsPlugin::~WindowUtilsPlugin()
 {
+  if (torrent_launch_hwnd_)
+    ::RemovePropW(torrent_launch_hwnd_, kTorrentLaunchPriority);
   if (window_proc_delegate_id_ >= 0 && registrar_)
   {
     registrar_->UnregisterTopLevelWindowProcDelegate(window_proc_delegate_id_);
@@ -1340,6 +1343,18 @@ void WindowUtilsPlugin::EnsureWindowProcDelegateRegistered()
       [this](HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
           -> std::optional<LRESULT>
       {
+        if (message == WM_COPYDATA && ::GetPropW(hwnd, kTorrentLaunchPriority))
+        {
+          std::vector<std::string> sources;
+          if (ReadTorrentLaunchMessage(reinterpret_cast<COPYDATASTRUCT*>(lparam), &sources))
+          {
+            flutter::EncodableList values;
+            for (const auto& source : sources) values.emplace_back(source);
+            channel_->InvokeMethod("onNativeTorrentSources",
+                std::make_unique<flutter::EncodableValue>(values));
+            return TRUE;
+          }
+        }
         if (!this->backdrop_active_)
           return std::nullopt;
 
@@ -1434,6 +1449,23 @@ void WindowUtilsPlugin::HandleMethodCall(
     std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result)
 {
   const auto method = method_call.method_name();
+
+  if (method == "setTorrentLaunchPriority")
+  {
+    const auto* priority = std::get_if<int32_t>(method_call.arguments());
+    HWND hwnd = GetTopLevelWindow(registrar_);
+    if (torrent_launch_hwnd_)
+      ::RemovePropW(torrent_launch_hwnd_, kTorrentLaunchPriority);
+    torrent_launch_hwnd_ = nullptr;
+    if (hwnd && priority && *priority >= 1 && *priority <= 3)
+    {
+      if (::SetPropW(hwnd, kTorrentLaunchPriority,
+                     reinterpret_cast<HANDLE>(static_cast<INT_PTR>(*priority))))
+        torrent_launch_hwnd_ = hwnd;
+    }
+    result->Success();
+    return;
+  }
 
   if (method == "allowForegroundWindow")
   {

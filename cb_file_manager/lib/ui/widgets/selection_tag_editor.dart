@@ -86,7 +86,11 @@ class _SelectionTagEditorState extends State<SelectionTagEditor> {
   }
 
   Future<void> _initialize() async {
-    await Future.wait([_hierarchy.initialize(), _thumbnails.initialize()]);
+    await Future.wait([
+      _hierarchy.initialize(),
+      _thumbnails.initialize(),
+      _colors.initialize(),
+    ]);
     _refresh();
   }
 

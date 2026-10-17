@@ -20,7 +20,12 @@ class TagChip extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: TagColorManager.instance,
+    builder: (context, _) => _buildChip(context),
+  );
+
+  Widget _buildChip(BuildContext context) {
     final theme = Theme.of(context);
     final isDarkMode = theme.brightness == Brightness.dark;
 
@@ -32,9 +37,10 @@ class TagChip extends StatelessWidget {
     final Color tagColor =
         customColor ?? TagColorManager.instance.getTagColor(tagName);
 
-    final Color displayColor = isDarkMode
-        ? Color.alphaBlend(Colors.white.withValues(alpha: 0.3), tagColor)
-        : tagColor;
+    final Color displayColor = TagChipStyle.background(
+      tagColor,
+      isDark: isDarkMode,
+    );
     final Color foregroundColor = TagChipStyle.readableOn(displayColor);
 
     return InkWell(
@@ -65,8 +71,8 @@ class TagChip extends StatelessWidget {
 
 /// The shared colour recipe for every tag chip in the app.
 ///
-/// Flat: a chip is a translucent tint of its tag colour with no outline;
-/// hover steps the tint up instead of darkening a border. Keeping the recipe
+/// Flat: a chip uses its tag colour with no outline; hover adjusts its shade.
+/// Keeping the recipe
 /// here is what lets the inline chips, the chips-input chips and the tag
 /// management chips stay the same object in three places.
 class TagChipStyle {
@@ -74,16 +80,18 @@ class TagChipStyle {
 
   static const double radius = 16;
 
-  /// Translucent tint of [tagColor] for a chip at rest or [hovered].
-  static Color tint(
+  /// Matches file-list chips, including their lighter shade in dark mode.
+  static Color background(
     Color tagColor, {
     required bool isDark,
     bool hovered = false,
   }) {
-    final double alpha = hovered
-        ? (isDark ? 0.34 : 0.28)
-        : (isDark ? 0.24 : 0.18);
-    return tagColor.withValues(alpha: alpha);
+    final base = isDark
+        ? Color.alphaBlend(Colors.white.withValues(alpha: 0.3), tagColor)
+        : tagColor;
+    return hovered
+        ? Color.alphaBlend(Colors.white.withValues(alpha: 0.08), base)
+        : base;
   }
 
   static BoxDecoration decoration(
@@ -92,7 +100,7 @@ class TagChipStyle {
     bool hovered = false,
   }) {
     return BoxDecoration(
-      color: tint(tagColor, isDark: isDark, hovered: hovered),
+      color: background(tagColor, isDark: isDark, hovered: hovered),
       borderRadius: BorderRadius.circular(radius),
     );
   }

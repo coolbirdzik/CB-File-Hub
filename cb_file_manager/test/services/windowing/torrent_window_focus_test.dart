@@ -1,7 +1,10 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:cb_file_manager/services/windowing/desktop_windowing_service.dart';
+import 'package:cb_file_manager/services/windowing/windows_native_tab_drag_drop_service.dart';
+import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -128,6 +131,60 @@ void main() {
     ]);
   });
 
+  test(
+    'peer acknowledges and switches tabs before slow OS focus finishes',
+    () async {
+      final reservation = await ServerSocket.bind(
+        InternetAddress.loopbackIPv4,
+        0,
+      );
+      final port = reservation.port;
+      await reservation.close();
+      final receiver = DesktopWindowingService.forTesting(registryPort: port);
+      final tabs = TabManagerBloc();
+      final focusGate = Completer<void>();
+      messenger.setMockMethodCallHandler(manager, (call) async {
+        if (call.method == 'isMinimized') return false;
+        if (call.method == 'show') await focusGate.future;
+        return null;
+      });
+      addTearDown(() async {
+        if (!focusGate.isCompleted) focusGate.complete();
+        await receiver.dispose();
+        await tabs.close();
+      });
+      final homeAdded = tabs.stream.first;
+      tabs.add(AddTab(path: '#home'));
+      await homeAdded;
+      await receiver.attachTabBloc(tabs);
+      // Heartbeat registration is intentionally asynchronous.
+      List<DesktopWindowInfo> windows = [];
+      for (var attempt = 0; attempt < 100 && windows.isEmpty; attempt++) {
+        windows = await receiver.listWindows();
+        if (windows.isEmpty) {
+          await Future<void>.delayed(const Duration(milliseconds: 5));
+        }
+      }
+      expect(windows, hasLength(1));
+      final sender = _AssociationService(windows);
+      final switched = tabs.stream.firstWhere(
+        (state) => state.activeTab?.path == '#torrents',
+      );
+      expect(
+        await sender
+            .openTorrentSourcesInExistingWindow([
+              'magnet:?xt=urn:btih:${'5' * 40}',
+            ])
+            .timeout(const Duration(seconds: 1)),
+        isTrue,
+      );
+      await switched;
+      expect(tabs.state.tabs, hasLength(2));
+      expect(focusGate.isCompleted, isFalse);
+      focusGate.complete();
+    },
+  );
+
   test('visible or maximized shell takes focus without restoring', () async {
     await DesktopWindowingService.focusTorrentWindow();
     expect(calls, [
@@ -143,4 +200,38 @@ void main() {
     await DesktopWindowingService.focusTorrentWindow();
     if (Platform.isWindows) expect(calls.last, 'forceActivateWindow');
   });
+
+  test(
+    'native fast handoff forwards sources and rejects malformed requests',
+    () async {
+      final tabs = TabManagerBloc();
+      final received = <List<String>>[];
+      WindowsNativeTabDragDropService.initialize(tabs);
+      WindowsNativeTabDragDropService.onTorrentSources = received.add;
+      addTearDown(() async {
+        WindowsNativeTabDragDropService.onTorrentSources = null;
+        await tabs.close();
+      });
+      Future<void> deliver(Object? arguments) async {
+        await messenger.handlePlatformMessage(
+          native.name,
+          const StandardMethodCodec().encodeMethodCall(
+            MethodCall('onNativeTorrentSources', arguments),
+          ),
+          (_) {},
+        );
+      }
+
+      final sources = [
+        'magnet:?xt=urn:btih:${'6' * 40}',
+        r'C:\Downloads\example.torrent',
+      ];
+      await deliver(sources);
+      await deliver([]);
+      await deliver(['ordinary.txt']);
+      await deliver([sources.first, 7]);
+      await deliver(List.filled(101, sources.first));
+      expect(received, [sources]);
+    },
+  );
 }

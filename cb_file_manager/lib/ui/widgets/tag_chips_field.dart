@@ -3,6 +3,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:cb_file_manager/helpers/tags/tag_hierarchy_manager.dart';
+import 'package:cb_file_manager/helpers/tags/tag_color_manager.dart';
 import 'package:cb_file_manager/helpers/tags/tag_thumbnail_manager.dart';
 import 'package:cb_file_manager/ui/widgets/chips_input.dart';
 import 'package:cb_file_manager/ui/widgets/tag_input_helpers.dart';
@@ -54,44 +55,47 @@ class TagChipsField extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final scope = scopeParent;
-    return ChipsInput<String>(
-      key: fieldKey,
-      values: tags,
-      suggestions: suggestions,
-      enableColonAutocomplete: true,
-      scopeParent: scope,
-      onScopeChanged: onScopeChanged,
-      onSuggestionSelected: onSuggestionSelected,
-      suggestionBuilder: (context, suggestion, isHighlighted, tagColor) =>
-          buildTagSuggestionItem(
-            context,
-            suggestion,
-            isHighlighted,
-            tagColor,
-            thumbnailManager: TagThumbnailManager.instance,
-            hierarchyManager: TagHierarchyManager.instance,
-          ),
-      decoration: InputDecoration(
-        labelText: l10n.tagName,
-        hintText: scope != null
-            ? l10n.childTagHint(scope)
-            : hintText ?? l10n.enterTagName,
-        prefixIcon: const Icon(PhosphorIconsLight.tag),
-      ).flat(context, radius: 16),
-      style: const TextStyle(fontSize: 16),
-      onChanged: (updated) {
-        for (final tag in tags) {
-          if (!updated.contains(tag)) onRemoved(tag);
-        }
-      },
-      onTextChanged: onTextChanged,
-      onSubmitted: onSubmitted,
-      chipBuilder: (context, tag) => TagInputChip(
-        tag: tag,
-        label: chipLabel?.call(tag),
-        tooltip: chipTooltip?.call(tag),
-        onDeleted: onRemoved,
-        onSelected: onChipTapped ?? (_) {},
+    return ListenableBuilder(
+      listenable: TagColorManager.instance,
+      builder: (context, _) => ChipsInput<String>(
+        key: fieldKey,
+        values: tags,
+        suggestions: suggestions,
+        enableColonAutocomplete: true,
+        scopeParent: scope,
+        onScopeChanged: onScopeChanged,
+        onSuggestionSelected: onSuggestionSelected,
+        suggestionBuilder: (context, suggestion, isHighlighted, tagColor) =>
+            buildTagSuggestionItem(
+              context,
+              suggestion,
+              isHighlighted,
+              tagColor,
+              thumbnailManager: TagThumbnailManager.instance,
+              hierarchyManager: TagHierarchyManager.instance,
+            ),
+        decoration: InputDecoration(
+          labelText: l10n.tagName,
+          hintText: scope != null
+              ? l10n.childTagHint(scope)
+              : hintText ?? l10n.enterTagName,
+          prefixIcon: const Icon(PhosphorIconsLight.tag),
+        ).flat(context, radius: 16),
+        style: const TextStyle(fontSize: 16),
+        onChanged: (updated) {
+          for (final tag in tags) {
+            if (!updated.contains(tag)) onRemoved(tag);
+          }
+        },
+        onTextChanged: onTextChanged,
+        onSubmitted: onSubmitted,
+        chipBuilder: (context, tag) => TagInputChip(
+          tag: tag,
+          label: chipLabel?.call(tag),
+          tooltip: chipTooltip?.call(tag),
+          onDeleted: onRemoved,
+          onSelected: onChipTapped ?? (_) {},
+        ),
       ),
     );
   }
