@@ -1,5 +1,6 @@
 import 'package:get_it/get_it.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../e2e/cb_e2e_config.dart';
 import '../helpers/core/user_preferences.dart';
 import '../models/database/database_manager.dart';
 import '../services/album_service.dart';
@@ -109,7 +110,9 @@ Future<void> setupServiceLocator() async {
 
   // Register DesktopWindowingService (desktop-only; no-op on mobile).
   locator.registerLazySingleton<DesktopWindowingService>(
-    () => DesktopWindowingService(),
+    () =>
+        (kCbE2E ? CbE2EConfig.desktopWindowingService : null) ??
+        DesktopWindowingService(),
   );
 
   // AI services
@@ -137,7 +140,10 @@ Future<void> setupServiceLocator() async {
   );
 
   locator.registerLazySingleton<ArchiveService>(() => ArchiveService());
-  locator.registerLazySingleton<TorrentService>(() => TorrentService.instance);
+  locator.registerLazySingleton<TorrentService>(
+    () =>
+        (kCbE2E ? CbE2EConfig.torrentService : null) ?? TorrentService.instance,
+  );
 
   // Disk cleaner skill — Windows-only, used both by the AI agent's
   // disk_cleaner tools and the companion CB Agent Cleaner screen.

@@ -14,9 +14,11 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:media_kit_video/media_kit_video.dart' as mk;
+import 'e2e_helpers.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  registerE2EAppSandbox();
 
   // A missing/unavailable audio device (headless CI runner, no sound card)
   // does not stop mpv decoding and playing video, it just plays silently —

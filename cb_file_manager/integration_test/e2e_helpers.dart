@@ -4,11 +4,33 @@ import 'dart:io';
 
 import 'package:cb_file_manager/e2e/cb_e2e_config.dart';
 import 'package:cb_file_manager/helpers/core/filesystem_utils.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'e2e_sandbox_paths.dart';
+
+/// Install before any app singleton opens its database or preference files.
+/// Real filesystem operations still run, but app data belongs to this suite.
+void registerE2EAppSandbox() {
+  setUpAll(() async {
+    await E2ESandboxPaths.install();
+    SharedPreferences.setMockInitialValues({
+      'torrent.autoImport': false,
+      'torrent.scanRoots': <String>[],
+      'torrent.qbittorrentSources': <String>[],
+    });
+  });
+  tearDownAll(E2ESandboxPaths.uninstall);
+}
+
 /// Runs E2E teardown for a test: clears config, stops services, wipes sandbox dir.
 Future<void> e2eTearDown(WidgetTester tester, Directory dir) async {
+  // Unmount first: listeners/focus/theme dependencies must be detached before
+  // disposing the services they use. Never leave the previous app tree alive
+  // while resetting GetIt or starting the next app instance.
+  await tester.pumpWidget(const SizedBox.shrink());
+  await tester.pump();
   CbE2EConfig.clear();
   await Future<void>.delayed(const Duration(milliseconds: 200));
   await tester.pump(const Duration(milliseconds: 50));

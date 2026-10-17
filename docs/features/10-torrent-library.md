@@ -344,3 +344,27 @@ and a fake download engine. They cover original-byte identity, unsafe paths,
 deduplication, 5,000-row pagination/filtering, storage modes, cancellation, corrupt
 archives, restart intent, action/status races and retaining files on index removal.
 They do not download from public swarms. E2E requires explicit authorization.
+
+The Windows Torrent E2E suite runs the real app, SQLite index, window IPC and
+bundled aria2 subprocess. It covers file/magnet opening, destination and start
+choices, focus/tab reuse, duplicate merging, clipboard links, F5 imports,
+pagination, shared views/search/sort, storage-mode confirmation and qBittorrent
+backup recovery. Download verification uses generated private metainfo and a
+loopback HTTP web seed, then checks the downloaded bytes. Peer discovery is
+disabled for this test engine. App data and client backup fixtures use temporary
+directories; the suite never imports the user's actual client backup.
+
+After authorizing E2E execution, run from the repository root:
+
+```sh
+just e2e-file torrent_library_e2e_test
+# Included in the parallel runner and Windows CI as well:
+just e2e-parallel "Torrent Library"
+```
+
+The parallel runner waits for its other workers before running Torrent's native
+focus checks, so another test window cannot steal focus during the assertions.
+
+All full-app E2E suites isolate app storage and unmount the app before resetting
+services. E2E windows do not prewarm spare app processes or join the production
+window registry. The Torrent IPC tests opt into their own loopback registry.

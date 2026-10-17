@@ -137,7 +137,7 @@ jobs:
       - name: Run integration tests - media_kit_playback_e2e_test
         run: |
           cd ${{ env.PROJECT_DIR }}
-          flutter test integration_test/media_kit_playback_e2e_test.dart -d windows
+          flutter test integration_test/media_kit_playback_e2e_test.dart -d windows --dart-define=CB_E2E=true
 
       - name: Stop stray cb_file_hub.exe (after media_kit_playback_e2e_test)
         if: always()
@@ -147,7 +147,7 @@ jobs:
       - name: Run integration tests - ffmpeg_thumbnail_e2e_test
         run: |
           cd ${{ env.PROJECT_DIR }}
-          flutter test integration_test/ffmpeg_thumbnail_e2e_test.dart -d windows
+          flutter test integration_test/ffmpeg_thumbnail_e2e_test.dart -d windows --dart-define=CB_E2E=true
 
       - name: Stop stray cb_file_hub.exe (after ffmpeg_thumbnail_e2e_test)
         if: always()
@@ -157,7 +157,7 @@ jobs:
       - name: Run integration tests - file_drag_drop_e2e_test
         run: |
           cd ${{ env.PROJECT_DIR }}
-          flutter test integration_test/file_drag_drop_e2e_test.dart -d windows
+          flutter test integration_test/file_drag_drop_e2e_test.dart -d windows --dart-define=CB_E2E=true
 
       - name: Stop stray cb_file_hub.exe (after file_drag_drop_e2e_test)
         if: always()
@@ -167,7 +167,22 @@ jobs:
       - name: Run integration tests - breadcrumb_address_bar_overflow_e2e_test
         run: |
           cd ${{ env.PROJECT_DIR }}
-          flutter test integration_test/breadcrumb_address_bar_overflow_e2e_test.dart -d windows
+          flutter test integration_test/breadcrumb_address_bar_overflow_e2e_test.dart -d windows --dart-define=CB_E2E=true
+
+      - name: Run integration tests - torrent_library_e2e_test
+        run: |
+          cd ${{ env.PROJECT_DIR }}
+          flutter test integration_test/torrent_library_e2e_test.dart --no-pub -d windows --dart-define=CB_E2E=true --reporter expanded --file-reporter json:build/e2e-torrent-ci.jsonl
+
+      - name: Upload Torrent E2E diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: torrent-e2e-diagnostics-${{ github.run_attempt }}
+          if-no-files-found: warn
+          path: |
+            ${{ env.PROJECT_DIR }}/build/e2e-torrent-ci.jsonl
+            ${{ env.PROJECT_DIR }}/build/e2e_report/
 
       - name: Stop stray cb_file_hub.exe (cleanup)
         if: always()

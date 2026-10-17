@@ -14,6 +14,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../config/languages/app_localizations.dart';
+import '../../../core/service_locator.dart';
 import '../../../design_system/cb_design_system.dart';
 import '../../../helpers/core/search_request_guard.dart';
 import '../../../helpers/core/user_preferences.dart';
@@ -71,7 +72,7 @@ class TorrentScreen extends StatefulWidget {
 }
 
 class _TorrentScreenState extends State<TorrentScreen> {
-  late final _service = widget.service ?? TorrentService.instance;
+  late final _service = widget.service ?? locator<TorrentService>();
   final _requests = SearchRequestGuard();
   final _focus = FocusNode();
   final _address = TextEditingController(text: '#torrents');
@@ -1310,6 +1311,7 @@ class _TorrentScreenState extends State<TorrentScreen> {
               ],
               _filterMenu(),
               CbButton.icon(
+                key: const ValueKey('torrent-settings-action'),
                 icon: PhosphorIconsLight.gear,
                 tooltip: l.settings,
                 onPressed: !_ready

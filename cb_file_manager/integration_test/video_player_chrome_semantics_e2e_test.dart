@@ -13,9 +13,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'e2e_helpers.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  registerE2EAppSandbox();
 
   testWidgets('video player chrome keeps a valid Windows AX tree', (
     tester,

@@ -6,6 +6,7 @@ import 'dart:ui';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';
 import 'package:cb_file_manager/utils/app_logger.dart';
 import 'package:uuid/uuid.dart';
+import 'package:flutter/foundation.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'desktop_window_process_launcher.dart';
@@ -13,6 +14,7 @@ import 'window_startup_payload.dart';
 import 'windows_native_tab_drag_drop_service.dart';
 import '../torrent/torrent_launch_request.dart';
 import '../torrent/torrent_service.dart';
+import '../../core/service_locator.dart';
 
 const double kDefaultTabTearOffAnchorX = 140.0;
 const double kDefaultTabTearOffAnchorY = 18.0;
@@ -57,7 +59,18 @@ class DesktopWindowInfo {
 }
 
 class DesktopWindowingService {
-  static const int _registryPort = 49490;
+  static const int _defaultRegistryPort = 49490;
+  final int _registryPort;
+  final bool _allowE2EPeers;
+
+  DesktopWindowingService()
+    : _registryPort = _defaultRegistryPort,
+      _allowE2EPeers = false;
+
+  /// Real peer/registry sockets on a test-owned port, with no spare processes.
+  @visibleForTesting
+  DesktopWindowingService.forTesting({required this._registryPort})
+    : _allowE2EPeers = true;
   static const Duration _heartbeatInterval = Duration(seconds: 10);
   static const Duration _registryTtl = Duration(seconds: 30);
 
@@ -104,12 +117,20 @@ class DesktopWindowingService {
       WindowsNativeTabDragDropService.initialize(tabBloc);
     }
 
+    // An integration-test executable starts its test entrypoint in every child
+    // process too. Pre-warming a spare would recursively rerun the suite, while
+    // joining the production registry could target the user's real app window.
+    if (const bool.fromEnvironment('CB_E2E') && !_allowE2EPeers) return;
+
     await _startPeerServerIfNeeded();
     await _ensureRegistryServerOrClient();
     _startHeartbeat();
     _listenToTabUpdates();
 
-    if (Platform.isWindows && !_isSecondaryWindow && _windowRole != 'spare') {
+    if (!const bool.fromEnvironment('CB_E2E') &&
+        Platform.isWindows &&
+        !_isSecondaryWindow &&
+        _windowRole != 'spare') {
       // Pre-warm as early as possible so "new window" feels instant.
       unawaited(ensureSpareWindow());
       _scheduleSpareWarmup();
@@ -476,7 +497,7 @@ class DesktopWindowingService {
           _windowRole == 'normal' &&
           _tabBloc != null &&
           (preference == 'engine'
-              ? TorrentService.instance.ownsEngine
+              ? locator<TorrentService>().ownsEngine
               : preference == 'primary'
               ? !_isSecondaryWindow
               : true);

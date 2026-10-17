@@ -19,14 +19,18 @@
 //   • List: ThumbnailLoader with videoCamera / playCircle icon
 //   • Context menu shows: Play video, Video info, Delete, Use system default
 //
-// Note: Uses the real 18 MB sample video at integration_test/samples/
-// if available (for real thumbnail generation tests). Falls back to
-// minimal MP4 stub files otherwise (sufficient for UI structure tests).
+// Uses the real sample video at integration_test/samples/; a missing fixture
+// fails instead of silently replacing decodable media with a header-only stub.
 
 import 'dart:io';
 
 import 'package:cb_file_manager/e2e/cb_e2e_config.dart';
+import 'package:cb_file_manager/helpers/core/user_preferences.dart';
+import 'package:cb_file_manager/design_system/primitives/cb_inline_rename.dart';
 import 'package:cb_file_manager/main.dart';
+import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
+import 'package:cb_file_manager/ui/widgets/inline_rename_field.dart';
+import 'package:cb_file_manager/ui/screens/media_gallery/video_player_full_screen.dart';
 import 'package:cb_file_manager/services/windowing/window_startup_payload.dart';
 import 'package:path/path.dart' as p;
 
@@ -41,6 +45,12 @@ import 'package:integration_test/integration_test.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  registerE2EAppSandbox();
+  setUp(() async {
+    await UserPreferences.instance.init();
+    await UserPreferences.instance.setViewMode(ViewMode.list);
+    await UserPreferences.instance.setOpenVideoInNewWindow(false);
+  });
 
   // ---------------------------------------------------------------------------
   // Helpers
@@ -48,57 +58,39 @@ void main() {
 
   /// Absolute path to the real sample video (18 MB MP4) in integration_test/samples/.
   String sampleVideoPath() {
+    final candidates = <String>[
+      p.join(
+        Directory.current.path,
+        'integration_test',
+        'samples',
+        'file_example_MP4_1920_18MG.mp4',
+      ),
+    ];
     try {
       final scriptStr = Platform.script.toString();
       final scriptPath = scriptStr.startsWith('file:///')
           ? Uri.parse(scriptStr).toFilePath()
           : scriptStr;
-      return p.join(
-        p.dirname(scriptPath),
-        'samples',
-        'file_example_MP4_1920_18MG.mp4',
+      candidates.add(
+        p.join(
+          p.dirname(scriptPath),
+          'samples',
+          'file_example_MP4_1920_18MG.mp4',
+        ),
       );
-    } catch (_) {
-      return '';
+    } catch (_) {}
+    for (final candidate in candidates) {
+      if (File(candidate).existsSync()) return candidate;
     }
+    throw StateError('Missing real video E2E fixture: $candidates');
   }
 
   /// Copies the sample video into [dir] with the given [name].
-  /// Falls back to a minimal stub if the sample file doesn't exist.
   File copySampleVideo(String dir, String name) {
     final dest = File('$dir${Platform.pathSeparator}$name');
     final sample = File(sampleVideoPath());
-    if (sample.existsSync()) {
-      sample.copySync(dest.path);
-      return dest;
-    }
-    // Fallback: write a minimal MP4 stub (header only).
-    // App detects video by extension, so this still triggers video-specific UI.
-    final file = File('$dir${Platform.pathSeparator}$name');
-    final mp4Header = <int>[
-      0x00,
-      0x00,
-      0x00,
-      0x0C,
-      0x66,
-      0x74,
-      0x79,
-      0x70,
-      0x69,
-      0x73,
-      0x6F,
-      0x6D,
-      0x00,
-      0x00,
-      0x00,
-      0x08,
-      0x6D,
-      0x64,
-      0x61,
-      0x74,
-    ];
-    file.writeAsBytesSync(mp4Header);
-    return file;
+    sample.copySync(dest.path);
+    return dest;
   }
 
   // ---------------------------------------------------------------------------
@@ -151,11 +143,16 @@ void main() {
       );
 
       try {
+        await UserPreferences.instance.setViewMode(ViewMode.grid);
         await runCbFileApp();
         await tester.pumpAndSettle(const Duration(seconds: 5));
         await et.init('video context menu shows Play video action');
 
-        assertFileRowExists(videoFile.path);
+        await waitForFileRowVisible(tester, videoFile.path);
+        expect(
+          find.byKey(ValueKey('file-grid-item-${videoFile.path}')),
+          findsOneWidget,
+        );
 
         // Right-click the video row to open context menu
         await rightClickFileRow(tester, videoFile.path);
@@ -199,7 +196,11 @@ void main() {
         await tester.pumpAndSettle(const Duration(seconds: 5));
         await et.init('video context menu in list view');
 
-        assertFileRowExists(videoFile.path);
+        await waitForFileRowVisible(tester, videoFile.path);
+        expect(
+          find.byKey(ValueKey('file-item-${videoFile.path}')),
+          findsOneWidget,
+        );
 
         // Right-click the video row
         await rightClickFileRow(tester, videoFile.path);
@@ -385,7 +386,14 @@ void main() {
         await tester.pumpAndSettle(const Duration(milliseconds: 500));
 
         // Type the new name (overwrite the extension)
-        final textFields = find.byType(TextField);
+        final textFields = find.descendant(
+          of: find.byWidgetPredicate(
+            (widget) =>
+                widget is InlineRenameField || widget is CbInlineRenamePanel,
+          ),
+          matching: find.byType(TextField),
+        );
+        await pumpUntilFound(tester, textFields);
         expect(
           textFields,
           findsAtLeastNWidgets(1),
@@ -445,18 +453,20 @@ void main() {
         await tapContextMenuItem(tester, 'play_video');
         await et.pumpAndSettle(const Duration(seconds: 5));
 
-        // The key assertion: the app process is still alive and rendering.
-        // After "Play video" any of these are valid outcomes:
-        //   (a) VideoPlayerFullScreen pushed → VideoPlayer widget visible
-        //   (b) System default / preferred external app launched → app stays
-        //       on the file list (still rendering MaterialApp/FluentApp root)
-        //   (c) OpenWithDialog appeared
-        // We fail only if the entire widget tree is gone (process crashed).
-        final hasAppRoot = find.byType(WidgetsApp).evaluate().isNotEmpty;
+        // This suite pins in-window playback and has no preferred external app.
+        // Merely retaining WidgetsApp would also pass if the action did nothing.
+        await pumpUntilFound(tester, find.byType(VideoPlayerFullScreen));
         expect(
-          hasAppRoot,
-          isTrue,
-          reason: 'App root widget gone — process likely crashed.',
+          find.byType(VideoPlayerFullScreen),
+          findsOneWidget,
+          reason: 'Play video should open the built-in player.',
+        );
+        expect(
+          tester
+              .widget<VideoPlayerFullScreen>(find.byType(VideoPlayerFullScreen))
+              .file
+              ?.path,
+          videoFile.path,
         );
 
         if (kDebugMode) debugPrint('[E2E] open video — SUCCESS');

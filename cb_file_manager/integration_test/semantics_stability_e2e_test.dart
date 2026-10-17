@@ -166,6 +166,7 @@ String _describeOwner(int id) {
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  registerE2EAppSandbox();
 
   testWidgets('AX semantics churn report', (WidgetTester tester) async {
     final handle = SemanticsBinding.instance.ensureSemantics();

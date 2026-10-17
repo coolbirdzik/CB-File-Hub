@@ -22,14 +22,15 @@ class Aria2RpcException implements Exception {
 /// aria2 is stopped with its parent; task intent is persisted in SQLite and
 /// `.aria2` control files preserve verified pieces across app restarts.
 class Aria2Engine {
-  Aria2Engine();
+  Aria2Engine({this._enablePeerDiscovery = true});
+  final bool _enablePeerDiscovery;
 
   /// Injects a transport for RPC contract unit tests without starting a process.
   Aria2Engine.forRpcTesting({
     required this._port,
     required this._secret,
     required this._httpClient,
-  });
+  }) : _enablePeerDiscovery = true;
   Process? _process;
   RandomAccessFile? _ownershipLock;
   Future<void>? _releasingOwnership;
@@ -93,6 +94,12 @@ class Aria2Engine {
     }
     final child = await Process.start(binary, [
       '--no-conf=true',
+      if (!_enablePeerDiscovery) ...[
+        '--enable-dht=false',
+        '--enable-dht6=false',
+        '--enable-peer-exchange=false',
+        '--bt-enable-lpd=false',
+      ],
       '--enable-rpc=true',
       '--rpc-listen-all=false',
       '--rpc-listen-port=$_port',

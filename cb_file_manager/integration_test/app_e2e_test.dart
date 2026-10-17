@@ -21,7 +21,11 @@
 import 'dart:io';
 
 import 'package:cb_file_manager/e2e/cb_e2e_config.dart';
+import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/design_system/primitives/cb_inline_rename.dart';
+import 'package:cb_file_manager/design_system/primitives/cb_tooltip.dart';
+import 'package:cb_file_manager/ui/components/common/search_text_field.dart';
+import 'package:cb_file_manager/ui/dialogs/create_file_dialog.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/main.dart';
 import 'package:cb_file_manager/services/windowing/window_startup_payload.dart';
@@ -103,8 +107,49 @@ Finder _findRenamePopoverField() {
   );
 }
 
+Future<void> _chooseBrowserView(WidgetTester tester, ViewMode mode) async {
+  final menu = find.byKey(const ValueKey('shared-view-mode-menu'));
+  await pumpUntilFound(tester, menu);
+  expect(menu, findsOneWidget);
+  await tester.tap(menu);
+  final choice = find.byWidgetPredicate(
+    (widget) => widget is PopupMenuItem<ViewMode> && widget.value == mode,
+  );
+  await pumpUntilFound(tester, choice);
+  expect(choice, findsOneWidget);
+  // Popup items enter the tree before their route accepts pointer events.
+  await tester.pumpAndSettle(
+    const Duration(milliseconds: 100),
+    EnginePhase.sendSemanticsUpdate,
+    const Duration(seconds: 5),
+  );
+  await tester.tap(choice);
+  await tester.pumpAndSettle(const Duration(milliseconds: 300));
+  final deadline = DateTime.now().add(const Duration(seconds: 5));
+  while (tester.widget<PopupMenuButton<ViewMode>>(menu).initialValue != mode &&
+      DateTime.now().isBefore(deadline)) {
+    await tester.pump(const Duration(milliseconds: 100));
+  }
+  expect(tester.widget<PopupMenuButton<ViewMode>>(menu).initialValue, mode);
+}
+
+Future<Finder> _openBrowserSearch(WidgetTester tester) async {
+  final action = find.byKey(const ValueKey('shared-search-action'));
+  await pumpUntilFound(tester, action);
+  expect(action, findsOneWidget);
+  await tester.tap(action);
+  final input = find.descendant(
+    of: find.byType(SearchTextField),
+    matching: find.byType(EditableText),
+  );
+  await pumpUntilFound(tester, input);
+  expect(input, findsOneWidget);
+  return input;
+}
+
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  registerE2EAppSandbox();
 
   // The production preference is stored in SQLite, not SharedPreferences.
   // Pin every E2E case to the clean-install default so local persisted state
@@ -112,6 +157,7 @@ void main() {
   setUp(() async {
     await UserPreferences.instance.init();
     await UserPreferences.instance.setViewMode(ViewMode.list);
+    await UserPreferences.instance.setSearchTipShown(true);
   });
 
   // ===========================================================================
@@ -1000,8 +1046,13 @@ void main() {
         await et.keyPress(LogicalKeyboardKey.enter);
         await et.pumpAndSettle(const Duration(seconds: 3));
 
-        // App should handle Enter key (may open file preview or show details)
-        // The test verifies no crash occurs
+        final viewer = find.byKey(ValueKey('viewer-text-${targetFile.path}'));
+        await pumpUntilFound(tester, viewer);
+        expect(
+          viewer,
+          findsOneWidget,
+          reason: 'Enter should open the selected text file in the viewer',
+        );
         await et.screenshot('after_enter_key');
         if (kDebugMode) {
           debugPrint('[E2E] Enter key handled without crash — SUCCESS');
@@ -1043,30 +1094,11 @@ void main() {
         await waitForFileRowVisible(tester, targetFile.path);
         await waitForFileRowVisible(tester, otherFile.path);
 
-        // Find and tap search box (search icon button)
-        final searchIcon = find.byIcon(Icons.search);
-        if (searchIcon.evaluate().isNotEmpty) {
-          await et.tap(searchIcon.first, detail: 'open_search');
-          await tester.pumpAndSettle(const Duration(milliseconds: 500));
-
-          // Type search query
-          await et.enterText(
-            find.byType(TextField).first,
-            'unique_search',
-            detail: 'type_search_query',
-          );
-          await et.pumpAndSettle(const Duration(seconds: 2));
-
-          // Target file should still be visible (filtered)
-          await waitForFileRowVisible(tester, targetFile.path);
-        } else {
-          // Search may be implemented differently - verify current state
-          if (kDebugMode) {
-            debugPrint(
-              '[E2E] Search icon not found, skipping search interaction',
-            );
-          }
-        }
+        final input = await _openBrowserSearch(tester);
+        await et.enterText(input, 'unique_search', detail: 'type_search_query');
+        await tester.testTextInput.receiveAction(TextInputAction.search);
+        await waitForFileRowVisible(tester, targetFile.path);
+        await waitForFileRowAbsent(tester, otherFile.path);
         if (kDebugMode) debugPrint('[E2E] search test — SUCCESS');
       } finally {
         await et.screenshot('result');
@@ -1097,28 +1129,21 @@ void main() {
         await waitForFileRowVisible(tester, fileA.path);
         await waitForFileRowVisible(tester, fileB.path);
 
-        // Open search and type a query
-        final searchIcon = find.byIcon(Icons.search);
-        if (searchIcon.evaluate().isNotEmpty) {
-          await et.tap(searchIcon.first, detail: 'open_search');
-          await tester.pumpAndSettle(const Duration(milliseconds: 500));
-
-          await et.enterText(
-            find.byType(TextField).first,
-            'alpha',
-            detail: 'type_partial_search',
-          );
-          await et.pumpAndSettle(const Duration(seconds: 2));
-
-          // Press Escape to clear search
-          await et.keyPress(LogicalKeyboardKey.escape);
-          await et.pumpAndSettle(const Duration(seconds: 2));
-
-          // Both files should be visible again. The listing restores
-          // asynchronously; poll so slow CI runners don't race it.
-          await waitForFileRowVisible(tester, fileA.path);
-          await waitForFileRowVisible(tester, fileB.path);
-        }
+        final input = await _openBrowserSearch(tester);
+        await et.enterText(input, 'alpha', detail: 'type_partial_search');
+        await tester.testTextInput.receiveAction(TextInputAction.search);
+        await waitForFileRowVisible(tester, fileA.path);
+        await waitForFileRowAbsent(tester, fileB.path);
+        final clearLabel = AppLocalizations.of(
+          tester.element(input),
+        )!.clearSearch;
+        final clear = find.byWidgetPredicate(
+          (widget) => widget is CbTooltip && widget.message == clearLabel,
+        );
+        expect(clear, findsOneWidget);
+        await tester.tap(clear);
+        await waitForFileRowVisible(tester, fileA.path);
+        await waitForFileRowVisible(tester, fileB.path);
         if (kDebugMode) debugPrint('[E2E] clear search — SUCCESS');
       } finally {
         await et.screenshot('result');
@@ -1155,16 +1180,13 @@ void main() {
         await waitForFileRowVisible(tester, fileA.path);
         await waitForFileRowVisible(tester, fileB.path);
 
-        // Look for grid icon to toggle view
-        final gridIcon = find.byIcon(Icons.grid_view);
-        if (gridIcon.evaluate().isNotEmpty) {
-          await et.tap(gridIcon.first, detail: 'toggle_to_grid');
-          await et.pumpAndSettle(const Duration(seconds: 2));
-
-          // Verify files are still visible in grid mode
-          await waitForFileRowVisible(tester, fileA.path);
-          await waitForFileRowVisible(tester, fileB.path);
-        }
+        await _chooseBrowserView(tester, ViewMode.grid);
+        await waitForFileRowVisible(tester, fileA.path);
+        await waitForFileRowVisible(tester, fileB.path);
+        expect(
+          find.byKey(ValueKey('file-grid-item-${fileA.path}')),
+          findsOneWidget,
+        );
         if (kDebugMode) debugPrint('[E2E] toggle to grid view — SUCCESS');
       } finally {
         await et.screenshot('result');
@@ -1195,23 +1217,15 @@ void main() {
         await waitForFileRowVisible(tester, fileA.path);
         await waitForFileRowVisible(tester, fileB.path);
 
-        // First toggle to grid
-        final gridIcon = find.byIcon(Icons.grid_view);
-        if (gridIcon.evaluate().isNotEmpty) {
-          await et.tap(gridIcon.first, detail: 'toggle_to_grid');
-          await et.pumpAndSettle(const Duration(seconds: 2));
-
-          // Now toggle back to list
-          final listIcon = find.byIcon(Icons.view_list);
-          if (listIcon.evaluate().isNotEmpty) {
-            await et.tap(listIcon.first, detail: 'toggle_to_list');
-            await et.pumpAndSettle(const Duration(seconds: 2));
-
-            // Verify files are still visible in list mode
-            await waitForFileRowVisible(tester, fileA.path);
-            await waitForFileRowVisible(tester, fileB.path);
-          }
-        }
+        await _chooseBrowserView(tester, ViewMode.grid);
+        expect(
+          find.byKey(ValueKey('file-grid-item-${fileA.path}')),
+          findsOneWidget,
+        );
+        await _chooseBrowserView(tester, ViewMode.list);
+        await waitForFileRowVisible(tester, fileA.path);
+        await waitForFileRowVisible(tester, fileB.path);
+        expect(find.byKey(ValueKey('file-item-${fileA.path}')), findsOneWidget);
         if (kDebugMode) debugPrint('[E2E] toggle back to list view — SUCCESS');
       } finally {
         await et.screenshot('result');
@@ -1240,14 +1254,12 @@ void main() {
         await tester.pumpAndSettle(const Duration(seconds: 5));
         await et.init('08.03 file operations work correctly in grid view');
 
-        // Switch to grid view first
-        final gridIcon = find.byIcon(Icons.grid_view);
-        if (gridIcon.evaluate().isNotEmpty) {
-          await et.tap(gridIcon.first, detail: 'toggle_to_grid');
-          await et.pumpAndSettle(const Duration(seconds: 2));
-        }
-
+        await _chooseBrowserView(tester, ViewMode.grid);
         await waitForFileRowVisible(tester, fileA.path);
+        expect(
+          find.byKey(ValueKey('file-grid-item-${fileA.path}')),
+          findsOneWidget,
+        );
 
         // Copy file via context menu in grid view
         await et.rightClickFileRow(
@@ -1269,6 +1281,7 @@ void main() {
         final pastedPath =
             '${destFolder.path}${Platform.pathSeparator}grid_op_file.txt';
         await waitForFileRowVisible(tester, pastedPath);
+        expect(await File(pastedPath).readAsString(), 'A');
         if (kDebugMode) debugPrint('[E2E] grid view file ops — SUCCESS');
       } finally {
         await et.screenshot('result');
@@ -1621,11 +1634,40 @@ void main() {
         // Right-click background to open context menu
         await et.openBackgroundContextMenu(detail: 'open_bg_menu');
 
-        // Try to create new file (may be "new_file" action)
         await et.tapContextMenuItem('new_file', detail: 'new_file');
-        await et.pumpAndSettle(const Duration(seconds: 2));
-
-        await et.screenshot('after_new_file_attempt');
+        final templates = find.byType(CreateFileDialog);
+        await pumpUntilFound(tester, templates);
+        expect(templates, findsOneWidget);
+        final templateSearch = find.descendant(
+          of: templates,
+          matching: find.byType(TextField),
+        );
+        await tester.enterText(templateSearch, 'txt');
+        await tester.pumpAndSettle(const Duration(milliseconds: 300));
+        final textTemplate = find.descendant(
+          of: templates,
+          matching: find.text(
+            AppLocalizations.of(tester.element(templates))!.fileTypeTxt,
+          ),
+        );
+        await pumpUntilFound(tester, textTemplate);
+        expect(textTemplate, findsOneWidget);
+        await tester.tap(textTemplate);
+        await tester.pumpAndSettle(const Duration(seconds: 2));
+        final created = dir
+            .listSync()
+            .whereType<File>()
+            .where((file) => file.path != dummyFile.path)
+            .toList();
+        expect(
+          created,
+          hasLength(1),
+          reason: 'The menu must create a real file',
+        );
+        expect(created.single.path, endsWith('.txt'));
+        await waitForFileRowVisible(tester, created.single.path);
+        expect(await dummyFile.readAsString(), 'keep empty');
+        await et.screenshot('new_text_file_created');
         if (kDebugMode) debugPrint('[E2E] create new file — SUCCESS');
       } finally {
         await et.screenshot('result');
@@ -1871,7 +1913,8 @@ void main() {
         await et.pumpAndSettle(const Duration(seconds: 2));
 
         // Enter new name
-        final textFields = find.byType(TextField);
+        final textFields = _findInlineRenameField();
+        await pumpUntilFound(tester, textFields);
         expect(
           textFields,
           findsAtLeastNWidgets(1),
