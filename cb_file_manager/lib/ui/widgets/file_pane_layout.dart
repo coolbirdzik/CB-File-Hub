@@ -212,7 +212,23 @@ class _FilePaneLayoutState extends State<FilePaneLayout> {
               visible = layout.visible(shown)!;
             }
           }
-          return _tree(visible);
+          // The stack shape never changes, so starting a drag keeps the
+          // mounted panes and split state.
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              _tree(visible),
+              if (_dragging != null)
+                for (final edge in FilePaneEdge.values)
+                  _RootDropZone(
+                    key: ValueKey('file-pane-root-drop-${edge.name}'),
+                    owner: _owner,
+                    edge: edge,
+                    onDock: (moving) =>
+                        _change(_controller.value.dockToEdge(moving, edge)),
+                  ),
+            ],
+          );
         },
       ),
     ),
@@ -374,6 +390,54 @@ class _PaneDropTargetState extends State<_PaneDropTarget> {
   );
 }
 
+/// A strip along one outer edge of the whole layout, shown only while a pane is
+/// dragged. Dropping here makes the pane span the full edge.
+class _RootDropZone extends StatelessWidget {
+  const _RootDropZone({
+    super.key,
+    required this.owner,
+    required this.edge,
+    required this.onDock,
+  });
+  static const double thickness = 28;
+  final Object owner;
+  final FilePaneEdge edge;
+  final ValueChanged<FilePane> onDock;
+
+  @override
+  Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
+    final horizontal = edge == FilePaneEdge.top || edge == FilePaneEdge.bottom;
+    return Positioned(
+      left: edge == FilePaneEdge.right ? null : 0,
+      right: edge == FilePaneEdge.left ? null : 0,
+      top: edge == FilePaneEdge.bottom ? null : 0,
+      bottom: edge == FilePaneEdge.top ? null : 0,
+      width: horizontal ? null : thickness,
+      height: horizontal ? thickness : null,
+      child: DragTarget<_PaneDrag>(
+        onWillAcceptWithDetails: (details) =>
+            identical(details.data.owner, owner),
+        onAcceptWithDetails: (details) => onDock(details.data.pane),
+        builder: (context, candidates, _) => IgnorePointer(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: primary.withValues(
+                alpha: candidates.isNotEmpty ? .4 : .08,
+              ),
+              border: Border.all(
+                color: primary.withValues(
+                  alpha: candidates.isNotEmpty ? 1 : .3,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _PaneSplit extends StatefulWidget {
   const _PaneSplit({
     super.key,
@@ -416,18 +480,20 @@ class _PaneSplitState extends State<_PaneSplit> {
       final scale = math.min(1.0, available / (minA + minB));
       final lower = minA * scale;
       final upper = available - minB * scale;
-      final defaultTrailing = horizontal
-          ? widget.previewWidth
-          : widget.propertiesHeight;
+      final fixedFirst = widget.node.firstIsFixed;
+      final node = widget.node;
+      // Fixed side in pixels: the saved extent, else an older ratio, else the
+      // preview width / properties height.
+      final fixedExtent =
+          node.extent ??
+          (node.ratio == null
+              ? math.min(
+                  horizontal ? widget.previewWidth : widget.propertiesHeight,
+                  available / (horizontal ? 1.25 : 2),
+                )
+              : available * (fixedFirst ? node.ratio! : 1 - node.ratio!));
       final extent =
-          (_dragExtent ??
-                  (widget.node.ratio == null
-                      ? available -
-                            math.min(
-                              defaultTrailing,
-                              available / (horizontal ? 1.25 : 2),
-                            )
-                      : available * widget.node.ratio!))
+          (_dragExtent ?? (fixedFirst ? fixedExtent : available - fixedExtent))
               .clamp(lower, math.max(lower, upper))
               .toDouble();
       final accent = Theme.of(context).colorScheme.primary;
@@ -464,7 +530,9 @@ class _PaneSplitState extends State<_PaneSplit> {
             },
             onPanEnd: (_) {
               if (!_cancelled && _dragExtent != null && available > 0) {
-                widget.onResize(_dragExtent! / available);
+                widget.onResize(
+                  fixedFirst ? _dragExtent! : available - _dragExtent!,
+                );
               }
               setState(() => _dragExtent = null);
             },

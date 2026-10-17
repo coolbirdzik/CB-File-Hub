@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
@@ -40,6 +41,7 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
   );
   late bool _start = widget.startImmediately;
   bool _choosing = false;
+  bool _closing = false;
   String? _error;
 
   @override
@@ -91,6 +93,7 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
   }
 
   void _submit() {
+    if (_choosing || _closing) return;
     final destination = _destination.text.trim();
     if (!p.isAbsolute(destination)) {
       setState(
@@ -98,6 +101,7 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
       );
       return;
     }
+    _closing = true;
     Navigator.pop(
       context,
       TorrentDownloadOptions(p.normalize(destination), _start),
@@ -107,6 +111,18 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
+    // Enter does the same as the Save button. Focused buttons handle their own
+    // Enter first, so Cancel/Browse still activate normally.
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.enter): _submit,
+        const SingleActivator(LogicalKeyboardKey.numpadEnter): _submit,
+      },
+      child: Focus(autofocus: true, child: _buildDialog(l)),
+    );
+  }
+
+  Widget _buildDialog(AppLocalizations l) {
     return CbDialog(
       title: l.torrentDownload,
       subtitle: widget.name,
@@ -130,6 +146,7 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
                       : null,
                   errorText: _error,
                   mono: true,
+                  onSubmitted: (_) => _submit(),
                   onChanged: (_) => setState(() => _error = null),
                 ),
               ),

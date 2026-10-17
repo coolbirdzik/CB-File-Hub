@@ -8,12 +8,18 @@ enum FilePaneEdge { left, right, top, bottom }
 
 /// A binary split tree. Hidden panes are pruned for display only, so toggling a
 /// pane restores its position and size instead of changing the saved layout.
+///
+/// A split sizes one side in logical pixels ([extent]) and lets the side that
+/// holds the file list absorb everything else. Resizing one divider therefore
+/// never changes the width or height of a pane on another divider. [ratio]
+/// only seeds a split that has no extent yet (a fresh dock, or an older save).
 class FilePaneLayoutNode {
   const FilePaneLayoutNode.pane(this.pane)
     : axis = null,
       first = null,
       second = null,
       ratio = null,
+      extent = null,
       id = null;
 
   const FilePaneLayoutNode.split(
@@ -21,6 +27,7 @@ class FilePaneLayoutNode {
     this.first,
     this.second, {
     this.ratio,
+    this.extent,
     this.id,
   }) : pane = null;
 
@@ -29,6 +36,7 @@ class FilePaneLayoutNode {
   final FilePaneLayoutNode? first;
   final FilePaneLayoutNode? second;
   final double? ratio;
+  final double? extent;
   final String? id;
 
   static const defaults = FilePaneLayoutNode.split(
@@ -67,8 +75,14 @@ class FilePaneLayoutNode {
     final b = second!.without(removed);
     if (a == null) return b;
     if (b == null) return a;
-    return FilePaneLayoutNode.split(axis, a, b, ratio: ratio);
+    return FilePaneLayoutNode.split(axis, a, b, ratio: ratio, extent: extent);
   }
+
+  /// The side that keeps its pixel size while the window or a sibling divider
+  /// changes: the one without the file list, else the second.
+  bool get firstIsFixed =>
+      !first!.panes.contains(FilePane.files) &&
+      second!.panes.contains(FilePane.files);
 
   FilePaneLayoutNode? visible(Set<FilePane> shown) {
     if (pane != null) return shown.contains(pane) ? this : null;
@@ -76,7 +90,14 @@ class FilePaneLayoutNode {
     final b = second!.visible(shown);
     if (a == null) return b;
     if (b == null) return a;
-    return FilePaneLayoutNode.split(axis, a, b, ratio: ratio, id: splitId);
+    return FilePaneLayoutNode.split(
+      axis,
+      a,
+      b,
+      ratio: ratio,
+      extent: extent,
+      id: splitId,
+    );
   }
 
   FilePaneLayoutNode dock(FilePane moving, FilePane target, FilePaneEdge edge) {
@@ -101,19 +122,42 @@ class FilePaneLayoutNode {
         insert(node.first!),
         insert(node.second!),
         ratio: node.ratio,
+        extent: node.extent,
       );
     }
 
     return insert(remaining);
   }
 
+  /// Docks [moving] along a whole edge of the layout, so it spans the full
+  /// width (top/bottom) or height (left/right) instead of sharing one pane's
+  /// edge. Without an extent the split starts at 30% for an auxiliary pane, or
+  /// 70% when the file list itself moves.
+  FilePaneLayoutNode dockToEdge(FilePane moving, FilePaneEdge edge) {
+    final remaining = without(moving)!;
+    final before = edge == FilePaneEdge.left || edge == FilePaneEdge.top;
+    final share = moving == FilePane.files ? .7 : .3;
+    final moved = FilePaneLayoutNode.pane(moving);
+    return FilePaneLayoutNode.split(
+      edge == FilePaneEdge.left || edge == FilePaneEdge.right
+          ? Axis.horizontal
+          : Axis.vertical,
+      before ? moved : remaining,
+      before ? remaining : moved,
+      ratio: before ? share : 1 - share,
+    );
+  }
+
+  /// Sets the pixel size of the fixed side of split [id].
   FilePaneLayoutNode resize(String id, double value) {
     if (pane != null) return this;
+    final target = splitId == id;
     return FilePaneLayoutNode.split(
       axis,
       first!.resize(id, value),
       second!.resize(id, value),
-      ratio: splitId == id ? value.clamp(.01, .99) : ratio,
+      ratio: target ? null : ratio,
+      extent: target ? math.max(1.0, value) : extent,
     );
   }
 
@@ -124,6 +168,7 @@ class FilePaneLayoutNode {
           'first': first!.toJson(),
           'second': second!.toJson(),
           'ratio': ratio,
+          if (extent != null) 'extent': extent,
         };
 
   String encode() => jsonEncode(toJson());
@@ -142,11 +187,17 @@ class FilePaneLayoutNode {
         if (ratio != null && (!ratio.isFinite || ratio <= 0 || ratio >= 1)) {
           throw const FormatException();
         }
+        final rawExtent = data['extent'];
+        final extent = rawExtent == null ? null : (rawExtent as num).toDouble();
+        if (extent != null && (!extent.isFinite || extent <= 0)) {
+          throw const FormatException();
+        }
         return FilePaneLayoutNode.split(
           Axis.values.byName(data['axis'] as String),
           parse(data['first'], depth + 1),
           parse(data['second'], depth + 1),
           ratio: ratio,
+          extent: extent,
         );
       }
 

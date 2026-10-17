@@ -67,6 +67,20 @@ void main() {
       expect(link.uri, isNot(contains('source.torrent')));
     },
   );
+  test('plainUri leaves values unescaped except structural characters', () {
+    final link = MagnetLink.parse(
+      'magnet:?xt=urn:btih:$hash&dn=Phim%20Vi%E1%BB%87t%20%26%20%231'
+      '&tr=udp%3A%2F%2Ftracker.example%3A80%2Fannounce',
+    );
+    expect(
+      link.plainUri,
+      'magnet:?xt=urn:btih:$hash&dn=Phim%20Việt%20%26%20%231'
+      '&tr=udp://tracker.example:80/announce',
+    );
+    final reparsed = MagnetLink.parse(link.plainUri);
+    expect(reparsed.hash, hash);
+    expect(reparsed.name, 'Phim Việt & #1');
+  });
   test(
     'magnet export retains a matching original and replaces a mismatched source',
     () {

@@ -1112,7 +1112,7 @@ class _TorrentScreenState extends State<TorrentScreen> {
                       name: item.name,
                       trackers: item.trackers,
                       sourceUri: item.sourceUri,
-                    ).uri,
+                    ).plainUri,
                   )
                   .join('\n');
               await Clipboard.setData(ClipboardData(text: links));

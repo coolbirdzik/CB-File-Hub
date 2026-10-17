@@ -53,34 +53,49 @@ void main() {
     expect(submittedValue, equals('urgent'));
   });
 
-  testWidgets('01.02 Ctrl+A replaces only draft text and preserves chips', (
+  testWidgets('01.02 Ctrl+A selects and highlights the chips and the draft', (
     tester,
   ) async {
     final key = GlobalKey<ChipsInputState<String>>();
+    var tags = <String>['existing', 'favorite'];
     String? draftText;
 
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: ChipsInput<String>(
-            key: key,
-            values: const <String>['existing', 'favorite'],
-            onChanged: (_) {},
-            onTextChanged: (value) => draftText = value,
-            chipBuilder: (context, value) => Chip(label: Text(value)),
+          body: StatefulBuilder(
+            builder: (context, setState) => ChipsInput<String>(
+              key: key,
+              values: tags,
+              onChanged: (value) => setState(() => tags = value),
+              onTextChanged: (value) => draftText = value,
+              chipBuilder: (context, value) => Chip(label: Text(value)),
+            ),
           ),
         ),
       ),
     );
 
+    bool selected(int i) =>
+        (tester
+                    .widget<DecoratedBox>(
+                      find.byKey(ValueKey('chips-input-selection-$i')),
+                    )
+                    .decoration
+                as BoxDecoration)
+            .border !=
+        null;
+
     await tester.tap(find.byType(TextField));
     tester.testTextInput.updateEditingValue(
       const TextEditingValue(
-        text: '\uFFFE\uFFFEold draft',
+        text: '￾￾old draft',
         selection: TextSelection.collapsed(offset: 11),
       ),
     );
     await tester.pump();
+    expect(selected(0), isFalse);
+    expect(selected(1), isFalse);
 
     await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
     await tester.sendKeyEvent(LogicalKeyboardKey.keyA);
@@ -90,22 +105,26 @@ void main() {
     final controller = key.currentState!.controller;
     expect(
       controller.selection,
-      const TextSelection(baseOffset: 2, extentOffset: 11),
+      const TextSelection(baseOffset: 0, extentOffset: 11),
     );
+    expect(selected(0), isTrue);
+    expect(selected(1), isTrue);
 
+    // Typing over the selection replaces the tags too.
     tester.testTextInput.updateEditingValue(
       const TextEditingValue(
-        text: '\uFFFE\uFFFEnew',
-        selection: TextSelection.collapsed(offset: 5),
+        text: 'new',
+        selection: TextSelection.collapsed(offset: 3),
       ),
     );
     await tester.pump();
 
-    expect(controller.textWithReplacements, '\uFFFE\uFFFEnew');
-    expect(controller.textWithoutReplacements, 'new');
+    expect(tags, isEmpty);
+    expect(controller.textWithReplacements, 'new');
     expect(draftText, 'new');
-    expect(find.text('existing'), findsOneWidget);
-    expect(find.text('favorite'), findsOneWidget);
+    expect(find.text('existing'), findsNothing);
+    expect(find.text('favorite'), findsNothing);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('01.03 ":" on a suggestion scopes the field to that parent', (

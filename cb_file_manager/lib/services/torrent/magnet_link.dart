@@ -97,6 +97,29 @@ class MagnetLink {
     );
   }
 
+  /// Human-readable form for copying: values are not percent-encoded
+  /// (`tr=udp://host:1337/announce`). Only characters that would break the
+  /// link structure (`&`, `#`, `%`, whitespace) stay encoded.
+  String get plainUri {
+    final query = Uri.parse(uri).query;
+    final parts = <String>[];
+    for (final part in query.split('&')) {
+      if (part.isEmpty) continue;
+      final eq = part.indexOf('=');
+      if (eq < 0) {
+        parts.add(part);
+        continue;
+      }
+      final value = Uri.decodeQueryComponent(part.substring(eq + 1));
+      final plain = value.replaceAllMapped(
+        RegExp(r'[&#%\s]'),
+        (m) => Uri.encodeComponent(m[0]!),
+      );
+      parts.add('${part.substring(0, eq)}=$plain');
+    }
+    return 'magnet:?${parts.join('&')}';
+  }
+
   MagnetLink withTrackers(Iterable<String> trackers) {
     final parsed = Uri.parse(uri);
     final known = (parsed.queryParametersAll['tr'] ?? const <String>[]).toSet();

@@ -607,6 +607,40 @@ void main() {
     },
   );
 
+  for (final inField in [true, false]) {
+    testWidgets('Enter in the download dialog saves like the Save button '
+        '(${inField ? 'in the folder field' : 'with nothing focused'})', (
+      tester,
+    ) async {
+      final directory = p.join(Directory.systemTemp.path, 'chosen-enter');
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('torrent.startImmediately', false);
+      // Without a remembered folder it is typed by hand; with one, Enter has
+      // to work straight after the dialog opens.
+      if (inField) {
+        await prefs.setBool('torrent.showDownloadDialog', false);
+      } else {
+        await prefs.setString('torrent.lastDownloadDirectory', directory);
+      }
+      final fake = service as _Service;
+      fake.openStatus = 'library';
+      await mount(tester, initialSource: '/enter.torrent');
+      expect(find.byType(TorrentDownloadDialog), findsOneWidget);
+      if (inField) {
+        await tester.enterText(
+          find.byKey(const ValueKey('torrent-download-destination')),
+          directory,
+        );
+      }
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+      expect(find.byType(TorrentDownloadDialog), findsNothing);
+      expect(fake.downloads, [('0' * 40, directory, false)]);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets(
     'explicit Download to action still opens options when automatic opens hide them',
     (tester) async {

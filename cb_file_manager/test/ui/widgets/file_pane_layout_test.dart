@@ -47,7 +47,7 @@ void main() {
         FilePane.files,
         FilePaneEdge.left,
       );
-      final last = first.resize(first.first!.splitId, .35);
+      final last = first.resize(first.first!.splitId, 300);
       controller.update(first);
       controller.update(last);
       read.complete(FilePaneLayoutNode.defaults.encode());
@@ -83,12 +83,13 @@ void main() {
   test('hidden panes preserve geometry and the original split identity', () {
     final layout = FilePaneLayoutNode.defaults.resize(
       'files-preview-properties',
-      .7,
+      200,
     );
     final visible = layout.visible({FilePane.files, FilePane.properties})!;
     expect(visible.splitId, 'files-preview-properties');
-    final changed = layout.resize(visible.splitId, .6);
-    expect(changed.ratio, .6);
+    final changed = layout.resize(visible.splitId, 150);
+    expect(changed.extent, 150);
+    expect(visible.extent, 200);
     expect(changed.panes, FilePane.values);
   });
 
@@ -107,6 +108,22 @@ void main() {
       );
     }
   });
+
+  test(
+    'pixel extents survive a saved round trip; bad extents are rejected',
+    () {
+      final layout = FilePaneLayoutNode.defaults.resize('files-preview', 420);
+      final restored = FilePaneLayoutNode.decode(layout.encode());
+      expect(restored.first!.extent, 420);
+      expect(restored.encode(), layout.encode());
+      expect(
+        FilePaneLayoutNode.decode(
+          layout.encode().replaceFirst('420', '-5'),
+        ).encode(),
+        FilePaneLayoutNode.defaults.encode(),
+      );
+    },
+  );
 
   late FilePaneLayoutController controller;
   setUp(() => controller = FilePaneLayoutController());
@@ -219,6 +236,52 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('preview and properties keep their own widths side by side', (
+    tester,
+  ) async {
+    desktop(tester);
+    controller.update(
+      FilePaneLayoutNode.defaults
+          .dock(FilePane.properties, FilePane.preview, FilePaneEdge.right)
+          .resize('preview-properties', 300)
+          .resize('files-preview-properties', 700),
+      persist: false,
+    );
+    await tester.pumpWidget(app());
+    await tester.pumpAndSettle();
+    final preview = find.byKey(const ValueKey('preview-body'));
+    final properties = find.byKey(const ValueKey('properties-body'));
+    expect(tester.getSize(properties).width, closeTo(300, 1));
+    expect(tester.getSize(preview).width, closeTo(394, 1));
+
+    // Dragging the divider left of the preview moves only that boundary.
+    await tester.drag(
+      find.byKey(const ValueKey('file-pane-resize-files-preview-properties')),
+      const Offset(-80, 0),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.getSize(properties).width, closeTo(300, 1));
+    expect(tester.getSize(preview).width, closeTo(474, 1));
+
+    // Dragging the preview/properties divider leaves the file list alone.
+    final filesWidth = tester.getSize(find.text('Selection 0')).width;
+    await tester.drag(
+      find.byKey(const ValueKey('file-pane-resize-preview-properties')),
+      const Offset(-50, 0),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.getSize(properties).width, closeTo(350, 1));
+    expect(tester.getSize(preview).width, closeTo(424, 1));
+    expect(tester.getSize(find.text('Selection 0')).width, filesWidth);
+
+    // The window narrowing is absorbed by the file list alone.
+    tester.view.physicalSize = const Size(1000, 700);
+    await tester.pumpAndSettle();
+    expect(tester.getSize(properties).width, closeTo(350, 1));
+    expect(tester.getSize(preview).width, closeTo(424, 1));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('drag docks beside a pane without losing its state', (
     tester,
   ) async {
@@ -236,7 +299,7 @@ void main() {
     await mouse.down(start);
     await mouse.moveTo(start + const Offset(-30, 0));
     await tester.pump();
-    await mouse.moveTo(Offset(4, target.center.dy));
+    await mouse.moveTo(Offset(40, target.center.dy));
     await tester.pump();
     await mouse.up();
     await tester.pump();
@@ -246,6 +309,60 @@ void main() {
     expect(
       tester.getCenter(preview).dx,
       lessThan(tester.getCenter(find.text('Selection 1')).dx),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  test('docking to a layout edge spans every other pane and round-trips', () {
+    for (final moving in FilePane.values) {
+      for (final edge in FilePaneEdge.values) {
+        final layout = FilePaneLayoutNode.defaults.dockToEdge(moving, edge);
+        expect(layout.panes.toSet(), FilePane.values.toSet());
+        final before = edge == FilePaneEdge.left || edge == FilePaneEdge.top;
+        final side = before ? layout.first! : layout.second!;
+        expect(side.pane, moving);
+        expect(
+          layout.axis,
+          edge == FilePaneEdge.left || edge == FilePaneEdge.right
+              ? Axis.horizontal
+              : Axis.vertical,
+        );
+        expect(
+          FilePaneLayoutNode.decode(layout.encode()).encode(),
+          layout.encode(),
+        );
+      }
+    }
+  });
+
+  testWidgets('drop on the bottom edge makes a pane full width', (
+    tester,
+  ) async {
+    desktop(tester);
+    await tester.pumpWidget(app());
+    await tester.pumpAndSettle();
+    final preview = find.byKey(const ValueKey('preview-body'));
+    expect(tester.getSize(preview).width, 360);
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    addTearDown(mouse.removePointer);
+    final start = tester.getCenter(
+      find.byKey(const ValueKey('file-pane-drag-preview')),
+    );
+    await mouse.down(start);
+    await mouse.moveTo(start + const Offset(-30, 0));
+    await tester.pump();
+    final zone = find.byKey(const ValueKey('file-pane-root-drop-bottom'));
+    expect(zone, findsOneWidget);
+    await mouse.moveTo(tester.getCenter(zone));
+    await tester.pump();
+    await mouse.up();
+    await tester.pumpAndSettle();
+    expect(controller.value.second!.pane, FilePane.preview);
+    expect(tester.getSize(preview).width, 1200);
+    expect(
+      find.byKey(const ValueKey('file-pane-root-drop-bottom')),
+      findsNothing,
+      reason: 'Edge zones only exist during a drag',
     );
     expect(tester.takeException(), isNull);
   });

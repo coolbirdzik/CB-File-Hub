@@ -471,18 +471,16 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
 
     final suggestions = widget.suggestions;
 
-    // The replacement characters represent existing chips and must not be
-    // included when selecting the editable draft. Otherwise, typing after
-    // Ctrl/Cmd+A removes those placeholders while the chips are still present,
-    // causing the new text to render on top of the existing tags.
+    // Select everything, chips included: the chips are highlighted by
+    // [ChipsInputEditingController.buildTextSpan], copy/cut take their names,
+    // and typing or deleting replaces them like any other selection.
     final isSelectAll =
         event.logicalKey == LogicalKeyboardKey.keyA &&
         (HardwareKeyboard.instance.isControlPressed ||
             HardwareKeyboard.instance.isMetaPressed);
     if (isSelectAll) {
-      final draftStart = countPrefixReplacements(controller.text);
       controller.selection = TextSelection(
-        baseOffset: draftStart,
+        baseOffset: 0,
         extentOffset: controller.text.length,
       );
       return KeyEventResult.handled;
@@ -827,11 +825,12 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
         if (cursorStart == cursorEnd) {
           values.removeRange(cursorStart - 1, cursorEnd);
         } else {
-          if (cursorStart > cursorEnd) {
-            values.removeRange(cursorEnd, cursorStart);
-          } else {
-            values.removeRange(cursorStart, cursorEnd);
-          }
+          // The selection can also cover the draft after the chips.
+          final start = math
+              .min(cursorStart, cursorEnd)
+              .clamp(0, values.length);
+          final end = math.max(cursorStart, cursorEnd).clamp(0, values.length);
+          values.removeRange(start, end);
         }
         widget.onChanged(values);
       }
@@ -856,6 +855,7 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
   @override
   Widget build(BuildContext context) {
     controller.chipBuilder = widget.chipBuilder;
+    controller.showChipSelection = _focusNode.hasFocus;
     controller.updateValues(<T>[...widget.values]);
     final parent = widget.scopeParent;
     final decoration = widget.decoration.copyWith(
@@ -1000,6 +1000,10 @@ class ChipsInputEditingController<T> extends TextEditingController {
   List<T> values;
   bool editingChild;
 
+  /// Whether chips covered by [selection] are drawn as selected. Set from the
+  /// field's focus, since an unfocused editor paints no selection either.
+  bool showChipSelection = false;
+
   void updateChildMode(bool enabled) {
     if (editingChild == enabled) return;
     final draft = textWithoutReplacements;
@@ -1063,9 +1067,21 @@ class ChipsInputEditingController<T> extends TextEditingController {
     // Create a list to hold all spans
     final List<InlineSpan> spans = <InlineSpan>[];
 
+    // Chips inside the selection get a tint and ring: the editor paints its
+    // selection behind inline widgets, where the opaque chips would hide it.
+    final selection = this.selection;
+    final selectionStart = showChipSelection && selection.isValid
+        ? selection.start
+        : 0;
+    final selectionEnd = showChipSelection && selection.isValid
+        ? selection.end
+        : 0;
+    final primary = Theme.of(context).colorScheme.primary;
+
     // Chips are centered in the row; the forced strut in ChipsInputState
     // provides the vertical breathing room, so no per-row offsets are needed.
     for (int i = 0; i < values.length; i++) {
+      final selected = i >= selectionStart && i < selectionEnd;
       spans.add(
         WidgetSpan(
           alignment: PlaceholderAlignment.middle,
@@ -1074,7 +1090,19 @@ class ChipsInputEditingController<T> extends TextEditingController {
             // next tag at this placeholder position (opacity 0/isDeleting).
             key: ValueKey<T>(values[i]),
             padding: const EdgeInsets.only(right: 4),
-            child: chipBuilder(context, values[i]),
+            // Always present, so selecting does not rebuild the chip's state.
+            child: DecoratedBox(
+              key: ValueKey<String>('chips-input-selection-$i'),
+              position: DecorationPosition.foreground,
+              decoration: BoxDecoration(
+                color: selected ? primary.withValues(alpha: .3) : null,
+                border: selected
+                    ? Border.all(color: primary, width: 1.5)
+                    : null,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: chipBuilder(context, values[i]),
+            ),
           ),
         ),
       );

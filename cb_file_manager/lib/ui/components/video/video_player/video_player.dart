@@ -376,7 +376,6 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
   Duration? _seekDragPosition;
   Timer? _seekPreviewTimer;
   Duration? _pendingSeekPreview;
-  bool _resumeAfterSeekDrag = false;
 
   // Seek bar hover thumbnails, decoded apart from the main player.
   VideoSeekPreviewController? _seekHoverFrames;
@@ -646,7 +645,6 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
       _seekPreviewTimer = null;
       _pendingSeekPreview = null;
       _seekDragPosition = null;
-      _resumeAfterSeekDrag = false;
       _isSeeking = false;
       _seekHoverFrames?.dispose();
       _seekHoverFrames = null;
@@ -1892,8 +1890,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
   void _startFastSeeking({required bool forward, bool withCtrl = false}) {
     if (_isFastSeeking || _player == null) return;
 
-    // Use the same paused, live frame previews as a slider drag. Repeated
-    // seeks while playing can starve media_kit's decoder of a reference clock.
+    // Same live, throttled previews as a slider drag, with audio kept playing.
     _startSeekDrag();
     _seekDragPosition = _player!.state.position;
 
@@ -2082,7 +2079,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
     }
   }
 
-  // Wheel notches accumulate into one paused seek drag (same path as holding
+  // Wheel notches accumulate into one seek drag (same path as holding
   // an arrow key) and land on the exact frame shortly after the last notch.
   void _wheelSeek({required bool forward}) {
     final player = _player;
@@ -3566,10 +3563,8 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
       ).inMilliseconds.clamp(0, maxMs).toDouble();
 
   void _startSeekDrag() {
-    final player = _player;
-    // A preceding drag may have requested play while media_kit still reports its
-    // temporary pause. Capture the requested mode, not that stale snapshot.
-    _resumeAfterSeekDrag = player?.playRequested ?? false;
+    // Playback is left running so the audio follows the seek instead of going
+    // silent for the duration of the drag.
     _seekingTimer?.cancel();
     _hideControlsTimer?.cancel();
     _seekPreviewTimer?.cancel();
@@ -3579,7 +3574,6 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
       _isSeeking = true;
       _seekDragPosition = null;
     });
-    if (player != null) unawaited(player.pause());
   }
 
   void _seekDuringDrag(double value) {
@@ -3599,11 +3593,11 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
     // on the exact frame.
     unawaited(player.seek(target, exact: false));
 
-    // Seeking this often is only safe because _startSeekDrag pauses first: a
-    // paused input reacquires its clock between seeks, where a playing one
-    // cannot and strands the decoder in "no reference clock". Always keep the
-    // newest pointer position, including when the user holds the thumb still.
-    _seekPreviewTimer = Timer(const Duration(milliseconds: 80), () {
+    // Seeks stay throttled because a playing input needs time to reacquire its
+    // clock between seeks, or the decoder strands in "no reference clock".
+    // Always keep the newest pointer position, including when the user holds
+    // the thumb still.
+    _seekPreviewTimer = Timer(const Duration(milliseconds: 150), () {
       _seekPreviewTimer = null;
       if (mounted) _flushSeekPreview();
     });
@@ -3616,8 +3610,6 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
     final target = finalPosition ?? _seekDragPosition;
     final player = _player;
     if (target != null && player != null) unawaited(player.seek(target));
-    if (_resumeAfterSeekDrag && player != null) unawaited(player.play());
-    _resumeAfterSeekDrag = false;
 
     _seekingTimer?.cancel();
     _seekingTimer = Timer(const Duration(milliseconds: 200), () {
