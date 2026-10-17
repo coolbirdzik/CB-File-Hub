@@ -42,6 +42,13 @@ class FileTypeRegistry {
 
   /// Complete registry of file types mapped by extension
   static final Map<String, FileTypeInfo> _registry = {
+    '.torrent': const FileTypeInfo(
+      category: FileCategory.unknown,
+      icon: PhosphorIconsLight.fileArrowDown,
+      color: Colors.blue,
+      mimeType: 'application/x-bittorrent',
+      extensions: ['.torrent'],
+    ),
     // Image files
     '.jpg': const FileTypeInfo(
       category: FileCategory.image,

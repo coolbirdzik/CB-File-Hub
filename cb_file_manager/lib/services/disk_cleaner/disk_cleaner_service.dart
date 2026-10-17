@@ -14,6 +14,7 @@ import '../../helpers/files/trash_manager.dart';
 import '../app_insights/app_insights_models.dart';
 import '../../utils/app_logger.dart';
 import 'cleaner_categories.dart';
+import 'cleaner_agent_review.dart';
 import 'cleaner_models.dart';
 import 'cleaner_safety.dart';
 import 'disk_cleaner_isolate.dart';
@@ -49,6 +50,7 @@ class DiskCleanerAgentActivity {
 }
 
 class CleanerScanContext {
+  final String scanId;
   final String ownerTabId;
   final DiskTreeNode root;
   final String? selectedPath;
@@ -59,8 +61,18 @@ class CleanerScanContext {
   final String? selectedAppId;
   final bool appInsightsSharedWithAgent;
   final DateTime updatedAt;
+  final List<DiskTreeNode>? Function(List<DiskTreeNode>, bool)? selectTargets;
+  final bool Function(DiskTreeNode, CleanerItemAnalysis?)? reviewItem;
+  final bool Function(CleanerReviewGroup, CleanerItemAnalysis)? reviewGroup;
+
+  /// Paths the scan could not measure fully, for explaining missing space.
+  final List<FullDiskScanCoverageIssue> coverageIssues;
+
+  /// Large paths with old filesystem activity. Evidence only.
+  final List<FullDiskScanInsight> oldLargeItems;
 
   const CleanerScanContext({
+    required this.scanId,
     required this.ownerTabId,
     required this.root,
     this.selectedPath,
@@ -71,7 +83,19 @@ class CleanerScanContext {
     this.selectedAppId,
     this.appInsightsSharedWithAgent = false,
     required this.updatedAt,
+    this.selectTargets,
+    this.reviewItem,
+    this.reviewGroup,
+    this.coverageIssues = const [],
+    this.oldLargeItems = const [],
   });
+}
+
+class CleanerSelectionResult {
+  final List<DiskTreeNode> selected;
+  final String? error;
+
+  const CleanerSelectionResult({this.selected = const [], this.error});
 }
 
 class _TrackedScanChanges {
@@ -287,6 +311,10 @@ class DiskCleanerService {
   int pendingCleanupBytes = 0;
 
   final Map<String, CleanerScanContext> _cleanerScanContexts = {};
+  int _cleanerContextSequence = 0;
+  final Map<String, DiskTreeNode> _inspectedCleanerItems = {};
+  final Map<String, CleanerFullReview> _fullCleanerReviews = {};
+  final Map<String, Set<CleanerReviewGroup>> _inspectedFullReviewGroups = {};
   final Map<String, _CompletedFullScan> _completedFullScans = {};
 
   CleanerScanHandle? _activeScan;
@@ -305,13 +333,31 @@ class DiskCleanerService {
     AppStorageReport? appStorageReport,
     String? selectedAppId,
     bool appInsightsSharedWithAgent = false,
+    List<DiskTreeNode>? Function(List<DiskTreeNode>, bool)? selectTargets,
+    bool Function(DiskTreeNode, CleanerItemAnalysis?)? reviewItem,
+    bool Function(CleanerReviewGroup, CleanerItemAnalysis)? reviewGroup,
+    List<FullDiskScanCoverageIssue> coverageIssues = const [],
+    List<FullDiskScanInsight> oldLargeItems = const [],
   }) {
     if (root == null) {
       _cleanerScanContexts.remove(ownerTabId);
+      _inspectedCleanerItems.remove(ownerTabId);
+      _fullCleanerReviews.remove(ownerTabId);
+      _inspectedFullReviewGroups.remove(ownerTabId);
       return;
     }
 
+    if (!identical(_cleanerScanContexts[ownerTabId]?.root, root) ||
+        isScanning ||
+        isCached ||
+        reviewItem == null) {
+      _inspectedCleanerItems.remove(ownerTabId);
+      _fullCleanerReviews.remove(ownerTabId);
+      _inspectedFullReviewGroups.remove(ownerTabId);
+    }
+
     _cleanerScanContexts[ownerTabId] = CleanerScanContext(
+      scanId: 'cleaner_${++_cleanerContextSequence}',
       ownerTabId: ownerTabId,
       root: root,
       selectedPath: selectedPath,
@@ -322,7 +368,176 @@ class DiskCleanerService {
       selectedAppId: selectedAppId,
       appInsightsSharedWithAgent: appInsightsSharedWithAgent,
       updatedAt: DateTime.now(),
+      selectTargets: selectTargets,
+      reviewItem: reviewItem,
+      reviewGroup: reviewGroup,
+      coverageIssues: coverageIssues,
+      oldLargeItems: oldLargeItems,
     );
+  }
+
+  /// Focus a real row first, then publish its assessment in that same UI.
+  /// This callback completes synchronously, so tool success means the visible
+  /// screen accepted the interaction rather than merely queuing an event.
+  CleanerItemInteractionResult interactWithCleanerScanItem({
+    required String? ownerTabId,
+    required String scanId,
+    required String path,
+    CleanerItemAnalysis? analysis,
+  }) {
+    final context = ownerTabId == null
+        ? null
+        : _cleanerScanContexts[ownerTabId];
+    if (context == null || context.scanId != scanId) {
+      return const CleanerItemInteractionResult(
+        error:
+            'Scan changed or is unavailable for this tab. Read get_current_cleaner_scan again.',
+      );
+    }
+    if (context.isScanning || context.isCached || context.reviewItem == null) {
+      return const CleanerItemInteractionResult(
+        error:
+            'Return to ready, fresh Disk usage results before inspecting items.',
+      );
+    }
+    String normalize(String value) => value
+        .trim()
+        .replaceAll('/', r'\')
+        .toUpperCase()
+        .replaceFirst(RegExp(r'\\+$'), '');
+    final target = normalize(path);
+    DiskTreeNode? node = _fullCleanerReviews[ownerTabId]?.pendingNodeForPath(
+      path,
+    );
+    final stack = <DiskTreeNode>[context.root];
+    while (node == null && stack.isNotEmpty) {
+      final candidate = stack.removeLast();
+      if (candidate.fullPath.isNotEmpty &&
+          !identical(candidate, context.root) &&
+          !RegExp(r'^[A-Z]:$').hasMatch(target) &&
+          normalize(candidate.fullPath) == target) {
+        node = candidate;
+        break;
+      }
+      stack.addAll(candidate.children);
+    }
+    if (node == null) {
+      return const CleanerItemInteractionResult(
+        error: 'Path is not an exact selectable scan target.',
+      );
+    }
+    if (analysis != null) {
+      if (!identical(_inspectedCleanerItems[ownerTabId], node)) {
+        return const CleanerItemInteractionResult(
+          error:
+              'Call inspect_cleaner_scan_item for this exact item before publishing an analysis.',
+        );
+      }
+      if (analysis.reason.trim().isEmpty || analysis.reason.length > 2000) {
+        return const CleanerItemInteractionResult(
+          error:
+              'Supply a concrete analysis reason between 1 and 2000 characters.',
+        );
+      }
+      if (analysis.selectForCleanup &&
+          analysis.decision != CleanerItemDecision.clean) {
+        return const CleanerItemInteractionResult(
+          error:
+              'Only CLEAN recommendations may be automatically checked. Leave REVIEW and KEEP for the user.',
+        );
+      }
+      if (analysis.decision == CleanerItemDecision.clean &&
+          CleanerCategories.byId(node.junkCategoryId ?? '')?.safety !=
+              CleanerSafety.safe) {
+        return const CleanerItemInteractionResult(
+          error:
+              'This item is not scanner-marked safe junk. Use REVIEW or KEEP and explain the evidence.',
+        );
+      }
+    }
+    if (!context.reviewItem!(node, analysis)) {
+      return const CleanerItemInteractionResult(
+        error: 'Cleaner results are no longer ready in the active tab.',
+      );
+    }
+    if (analysis == null) _inspectedCleanerItems[ownerTabId!] = node;
+    if (analysis != null) _fullCleanerReviews[ownerTabId]?.markReviewed(node);
+    return CleanerItemInteractionResult(
+      node: node,
+      scanId: _cleanerScanContexts[ownerTabId]?.scanId,
+    );
+  }
+
+  /// Changes only the visible selection. Deletion still needs UI review.
+  /// Resolve every exact target before touching the selection, so a stale or
+  /// invented path cannot cause a partial update or select an entire drive.
+  CleanerSelectionResult selectCleanerScanItems({
+    required String? ownerTabId,
+    required String scanId,
+    required List<String> paths,
+    bool replace = true,
+  }) {
+    final context = ownerTabId == null
+        ? null
+        : _cleanerScanContexts[ownerTabId];
+    if (context == null || context.scanId != scanId) {
+      return const CleanerSelectionResult(
+        error:
+            'Scan changed or is unavailable for this tab. Read get_current_cleaner_scan again.',
+      );
+    }
+    if (context.isScanning ||
+        context.isCached ||
+        context.selectTargets == null) {
+      return const CleanerSelectionResult(
+        error:
+            'Selection is unavailable. Finish or refresh the scan and return to Disk usage results.',
+      );
+    }
+    if (paths.isEmpty || paths.length > 100) {
+      return const CleanerSelectionResult(
+        error: 'Supply between 1 and 100 exact scanned paths.',
+      );
+    }
+    String normalize(String path) => path
+        .trim()
+        .replaceAll('/', r'\')
+        .toUpperCase()
+        .replaceFirst(RegExp(r'\\+$'), '');
+    final wanted = paths.map(normalize).toSet();
+    final found = <String, DiskTreeNode>{};
+    final stack = <DiskTreeNode>[context.root];
+    while (stack.isNotEmpty && found.length < wanted.length) {
+      final node = stack.removeLast();
+      final path = normalize(node.fullPath);
+      if (wanted.contains(path) &&
+          node.fullPath.isNotEmpty &&
+          !identical(node, context.root) &&
+          !RegExp(r'^[A-Z]:$').hasMatch(path)) {
+        found[path] = node;
+      }
+      stack.addAll(node.children);
+    }
+    final missing = paths
+        .where((path) => !found.containsKey(normalize(path)))
+        .toList();
+    if (missing.isNotEmpty) {
+      return CleanerSelectionResult(
+        error:
+            'Not an exact selectable scan target: ${missing.join(', ')}. Read the scan again.',
+      );
+    }
+    final selected = context.selectTargets!(
+      wanted.map((path) => found[path]!).toList(),
+      replace,
+    );
+    if (selected == null) {
+      return const CleanerSelectionResult(
+        error:
+            'Cleaner results are no longer ready for selection. Read the scan again.',
+      );
+    }
+    return CleanerSelectionResult(selected: selected);
   }
 
   CleanerScanContext? getCleanerScanContext({String? ownerTabId}) {
@@ -335,8 +550,102 @@ class DiskCleanerService {
     );
   }
 
+  CleanerFullReview beginFullCleanerReview(String? ownerTabId) {
+    final context = _cleanerScanContexts[ownerTabId];
+    if (context == null ||
+        context.isScanning ||
+        context.isCached ||
+        context.reviewItem == null) {
+      throw StateError('Open ready, fresh Cleaner results before reviewing.');
+    }
+    final existing = _fullCleanerReviews[ownerTabId];
+    if (existing != null && identical(existing.root, context.root)) {
+      existing.reconcileFallbacks();
+    }
+    if (existing != null &&
+        !existing.isComplete &&
+        identical(existing.root, context.root)) {
+      return existing;
+    }
+    final review = CleanerFullReview.deferred(context.root);
+    _inspectedFullReviewGroups.remove(ownerTabId);
+    _fullCleanerReviews[ownerTabId!] = review;
+    return review;
+  }
+
+  CleanerFullReview? fullCleanerReview(String? ownerTabId) =>
+      _fullCleanerReviews[ownerTabId];
+
+  /// Verify the exact queued evidence for a bounded batch, focusing one
+  /// representative. Membership is indexed; this never walks the whole tree.
+  void inspectFullReviewGroups({
+    required String? ownerTabId,
+    required CleanerFullReview review,
+    required List<CleanerReviewGroup> groups,
+  }) {
+    final context = _cleanerScanContexts[ownerTabId];
+    if (context == null ||
+        context.isCached ||
+        context.isScanning ||
+        !identical(_fullCleanerReviews[ownerTabId], review) ||
+        !identical(context.root, review.root) ||
+        groups.isEmpty ||
+        groups.any((group) => !review.ownsGroup(group)) ||
+        context.reviewItem == null ||
+        !context.reviewItem!(groups.first.representative, null)) {
+      throw StateError(
+        'Cleaner batch evidence is stale or its UI is unavailable.',
+      );
+    }
+    // The UI callback can publish a changed context or dispose the screen.
+    if (!identical(_fullCleanerReviews[ownerTabId], review)) {
+      throw StateError('Cleaner scan changed during batch inspection.');
+    }
+    (_inspectedFullReviewGroups[ownerTabId!] ??= {}).addAll(groups);
+  }
+
+  void applyFullReviewGroup({
+    required String? ownerTabId,
+    required CleanerFullReview review,
+    required CleanerReviewGroup group,
+    required CleanerItemAnalysis analysis,
+    bool fallback = false,
+  }) {
+    final context = _cleanerScanContexts[ownerTabId];
+    if (context == null ||
+        context.isScanning ||
+        context.isCached ||
+        !identical(_fullCleanerReviews[ownerTabId], review) ||
+        !identical(context.root, review.root) ||
+        !review.ownsGroup(group) ||
+        (!(_inspectedFullReviewGroups[ownerTabId]?.contains(group) ?? false) &&
+            !identical(
+              _inspectedCleanerItems[ownerTabId],
+              group.representative,
+            ))) {
+      throw StateError('Cleaner group evidence is stale or was not inspected.');
+    }
+    if (analysis.reason.trim().isEmpty ||
+        analysis.reason.length > 2000 ||
+        (analysis.decision == CleanerItemDecision.clean && !group.canClean) ||
+        (analysis.selectForCleanup &&
+            analysis.decision != CleanerItemDecision.clean)) {
+      throw StateError('Invalid Cleaner group assessment or unsafe selection.');
+    }
+    final accepted = context.reviewGroup?.call(group, analysis);
+    if (accepted != true) {
+      throw StateError(
+        'Cleaner results are no longer ready in the active tab.',
+      );
+    }
+    review.markGroupReviewed(group, analysis, fallback: fallback);
+  }
+
   void clearCleanerScanContext(String ownerTabId) {
     _cleanerScanContexts.remove(ownerTabId);
+    _inspectedCleanerItems.remove(ownerTabId);
+    _fullCleanerReviews.remove(ownerTabId);
+    _inspectedFullReviewGroups.remove(ownerTabId);
   }
 
   /// Lists every category the cleaner knows about.
@@ -382,6 +691,22 @@ class DiskCleanerService {
       );
     }
     return result;
+  }
+
+  /// Free / total space of the volume holding [drivePath], or null when it
+  /// cannot be read (non-Windows, unmounted or invalid path).
+  DriveSpace? readDriveSpace(String drivePath) {
+    final match = RegExp(r'^[A-Za-z]:').firstMatch(drivePath.trim());
+    if (match == null) return null;
+    final drive = '${match.group(0)!.toUpperCase()}\\';
+    final info = _readDriveSpace(drive);
+    if (info == null) return null;
+    return DriveSpace(
+      path: drive,
+      label: '',
+      totalBytes: info.totalBytes,
+      freeBytes: info.freeBytes,
+    );
   }
 
   /// Scans the requested categories, awaiting the final report.
@@ -1854,11 +2179,7 @@ class DiskCleanerService {
     List<String> drivePaths,
     List<String> categoryIds,
   ) async {
-    if (_activeScan != null) {
-      throw StateError(
-        'A disk scan is already in progress; call cancelActiveScan first.',
-      );
-    }
+    if (_activeScan != null) throw CleanerScanBusyError();
     if (!Platform.isWindows) {
       throw StateError('DiskCleanerService is only supported on Windows.');
     }

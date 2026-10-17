@@ -14,6 +14,7 @@ import '../controllers/file_operations_handler.dart';
 import '../screens/folder_list/folder_list_bloc.dart';
 import '../tab_manager/core/tab_manager.dart';
 import 'file_type_utils.dart';
+import 'torrent_open_actions.dart';
 import 'video_playback_launcher.dart';
 
 class EntityOpenActions {
@@ -146,6 +147,7 @@ class EntityOpenActions {
     if (entityType != FileSystemEntityType.file) return false;
     // Archives are browsable, so they keep opening as a new tab / window.
     if (FileTypeUtils.isArchiveFile(trimmed)) return false;
+    if (TorrentOpenActions.tryOpen(context, trimmed)) return true;
 
     // Shift+Enter on a video: always a brand new player window, never the
     // one that is already open.

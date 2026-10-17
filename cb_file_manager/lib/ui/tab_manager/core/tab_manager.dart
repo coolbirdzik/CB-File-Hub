@@ -11,6 +11,7 @@ import 'package:cb_file_manager/core/service_locator.dart';
 import 'package:cb_file_manager/main.dart' show navigatorKey;
 import 'package:cb_file_manager/services/tab_activity/tab_activity_manager.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_paths.dart';
+import 'package:cb_file_manager/services/torrent/torrent_launch_request.dart';
 
 /// Events for the TabManager
 abstract class TabEvent {}
@@ -36,6 +37,14 @@ class SwitchToTab extends TabEvent {
   final String tabId;
 
   SwitchToTab(this.tabId);
+}
+
+/// Removes a launch request once its torrent screen starts handling it.
+class ConsumeTorrentSource extends TabEvent {
+  final String tabId;
+  final TorrentLaunchRequest request;
+
+  ConsumeTorrentSource(this.tabId, this.request);
 }
 
 /// Event to close a tab
@@ -199,6 +208,7 @@ class TabManagerBloc extends Bloc<TabEvent, TabManagerState> {
 
   TabManagerBloc() : super(TabManagerState(tabs: [])) {
     on<AddTab>(_onAddTab);
+    on<ConsumeTorrentSource>(_onConsumeTorrentSource);
     on<SwitchToTab>(_onSwitchToTab);
     on<CloseTab>(_onCloseTab);
     on<CloseAllTabs>(_onCloseAllTabs);
@@ -217,6 +227,36 @@ class TabManagerBloc extends Bloc<TabEvent, TabManagerState> {
   }
 
   void _onAddTab(AddTab event, Emitter<TabManagerState> emit) {
+    final source = TorrentLaunchRequest.sourceFromPath(event.path);
+    if (source != null) {
+      final active = state.activeTab;
+      final existing =
+          active != null && TorrentLaunchRequest.isPath(active.path)
+          ? active
+          : state.tabs
+                .where((tab) => TorrentLaunchRequest.isPath(tab.path))
+                .firstOrNull;
+      if (existing != null) {
+        final updated = existing.copyWith(
+          pendingTorrentSources: [
+            ...existing.pendingTorrentSources,
+            TorrentLaunchRequest(source),
+          ],
+        );
+        _activity?.onTabFocused(existing.id, path: existing.path);
+        emit(
+          state.copyWith(
+            tabs: state.tabs
+                .map((tab) => tab.id == existing.id ? updated : tab)
+                .toList(),
+            activeTabId: existing.id,
+            clearSelectedTabIds: true,
+          ),
+        );
+        return;
+      }
+    }
+    final path = source == null ? event.path : '#torrents';
     final random = Random();
     final newTabId =
         'tab_${DateTime.now().millisecondsSinceEpoch}_${random.nextInt(10000)}';
@@ -227,7 +267,10 @@ class TabManagerBloc extends Bloc<TabEvent, TabManagerState> {
     final newTab = TabData(
       id: newTabId,
       name: event.name ?? _extractNameFromPath(event.path),
-      path: event.path,
+      path: path,
+      pendingTorrentSources: source == null
+          ? const []
+          : [TorrentLaunchRequest(source)],
       isLoading: false,
       highlightedFileName: event.highlightedFileName,
     );
@@ -251,6 +294,26 @@ class TabManagerBloc extends Bloc<TabEvent, TabManagerState> {
         activeTabId: event.switchToTab ? newTabId : state.activeTabId,
         // When a new tab becomes active (e.g., Ctrl+N), clear multi-selection.
         selectedTabIds: event.switchToTab ? <String>{} : state.selectedTabIds,
+      ),
+    );
+  }
+
+  void _onConsumeTorrentSource(
+    ConsumeTorrentSource event,
+    Emitter<TabManagerState> emit,
+  ) {
+    emit(
+      state.copyWith(
+        tabs: state.tabs.map((tab) {
+          if (tab.id != event.tabId ||
+              tab.pendingTorrentSources.isEmpty ||
+              tab.pendingTorrentSources.first != event.request) {
+            return tab;
+          }
+          return tab.copyWith(
+            pendingTorrentSources: tab.pendingTorrentSources.skip(1).toList(),
+          );
+        }).toList(),
       ),
     );
   }
@@ -619,9 +682,12 @@ class TabManagerBloc extends Bloc<TabEvent, TabManagerState> {
     // Named system screens get their localized title instead of leaking the
     // raw hash path into the tab strip after back/forward navigation.
     if (path.startsWith('#')) {
+      if (path.startsWith('#torrents?')) return l10n?.torrents ?? 'Torrents';
       switch (path) {
         case '#video':
           return l10n?.videoHubTitle ?? 'Video Hub';
+        case '#torrents':
+          return l10n?.torrents ?? 'Torrents';
         case '#gallery':
           return l10n?.imageGallery ?? 'Image Gallery';
         case '#albums':

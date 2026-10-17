@@ -283,12 +283,22 @@ class ScanProgress {
   /// Category being scanned right now.
   final String categoryId;
 
+  /// Estimated completion, 0..1, never decreasing. Null when unknown.
+  final double? fraction;
+
   const ScanProgress({
     required this.currentPath,
     required this.itemsFound,
     required this.bytesFound,
     required this.categoryId,
+    this.fraction,
   });
+}
+
+/// Thrown when a junk scan is requested while another one is running.
+class CleanerScanBusyError extends StateError {
+  CleanerScanBusyError()
+    : super('A disk scan is already in progress; call cancelActiveScan first.');
 }
 
 /// Result of [DiskCleanerService.cleanJunk].

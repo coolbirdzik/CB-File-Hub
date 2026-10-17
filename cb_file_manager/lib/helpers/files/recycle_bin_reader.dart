@@ -33,6 +33,7 @@ import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:path/path.dart' as pathlib;
+import 'package:flutter/foundation.dart' show visibleForTesting;
 
 import 'trash_manager.dart' show SystemTrashItem;
 
@@ -188,21 +189,32 @@ List<dynamic>? _parseAndEncode(File metaFile, Directory sidDir) {
   final base = pathlib.basename(metaFile.path);
   final companionName = '\$R${base.substring(2)}';
   final companionPath = pathlib.join(sidDir.path, companionName);
-  final companionFile = File(companionPath);
-  final companionDir = Directory(companionPath);
-  final isFolder = !companionFile.existsSync() && companionDir.existsSync();
+  final companionType = FileSystemEntity.typeSync(
+    companionPath,
+    followLinks: false,
+  );
+  // Emptying the bin can leave $I metadata after the $R payload is gone.
+  // Such entries cannot be restored or thumbnailed.
+  if (companionType == FileSystemEntityType.notFound) return null;
+  final isFolder = companionType == FileSystemEntityType.directory;
 
   // Encode as a positional list: [name, path, originalPath, size,
   // trashedDateMs, isFolder]. Cheaper to send across isolates than a
   // Map and decoded in the main isolate.
   return <dynamic>[
     pathlib.basename(originalPath),
-    isFolder ? companionDir.path : companionFile.path,
+    companionPath,
     originalPath,
     originalSize >= 0 ? originalSize : 0,
     deletedAtMs,
     isFolder,
   ];
+}
+
+@visibleForTesting
+SystemTrashItem? readRecycleBinMetadata(File metaFile) {
+  final encoded = _parseAndEncode(metaFile, metaFile.parent);
+  return encoded == null ? null : _decodeItem(encoded);
 }
 
 SystemTrashItem? _decodeItem(List<dynamic> raw) {

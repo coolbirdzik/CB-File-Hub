@@ -6,7 +6,9 @@ import '../../helpers/files/trash_manager.dart';
 import '../../utils/app_logger.dart';
 import '../album_service.dart';
 import '../disk_cleaner/cleaner_categories.dart';
+import '../disk_cleaner/cleaner_agent_review.dart';
 import '../disk_cleaner/cleaner_models.dart';
+import '../disk_cleaner/cleaner_space_insights.dart';
 import '../disk_cleaner/disk_cleaner_service.dart';
 import '../disk_cleaner/disk_tree_node.dart';
 import 'cleaner_scan_registry.dart';
@@ -75,6 +77,17 @@ class ToolExecutor {
   ToolCall prepareCall(ToolCall call) {
     final normalized = normalizeCall(call);
     final args = Map<String, dynamic>.from(normalized.arguments);
+    // These paths identify rows in an existing scan, not files relative to
+    // the agent's working directory. A Windows scan can also be inspected
+    // on a non-Windows host (for example in unit tests).
+    if (const {
+      'explore_cleaner_scan',
+      'select_cleaner_scan_items',
+      'inspect_cleaner_scan_item',
+      'set_cleaner_scan_item_analysis',
+    }.contains(normalized.name)) {
+      return normalized;
+    }
     // Freeze exact resolved targets before approval. Empty list_directory path
     // explicitly means drive discovery; omitted path means the current folder.
     for (final key in ['path', 'source', 'destination', 'working_directory']) {
@@ -415,6 +428,19 @@ class ToolExecutor {
           return _getPendingCleanupReview(call.arguments);
         case 'get_current_cleaner_scan':
           return _getCurrentCleanerScan(call.arguments);
+        case 'explore_cleaner_scan':
+          return _exploreCleanerScan(call.arguments);
+        case 'search_cleaner_scan':
+          return _searchCleanerScan(call.arguments);
+        case 'select_cleaner_scan_items':
+          return _selectCleanerScanItems(call.arguments);
+        case 'inspect_cleaner_scan_item':
+          return _interactWithCleanerScanItem(call.arguments, inspecting: true);
+        case 'set_cleaner_scan_item_analysis':
+          return _interactWithCleanerScanItem(
+            call.arguments,
+            inspecting: false,
+          );
         case 'get_current_app_storage':
           return _getCurrentAppStorage(call.arguments);
         default:
@@ -1285,6 +1311,106 @@ class ToolExecutor {
     );
   }
 
+  ToolResult _interactWithCleanerScanItem(
+    Map<String, dynamic> args, {
+    required bool inspecting,
+  }) {
+    final toolName = inspecting
+        ? 'inspect_cleaner_scan_item'
+        : 'set_cleaner_scan_item_analysis';
+    CleanerItemAnalysis? analysis;
+    if (!inspecting) {
+      final decision = switch ((args['decision'] as String).toLowerCase()) {
+        'clean' => CleanerItemDecision.clean,
+        'review' => CleanerItemDecision.review,
+        'keep' => CleanerItemDecision.keep,
+        _ => null,
+      };
+      if (decision == null) {
+        return ToolResult(
+          toolName: toolName,
+          success: false,
+          output: jsonEncode({
+            'ok': false,
+            'error': 'decision must be CLEAN, REVIEW or KEEP.',
+          }),
+        );
+      }
+      analysis = CleanerItemAnalysis(
+        decision: decision,
+        reason: args['reason'] as String,
+        selectForCleanup: args['select'] as bool? ?? false,
+      );
+    }
+    final result = DiskCleanerService.instance.interactWithCleanerScanItem(
+      ownerTabId: ownerTabId,
+      scanId: args['scan_id'] as String,
+      path: args['path'] as String,
+      analysis: analysis,
+    );
+    final node = result.node;
+    return ToolResult(
+      toolName: toolName,
+      success: result.error == null,
+      output: jsonEncode({
+        'ok': result.error == null,
+        if (result.error != null) 'error': result.error,
+        if (node != null) ...{
+          'scan_id': result.scanId,
+          'path': node.fullPath,
+          'size_bytes': node.sizeBytes,
+          'type': node.isFile ? 'file' : 'folder',
+          'evidence': _formatSpaceConsumer(node),
+          if (CleanerSpaceInsights.causeWithin(
+                node.fullPath,
+                isFile: node.isFile,
+              )
+              case final cause?)
+            'known_cause': {
+              'label': cause.label,
+              'why': cause.explanation,
+              'reclaim': cause.action,
+              'start_as': cause.verdict,
+            },
+          'selected_for_cleanup': node.isSelectedForDeletion,
+          if (analysis != null)
+            'decision': analysis.decision.name.toUpperCase(),
+          'message': inspecting
+              ? 'Item revealed on the scan UI. Read this evidence, then call set_cleaner_scan_item_analysis with this latest scan_id. Do not infer deletion safety from size alone.'
+              : 'Analysis displayed on the scan UI. No files deleted. Use this latest scan_id for the next interaction.',
+        },
+      }),
+    );
+  }
+
+  ToolResult _selectCleanerScanItems(Map<String, dynamic> args) {
+    final result = DiskCleanerService.instance.selectCleanerScanItems(
+      ownerTabId: ownerTabId,
+      scanId: args['scan_id'] as String,
+      paths: (args['paths'] as List).cast<String>(),
+      replace: args['replace'] as bool? ?? true,
+    );
+    return ToolResult(
+      toolName: 'select_cleaner_scan_items',
+      success: result.error == null,
+      output: jsonEncode({
+        'ok': result.error == null,
+        if (result.error != null) 'error': result.error,
+        if (result.error == null) ...{
+          'selected_paths': result.selected
+              .map((node) => node.fullPath)
+              .toList(),
+          'selected_bytes': result.selected.fold<int>(
+            0,
+            (sum, node) => sum + node.sizeBytes,
+          ),
+          'message':
+              'Selected in scan results for review. No files deleted. The user must review and confirm cleanup in the Cleaner UI.',
+        },
+      }),
+    );
+  }
+
   ToolResult _getCurrentCleanerScan(Map<String, dynamic> args) {
     final service = DiskCleanerService.instance;
     final context = service.getCleanerScanContext(ownerTabId: ownerTabId);
@@ -1308,7 +1434,6 @@ class ToolExecutor {
         : _findDiskTreeNode(root, context.chartPath!);
 
     final largestFiles = <DiskTreeNode>[];
-    final largestFolders = <DiskTreeNode>[];
     final junkNodes = <DiskTreeNode>[];
     final selectedNodes = <DiskTreeNode>[];
     var selectedBytes = 0;
@@ -1321,12 +1446,8 @@ class ToolExecutor {
         selectedCount++;
       }
 
-      if (node.fullPath.isNotEmpty && !identical(node, root)) {
-        _offerLargest(
-          node.isFile ? largestFiles : largestFolders,
-          node,
-          sectionLimit,
-        );
+      if (node.fullPath.isNotEmpty && node.isFile && !identical(node, root)) {
+        _offerLargest(largestFiles, node, sectionLimit > 6 ? 6 : sectionLimit);
       }
 
       final isCanonicalJunk = node.isJunk && !coveredByJunkAncestor;
@@ -1351,6 +1472,13 @@ class ToolExecutor {
           : 'CURRENT CLEANER SCAN',
     );
     buffer.writeln('Owner tab: ${context.ownerTabId}');
+    buffer.writeln('scan_id: ${context.scanId}');
+    buffer.writeln(
+      'Interactive review available: ${!context.isScanning && !context.isCached && context.reviewItem != null}',
+    );
+    buffer.writeln(
+      'Selection available: ${!context.isScanning && !context.isCached && context.selectTargets != null}',
+    );
     buffer.writeln('Context published: ${context.updatedAt.toIso8601String()}');
     buffer.writeln(
       'Status: ${context.isCached
@@ -1370,9 +1498,26 @@ class ToolExecutor {
     buffer.writeln(
       'Root: ${root.fullPath} (${_formatSize(root.sizeBytes)}, ${root.fileCount} files)',
     );
+    final unaccountedBytes = _writeDriveUsage(buffer, context);
     buffer.writeln('Junk marked: ${_formatSize(root.junkBytes)}');
     buffer.writeln(
       'Selected for cleanup: $selectedCount items, ${_formatSize(selectedBytes)}',
+    );
+    buffer.writeln(
+      'GUIDANCE: Explain WHY the drive is full from the hotspots and known causes '
+      'below, not just which folders are big. Investigate before concluding: '
+      'explore_cleaner_scan drills into any scanned path and '
+      'search_cleaner_scan finds files by name, extension, type or size, both '
+      'read-only and instant. Answer with a readable ranked report, not JSON. '
+      'Label each item CLEAN, REVIEW or KEEP with a reason; prefer the '
+      '"Reclaim" method of a known cause over deleting its files. Do not call '
+      'clean_disk_junk for an analysis or recommendation request. When asked '
+      'to select recommendations, call select_cleaner_scan_items with this '
+      'exact scan_id and scanned paths. For an interactive review, '
+      'inspect_cleaner_scan_item one item at a time, then '
+      'set_cleaner_scan_item_analysis with a concrete reason and select:true '
+      'only for CLEAN candidates when selection was requested. Use the latest '
+      'scan_id returned by each interaction. Selection alone deletes nothing.',
     );
 
     if (selectedNode != null) {
@@ -1384,12 +1529,47 @@ class ToolExecutor {
     }
 
     buffer.writeln();
-    buffer.writeln('Largest folders (size is evidence, not deletion safety):');
-    if (largestFolders.isEmpty) {
+    buffer.writeln('Top level: ${_formatChildShares(root, 8)}');
+
+    final hotspots = CleanerSpaceInsights.findHotspots(
+      root,
+      limit: sectionLimit,
+    );
+    buffer.writeln();
+    buffer.writeln(
+      'Space hotspots (most specific locations of at least '
+      '${_formatSize(CleanerSpaceInsights.hotspotThreshold(root.sizeBytes))}; '
+      'size is evidence, not deletion safety):',
+    );
+    if (hotspots.isEmpty) {
       buffer.writeln('  (none)');
+    }
+    for (final hotspot in hotspots) {
+      buffer.writeln('  - ${_formatHotspot(hotspot, root.sizeBytes)}');
+    }
+
+    final causes = CleanerSpaceInsights.findCauses(root);
+    buffer.writeln();
+    buffer.writeln('Known space causes (explanations, not deletion rules):');
+    if (causes.isEmpty) {
+      buffer.writeln('  (none recognised)');
+    }
+    for (final match in causes.take(sectionLimit > 6 ? 6 : sectionLimit)) {
+      buffer.writeln('  - ${_formatCauseMatch(match)}');
+    }
+    if (causes.length > 6) {
+      buffer.writeln(
+        '  Also: ${causes.skip(6).map((m) => '${m.cause.label} ${_formatSize(m.totalBytes)}').join('; ')}',
+      );
+    }
+
+    buffer.writeln();
+    buffer.writeln('Rule-backed cleanup candidates:');
+    if (junkNodes.isEmpty) {
+      buffer.writeln('  (none marked as junk)');
     } else {
-      for (final node in largestFolders) {
-        buffer.writeln('  - ${_formatSpaceConsumer(node)}');
+      for (final node in junkNodes) {
+        buffer.writeln('  - ${_formatCleanupCandidate(node)}');
       }
     }
 
@@ -1403,13 +1583,30 @@ class ToolExecutor {
       }
     }
 
-    buffer.writeln();
-    buffer.writeln('Rule-backed cleanup candidates:');
-    if (junkNodes.isEmpty) {
-      buffer.writeln('  (none marked as junk)');
-    } else {
-      for (final node in junkNodes) {
-        buffer.writeln('  - ${_formatCleanupCandidate(node)}');
+    final fileTypes = CleanerSpaceInsights.fileTypeTotals(root);
+    if (fileTypes.isNotEmpty) {
+      buffer.writeln();
+      buffer.writeln(
+        'File types (named file rows; tiny files are rolled into "other"): '
+        '${fileTypes.take(8).map((t) => '${t.group} ${_formatSize(t.bytes)} (${t.files})').join(', ')}',
+      );
+    }
+
+    _writeCoverageGaps(buffer, context, unaccountedBytes);
+
+    final oldLarge = context.oldLargeItems.take(3).toList();
+    if (oldLarge.isNotEmpty) {
+      buffer.writeln();
+      buffer.writeln(
+        'Large items with old activity (evidence only; old is not unused):',
+      );
+      for (final item in oldLarge) {
+        final activity = item.lastActivity;
+        buffer.writeln(
+          '  - ${item.path} [${item.isFile ? 'file' : 'folder'}, '
+          '${_formatSize(item.sizeBytes)}, last activity '
+          '${activity == null ? 'unknown' : activity.toIso8601String().substring(0, 10)}]',
+        );
       }
     }
 
@@ -1428,16 +1625,339 @@ class ToolExecutor {
       }
     }
 
-    buffer.writeln();
-    buffer.writeln(
-      'RESPONSE REQUIREMENT: Answer with a readable ranked report, '
-      'not JSON. Explain what each item belongs to and label it CLEAN, REVIEW, '
-      'or KEEP with a reason. Do not call clean_disk_junk for an analysis or '
-      'recommendation request.',
-    );
-
     return ToolResult(
       toolName: 'get_current_cleaner_scan',
+      output: _truncate(buffer.toString().trim()),
+    );
+  }
+
+  /// Compares the scanned total with the volume's used space. Returns the
+  /// bytes the scan could not see, or 0 when unknown or insignificant.
+  int _writeDriveUsage(StringBuffer buffer, CleanerScanContext context) {
+    final root = context.root;
+    if (context.isScanning ||
+        !RegExp(r'^[A-Za-z]:\\?$').hasMatch(root.fullPath)) {
+      return 0;
+    }
+    final drive = DiskCleanerService.instance.readDriveSpace(root.fullPath);
+    if (drive == null || drive.totalBytes <= 0) return 0;
+    final unaccounted = drive.usedBytes - root.sizeBytes;
+    buffer.writeln(
+      'Drive: ${_formatSize(drive.totalBytes)} total, '
+      '${_formatSize(drive.freeBytes)} free, '
+      '${_formatSize(drive.usedBytes)} used; scan accounts for '
+      '${_formatSize(root.sizeBytes)}'
+      '${unaccounted > 0 ? ', unaccounted ${_formatSize(unaccounted)}' : ''}',
+    );
+    const gb = 1024 * 1024 * 1024;
+    final significant = drive.usedBytes ~/ 50; // 2%
+    return unaccounted >= gb && unaccounted >= significant ? unaccounted : 0;
+  }
+
+  void _writeCoverageGaps(
+    StringBuffer buffer,
+    CleanerScanContext context,
+    int unaccountedBytes,
+  ) {
+    final issues = context.coverageIssues
+        .where(
+          (issue) =>
+              issue.reason != FullDiskScanCoverageIssueReason.scanInProgress,
+        )
+        .toList();
+    if (issues.isEmpty && unaccountedBytes == 0) return;
+    buffer.writeln();
+    buffer.writeln('Measurement gaps:');
+    if (unaccountedBytes > 0) {
+      buffer.writeln(
+        '  - ${_formatSize(unaccountedBytes)} used on the drive is not in the '
+        'scan. Typical causes: restore points / shadow copies in System Volume '
+        'Information, folders denied to this user, NTFS metadata. Suggest '
+        '"vssadmin list shadowstorage" or running the scan as administrator.',
+      );
+    }
+    if (issues.isNotEmpty) {
+      final counts = <String, int>{};
+      for (final issue in issues) {
+        counts[issue.reason.name] = (counts[issue.reason.name] ?? 0) + 1;
+      }
+      buffer.writeln(
+        '  - Not fully measured: ${counts.entries.map((e) => '${e.value} ${e.key}').join(', ')}. '
+        'Examples: ${issues.take(4).map((i) => i.path).join('; ')}',
+      );
+    }
+  }
+
+  String _formatChildShares(DiskTreeNode node, int limit) {
+    final children = node.children
+        .where((child) => child.sizeBytes > 0)
+        .take(limit)
+        .map((child) {
+          final name = child.isAggregate
+              ? '(${child.aggregatedItemCount} small items)'
+              : child.name;
+          return '$name ${_formatSize(child.sizeBytes)} '
+              '(${_percent(child.sizeBytes, node.sizeBytes)})';
+        })
+        .toList();
+    if (children.isEmpty) return '(empty)';
+    final hidden = node.children.length - children.length;
+    return '${children.join(' | ')}${hidden > 0 ? ' | +$hidden more' : ''}';
+  }
+
+  String _formatHotspot(CleanerSpaceHotspot hotspot, int rootBytes) {
+    final node = hotspot.node;
+    final cause = CleanerSpaceInsights.causeWithin(
+      node.fullPath,
+      isFile: node.isFile,
+    );
+    final spread = hotspot.isResidual
+        ? ', ${_formatSize(hotspot.spreadBytes)} spread across items outside its large subfolders'
+        : (!node.isFile && node.children.length > 1
+              ? ', ${node.children.length} direct items'
+              : '');
+    return '${node.fullPath} [${node.isFile ? 'file' : 'folder'}, '
+        '${_formatSize(node.sizeBytes)}, ${_percent(node.sizeBytes, rootBytes)} of scan'
+        '$spread'
+        '${node.junkBytes > 0 ? ', junk ${_formatSize(node.junkBytes)}' : ''}'
+        '${cause != null ? ', cause=${cause.label} (${cause.verdict})' : ''}]';
+  }
+
+  String _formatCauseMatch(CleanerSpaceCauseMatch match) {
+    final cause = match.cause;
+    final paths = match.nodes.length;
+    return '${cause.label}: ${_formatSize(match.totalBytes)} in $paths '
+        'path${paths == 1 ? '' : 's'}, largest ${match.nodes.first.fullPath} '
+        '(${_formatSize(match.nodes.first.sizeBytes)}). Why: ${cause.explanation} '
+        'Reclaim: ${cause.action} Start as ${cause.verdict}.';
+  }
+
+  static String _percent(int part, int whole) {
+    if (whole <= 0) return '0%';
+    final value = part * 100 / whole;
+    return value >= 10 || value == 0
+        ? '${value.round()}%'
+        : '${value.toStringAsFixed(1)}%';
+  }
+
+  /// Read-only drill-down into the scan tree already in memory.
+  ToolResult _exploreCleanerScan(Map<String, dynamic> args) {
+    const toolName = 'explore_cleaner_scan';
+    final context = DiskCleanerService.instance.getCleanerScanContext(
+      ownerTabId: ownerTabId,
+    );
+    if (context == null) {
+      return const ToolResult(
+        toolName: toolName,
+        success: false,
+        output:
+            'No Cleaner scan for this tab. Ask the user to run a Disk usage scan first.',
+      );
+    }
+    final root = context.root;
+    final path = (args['path'] as String?)?.trim() ?? '';
+    final node = path.isEmpty ? root : CleanerSpaceInsights.find(root, path);
+    if (node == null) {
+      return ToolResult(
+        toolName: toolName,
+        success: false,
+        output:
+            'Path is not in the scan: $path. Use a path returned by get_current_cleaner_scan or a previous explore_cleaner_scan, or list_directory for live data.',
+      );
+    }
+    final depth = ((args['depth'] as int?) ?? 1).clamp(1, 3);
+    final limit = ((args['limit'] as int?) ?? 12).clamp(3, 30);
+
+    final buffer = StringBuffer('EXPLORE CLEANER SCAN\n');
+    buffer.writeln('scan_id: ${context.scanId}');
+    if (context.isCached) {
+      buffer.writeln('Freshness: previous cached result.');
+    }
+    buffer.writeln(
+      'Path: ${node.fullPath} [${node.isFile ? 'file' : 'folder'}, '
+      '${_formatSize(node.sizeBytes)}, ${_percent(node.sizeBytes, root.sizeBytes)} of scan, '
+      '${node.fileCount} files'
+      '${node.junkBytes > 0 ? ', junk ${_formatSize(node.junkBytes)}' : ''}]',
+    );
+    final cause = CleanerSpaceInsights.causeWithin(
+      node.fullPath,
+      isFile: node.isFile,
+    );
+    if (cause != null) {
+      buffer.writeln(
+        'Known cause: ${cause.label} (start as ${cause.verdict}). '
+        'Why: ${cause.explanation} Reclaim: ${cause.action}',
+      );
+    }
+    if (node.isJunk) {
+      buffer.writeln('Scanner rule: ${_formatCleanupCandidate(node)}');
+    }
+
+    if (node.children.isNotEmpty) {
+      buffer.writeln();
+      buffer.writeln('Contents (largest first):');
+      void writeLevel(DiskTreeNode parent, int level) {
+        final indent = '  ' * level;
+        final shown = parent.children.take(limit).toList();
+        for (final child in shown) {
+          if (child.isAggregate) {
+            buffer.writeln(
+              '$indent- (${child.aggregatedItemCount} smaller items rolled up, '
+              '${_formatSize(child.sizeBytes)}; use list_directory on '
+              '${parent.fullPath} for names)',
+            );
+            continue;
+          }
+          final childCause = CleanerSpaceInsights.causeFor(child);
+          buffer.writeln(
+            '$indent- ${child.fullPath} [${child.isFile ? 'file' : 'folder'}, '
+            '${_formatSize(child.sizeBytes)}, '
+            '${_percent(child.sizeBytes, parent.sizeBytes)} of parent'
+            '${child.isFile ? '' : ', ${child.fileCount} files'}'
+            '${child.isJunk ? ', junk=${child.junkCategoryId}' : (child.junkBytes > 0 ? ', junk ${_formatSize(child.junkBytes)}' : '')}'
+            '${childCause != null && childCause != cause ? ', cause=${childCause.label} (${childCause.verdict})' : ''}]',
+          );
+          if (level < depth && child.children.isNotEmpty) {
+            writeLevel(child, level + 1);
+          }
+        }
+        final hidden = parent.children.length - shown.length;
+        if (hidden > 0) {
+          final hiddenBytes = parent.children
+              .skip(limit)
+              .fold<int>(0, (sum, c) => sum + c.sizeBytes);
+          buffer.writeln(
+            '$indent- ... $hidden more items, ${_formatSize(hiddenBytes)}',
+          );
+        }
+      }
+
+      writeLevel(node, 1);
+
+      final fileTypes = CleanerSpaceInsights.fileTypeTotals(node);
+      if (fileTypes.isNotEmpty) {
+        buffer.writeln();
+        buffer.writeln(
+          'File types inside: ${fileTypes.take(6).map((t) => '${t.group} ${_formatSize(t.bytes)} (${t.files})').join(', ')}',
+        );
+      }
+      final largest = CleanerSpaceInsights.search(
+        node,
+        kind: 'file',
+        limit: 5,
+      ).matches;
+      if (largest.isNotEmpty) {
+        buffer.writeln('Largest files inside:');
+        for (final file in largest) {
+          buffer.writeln(
+            '  - ${file.fullPath} (${_formatSize(file.sizeBytes)})',
+          );
+        }
+      }
+    }
+
+    buffer.writeln();
+    buffer.writeln(
+      'Next: explore a child path to go deeper, search_cleaner_scan to find '
+      'specific file types, or inspect_cleaner_scan_item to show an item on '
+      'screen. This tool changes nothing.',
+    );
+    return ToolResult(
+      toolName: toolName,
+      output: _truncate(buffer.toString().trim()),
+    );
+  }
+
+  /// Finds scanned files or folders by name, extension, type group and size.
+  ToolResult _searchCleanerScan(Map<String, dynamic> args) {
+    const toolName = 'search_cleaner_scan';
+    ToolResult fail(String message) =>
+        ToolResult(toolName: toolName, success: false, output: message);
+
+    final context = DiskCleanerService.instance.getCleanerScanContext(
+      ownerTabId: ownerTabId,
+    );
+    if (context == null) {
+      return fail(
+        'No Cleaner scan for this tab. Ask the user to run a Disk usage scan first.',
+      );
+    }
+    final query = (args['query'] as String?)?.trim() ?? '';
+    final extensions = ((args['extension'] as String?) ?? '')
+        .split(RegExp(r'[,;\s]+'))
+        .map((e) => e.replaceFirst(RegExp(r'^\*?\.'), '').toUpperCase())
+        .where((e) => e.isNotEmpty)
+        .toSet();
+    final type = (args['type'] as String?)?.trim().toLowerCase();
+    if (type != null &&
+        type.isNotEmpty &&
+        !CleanerSpaceInsights.fileTypeGroups.containsKey(type)) {
+      return fail(
+        'Unknown type "$type". Use one of: ${CleanerSpaceInsights.fileTypeGroups.keys.join(', ')}.',
+      );
+    }
+    final kind = (args['kind'] as String?)?.trim().toLowerCase() ?? 'any';
+    if (!const {'any', 'file', 'folder'}.contains(kind)) {
+      return fail('kind must be file, folder or any.');
+    }
+    final minSizeMb = (args['min_size_mb'] as num?)?.toInt() ?? 0;
+    if (query.isEmpty &&
+        extensions.isEmpty &&
+        (type == null || type.isEmpty) &&
+        minSizeMb <= 0) {
+      return fail('Supply query, extension, type or min_size_mb.');
+    }
+    final scopePath = (args['path'] as String?)?.trim() ?? '';
+    final scope = scopePath.isEmpty
+        ? context.root
+        : CleanerSpaceInsights.find(context.root, scopePath);
+    if (scope == null) {
+      return fail('Path is not in the scan: $scopePath.');
+    }
+    final limit = ((args['limit'] as int?) ?? 20).clamp(1, 50);
+    final result = CleanerSpaceInsights.search(
+      scope,
+      query: query,
+      extensions: extensions,
+      typeGroup: type == null || type.isEmpty ? null : type,
+      minBytes: minSizeMb * 1024 * 1024,
+      kind: kind,
+      limit: limit,
+    );
+
+    final buffer = StringBuffer('SEARCH CLEANER SCAN\n');
+    buffer.writeln('scan_id: ${context.scanId}');
+    buffer.writeln(
+      'Scope: ${scope.fullPath}; matches: ${result.count}, total '
+      '${_formatSize(result.totalBytes)} (${_percent(result.totalBytes, context.root.sizeBytes)} of scan)',
+    );
+    if (result.matches.isEmpty) {
+      buffer.writeln(
+        'No scanned rows matched. Small files may be rolled up in the scan; use search_files for a live search.',
+      );
+    }
+    for (final node in result.matches) {
+      final cause = CleanerSpaceInsights.causeWithin(
+        node.fullPath,
+        isFile: node.isFile,
+      );
+      buffer.writeln(
+        '  - ${node.fullPath} [${node.isFile ? 'file' : 'folder'}, '
+        '${_formatSize(node.sizeBytes)}'
+        '${node.isJunk ? ', junk=${node.junkCategoryId}' : ''}'
+        '${cause != null ? ', cause=${cause.label} (${cause.verdict})' : ''}]',
+      );
+    }
+    if (result.count > result.matches.length) {
+      buffer.writeln(
+        '  ... ${result.count - result.matches.length} smaller matches',
+      );
+    }
+    buffer.writeln(
+      'Matches are evidence only. Size or type alone never makes a file safe to delete.',
+    );
+    return ToolResult(
+      toolName: toolName,
       output: _truncate(buffer.toString().trim()),
     );
   }
@@ -1644,9 +2164,17 @@ class ToolExecutor {
           'category=${category?.displayName ?? categoryId}, '
           '${_categoryRecommendation(safety)}]';
     }
+    final cause = CleanerSpaceInsights.causeWithin(
+      node.fullPath,
+      isFile: node.isFile,
+    );
+    final known = cause == null
+        ? ''
+        : 'cause=${cause.label} (${cause.verdict}), ';
     return '${node.fullPath} [$type, ${_formatSize(node.sizeBytes)}, '
-        'owner=${_pathOwner(node.fullPath)}, REVIEW: Large size alone does not '
-        'make this safe to delete; keep it unless the user recognizes it.]';
+        'owner=${_pathOwner(node.fullPath)}, $known'
+        'REVIEW: Large size alone does not make this safe to delete; keep it '
+        'unless the user recognizes it.]';
   }
 
   String _formatCleanupCandidate(DiskTreeNode node) {

@@ -3,6 +3,7 @@ import 'package:cb_file_manager/helpers/core/search_request_guard.dart';
 import 'package:cb_file_manager/helpers/core/search_query.dart';
 import 'package:cb_file_manager/helpers/core/text_utils.dart';
 import 'dart:async';
+import 'package:cb_file_manager/config/languages/current_localizations.dart';
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:equatable/equatable.dart';
@@ -238,7 +239,12 @@ class TagSearchBloc extends Bloc<TagSearchEvent, TagSearchState> {
       final fileTags = await TagManager.getTagsForFiles(event.filePaths);
       emit(state.copyWith(fileTags: fileTags, isLoading: false, error: null));
     } catch (e) {
-      emit(state.copyWith(isLoading: false, error: 'Error loading tags: $e'));
+      emit(
+        state.copyWith(
+          isLoading: false,
+          error: currentL10n.tsErrorLoadingTags(e.toString()),
+        ),
+      );
     }
   }
 
@@ -267,7 +273,7 @@ class TagSearchBloc extends Bloc<TagSearchEvent, TagSearchState> {
       updatedTags[event.filePath] = tags;
       emit(state.copyWith(fileTags: updatedTags, error: null));
     } catch (e) {
-      emit(state.copyWith(error: 'Error adding tag: ${e.toString()}'));
+      emit(state.copyWith(error: currentL10n.tsErrorAddingTag(e.toString())));
     }
   }
 
@@ -287,7 +293,7 @@ class TagSearchBloc extends Bloc<TagSearchEvent, TagSearchState> {
       }
       emit(state.copyWith(fileTags: updatedTags, error: null));
     } catch (e) {
-      emit(state.copyWith(error: 'Error removing tag: ${e.toString()}'));
+      emit(state.copyWith(error: currentL10n.tsErrorRemovingTag(e.toString())));
     }
   }
 
@@ -320,7 +326,7 @@ class TagSearchBloc extends Bloc<TagSearchEvent, TagSearchState> {
       }
       emit(state.copyWith(fileTags: updatedTags, error: null));
     } catch (e) {
-      emit(state.copyWith(error: 'Error batch adding tag: ${e.toString()}'));
+      emit(state.copyWith(error: currentL10n.tsErrorBatchAdding(e.toString())));
     }
   }
 
@@ -356,7 +362,7 @@ class TagSearchBloc extends Bloc<TagSearchEvent, TagSearchState> {
       emit(
         state.copyWith(
           isLoading: false,
-          error: 'Tag search error: ${e.toString()}',
+          error: currentL10n.tsTagSearchError(e.toString()),
         ),
       );
     }
@@ -395,7 +401,7 @@ class TagSearchBloc extends Bloc<TagSearchEvent, TagSearchState> {
       emit(
         state.copyWith(
           isLoading: false,
-          error: 'Global tag search error: ${e.toString()}',
+          error: currentL10n.tsGlobalTagSearchError(e.toString()),
         ),
       );
     }
@@ -452,7 +458,7 @@ class TagSearchBloc extends Bloc<TagSearchEvent, TagSearchState> {
       emit(
         state.copyWith(
           isLoading: false,
-          error: 'Multi-tag search error: ${e.toString()}',
+          error: currentL10n.tsMultiTagSearchError(e.toString()),
         ),
       );
     }
@@ -512,7 +518,7 @@ class TagSearchBloc extends Bloc<TagSearchEvent, TagSearchState> {
       emit(
         state.copyWith(
           isLoading: false,
-          error: 'Global multi-tag search error: ${e.toString()}',
+          error: currentL10n.tsGlobalMultiTagSearchError(e.toString()),
         ),
       );
     }

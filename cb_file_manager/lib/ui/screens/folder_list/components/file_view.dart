@@ -15,6 +15,7 @@ import 'package:cb_file_manager/ui/tab_manager/core/tabbed_folder/tabbed_folder_
 import 'package:cb_file_manager/ui/utils/grid_zoom_constraints.dart';
 import 'package:cb_file_manager/ui/utils/scroll_velocity_notifier.dart';
 import 'package:cb_file_manager/ui/widgets/ctrl_scroll_zoom.dart';
+import 'package:cb_file_manager/ui/components/common/file_details_columns.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -74,6 +75,7 @@ class FileView extends StatelessWidget {
   final ScrollController? scrollController;
   final GlobalKey Function(String path)? itemKeyForPath;
   final Function(ColumnVisibility)? onColumnVisibilityChanged;
+  final ValueChanged<SortOption>? onSortOptionSelected;
   final TabbedFolderDragSelectionController? dragSelectionController;
   final ValueChanged<List<String>>? onStartFileDrag;
   final Future<void> Function(List<String> sources, String destinationFolder)?
@@ -106,6 +108,7 @@ class FileView extends StatelessWidget {
     this.scrollController,
     this.itemKeyForPath,
     this.onColumnVisibilityChanged,
+    this.onSortOptionSelected,
     this.dragSelectionController,
     this.onStartFileDrag,
     this.onMoveItemsToFolder,
@@ -228,6 +231,33 @@ class FileView extends StatelessWidget {
   }
 
   Widget _buildDetailsView(BuildContext context) {
+    final extraColumns = FileDetailsColumns.maybeOf(context);
+    final table = _buildDetailsTable(context);
+    if (extraColumns == null || extraColumns.visible.isEmpty) return table;
+    final baseFlex =
+        3 +
+        (columnVisibility.type ? 2 : 0) +
+        (columnVisibility.size ? 1 : 0) +
+        (columnVisibility.dateModified ? 2 : 0) +
+        (columnVisibility.dateCreated ? 2 : 0) +
+        (columnVisibility.attributes ? 1 : 0) +
+        (columnVisibility.dateAccessed ? 2 : 0) +
+        (columnVisibility.extension ? 1 : 0) +
+        (columnVisibility.path ? 3 : 0) +
+        (columnVisibility.tags ? 2 : 0) +
+        (columnVisibility.dimensions ? 1 : 0) +
+        (columnVisibility.duration ? 1 : 0) +
+        (columnVisibility.itemCount ? 1 : 0);
+    return FileDetailsViewport(
+      minimumWidth:
+          math.max(720.0, baseFlex * 72.0) +
+          extraColumns.visible.fold<double>(0, (sum, c) => sum + c.width),
+      child: table,
+    );
+  }
+
+  Widget _buildDetailsTable(BuildContext context) {
+    final extraColumns = FileDetailsColumns.maybeOf(context);
     // Optimize scrolling with frame timing
     FrameTimingOptimizer().optimizeScrolling();
     final bool isMobile = Platform.isAndroid || Platform.isIOS;
@@ -277,6 +307,20 @@ class FileView extends StatelessWidget {
                         descendingOption: SortOption.nameDesc,
                       ),
                     ),
+
+                    for (final column
+                        in extraColumns?.visible ?? <FileDetailsColumn>[])
+                      SizedBox(
+                        width: column.width,
+                        child: Tooltip(
+                          message: column.description ?? column.label,
+                          child: _buildHeaderCell(
+                            context: context,
+                            label: column.label,
+                            style: headerStyle,
+                          ),
+                        ),
+                      ),
 
                     // Type column
                     if (columnVisibility.type)
@@ -590,6 +634,10 @@ class FileView extends StatelessWidget {
     return InkWell(
       onTap: () {
         final nextSort = isAscending ? descendingOption : ascendingOption;
+        if (onSortOptionSelected != null) {
+          onSortOptionSelected!(nextSort);
+          return;
+        }
         context.read<FolderListBloc>().add(
           SetSortOption(nextSort, folderPath: state.currentPath.path),
         );
@@ -632,6 +680,7 @@ class FileView extends StatelessWidget {
     dynamic l10n,
   ) {
     if (onColumnVisibilityChanged == null) return;
+    final extraColumns = FileDetailsColumns.maybeOf(context);
 
     final RenderBox overlay =
         Overlay.of(context).context.findRenderObject() as RenderBox;
@@ -645,6 +694,13 @@ class FileView extends StatelessWidget {
         overlay.size.height - position.dy,
       ),
       items: [
+        for (final column in extraColumns?.columns ?? <FileDetailsColumn>[])
+          _buildColumnToggleItem(
+            column.label,
+            'extra:${column.id}',
+            column.visible,
+          ),
+        if (extraColumns != null) const PopupMenuDivider(),
         _buildColumnToggleItem(l10n.columnSize, 'size', columnVisibility.size),
         _buildColumnToggleItem(l10n.columnType, 'type', columnVisibility.type),
         _buildColumnToggleItem(
@@ -692,6 +748,10 @@ class FileView extends StatelessWidget {
       ],
     ).then((value) {
       if (value == null || onColumnVisibilityChanged == null) return;
+      if (value.startsWith('extra:')) {
+        extraColumns?.onToggle(value.substring(6));
+        return;
+      }
       final newVisibility = _toggleColumn(value);
       onColumnVisibilityChanged!(newVisibility);
     });

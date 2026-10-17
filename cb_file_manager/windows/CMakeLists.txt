@@ -144,6 +144,19 @@ install(PROGRAMS "${CMAKE_CURRENT_SOURCE_DIR}/llama/llama-server.exe"
   DESTINATION "${INSTALL_BUNDLE_LLAMA_DIR}"
   COMPONENT Runtime)
 
+# Torrent engine and its redistribution notices. Fetch with just fetch-aria2
+# before a direct Flutter Windows build on a fresh checkout.
+install(PROGRAMS "${CMAKE_CURRENT_SOURCE_DIR}/aria2/aria2c.exe"
+  DESTINATION "${INSTALL_BUNDLE_LIB_DIR}/aria2" COMPONENT Runtime)
+install(FILES
+  "${CMAKE_CURRENT_SOURCE_DIR}/aria2/COPYING"
+  "${CMAKE_CURRENT_SOURCE_DIR}/aria2/LICENSE.OpenSSL"
+  "${CMAKE_CURRENT_SOURCE_DIR}/aria2/README.mingw"
+  "${CMAKE_CURRENT_SOURCE_DIR}/aria2/README.html"
+  "${CMAKE_CURRENT_SOURCE_DIR}/aria2/AUTHORS"
+  "${CMAKE_CURRENT_SOURCE_DIR}/aria2/SOURCE.txt"
+  DESTINATION "${INSTALL_BUNDLE_LIB_DIR}/aria2" COMPONENT Runtime)
+
 # Copy the native assets provided by the build.dart from all packages.
 # This directory may not exist if there are no native assets for the platform.
 set(NATIVE_ASSETS_DIR "${PROJECT_BUILD_DIR}/native_assets/windows")

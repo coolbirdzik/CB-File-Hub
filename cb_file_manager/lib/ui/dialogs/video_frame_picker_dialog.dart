@@ -9,6 +9,7 @@ import 'package:cb_file_manager/helpers/core/app_path_helper.dart';
 import 'package:cb_file_manager/helpers/media/fc_native_video_thumbnail.dart';
 import 'package:cb_file_manager/utils/app_logger.dart';
 import 'package:image/image.dart' as img;
+import 'package:cb_file_manager/config/translation_helper.dart';
 
 /// A dialog that lets the user seek through a video and pick a specific frame
 /// as a thumbnail image.
@@ -203,7 +204,7 @@ class _VideoFramePickerDialogState extends State<VideoFramePickerDialog> {
         Navigator.of(context).pop(savedPath);
       } else if (mounted) {
         setState(() {
-          _error = 'Failed to extract frame. Try a different position.';
+          _error = context.tr.vfExtractFailed;
           _isExtracting = false;
         });
       }
@@ -211,7 +212,7 @@ class _VideoFramePickerDialogState extends State<VideoFramePickerDialog> {
       AppLogger.error('[VideoFramePicker] Extract failed', error: e);
       if (mounted) {
         setState(() {
-          _error = 'Error: $e';
+          _error = context.tr.errorWithDetail(e.toString());
           _isExtracting = false;
         });
       }
@@ -255,7 +256,7 @@ class _VideoFramePickerDialogState extends State<VideoFramePickerDialog> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'Pick frame from video',
+                      context.tr.vfPickFrame,
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w600,
                       ),
@@ -264,7 +265,7 @@ class _VideoFramePickerDialogState extends State<VideoFramePickerDialog> {
                   IconButton(
                     icon: const Icon(PhosphorIconsLight.x, size: 20),
                     onPressed: () => Navigator.of(context).pop(null),
-                    tooltip: 'Close',
+                    tooltip: context.tr.close,
                   ),
                 ],
               ),
@@ -374,7 +375,9 @@ class _VideoFramePickerDialogState extends State<VideoFramePickerDialog> {
                             size: 28,
                           ),
                           onPressed: () => _player.playOrPause(),
-                          tooltip: isPlaying ? 'Pause' : 'Play',
+                          tooltip: isPlaying
+                              ? context.tr.pause
+                              : context.tr.play,
                         );
                       },
                     ),
@@ -423,7 +426,7 @@ class _VideoFramePickerDialogState extends State<VideoFramePickerDialog> {
                     ),
                     const SizedBox(width: 12),
                     Text(
-                      'Preview at ${_formatDuration(_position)}',
+                      context.tr.vfPreviewAt(_formatDuration(_position)),
                       style: TextStyle(
                         fontSize: 12,
                         color: theme.colorScheme.onSurfaceVariant,
@@ -445,7 +448,7 @@ class _VideoFramePickerDialogState extends State<VideoFramePickerDialog> {
                     onPressed: _isExtracting
                         ? null
                         : () => Navigator.of(context).pop(null),
-                    child: const Text('Cancel'),
+                    child: Text(context.tr.cancel),
                   ),
                   const SizedBox(width: 8),
                   OutlinedButton.icon(
@@ -459,7 +462,7 @@ class _VideoFramePickerDialogState extends State<VideoFramePickerDialog> {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Icon(PhosphorIconsLight.eye, size: 18),
-                    label: const Text('Preview'),
+                    label: Text(context.tr.preview),
                   ),
                   const SizedBox(width: 8),
                   ElevatedButton.icon(
@@ -473,7 +476,7 @@ class _VideoFramePickerDialogState extends State<VideoFramePickerDialog> {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Icon(PhosphorIconsLight.check, size: 18),
-                    label: const Text('Use this frame'),
+                    label: Text(context.tr.vfUseFrame),
                   ),
                 ],
               ),

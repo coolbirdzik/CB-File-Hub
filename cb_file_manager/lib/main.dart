@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ui/tab_manager/core/tab_main_screen.dart';
 import 'helpers/tags/tag_manager.dart';
+import 'helpers/tags/tag_color_manager.dart';
 import 'helpers/tags/tag_hierarchy_manager.dart';
 import 'package:window_manager/window_manager.dart';
 import 'ui/components/video/pip_window/desktop_pip_window.dart';
@@ -21,6 +22,9 @@ import 'helpers/ui/frame_timing_optimizer.dart';
 import 'helpers/tags/batch_tag_manager.dart';
 import 'models/database/database_manager.dart';
 import 'services/network_credentials_service.dart';
+import 'services/torrent/torrent_service.dart';
+import 'services/torrent/torrent_launch_request.dart';
+import 'services/windowing/desktop_windowing_service.dart';
 import 'providers/theme_provider.dart';
 import 'config/theme_config.dart';
 import 'config/fluent_theme_config.dart';
@@ -228,6 +232,20 @@ Future<void> runCbFileApp() async {
     navigatorKey = GlobalKey<NavigatorState>();
   }
   final env = Platform.environment;
+  final torrentSources = Platform.isWindows
+      ? TorrentLaunchRequest.takeArguments(_launchPaths)
+      : <String>[];
+  if (!kCbE2E &&
+      torrentSources.isNotEmpty &&
+      await DesktopWindowingService().openTorrentSourcesInExistingWindow(
+        torrentSources,
+      )) {
+    try {
+      await windowManager.ensureInitialized();
+      await windowManager.destroy();
+    } catch (_) {}
+    exit(0);
+  }
   final isDesktopPlatform =
       Platform.isWindows || Platform.isLinux || Platform.isMacOS;
   final environmentVideoPath = VideoWindowService.startupVideoPath();
@@ -438,8 +456,12 @@ Future<void> runCbFileApp() async {
             if (!kCbE2E) {
               await windowManager.maximize();
             }
-            await windowManager.show();
-            unawaited(windowManager.focus());
+            if (torrentSources.isNotEmpty) {
+              await DesktopWindowingService.focusTorrentWindow();
+            } else {
+              await windowManager.show();
+              unawaited(windowManager.focus());
+            }
             unawaited(windowManager.setResizable(true));
             unawaited(windowManager.setPreventClose(false));
             unawaited(windowManager.setSkipTaskbar(false));
@@ -514,6 +536,15 @@ Future<void> runCbFileApp() async {
   await setupServiceLocator();
   debugPrint('Service locator initialized successfully');
 
+  // One download owner per app, never a player/spare window or E2E sandbox.
+  if (!isSecondaryWindow && !isPip && !isDedicatedVideoWindow && !kCbE2E) {
+    unawaited(
+      locator<TorrentService>().initialize().catchError((Object error) {
+        debugPrint('Torrent initialization failed: $error');
+      }),
+    );
+  }
+
   // Initialize preferences first for theme and language.
   if (isSecondaryWindow && !isPip) {
     deferredSecondaryInitializers.add(() async {
@@ -559,6 +590,7 @@ Future<void> runCbFileApp() async {
 
       await BatchTagManager.initialize();
       await TagManager.initialize();
+      await TagColorManager.instance.initialize();
       // Load the tag hierarchy cache so the tag results view can show a tag's
       // child tags even before the tag management screens are opened.
       await TagHierarchyManager.instance.initialize();
@@ -651,8 +683,17 @@ Future<void> runCbFileApp() async {
     AppUpdateService.instance.scheduleStartupCheck(_announceAppUpdate);
   }
 
-  final WindowStartupPayload? startupPayload =
-      kCbE2E && CbE2EConfig.startupPayload != null
+  final WindowStartupPayload? startupPayload = torrentSources.isNotEmpty
+      ? WindowStartupPayload(
+          tabs: [
+            for (final source in torrentSources)
+              WindowTabPayload(
+                path: TorrentLaunchRequest.pathFor(source),
+                name: 'Torrent',
+              ),
+          ],
+        )
+      : kCbE2E && CbE2EConfig.startupPayload != null
       ? CbE2EConfig.startupPayload
       : WindowStartupPayload.fromEnvironment();
   runApp(
@@ -689,12 +730,14 @@ Future<void> runCbFileApp() async {
   }
 }
 
-/// Background update check result. On desktop nothing pops up: the update
-/// sits in the Status Center and the toolbar bell shows a badge until it is
-/// opened. Mobile has no bell, so it gets a toast whose action opens the
-/// update dialog.
+/// Background update check result. A newer desktop release opens the toolbar
+/// bell's Status Center once, with download/install actions inside the panel.
+/// Mobile has no bell, so it gets a toast whose action opens the update dialog.
 void _announceAppUpdate(AppUpdateInfo update, {int attempt = 0}) {
-  if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) return;
+  if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
+    AppUpdateService.instance.requestStartupNotification();
+    return;
+  }
   final context = navigatorKey.currentContext;
   final l10n = context != null && context.mounted
       ? AppLocalizations.of(context)
@@ -1087,7 +1130,12 @@ class _CBFileAppState extends State<CBFileApp>
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      supportedLocales: const [Locale('vi', ''), Locale('en', '')],
+      supportedLocales: const [
+        Locale('vi', ''),
+        Locale('en', ''),
+        Locale('tr', ''),
+        Locale('zh', ''),
+      ],
       builder: (context, child) {
         final wrappedChild = AppBusyCursorOverlay(
           child: child ?? const SizedBox.shrink(),
@@ -1118,7 +1166,12 @@ class _CBFileAppState extends State<CBFileApp>
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      supportedLocales: const [Locale('vi', ''), Locale('en', '')],
+      supportedLocales: const [
+        Locale('vi', ''),
+        Locale('en', ''),
+        Locale('tr', ''),
+        Locale('zh', ''),
+      ],
       builder: (context, child) {
         // FluentApp does not insert [ScaffoldMessenger]; MaterialApp does. Several
         // screens (e.g. [TabbedFolderListScreen]) and [NavigationController] use

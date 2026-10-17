@@ -7,6 +7,7 @@ import 'package:cb_file_manager/ui/components/app_update/app_update_dialog.dart'
 import 'package:cb_file_manager/ui/controllers/operation_progress_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:cb_file_manager/config/translation_helper.dart';
 
 class OperationProgressOverlay extends StatefulWidget {
   const OperationProgressOverlay({super.key});
@@ -76,6 +77,7 @@ class _StatusCenterToolbarButtonState extends State<StatusCenterToolbarButton>
   late final Animation<double> _glowAnimation;
   int _lastUnseenCount = 0;
   int _lastRunningCount = 0;
+  bool _startupOpenScheduled = false;
 
   @override
   void initState() {
@@ -111,6 +113,7 @@ class _StatusCenterToolbarButtonState extends State<StatusCenterToolbarButton>
     );
     _controller.addListener(_onChanged);
     _updates.addListener(_onChanged);
+    _scheduleStartupNotification();
   }
 
   /// Unseen task notifications plus an update the user has not looked at.
@@ -143,17 +146,43 @@ class _StatusCenterToolbarButtonState extends State<StatusCenterToolbarButton>
     _lastUnseenCount = unseenCount;
     _lastRunningCount = runningCount;
     if (mounted) setState(() {});
+    _scheduleStartupNotification();
   }
 
   OverlayEntry? _panelOverlay;
+
+  void _scheduleStartupNotification() {
+    if (!_updates.shouldExpandStartupNotification || _startupOpenScheduled) {
+      return;
+    }
+    _startupOpenScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _startupOpenScheduled = false;
+      if (!mounted || !_updates.shouldExpandStartupNotification) return;
+      // Wait for a visible, laid-out toolbar rather than opening from a hidden
+      // route or an inactive pane during startup.
+      if (!TickerMode.valuesOf(context).enabled ||
+          !(ModalRoute.of(context)?.isCurrent ?? true)) {
+        return;
+      }
+      final box = context.findRenderObject();
+      if (box is! RenderBox || !box.hasSize || box.size.isEmpty) return;
+      _showStatusCenter();
+    });
+  }
 
   void _openStatusCenter() {
     if (_panelOverlay != null) {
       _closePanelOverlay();
       return;
     }
+    _showStatusCenter();
+  }
+
+  void _showStatusCenter() {
     _controller.markAllSeen();
     _updates.markUpdateSeen();
+    if (_panelOverlay != null) return;
 
     final overlay = Overlay.of(context);
     final overlayBox = overlay.context.findRenderObject() as RenderBox;
@@ -197,6 +226,7 @@ class _StatusCenterToolbarButtonState extends State<StatusCenterToolbarButton>
 
   @override
   Widget build(BuildContext context) {
+    _scheduleStartupNotification();
     final theme = Theme.of(context);
     final unseenCount = _unseenCount;
     final runningCount = _controller.runningCount;
@@ -488,7 +518,7 @@ class _StatusCenterPanelState extends State<StatusCenterPanel> {
                     if (finished.isNotEmpty)
                       TextButton(
                         onPressed: controller.dismissFinished,
-                        child: const Text('Clear completed'),
+                        child: Text(context.tr.clearCompleted),
                       ),
                   ],
                 ),
@@ -507,7 +537,7 @@ class _StatusCenterPanelState extends State<StatusCenterPanel> {
                       const AppUpdateStatusCard(),
                     ],
                     if (running.isNotEmpty) ...[
-                      const _SectionHeader(title: 'Running'),
+                      _SectionHeader(title: context.tr.running),
                       for (final entry in running)
                         _StatusCenterTaskTile(
                           entry: entry,
@@ -515,7 +545,7 @@ class _StatusCenterPanelState extends State<StatusCenterPanel> {
                         ),
                     ],
                     if (finished.isNotEmpty) ...[
-                      const _SectionHeader(title: 'Notifications'),
+                      _SectionHeader(title: context.tr.notifications),
                       for (final entry in finished)
                         _StatusCenterTaskTile(
                           entry: entry,
@@ -607,7 +637,7 @@ class _StatusCenterTaskTile extends StatelessWidget {
                 ),
                 if (entry.isFinished)
                   IconButton(
-                    tooltip: 'Dismiss',
+                    tooltip: context.tr.dismiss,
                     visualDensity: VisualDensity.compact,
                     onPressed: () => controller.dismiss(entry.id),
                     icon: const Icon(PhosphorIconsLight.x, size: 16),
@@ -625,13 +655,17 @@ class _StatusCenterTaskTile extends StatelessWidget {
                 ),
               ),
             ],
-            const SizedBox(height: 10),
-            LinearProgressIndicator(
-              value: entry.isIndeterminate ? null : entry.progressFraction,
-              minHeight: 7,
-              borderRadius: BorderRadius.circular(999),
-              color: color,
-            ),
+            // Finished tasks are history: the status icon/text already say
+            // done or failed, so a leftover bar just looks like it is loading.
+            if (entry.isRunning) ...[
+              const SizedBox(height: 10),
+              LinearProgressIndicator(
+                value: entry.isIndeterminate ? null : entry.progressFraction,
+                minHeight: 7,
+                borderRadius: BorderRadius.circular(999),
+                color: color,
+              ),
+            ],
             if (entry.canCancel && entry.isRunning) ...[
               const SizedBox(height: 8),
               Align(

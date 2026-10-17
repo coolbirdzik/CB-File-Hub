@@ -44,7 +44,7 @@ class CbDialog extends StatelessWidget {
     this.actions = const [],
     this.icon,
     this.destructive = false,
-    this.width = 440,
+    this.width = 520,
     this.showCloseButton = true,
   });
 
@@ -69,40 +69,48 @@ class CbDialog extends StatelessWidget {
     final c = context.cbColors;
     final dialogTheme = DialogTheme.of(context);
     final iconColor = destructive ? c.status.danger : c.icon;
+    final media = MediaQuery.of(context);
+    final narrow = media.size.width < 600;
+    final padding = narrow ? CbSpacing.lg : CbSpacing.xxl;
 
     return Dialog(
-      insetPadding: const EdgeInsets.all(CbSpacing.xl),
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: narrow ? CbSpacing.lg : CbSpacing.xxl,
+        vertical: CbSpacing.xl,
+      ),
+      clipBehavior: Clip.antiAlias,
       child: ConstrainedBox(
         constraints: BoxConstraints(
           maxWidth: width,
-          maxHeight: MediaQuery.of(context).size.height - CbSpacing.xxxl * 2,
+          maxHeight:
+              (media.size.height - media.viewInsets.vertical - CbSpacing.xxxl)
+                  .clamp(0.0, double.infinity),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(
-                CbSpacing.xl,
-                CbSpacing.xl,
-                CbSpacing.md,
-                0,
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              padding: EdgeInsets.fromLTRB(padding, CbSpacing.xl, padding, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  if (icon != null) ...[
-                    Padding(
-                      padding: const EdgeInsets.only(top: CbSpacing.xs),
-                      child: Icon(icon, size: CbSizes.iconLg, color: iconColor),
-                    ),
-                    const SizedBox(width: CbSpacing.md),
-                  ],
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (icon != null) ...[
+                        Padding(
+                          padding: const EdgeInsets.only(top: CbSpacing.xs),
+                          child: Icon(
+                            icon,
+                            size: CbSizes.iconLg,
+                            color: iconColor,
+                          ),
+                        ),
+                        const SizedBox(width: CbSpacing.md),
+                      ],
+                      Expanded(
+                        child: Text(
                           title,
                           style:
                               dialogTheme.titleTextStyle ??
@@ -110,29 +118,26 @@ class CbDialog extends StatelessWidget {
                                 color: c.textPrimary,
                               ),
                         ),
-                        if (subtitle != null) ...[
-                          const SizedBox(height: CbSpacing.xs),
-                          Text(
-                            subtitle!,
-                            style:
-                                dialogTheme.contentTextStyle ??
-                                CbTypography.body.copyWith(
-                                  color: c.textSecondary,
-                                ),
-                          ),
-                        ],
+                      ),
+                      if (showCloseButton) ...[
+                        const SizedBox(width: CbSpacing.lg),
+                        CbButton.icon(
+                          icon: Icons.close,
+                          tooltip: MaterialLocalizations.of(
+                            context,
+                          ).closeButtonTooltip,
+                          size: CbButtonSize.sm,
+                          onPressed: () => Navigator.of(context).maybePop(),
+                        ),
                       ],
-                    ),
+                    ],
                   ),
-                  if (showCloseButton) ...[
-                    const SizedBox(width: CbSpacing.sm),
-                    CbButton.icon(
-                      icon: Icons.close,
-                      tooltip: MaterialLocalizations.of(
-                        context,
-                      ).closeButtonTooltip,
-                      size: CbButtonSize.sm,
-                      onPressed: () => Navigator.of(context).maybePop(),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: CbSpacing.sm),
+                    Text(
+                      subtitle!,
+                      style: (dialogTheme.contentTextStyle ?? CbTypography.body)
+                          .copyWith(color: c.textSecondary, height: 1.5),
                     ),
                   ],
                 ],
@@ -141,29 +146,41 @@ class CbDialog extends StatelessWidget {
             if (content != null)
               Flexible(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(
+                  padding: EdgeInsets.fromLTRB(
+                    padding,
                     CbSpacing.xl,
-                    CbSpacing.lg,
+                    padding,
                     CbSpacing.xl,
-                    0,
                   ),
                   child: SingleChildScrollView(child: content),
                 ),
               ),
             if (actions.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.all(CbSpacing.xl),
+              Container(
+                margin: content == null
+                    ? const EdgeInsets.only(top: CbSpacing.xl)
+                    : EdgeInsets.zero,
+                padding: EdgeInsets.fromLTRB(
+                  padding,
+                  CbSpacing.lg,
+                  padding,
+                  CbSpacing.lg,
+                ),
+                decoration: BoxDecoration(
+                  color: c.fillSubtle,
+                  border: Border(top: BorderSide(color: c.strokeSubtle)),
+                ),
                 child: Align(
                   alignment: Alignment.centerRight,
                   child: Wrap(
                     alignment: WrapAlignment.end,
-                    spacing: CbSpacing.sm,
-                    runSpacing: CbSpacing.sm,
+                    spacing: CbSpacing.md,
+                    runSpacing: CbSpacing.md,
                     children: actions,
                   ),
                 ),
               )
-            else
+            else if (content == null)
               const SizedBox(height: CbSpacing.xl),
           ],
         ),

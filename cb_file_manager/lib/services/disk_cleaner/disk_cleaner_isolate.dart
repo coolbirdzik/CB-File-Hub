@@ -115,6 +115,7 @@ Future<CleanerScanHandle> spawnScanWithResolvedRules({
             itemsFound: msg.itemsFound,
             bytesFound: msg.bytesFound,
             categoryId: msg.categoryId,
+            fraction: msg.fraction,
           ),
         );
       }
@@ -178,10 +179,11 @@ void _scanWorker(_SpawnArgs args) async {
   int totalBytes = 0;
   DateTime lastFlush = DateTime.now();
   String currentCategory = '';
+  final progress = JunkScanFraction(groups.map((group) => group.scanPath));
 
-  void maybeFlush(String path) {
+  void maybeFlush(String path, {bool force = false}) {
     final now = DateTime.now();
-    if (now.difference(lastFlush).inMilliseconds >= 100) {
+    if (force || now.difference(lastFlush).inMilliseconds >= 100) {
       lastFlush = now;
       sendPort.send(
         _ProgressMsg(
@@ -189,12 +191,15 @@ void _scanWorker(_SpawnArgs args) async {
           itemsFound: totalItems,
           bytesFound: totalBytes,
           categoryId: currentCategory,
+          fraction: progress.at(path),
         ),
       );
     }
   }
 
-  for (final group in groups) {
+  for (final (index, group) in groups.indexed) {
+    progress.startGroup(index);
+    maybeFlush(group.scanPath, force: true);
     final dir = Directory(group.scanPath);
     final check = await _checkDirectory(
       dir,
@@ -307,6 +312,8 @@ void _scanWorker(_SpawnArgs args) async {
     }
   }
 
+  progress.finish();
+  maybeFlush('', force: true);
   sendPort.send(_DoneMsg(itemsByCategory: results, warnings: warnings));
 }
 
@@ -540,12 +547,87 @@ class _ProgressMsg {
   final int itemsFound;
   final int bytesFound;
   final String categoryId;
+  final double fraction;
   const _ProgressMsg({
     required this.currentPath,
     required this.itemsFound,
     required this.bytesFound,
     required this.categoryId,
+    required this.fraction,
   });
+}
+
+/// Estimates how far a junk scan has got from the path being read.
+///
+/// Each scan root weighs as much as it has top-level folders, and inside a
+/// root the position of the top-level folder being walked marks progress.
+/// The value never goes backwards, even if listing order differs.
+class JunkScanFraction {
+  final List<String> _roots;
+  final List<Map<String, int>> _childIndex = [];
+  final List<int> _weights = [];
+  late final int _total;
+  int _group = -1;
+  int _doneWeight = 0;
+  double _reported = 0;
+
+  JunkScanFraction(
+    Iterable<String> roots, {
+    List<String> Function(String root)? listChildren,
+  }) : _roots = roots.map(_upper).toList() {
+    for (final root in _roots) {
+      final index = <String, int>{};
+      try {
+        for (final name in (listChildren ?? _childFolders)(root)) {
+          index.putIfAbsent(name.toUpperCase(), () => index.length);
+        }
+      } catch (_) {}
+      _childIndex.add(index);
+      // One unit for files directly in the root plus one per folder.
+      _weights.add(index.length + 1);
+    }
+    _total = _weights.fold(0, (sum, w) => sum + w);
+  }
+
+  static String _upper(String path) {
+    final upper = path.toUpperCase();
+    return upper.endsWith(r'\') ? upper.substring(0, upper.length - 1) : upper;
+  }
+
+  static List<String> _childFolders(String root) => [
+    for (final entity in Directory(root).listSync(followLinks: false))
+      if (entity is Directory)
+        entity.path.substring(entity.path.lastIndexOf(r'\') + 1),
+  ];
+
+  void startGroup(int index) {
+    for (var i = _group < 0 ? 0 : _group; i < index; i++) {
+      _doneWeight += _weights[i];
+    }
+    _group = index;
+  }
+
+  void finish() => _reported = 1;
+
+  double at(String path) {
+    if (_total == 0 || _reported >= 1) return _reported;
+    var within = 0;
+    if (_group >= 0 && path.isNotEmpty) {
+      final prefix = '${_roots[_group]}\\';
+      final upper = path.toUpperCase();
+      if (upper.startsWith(prefix)) {
+        final rest = upper.substring(prefix.length);
+        final slash = rest.indexOf(r'\');
+        final child = slash < 0 ? rest : rest.substring(0, slash);
+        // Folders before this one are done; +1 for the root's own files.
+        final position = _childIndex[_group][child];
+        if (position != null) within = position + 1;
+      }
+    }
+    final value = (_doneWeight + within) / _total;
+    if (value > _reported) _reported = value.clamp(0.0, 0.999);
+    return _reported;
+  }
 }
 
 class _DoneMsg {

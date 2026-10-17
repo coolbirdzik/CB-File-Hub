@@ -5,6 +5,7 @@ import 'package:cb_file_manager/ui/screens/tag_management/tag_management_screen.
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';
 import 'package:cb_file_manager/helpers/core/uri_utils.dart';
+import 'package:cb_file_manager/config/translation_helper.dart';
 
 /// A tab component for the tag management screen
 /// This component wraps the TagManagementScreen inside our SystemScreen base class
@@ -18,7 +19,7 @@ class TagManagementTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SystemScreen(
-      title: 'Tags',
+      title: context.tr.tags,
       systemId: '#tags',
       icon: PhosphorIconsLight.tag,
       child: TagManagementScreen(
@@ -35,7 +36,7 @@ class TagManagementTab extends StatelessWidget {
   /// changes to the results and the back button returns to the tag list.
   void _openTagSearchTab(BuildContext context, String tag) {
     final searchSystemId = UriUtils.buildTagSearchPath(tag);
-    final tabName = 'Tag: $tag';
+    final tabName = context.tr.tagTabName(tag);
 
     final tabBloc = BlocProvider.of<TabManagerBloc>(context);
 
@@ -49,7 +50,7 @@ class TagManagementTab extends StatelessWidget {
     SystemScreen.openInTab(
       context,
       systemId: '#tags',
-      title: 'Tags',
+      title: context.tr.tags,
       icon: PhosphorIconsLight.tag,
     );
   }

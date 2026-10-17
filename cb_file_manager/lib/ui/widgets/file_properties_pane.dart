@@ -62,7 +62,6 @@ class _FilePropertiesPaneState extends State<FilePropertiesPane> {
   void initState() {
     super.initState();
     _tags = widget.controller ?? SelectionTagsController();
-    _tags.addListener(_changed);
     if (widget.visible) _select();
   }
 
@@ -77,8 +76,17 @@ class _FilePropertiesPaneState extends State<FilePropertiesPane> {
     }
   }
 
+  @override
+  void reassemble() {
+    super.reassemble();
+    _tags.removeListener(_changed);
+  }
+
+  // Older mounted panes registered this tear-off before tag updates moved to
+  // ListenableBuilder. Hot reload preserves those listeners, so keep the
+  // callback callable and detach it without rebuilding the surrounding panes.
   void _changed() {
-    if (mounted) setState(() {});
+    _tags.removeListener(_changed);
   }
 
   void _select() {
@@ -210,7 +218,14 @@ class _FilePropertiesPaneState extends State<FilePropertiesPane> {
     );
   }
 
-  Widget _contents(BuildContext context) {
+  // A tag write only updates the panel contents, preserving the surrounding
+  // dock layout and file/preview panes throughout saving and reloading.
+  Widget _contents(BuildContext context) => ListenableBuilder(
+    listenable: _tags,
+    builder: (context, _) => _buildContents(context),
+  );
+
+  Widget _buildContents(BuildContext context) {
     if (_paths.isEmpty && _tags.failures.isEmpty) {
       return Center(
         child: Text(AppLocalizations.of(context)!.propertiesSelectFile),

@@ -80,7 +80,7 @@ class _DatabaseSettingsScreenState extends State<DatabaseSettingsScreen> {
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error loading database preferences: $e'),
+            content: Text(context.tr.dbLoadPrefsFailed(e.toString())),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -408,10 +408,7 @@ class _SharedPreferencesDialogState extends State<_SharedPreferencesDialog> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(context.tr.clearSharedPreferencesConfirm),
-        content: const Text(
-          'This will delete all app settings including theme, language, '
-          'and view preferences. The app may restart.',
-        ),
+        content: Text(context.tr.dbClearAllWarning),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -443,9 +440,9 @@ class _SharedPreferencesDialogState extends State<_SharedPreferencesDialog> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(context.tr.errorWithDetail(e.toString()))),
+        );
       }
     }
     if (mounted) setState(() => _isClearing = false);
@@ -486,9 +483,9 @@ class _SharedPreferencesDialogState extends State<_SharedPreferencesDialog> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(context.tr.errorWithDetail(e.toString()))),
+        );
       }
     }
   }
@@ -530,7 +527,7 @@ class _SharedPreferencesDialogState extends State<_SharedPreferencesDialog> {
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
             : _prefs.isEmpty
-            ? const Center(child: Text('No preferences stored.'))
+            ? Center(child: Text(context.tr.dbNoPrefs))
             : ListView.builder(
                 itemCount: sortedEntries.length,
                 itemBuilder: (ctx, i) {
@@ -547,7 +544,7 @@ class _SharedPreferencesDialogState extends State<_SharedPreferencesDialog> {
         const Spacer(),
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Close'),
+          child: Text(context.tr.close),
         ),
       ],
     );
@@ -752,7 +749,7 @@ class _RawDataDialogState extends State<_RawDataDialog> {
           IconButton(
             icon: const Icon(PhosphorIconsLight.arrowsClockwise),
             onPressed: _loadData,
-            tooltip: 'Refresh',
+            tooltip: context.tr.refresh,
           ),
           IconButton(
             icon: const Icon(PhosphorIconsLight.bracketsCurly),
@@ -778,13 +775,13 @@ class _RawDataDialogState extends State<_RawDataDialog> {
         Padding(
           padding: const EdgeInsets.only(right: 12),
           child: Text(
-            '$_totalRows rows',
+            context.tr.dbRowsCount(_totalRows),
             style: Theme.of(context).textTheme.bodySmall,
           ),
         ),
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Close'),
+          child: Text(context.tr.close),
         ),
       ],
     );
@@ -807,11 +804,14 @@ class _RawDataDialogState extends State<_RawDataDialog> {
         Row(
           children: [
             Text(
-              '$visibleStart-$visibleEnd of $_totalRows',
+              context.tr.dbRangeOfTotal(visibleStart, visibleEnd, _totalRows),
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const Spacer(),
-            Text('Rows per page', style: Theme.of(context).textTheme.bodySmall),
+            Text(
+              context.tr.dbRowsPerPage,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
             const SizedBox(width: 8),
             CbSelect.fromValues<int>(
               size: CbSelectSize.sm,
@@ -912,7 +912,7 @@ class _RawDataDialogState extends State<_RawDataDialog> {
               tooltip: context.tr.previousPage,
             ),
             Text(
-              'Page ${_currentPageNumber()} / ${_totalPages()}',
+              context.tr.dbPageOf(_currentPageNumber(), _totalPages()),
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             IconButton(
@@ -921,7 +921,7 @@ class _RawDataDialogState extends State<_RawDataDialog> {
                         _loadPage(offset: _currentOffset + effectiveRowsPerPage)
                   : null,
               icon: const Icon(Icons.chevron_right),
-              tooltip: 'Next page',
+              tooltip: context.tr.nextPage,
             ),
             IconButton(
               onPressed: _canGoToNextPage() && !_isPageLoading
@@ -930,7 +930,7 @@ class _RawDataDialogState extends State<_RawDataDialog> {
                     )
                   : null,
               icon: const Icon(Icons.last_page),
-              tooltip: 'Last page',
+              tooltip: context.tr.lastPage,
             ),
           ],
         ),
@@ -1145,7 +1145,7 @@ class _RawDataDialogState extends State<_RawDataDialog> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Close'),
+            child: Text(context.tr.close),
           ),
         ],
       ),

@@ -15,6 +15,7 @@ import 'package:cb_file_manager/ui/screens/folder_list/folder_list_bloc.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_event.dart';
 import 'package:cb_file_manager/ui/controllers/inline_rename_controller.dart';
 import 'package:cb_file_manager/helpers/core/text_utils.dart';
+import 'package:cb_file_manager/config/translation_helper.dart';
 
 /// Dialog for creating a new file from a template.
 /// Shows a grid (desktop) or list (mobile) of file types, filtered by detected
@@ -154,7 +155,8 @@ class _CreateFileDialogState extends State<CreateFileDialog> {
       case 'fileType7z':
         return AppLocalizations.of(context)?.fileType7z ?? '7Z Archive';
       case 'fileTypeCsv':
-        return 'CSV Spreadsheet';
+        return AppLocalizations.of(context)?.cfCsvSpreadsheet ??
+            'CSV Spreadsheet';
       case 'fileTypePng':
         return AppLocalizations.of(context)?.fileTypePng ?? 'PNG Image';
       case 'fileTypeJpeg':
@@ -411,7 +413,7 @@ class _CreateFileDialogState extends State<CreateFileDialog> {
               _searchQuery.isNotEmpty
                   ? (AppLocalizations.of(context)?.searchVideos ??
                         'No results for "$_searchQuery"')
-                  : 'No templates available',
+                  : context.tr.cfNoTemplates,
               style: TextStyle(
                 color: isDarkMode ? Colors.white54 : Colors.black54,
               ),
@@ -513,7 +515,7 @@ class _CreateFileNameDialogState extends State<_CreateFileNameDialog> {
           ),
           const SizedBox(height: 12),
           Text(
-            'Extension: ${widget.extension}',
+            context.tr.cfExtension(widget.extension),
             style: Theme.of(context).textTheme.bodySmall,
           ),
         ],
@@ -546,7 +548,7 @@ class _TemplateCard extends StatelessWidget {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return Tooltip(
-      message: 'Creates a${template.extension} file',
+      message: context.tr.cfCreatesFile(template.extension),
       child: Material(
         color: isDarkMode
             ? Colors.white.withAlpha(13)

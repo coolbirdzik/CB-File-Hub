@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'tree_node.dart';
 import 'tree_row.dart';
+import 'package:cb_file_manager/config/translation_helper.dart';
 
 /// Builder signature for the user-supplied row content (everything except
 /// the indent column and expand chevron, which the tree owns).
@@ -324,10 +325,10 @@ class _GenericTreeViewState<T> extends State<GenericTreeView<T>> {
     final rows = _flatten();
     if (rows.isEmpty) {
       return widget.emptyState ??
-          const Center(
+          Center(
             child: Padding(
-              padding: EdgeInsets.all(16),
-              child: Text('Nothing to show'),
+              padding: const EdgeInsets.all(16),
+              child: Text(context.tr.nothingToShow),
             ),
           );
     }

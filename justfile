@@ -7,7 +7,7 @@
 #   just e2e Navigation           # run one E2E suite
 #   just e2e                      # all E2E suites (single process)
 #   just e2e-parallel             # all E2E suites (parallel + dashboard)
-#   just analyze                  # analyze code
+#   just analyze                  # CI checks: format, analyze, unit/widget tests
 #   just format                   # format code
 
 # Shell config: use bash on all platforms
@@ -46,6 +46,9 @@ deps:
 fetch-llama:
     bash scripts/fetch_llama_runtime.sh
 
+fetch-aria2:
+    bash scripts/fetch_aria2_runtime.sh
+
 # Run flutter doctor
 doctor:
     {{flutter}} doctor -v
@@ -78,8 +81,12 @@ deep-clean:
     rm -rf {{project_dir}}/ios/Flutter/Flutter.framework 2>/dev/null || true
     rm -rf {{project_dir}}/ios/Flutter/Flutter.podspec 2>/dev/null || true
 
-# Analyze code
+# Run the same checks as the CI analyze job (no E2E)
 analyze:
+    bash scripts/check_quality.sh {{flutter}}
+
+# Static analysis only
+lint:
     cd {{project_dir}} && {{flutter}} analyze
 
 # Format code
@@ -136,7 +143,14 @@ dashboard: _open-dashboard
 e2e-list:
     @echo "Available E2E test cases (use as: just e2e \"<name>\"):"
     @echo ""
-    @grep -hE "^[[:space:]]*(group\\(|testWidgets\\()'" {{project_dir}}/integration_test/app_e2e_test.dart {{project_dir}}/integration_test/video_thumbnails_e2e_test.dart {{project_dir}}/integration_test/media_kit_playback_e2e_test.dart {{project_dir}}/integration_test/ffmpeg_thumbnail_e2e_test.dart {{project_dir}}/integration_test/file_drag_drop_e2e_test.dart {{project_dir}}/integration_test/breadcrumb_address_bar_overflow_e2e_test.dart 2>/dev/null | sed -E -e "s|^[[:space:]]*group\\('([^']+)'.*|\\n[\\1]|" -e "s|^[[:space:]]*testWidgets\\('([^']+)'.*|  - \\1|"
+    @grep -hE "^[[:space:]]*(group\\(|testWidgets\\()'" {{project_dir}}/integration_test/app_e2e_test.dart {{project_dir}}/integration_test/video_thumbnails_e2e_test.dart {{project_dir}}/integration_test/media_kit_playback_e2e_test.dart {{project_dir}}/integration_test/ffmpeg_thumbnail_e2e_test.dart {{project_dir}}/integration_test/file_drag_drop_e2e_test.dart {{project_dir}}/integration_test/breadcrumb_address_bar_overflow_e2e_test.dart {{project_dir}}/integration_test/torrent_library_e2e_test.dart 2>/dev/null | sed -E -e "s|^[[:space:]]*group\\('([^']+)'.*|\\n[\\1]|" -e "s|^[[:space:]]*testWidgets\\('([^']+)'.*|  - \\1|"
+
+# Show which E2E suites CI would run for your changes (committed + uncommitted).
+# Rules: cb_file_manager/integration_test/e2e_impact.json
+#   just e2e-affected            # vs the branch upstream (else develop)
+#   just e2e-affected main       # vs another base
+e2e-affected base="":
+    node scripts/ci/e2e_select.mjs {{base}}
 
 # Internal: open dashboard in default browser
 [private]
@@ -188,7 +202,7 @@ macos-dev: deps
 # =============================================================================
 
 # Build Windows portable (ZIP)
-windows: deps fetch-llama
+windows: deps fetch-llama fetch-aria2
     cd {{project_dir}} && {{flutter}} build windows --release {{dart_env}}
     mkdir -p {{build_dir}}/windows/portable
     cd {{build_dir}}/windows/x64/runner/Release && if command -v zip >/dev/null 2>&1; then zip -r ../../portable/CBFileHub-Portable.zip ./*; elif command -v 7z >/dev/null 2>&1; then 7z a -tzip ../../portable/CBFileHub-Portable.zip ./*; fi

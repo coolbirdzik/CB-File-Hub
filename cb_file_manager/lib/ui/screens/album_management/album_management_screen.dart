@@ -32,6 +32,7 @@ import 'package:cb_file_manager/ui/utils/route.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tabbed_folder/tabbed_folder_drag_selection_controller.dart';
 import 'package:cb_file_manager/ui/tab_manager/components/search_bar.dart'
     as tab_components;
+import 'package:cb_file_manager/config/translation_helper.dart';
 
 class AlbumManagementScreen extends StatefulWidget {
   final String tabId;
@@ -71,6 +72,7 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
   final Map<int, Future<int>> _albumCountFutures = {};
   bool _isLoading = true;
   bool _showSearchBar = false;
+  final _searchFocusNode = FocusNode(debugLabel: 'album search');
   String _searchQuery = '';
   SortOption _sortOption = SortOption.nameAsc;
   int _gridZoomLevel = 3;
@@ -174,6 +176,11 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
 
   void _toggleSearchBar() => setState(() => _showSearchBar = !_showSearchBar);
 
+  void _openOrFocusSearch() {
+    if (!_showSearchBar) setState(() => _showSearchBar = true);
+    _searchFocusNode.requestFocus();
+  }
+
   void _closeSearchBar() => setState(() => _showSearchBar = false);
 
   void _setSearchQuery(String value) => setState(() => _searchQuery = value);
@@ -189,6 +196,7 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
 
   @override
   void dispose() {
+    _searchFocusNode.dispose();
     _view.removeListener(_onViewChanged);
     _view.dispose();
     _dragSelectionController.dispose();
@@ -336,8 +344,8 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
         title: Text(AppLocalizations.of(context)!.deleteAlbum),
         content: Text(
           albums.length == 1
-              ? 'Are you sure you want to delete the album "${albums.single.name}"? This action cannot be undone.'
-              : 'Are you sure you want to delete ${albums.length} albums? This action cannot be undone.',
+              ? context.tr.albumDeleteOneConfirm(albums.single.name)
+              : context.tr.albumDeleteManyConfirm(albums.length),
         ),
         actions: [
           TextButton(
@@ -366,8 +374,8 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
             SnackBar(
               content: Text(
                 successCount == 1
-                    ? 'Album deleted successfully'
-                    : '$successCount albums deleted successfully',
+                    ? context.tr.albumDeletedOne
+                    : context.tr.albumDeletedMany(successCount),
               ),
             ),
           );
@@ -378,7 +386,7 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                'Failed to delete ${albums.length - successCount} album(s)',
+                context.tr.albumDeleteFailedCount(albums.length - successCount),
               ),
               backgroundColor: Colors.red,
             ),
@@ -497,7 +505,7 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
                   FutureBuilder<int>(
                     future: _getAlbumImageCount(album),
                     builder: (_, snapshot) => Text(
-                      '${snapshot.data ?? 0} images',
+                      context.tr.albumImageCount(snapshot.data ?? 0),
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ),
@@ -522,10 +530,10 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
       alignment: Alignment.center,
       child: Row(
         children: [
-          Expanded(flex: 4, child: Text('Name', style: style)),
-          Expanded(child: Text('Images', style: style)),
-          Expanded(child: Text('Privacy', style: style)),
-          Expanded(flex: 2, child: Text('Modified', style: style)),
+          Expanded(flex: 4, child: Text(context.tr.columnName, style: style)),
+          Expanded(child: Text(context.tr.images, style: style)),
+          Expanded(child: Text(context.tr.albumColumnPrivacy, style: style)),
+          Expanded(flex: 2, child: Text(context.tr.fileModified, style: style)),
           const SizedBox(width: 40),
         ],
       ),
@@ -554,7 +562,7 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
             ),
             Expanded(
               child: Text(
-                album.isNsfw ? 'NSFW' : 'Public',
+                album.isNsfw ? 'NSFW' : context.tr.albumPublic,
                 style: TextStyle(color: secondary),
               ),
             ),
@@ -621,7 +629,7 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
                     ),
                     if (directories.isNotEmpty)
                       Text(
-                        '${directories.length} source${directories.length == 1 ? '' : 's'}',
+                        context.tr.albumSourceCount(directories.length),
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     _buildAlbumMenu(album),
@@ -673,11 +681,18 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
   List<PopupMenuEntry<String>> _albumMenuItems(Album album) => [
     PopupMenuItem(
       value: 'edit',
-      child: Text(widget.sourceGalleryMode ? 'Source settings' : 'Edit album'),
+      child: Text(
+        widget.sourceGalleryMode
+            ? context.tr.albumSourceSettings
+            : context.tr.albumEditAlbumLower,
+      ),
     ),
     galleryNsfwMenuItem(context, album.isNsfw),
-    const PopupMenuItem(value: 'set_cover', child: Text('Set Cover…')),
-    const PopupMenuItem(value: 'random_cover', child: Text('Random Cover')),
+    PopupMenuItem(value: 'set_cover', child: Text(context.tr.albumSetCover)),
+    PopupMenuItem(
+      value: 'random_cover',
+      child: Text(context.tr.albumRandomCover),
+    ),
     PopupMenuItem(
       value: 'delete',
       child: Text(
@@ -700,7 +715,7 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
   }
 
   Widget _buildAlbumMenu(Album album) => PopupMenuButton<String>(
-    tooltip: 'Album options',
+    tooltip: context.tr.albumOptions,
     onSelected: (value) => _handleAlbumMenuAction(album, value),
     itemBuilder: (_) => _albumMenuItems(album),
   );
@@ -783,13 +798,15 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
             onRefresh: _loadAlbums,
             showRefreshAction: false,
             showSearchBar: _showSearchBar,
+            onSearch: _openOrFocusSearch,
             searchBar: tab_components.SearchBar(
+              focusNode: _searchFocusNode,
               currentPath: widget.rootPath,
               tabId: widget.tabId,
               initialQuery: _searchQuery,
               hintText: widget.sourceGalleryMode
-                  ? 'Search image sources'
-                  : 'Search albums',
+                  ? context.tr.albumSearchSources
+                  : context.tr.albumSearchAlbums,
               onQueryChanged: _setSearchQuery,
               onClearSearch: () => _setSearchQuery(''),
               onCloseSearch: _closeSearchBar,
@@ -834,10 +851,10 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
                         const SizedBox(height: 16),
                         Text(
                           _searchQuery.trim().isNotEmpty
-                              ? 'No matching results'
+                              ? context.tr.albumNoMatchingResults
                               : widget.sourceGalleryMode
-                              ? 'No image sources yet'
-                              : 'No albums yet',
+                              ? context.tr.albumNoSourcesYet
+                              : context.tr.albumNoAlbumsYet,
                           style: TextStyle(
                             fontSize: 18,
                             color: Theme.of(
@@ -848,8 +865,8 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
                         const SizedBox(height: 8),
                         Text(
                           widget.sourceGalleryMode
-                              ? 'Add a source to browse images from its folders'
-                              : 'Create your first album to organize your images',
+                              ? context.tr.albumAddSourceHint
+                              : context.tr.albumCreateFirstHint,
                           style: TextStyle(
                             fontSize: 14,
                             color: Theme.of(
@@ -865,8 +882,8 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
                             icon: const Icon(PhosphorIconsLight.plus),
                             label: Text(
                               widget.sourceGalleryMode
-                                  ? 'Create Image Source'
-                                  : 'Create Album',
+                                  ? context.tr.albumCreateImageSource
+                                  : context.tr.albumCreateAlbum,
                             ),
                           ),
                         ],
@@ -950,7 +967,7 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
                         if (widget.sourceGalleryMode)
                           _buildAlbumBadge(
                             icon: PhosphorIconsLight.folderOpen,
-                            label: 'Source',
+                            label: context.tr.albumBadgeSource,
                           ),
                         if (album.isNsfw)
                           _buildAlbumBadge(
@@ -972,7 +989,7 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
                         shape: BoxShape.circle,
                       ),
                       child: PopupMenuButton<String>(
-                        tooltip: 'Album options',
+                        tooltip: context.tr.albumOptions,
                         padding: EdgeInsets.zero,
                         icon: const Icon(
                           PhosphorIconsLight.dotsThreeVertical,
@@ -1186,7 +1203,7 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
     if (files.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No images to pick as cover')),
+          SnackBar(content: Text(context.tr.albumNoImagesForCover)),
         );
       }
       return;
@@ -1198,7 +1215,7 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
         context: context,
         builder: (context) {
           return AlertDialog(
-            title: const Text('Choose Cover Image'),
+            title: Text(context.tr.albumChooseCover),
             content: SizedBox(
               width: 600,
               height: 400,
@@ -1232,7 +1249,7 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cancel'),
+                child: Text(context.tr.cancel),
               ),
             ],
           );

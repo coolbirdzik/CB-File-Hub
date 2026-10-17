@@ -221,6 +221,29 @@ class WindowsAppIcon {
     );
   }
 
+  /// Advertises .torrent and magnet handlers without replacing UserChoice.
+  static Future<bool> registerTorrentAssociations() async {
+    if (!Platform.isWindows) return false;
+    try {
+      return await _channel.invokeMethod<bool>('registerTorrentAssociations', {
+            'exePath': Platform.resolvedExecutable,
+          }) ??
+          false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static Future<bool> openTorrentDefaultSettings() async {
+    if (!await registerTorrentAssociations()) return false;
+    try {
+      return await _channel.invokeMethod<bool>('openTorrentDefaultSettings') ??
+          false;
+    } catch (_) {
+      return false;
+    }
+  }
+
   // ─── Brand Detection (for create-file dialog) ────────────────────────────────
 
   /// Windows: Detects which office suites are installed via the native plugin.

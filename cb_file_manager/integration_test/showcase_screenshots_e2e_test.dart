@@ -34,12 +34,7 @@ void main() {
   // Isolate ALL app data (SQLite DB, tags, prefs-backed files, thumbnail
   // caches, trash) into a throwaway sandbox so capturing screenshots never
   // touches the real Documents/CBFileHub_v2 data of your debug/release build.
-  setUpAll(() async {
-    await E2ESandboxPaths.install();
-  });
-  tearDownAll(() async {
-    await E2ESandboxPaths.uninstall();
-  });
+  registerE2EAppSandbox();
 
   // The desktop scenes below rely on the multi-pane desktop shell (AI side
   // panel, tag tree, disk cleaner). On phones the app renders a completely

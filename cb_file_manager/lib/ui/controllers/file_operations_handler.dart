@@ -5,6 +5,7 @@ import 'package:cb_file_manager/design_system/cb_page_transitions.dart';
 import 'package:cb_file_manager/helpers/files/archive_path_utils.dart';
 import 'package:cb_file_manager/services/archive/archive_service.dart';
 import 'package:cb_file_manager/core/service_locator.dart';
+import 'package:cb_file_manager/helpers/core/filesystem_utils.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/ui/screens/media_gallery/image_viewer_screen.dart';
 import 'package:cb_file_manager/ui/utils/video_playback_launcher.dart';
@@ -26,6 +27,7 @@ import 'package:cb_file_manager/ui/utils/route.dart';
 import 'package:cb_file_manager/ui/widgets/file_preview_pane.dart';
 import 'package:cb_file_manager/design_system/primitives/cb_inline_rename.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import '../utils/torrent_open_actions.dart';
 
 /// Handles file operations such as opening files with appropriate viewers
 class FileOperationsHandler {
@@ -282,11 +284,11 @@ class FileOperationsHandler {
     required FileSystemEntity entity,
     FolderListBloc? folderListBloc,
   }) {
-    final bloc = folderListBloc ?? context.read<FolderListBloc>();
-    final l10n = AppLocalizations.of(context)!;
-    final name = _entityBaseName(entity);
-    bloc.add(CopyFile(entity));
-    _showToastSafe(context, l10n.copiedToClipboard(name));
+    copyFilesToClipboard(
+      context: context,
+      entities: [entity],
+      folderListBloc: folderListBloc,
+    );
   }
 
   static void copyFilesToClipboard({
@@ -294,14 +296,12 @@ class FileOperationsHandler {
     required List<FileSystemEntity> entities,
     FolderListBloc? folderListBloc,
   }) {
-    if (entities.isEmpty) return;
-    final bloc = folderListBloc ?? context.read<FolderListBloc>();
-    final l10n = AppLocalizations.of(context)!;
-    bloc.add(CopyFiles(entities));
-    final message = entities.length == 1
-        ? l10n.copiedToClipboard(_entityBaseName(entities.first))
-        : '${entities.length} items copied to clipboard';
-    _showToastSafe(context, message);
+    _setClipboard(
+      context: context,
+      entities: entities,
+      isCut: false,
+      folderListBloc: folderListBloc,
+    );
   }
 
   static void cutToClipboard({
@@ -309,11 +309,11 @@ class FileOperationsHandler {
     required FileSystemEntity entity,
     FolderListBloc? folderListBloc,
   }) {
-    final bloc = folderListBloc ?? context.read<FolderListBloc>();
-    final l10n = AppLocalizations.of(context)!;
-    final name = _entityBaseName(entity);
-    bloc.add(CutFile(entity));
-    _showToastSafe(context, l10n.cutToClipboard(name));
+    cutFilesToClipboard(
+      context: context,
+      entities: [entity],
+      folderListBloc: folderListBloc,
+    );
   }
 
   static void cutFilesToClipboard({
@@ -321,14 +321,49 @@ class FileOperationsHandler {
     required List<FileSystemEntity> entities,
     FolderListBloc? folderListBloc,
   }) {
+    _setClipboard(
+      context: context,
+      entities: entities,
+      isCut: true,
+      folderListBloc: folderListBloc,
+    );
+  }
+
+  /// The clipboard is app-wide ([FileOperations] is a singleton), so copy and
+  /// cut work from screens that have no [FolderListBloc] — the video library,
+  /// albums. A bloc, when there is one, also bumps the revision that dims cut
+  /// items in that view.
+  static void _setClipboard({
+    required BuildContext context,
+    required List<FileSystemEntity> entities,
+    required bool isCut,
+    FolderListBloc? folderListBloc,
+  }) {
     if (entities.isEmpty) return;
-    final bloc = folderListBloc ?? context.read<FolderListBloc>();
+    final bloc = folderListBloc ?? _maybeFolderListBloc(context);
     final l10n = AppLocalizations.of(context)!;
-    bloc.add(CutFiles(entities));
-    final message = entities.length == 1
-        ? l10n.cutToClipboard(_entityBaseName(entities.first))
-        : '${entities.length} items cut to clipboard';
-    _showToastSafe(context, message);
+    if (bloc != null) {
+      bloc.add(isCut ? CutFiles(entities) : CopyFiles(entities));
+    } else if (isCut) {
+      FileOperations().cutFilesToClipboard(entities);
+    } else {
+      FileOperations().copyFilesToClipboard(entities);
+    }
+    final name = entities.length == 1
+        ? _entityBaseName(entities.first)
+        : l10n.itemsCount(entities.length);
+    _showToastSafe(
+      context,
+      isCut ? l10n.cutToClipboard(name) : l10n.copiedToClipboard(name),
+    );
+  }
+
+  static FolderListBloc? _maybeFolderListBloc(BuildContext context) {
+    try {
+      return context.read<FolderListBloc>();
+    } catch (_) {
+      return null;
+    }
   }
 
   static void pasteFromClipboard({
@@ -502,6 +537,8 @@ class FileOperationsHandler {
       );
       return;
     }
+
+    if (TorrentOpenActions.tryOpen(context, file.path)) return;
 
     // Check file type using utility
     final isVideo = FileTypeUtils.isVideoFile(file.path);

@@ -3,6 +3,7 @@ import 'package:cb_file_manager/design_system/primitives/cb_tooltip.dart';
 import 'package:cb_file_manager/services/tab_activity/tab_activity_manager.dart';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:cb_file_manager/config/translation_helper.dart';
 
 /// Small visual indicator shown on a tab header when the tab has been
 /// auto-suspended due to inactivity (>= 60 minutes idle).
@@ -76,7 +77,7 @@ class _TabInactiveIndicatorState extends State<TabInactiveIndicator> {
     return Padding(
       padding: const EdgeInsets.only(right: 6),
       child: CbTooltip(
-        message: 'Inactive (auto-suspended after 60 minutes)',
+        message: context.tr.tabInactiveTooltip,
         waitDuration: const Duration(milliseconds: 350),
         child: Icon(
           PhosphorIconsLight.moon,

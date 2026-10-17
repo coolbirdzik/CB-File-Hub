@@ -444,6 +444,7 @@ build_windows_portable() {
     # These large binaries are not committed to git; download them at build time.
     print_info "Fetching llama.cpp runtime for Local AI..."
     bash "$SCRIPT_DIR/fetch_llama_runtime.sh"
+    bash "$SCRIPT_DIR/fetch_aria2_runtime.sh"
     
     cd "$PROJECT_DIR"
     

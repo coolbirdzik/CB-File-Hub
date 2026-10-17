@@ -662,7 +662,7 @@ class PopularTagsWidget extends StatelessWidget {
 }
 
 /// Widget to display a list of recently used tags with animation and hover effects
-class RecentTagsWidget extends StatelessWidget {
+class RecentTagsWidget extends StatefulWidget {
   final Function(String) onTagSelected;
   final int limit;
   final Future<List<String>> Function(int limit)? loadRecentTags;
@@ -673,17 +673,50 @@ class RecentTagsWidget extends StatelessWidget {
     this.limit = 20,
     this.loadRecentTags,
     this.compact = false,
+    this.refreshVersion = 0,
   });
+
+  /// Refresh at a new editing session, rather than shuffling buttons every
+  /// time a tag is assigned and the parent rebuilds.
+  final int refreshVersion;
 
   /// Small muted heading, for a host whose own section titles are smaller
   /// than the dialog-sized default.
   final bool compact;
 
   @override
+  State<RecentTagsWidget> createState() => _RecentTagsWidgetState();
+}
+
+class _RecentTagsWidgetState extends State<RecentTagsWidget> {
+  late Future<List<String>> _recentTags;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(RecentTagsWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.limit != widget.limit ||
+        oldWidget.refreshVersion != widget.refreshVersion) {
+      _load();
+    }
+  }
+
+  void _load() {
+    _recentTags =
+        widget.loadRecentTags?.call(widget.limit) ??
+        TagManager.getRecentTags(limit: widget.limit);
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final compact = widget.compact;
     return FutureBuilder<List<String>>(
-      future:
-          loadRecentTags?.call(limit) ?? TagManager.getRecentTags(limit: limit),
+      future: _recentTags,
       builder: (context, snapshot) {
         if (!snapshot.hasData || snapshot.data!.isEmpty) {
           return const SizedBox.shrink();
@@ -720,7 +753,10 @@ class RecentTagsWidget extends StatelessWidget {
                 ],
               ),
             SizedBox(height: compact ? CbSpacing.xs + CbSpacing.xxs : 12),
-            AnimatedTagList(tags: recentTags, onTagSelected: onTagSelected),
+            AnimatedTagList(
+              tags: recentTags,
+              onTagSelected: widget.onTagSelected,
+            ),
           ],
         );
       },
@@ -800,10 +836,16 @@ class _AnimatedTagChipState extends State<AnimatedTagChip>
       begin: 1.0,
       end: 1.05,
     ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
+    _colorManager.addListener(_colorChanged);
+  }
+
+  void _colorChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
+    _colorManager.removeListener(_colorChanged);
     _controller.dispose();
     super.dispose();
   }
@@ -817,15 +859,12 @@ class _AnimatedTagChipState extends State<AnimatedTagChip>
     final tagColor = _colorManager.getTagColor(widget.tag);
 
     final Color foregroundColor = TagChipStyle.readableOn(
-      Color.alphaBlend(
-        TagChipStyle.tint(tagColor, isDark: isDark, hovered: _isHovered),
-        theme.colorScheme.surface,
-      ),
+      TagChipStyle.background(tagColor, isDark: isDark, hovered: _isHovered),
     );
     final Color textColor = foregroundColor;
     final Color iconColor = foregroundColor.withValues(alpha: 0.92);
 
-    return MouseRegion(
+    final chip = MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) {
         setState(() => _isHovered = true);
@@ -855,33 +894,25 @@ class _AnimatedTagChipState extends State<AnimatedTagChip>
                     isDark: isDark,
                     hovered: _isHovered,
                   ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
-                  ),
+                  padding: TagChipStyle.padding,
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      _buildLeadingWidget(iconColor, tagColor),
+                      SizedBox.square(
+                        dimension: TagChipStyle.iconExtent,
+                        child: Center(
+                          child: _buildLeadingWidget(iconColor, tagColor),
+                        ),
+                      ),
                       const SizedBox(width: 4),
                       Flexible(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              widget.displayText,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: textColor,
-                                fontSize: 13,
-                                fontWeight: _isHovered
-                                    ? FontWeight.bold
-                                    : FontWeight.normal,
-                              ),
-                            ),
-                            _buildHierarchyLabel(textColor),
-                          ],
+                        child: Text(
+                          widget.displayText,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TagChipStyle.labelStyle(
+                            context,
+                          ).copyWith(color: textColor),
                         ),
                       ),
                       if (_isHovered) ...[
@@ -901,6 +932,14 @@ class _AnimatedTagChipState extends State<AnimatedTagChip>
         ),
       ),
     );
+    final parents = _hierarchyManager.getParents(widget.tag);
+    return parents.isEmpty
+        ? chip
+        : Tooltip(
+            message:
+                '${widget.displayText}\n${AppLocalizations.of(context)!.parentTagLabel}: ${parents.join(', ')}',
+            child: chip,
+          );
   }
 
   /// Builds thumbnail image or tag icon as the leading widget.
@@ -911,11 +950,14 @@ class _AnimatedTagChipState extends State<AnimatedTagChip>
         borderRadius: BorderRadius.circular(4),
         child: Image.file(
           File(thumbnailPath),
-          width: 20,
-          height: 20,
+          width: TagChipStyle.iconExtent,
+          height: TagChipStyle.iconExtent,
           fit: BoxFit.cover,
-          errorBuilder: (_, _, _) =>
-              Icon(PhosphorIconsLight.tag, size: 14, color: iconColor),
+          errorBuilder: (_, _, _) => Icon(
+            PhosphorIconsLight.tag,
+            size: TagChipStyle.iconSize,
+            color: iconColor,
+          ),
         ),
       );
     }
@@ -923,24 +965,8 @@ class _AnimatedTagChipState extends State<AnimatedTagChip>
       _hierarchyManager.isParent(widget.tag)
           ? PhosphorIconsLight.treeStructure
           : PhosphorIconsLight.tag,
-      size: 14,
+      size: TagChipStyle.iconSize,
       color: iconColor,
-    );
-  }
-
-  /// Builds a small hierarchy label if tag has parents.
-  Widget _buildHierarchyLabel(Color textColor) {
-    final parents = _hierarchyManager.getParents(widget.tag);
-    if (parents.isEmpty) return const SizedBox.shrink();
-    return Text(
-      parents.join(', '),
-      style: TextStyle(
-        fontSize: 10,
-        color: textColor.withValues(alpha: 0.6),
-        fontStyle: FontStyle.italic,
-      ),
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
     );
   }
 }

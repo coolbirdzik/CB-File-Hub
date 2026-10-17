@@ -4,12 +4,14 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:media_kit/media_kit.dart' as mk; // TEMP-DIAG
 import 'package:cb_file_manager/services/media/media_kit_playback.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:path/path.dart' as pathlib;
@@ -43,6 +45,9 @@ import 'video_player_models.dart';
 import 'video_player_seek_preview.dart';
 import 'video_player_seek_slider.dart';
 import 'video_player_utils.dart';
+import 'video_player_osd.dart';
+import 'video_playlist.dart';
+import 'package:cb_file_manager/config/translation_helper.dart';
 
 part 'video_player.volume.dart';
 part 'video_player.settings.dart';
@@ -80,8 +85,17 @@ class VideoPlayer extends StatefulWidget {
   final Function(String folderPath, String highlightedFileName)? onOpenFolder;
 
   // Navigation state
+  /// [onNextVideo] also runs when a non-looping video plays to the end.
   final bool hasNextVideo;
   final bool hasPreviousVideo;
+
+  /// Starts in fullscreen, for a player that replaces one already in
+  /// fullscreen (the window or system UI is still in that state).
+  final bool initiallyFullScreen;
+
+  /// Files offered by the playlist button; it is hidden for fewer than two.
+  final List<File>? playlist;
+  final ValueChanged<File>? onPlaylistItemSelected;
 
   // UI configuration
   final bool showStreamingSpeed;
@@ -112,6 +126,9 @@ class VideoPlayer extends StatefulWidget {
     this.onOpenFolder,
     this.hasNextVideo = false,
     this.hasPreviousVideo = false,
+    this.playlist,
+    this.onPlaylistItemSelected,
+    this.initiallyFullScreen = false,
     this.showStreamingSpeed = false,
     this.onToggleStreamingSpeed,
   }) : assert(
@@ -142,6 +159,9 @@ class VideoPlayer extends StatefulWidget {
     Function(String folderPath, String highlightedFileName)? onOpenFolder,
     bool hasNextVideo = false,
     bool hasPreviousVideo = false,
+    List<File>? playlist,
+    ValueChanged<File>? onPlaylistItemSelected,
+    bool initiallyFullScreen = false,
     bool showStreamingSpeed = false,
     VoidCallback? onToggleStreamingSpeed,
   }) : this._(
@@ -167,6 +187,9 @@ class VideoPlayer extends StatefulWidget {
          onOpenFolder: onOpenFolder,
          hasNextVideo: hasNextVideo,
          hasPreviousVideo: hasPreviousVideo,
+         playlist: playlist,
+         onPlaylistItemSelected: onPlaylistItemSelected,
+         initiallyFullScreen: initiallyFullScreen,
          showStreamingSpeed: showStreamingSpeed,
          onToggleStreamingSpeed: onToggleStreamingSpeed,
        );
@@ -327,7 +350,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
   // State variables
   bool _isLoading = true;
   bool _hasError = false;
-  bool _isFullScreen = false;
+  late bool _isFullScreen = widget.initiallyFullScreen;
   bool _isDesktopFullScreenToggleInProgress = false;
   bool _desktopWasMaximizedBeforeFullScreen = false;
   bool? _desktopWasResizableBeforeFullScreen;
@@ -341,6 +364,9 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
   bool _showControls = true;
   final bool _showSpeedIndicator = false;
 
+  // The end of playback hands over to the next video only once.
+  bool _advancedToNextVideo = false;
+
   // Persist a software-decoding preference only once after a GPU error.
   bool _hwDecodeFallbackAttempted = false;
 
@@ -350,7 +376,6 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
   Duration? _seekDragPosition;
   Timer? _seekPreviewTimer;
   Duration? _pendingSeekPreview;
-  bool _resumeAfterSeekDrag = false;
 
   // Seek bar hover thumbnails, decoded apart from the main player.
   VideoSeekPreviewController? _seekHoverFrames;
@@ -395,10 +420,10 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
   @override
   String _selectedCodec = 'auto'; // auto, h264, h265, vp9, av1
   @override
-  // Preserve the established Windows software-decoding default.
-  bool _hardwareAcceleration = kIsWeb ? true : !Platform.isWindows;
-  @override
   String _videoDecoder = 'auto'; // auto, software, hardware
+  @override
+  bool get _hardwareAcceleration =>
+      _buildVideoControllerConfig().enableHardwareAcceleration;
   @override
   String _audioDecoder = 'auto'; // auto, software, hardware
   @override
@@ -452,6 +477,22 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
   Timer? _fastSeekTimer;
   int _fastSeekSeconds = 5; // Current seek amount, increases over time
   int _fastSeekTicks = 0; // Count of seek ticks to accelerate
+
+  // Centered OSD (volume level, wheel seek offset, wheel mode switch)
+  bool _osdVisible = false;
+  IconData? _osdIcon;
+  String _osdLabel = '';
+  double? _osdProgress;
+  String? _osdHint;
+  Timer? _osdTimer;
+
+  // Mouse wheel over the video: volume or seek; middle-click toggles
+  @override
+  VideoWheelAction _videoWheelAction = VideoWheelAction.volume;
+  static const int _wheelSeekStepSeconds = 5;
+  Duration _wheelSeekOrigin = Duration.zero;
+  Timer? _wheelSeekCommitTimer;
+
   // Seek speed: 0=slow, 1=medium, 2=fast — loaded from preferences
   @override
   int _videoSeekSpeed = 1;
@@ -464,12 +505,14 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
 
     // Ensure system UI is visible when video player starts (not fullscreen)
     if (Platform.isAndroid || Platform.isIOS) {
-      SystemChrome.setEnabledSystemUIMode(
-        SystemUiMode.manual,
-        overlays: [SystemUiOverlay.top, SystemUiOverlay.bottom],
-      );
-      // Explicitly set light status bar icons to ensure visibility on dark backgrounds
-      SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light);
+      if (!_isFullScreen) {
+        SystemChrome.setEnabledSystemUIMode(
+          SystemUiMode.manual,
+          overlays: [SystemUiOverlay.top, SystemUiOverlay.bottom],
+        );
+        // Explicitly set light status bar icons to ensure visibility on dark backgrounds
+        SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light);
+      }
       // Guard against plugins or platform views hiding system UI unexpectedly
       SystemChrome.setSystemUIChangeCallback((visible) async {
         if (!mounted) return;
@@ -549,6 +592,8 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
     WidgetsBinding.instance.removeObserver(this);
     VideoUiState.notifyPlayerDisposed();
     _disposeResources();
+    _osdTimer?.cancel();
+    _wheelSeekCommitTimer?.cancel();
     _keyboardFocusNode.dispose();
     super.dispose();
   }
@@ -600,7 +645,6 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
       _seekPreviewTimer = null;
       _pendingSeekPreview = null;
       _seekDragPosition = null;
-      _resumeAfterSeekDrag = false;
       _isSeeking = false;
       _seekHoverFrames?.dispose();
       _seekHoverFrames = null;
@@ -701,13 +745,10 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
         oldWidget.fileStream != widget.fileStream;
   }
 
-  /// Applies the persisted hardware decoding preference to libmpv.
+  /// Applies the persisted decoder choice to libmpv.
   @override
-  PlaybackVideoConfiguration _buildVideoControllerConfig() {
-    return PlaybackVideoConfiguration(
-      enableHardwareAcceleration: _hardwareAcceleration,
-    );
-  }
+  PlaybackVideoConfiguration _buildVideoControllerConfig() =>
+      PlaybackVideoConfiguration.forDecoder(_videoDecoder);
 
   Future<void> _initializePlayer() async {
     try {
@@ -807,6 +848,24 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
 
     // Track buffering state - but ignore buffering during seek to prevent UI flicker
     _player!.stream.buffering.listen((buffering) {
+      // TEMP-DIAG
+      if (_player?.controller.platform case final mk.NativePlayer n) {
+        () async {
+          final p = await (
+            n.getProperty('core-idle'),
+            n.getProperty('paused-for-cache'),
+            n.getProperty('hwdec-current'),
+            n.getProperty('time-pos'),
+            n.getProperty('pause'),
+            n.getProperty('seeking'),
+          ).wait;
+          tempDiag(
+            'buffering=$buffering isSeeking=$_isSeeking isLoading=$_isLoading '
+            'core-idle=${p.$1} pfc=${p.$2} hwdec=${p.$3} pos=${p.$4} '
+            'pause=${p.$5} seeking=${p.$6}',
+          );
+        }();
+      }
       if (!_isSeeking && mounted) {
         setState(() {
           _isLoading = buffering;
@@ -840,19 +899,17 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
     _player!.stream.width.listen((width) {
       if (mounted && width != null) _extractVideoMetadata();
     });
+    _player!.stream.completed.listen((completed) {
+      if (!completed || !mounted || _advancedToNextVideo) return;
+      if (widget.looping || !widget.hasNextVideo) return;
+      _advancedToNextVideo = true;
+      widget.onNextVideo?.call();
+    });
 
     // Track errors
     _player!.stream.error.listen((error) {
       debugPrint('Player error: $error');
 
-      // Hardware (D3D11/Direct3D) decoding can fail on some Windows
-      // GPUs/drivers or under GPU-memory pressure. We do NOT attempt to
-      // recreate the VideoController inline here: that would trigger another
-      // D3D11 device creation against an already-failing GPU/driver and can
-      // tear down the entire Flutter engine ("Lost connection to device").
-      //
-      // Instead, persist software decoding for next time and surface a clear
-      // error so the user just needs to reopen the video.
       // A missing/unavailable audio device (no sound card, disabled output,
       // headless CI runner) does not stop mpv from decoding and playing
       // video — it just plays silently. Surfacing this as a fatal error
@@ -862,8 +919,24 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
         return;
       }
 
-      if (_isHardwareDecodeError(error)) {
+      // Hardware (D3D11/Direct3D) decoding can fail on some Windows
+      // GPUs/drivers or under GPU-memory pressure. We do NOT recreate the
+      // VideoController here: another D3D11 device creation against a failing
+      // driver can tear down the entire Flutter engine ("Lost connection to
+      // device"). PlaybackPlayer instead switches libmpv's decoder to the CPU
+      // in place, and the choice is persisted for next time.
+      if (PlaybackPlayer.isHardwareDecodeError(error)) {
+        final firstFailure = !_hwDecodeFallbackAttempted;
         _persistSoftwareDecodingPreference();
+        if (_player?.fellBackToSoftware ?? false) {
+          if (firstFailure && mounted) {
+            AppToast.warning(
+              context,
+              AppLocalizations.of(context)!.videoDecodingFellBackToCpu,
+            );
+          }
+          return;
+        }
         if (mounted && !_hasError) {
           setState(() {
             _hasError = true;
@@ -888,29 +961,15 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
     });
   }
 
-  /// Returns true if [error] looks like a hardware/GPU decoding failure that
-  /// could be resolved by falling back to software decoding.
   bool _isAudioDeviceError(String error) {
     final lower = error.toLowerCase();
     return lower.contains('audio device') || lower.contains('no sound');
   }
 
-  bool _isHardwareDecodeError(String error) {
-    final lower = error.toLowerCase();
-    return lower.contains('d3d11') ||
-        lower.contains('direct3d') ||
-        lower.contains('d3derr') ||
-        lower.contains('0x8007000e') || // E_OUTOFMEMORY
-        lower.contains('0x8876086a') || // D3DERR_NOTAVAILABLE
-        lower.contains('hardware') ||
-        lower.contains('hwdec') ||
-        lower.contains('gpu');
-  }
-
-  /// Persists `hardware_acceleration=false` and `video_decoder=software` so the
-  /// next playback session on this machine skips the failing hardware path.
-  /// Does not touch the live player/controller — see notes in the error
-  /// listener above for why we avoid creating new GPU resources here.
+  /// Persists `video_decoder=software` so the next playback session on this
+  /// machine skips the failing hardware path. Does not touch the live
+  /// player/controller — see notes in the error listener above for why we
+  /// avoid creating new GPU resources here.
   void _persistSoftwareDecodingPreference() {
     if (_hwDecodeFallbackAttempted) return;
     _hwDecodeFallbackAttempted = true;
@@ -924,10 +983,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
         await prefs.setVideoPlayerBool('hardware_acceleration', false);
         await prefs.setVideoPlayerString('video_decoder', 'software');
         // Update in-memory state so a manual settings reopen reflects reality.
-        if (mounted) {
-          _hardwareAcceleration = false;
-          _videoDecoder = 'software';
-        }
+        if (mounted) _videoDecoder = 'software';
       } catch (e) {
         debugPrint('VideoPlayer: failed to persist software decoding pref: $e');
       }
@@ -1173,7 +1229,8 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
               if (!focused) _stopFastSeeking();
             },
             child: Listener(
-              onPointerDown: (_) => _keyboardFocusNode.requestFocus(),
+              onPointerDown: _handlePointerDown,
+              onPointerSignal: _handlePointerSignal,
               child: MouseRegion(
                 onHover: (_) {
                   _showControlsWithTimer();
@@ -1198,6 +1255,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
                           widget.showControls &&
                           _showControls)
                         _buildCustomControls(),
+                      _buildOsd(),
                     ],
                   ),
                 ),
@@ -1232,7 +1290,8 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
         if (!focused) _stopFastSeeking();
       },
       child: Listener(
-        onPointerDown: (_) => _keyboardFocusNode.requestFocus(),
+        onPointerDown: _handlePointerDown,
+        onPointerSignal: _handlePointerSignal,
         child: _buildPlayerBody(),
       ),
     );
@@ -1281,6 +1340,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
             _buildSpeedIndicatorOverlay(),
           _buildFastSeekGestureOverlay(),
           _buildFastSeekIndicator(),
+          _buildOsd(),
         ],
       ),
     );
@@ -1345,6 +1405,61 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
       isFastSeeking: _isFastSeeking,
       fastSeekSeconds: _fastSeekSeconds,
       fastSeekingForward: _fastSeekingForward,
+    );
+  }
+
+  Widget _buildOsd() {
+    return VideoPlayerOsd(
+      visible: _osdVisible,
+      icon: _osdIcon,
+      label: _osdLabel,
+      progress: _osdProgress,
+      hint: _osdHint,
+    );
+  }
+
+  void _flashOsd({
+    required IconData icon,
+    required String label,
+    double? progress,
+    String? hint,
+  }) {
+    if (!mounted) return;
+    _osdTimer?.cancel();
+    setState(() {
+      _osdVisible = true;
+      _osdIcon = icon;
+      _osdLabel = label;
+      _osdProgress = progress;
+      _osdHint = hint;
+    });
+    // Linger a bit longer when there is a hint to read.
+    _osdTimer = Timer(Duration(milliseconds: hint != null ? 2000 : 1200), () {
+      if (mounted) setState(() => _osdVisible = false);
+    });
+  }
+
+  void _flashVolumeOsd({String? hint}) {
+    final v = _currentEffectiveVolume0to100();
+    _flashOsd(
+      icon: v <= 0.1
+          ? PhosphorIconsLight.speakerSlash
+          : v < 50
+          ? PhosphorIconsLight.speakerLow
+          : PhosphorIconsLight.speakerHigh,
+      label: '${v.round()}%',
+      progress: v / 100.0,
+      hint: hint,
+    );
+  }
+
+  /// "Middle-click to switch to `other mode`" for wheel-driven OSDs.
+  String _wheelSwitchHint() {
+    final l10n = AppLocalizations.of(context)!;
+    return l10n.videoWheelSwitchHint(
+      _videoWheelAction == VideoWheelAction.volume
+          ? l10n.videoWheelSeek
+          : l10n.videoWheelVolume,
     );
   }
 
@@ -1446,9 +1561,15 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
       right: 16,
       child: Column(
         children: [
-          StreamSpeedIndicator(stream: _currentStream, label: 'Stream Speed'),
+          StreamSpeedIndicator(
+            stream: _currentStream,
+            label: context.tr.vpStreamSpeed,
+          ),
           const SizedBox(height: 12),
-          BufferInfoWidget(stream: _currentStream, label: 'Buffer Info'),
+          BufferInfoWidget(
+            stream: _currentStream,
+            label: context.tr.vpBufferInfo,
+          ),
           const SizedBox(height: 12),
           Container(
             width: 200,
@@ -1769,8 +1890,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
   void _startFastSeeking({required bool forward, bool withCtrl = false}) {
     if (_isFastSeeking || _player == null) return;
 
-    // Use the same paused, live frame previews as a slider drag. Repeated
-    // seeks while playing can starve media_kit's decoder of a reference clock.
+    // Same live, throttled previews as a slider drag, with audio kept playing.
     _startSeekDrag();
     _seekDragPosition = _player!.state.position;
 
@@ -1901,18 +2021,133 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
     }
   }
 
-  void _increaseVolume() async {
-    final current = (_player?.state.volume ?? _savedVolume);
-    await _setVolumeFromUser((current + 5).clamp(0.0, 100.0));
+  void _handlePointerDown(PointerDownEvent event) {
+    _keyboardFocusNode.requestFocus();
+    if (event.kind == PointerDeviceKind.mouse &&
+        (event.buttons & kMiddleMouseButton) != 0) {
+      _toggleVideoWheelAction();
+    }
   }
 
-  void _decreaseVolume() async {
+  // Mouse wheel over the player adjusts volume or seeks, per
+  // [_videoWheelAction]. Registering with the resolver lets nested
+  // scrollables (e.g. playlist) keep their own scroll and stops ancestors
+  // from scrolling the page.
+  void _handlePointerSignal(PointerSignalEvent event) {
+    if (event is! PointerScrollEvent) return;
+    final dy = event.scrollDelta.dy;
+    if (dy == 0) return;
+    if (_videoWheelAction == VideoWheelAction.volume && !widget.allowMuting) {
+      return;
+    }
+    GestureBinding.instance.pointerSignalResolver.register(event, (_) {
+      // Wheel up = louder / forward.
+      final up = dy < 0;
+      switch (_videoWheelAction) {
+        case VideoWheelAction.volume:
+          if (up) {
+            _increaseVolume(fromWheel: true);
+          } else {
+            _decreaseVolume(fromWheel: true);
+          }
+          _showControlsWithTimer();
+        case VideoWheelAction.seek:
+          _wheelSeek(forward: up);
+      }
+    });
+  }
+
+  Future<void> _toggleVideoWheelAction() async {
+    final next = _videoWheelAction == VideoWheelAction.volume
+        ? VideoWheelAction.seek
+        : VideoWheelAction.volume;
+    setState(() => _videoWheelAction = next);
+    final l10n = AppLocalizations.of(context)!;
+    _flashOsd(
+      icon: PhosphorIconsLight.mouseScroll,
+      label: l10n.videoWheelModeSwitched(
+        next == VideoWheelAction.volume
+            ? l10n.videoWheelVolume
+            : l10n.videoWheelSeek,
+      ),
+      hint: _wheelSwitchHint(),
+    );
+    try {
+      await UserPreferences.instance.setVideoWheelAction(next);
+    } catch (_) {
+      // Best-effort.
+    }
+  }
+
+  // Wheel notches accumulate into one seek drag (same path as holding
+  // an arrow key) and land on the exact frame shortly after the last notch.
+  void _wheelSeek({required bool forward}) {
+    final player = _player;
+    if (player == null || _isFastSeeking) return;
+    final duration = player.state.duration;
+    if (duration <= Duration.zero) return;
+
+    if (_wheelSeekCommitTimer == null) {
+      _startSeekDrag();
+      _wheelSeekOrigin = player.state.position;
+      _seekDragPosition = _wheelSeekOrigin;
+    }
+
+    final current = _seekDragPosition ?? player.state.position;
+    final delta = Duration(
+      seconds: forward ? _wheelSeekStepSeconds : -_wheelSeekStepSeconds,
+    );
+    final maxMs = (duration.inMilliseconds - 1000).clamp(
+      0,
+      duration.inMilliseconds,
+    );
+    final targetMs = (current + delta).inMilliseconds.clamp(0, maxMs);
+    _seekDuringDrag(targetMs.toDouble());
+
+    final offset = Duration(milliseconds: targetMs) - _wheelSeekOrigin;
+    _flashOsd(
+      icon: offset.isNegative
+          ? PhosphorIconsLight.rewind
+          : PhosphorIconsLight.fastForward,
+      label: _formatSeekOffset(offset),
+      progress: targetMs / duration.inMilliseconds,
+      hint: _wheelSwitchHint(),
+    );
+
+    _wheelSeekCommitTimer?.cancel();
+    _wheelSeekCommitTimer = Timer(const Duration(milliseconds: 400), () {
+      _wheelSeekCommitTimer = null;
+      if (!mounted) return;
+      _finishSeekDrag();
+      _showControlsWithTimer();
+    });
+  }
+
+  String _formatSeekOffset(Duration offset) {
+    final sign = offset.isNegative ? '-' : '+';
+    final seconds = offset.inSeconds.abs();
+    if (seconds < 60) return '$sign${seconds}s';
+    final rest = (seconds % 60).toString().padLeft(2, '0');
+    return '$sign${seconds ~/ 60}:$rest';
+  }
+
+  void _increaseVolume({bool fromWheel = false}) async {
+    final current = (_player?.state.volume ?? _savedVolume);
+    await _setVolumeFromUser((current + 5).clamp(0.0, 100.0));
+    if (!mounted) return;
+    _flashVolumeOsd(hint: fromWheel ? _wheelSwitchHint() : null);
+  }
+
+  void _decreaseVolume({bool fromWheel = false}) async {
     final current = (_player?.state.volume ?? _savedVolume);
     await _setVolumeFromUser((current - 5).clamp(0.0, 100.0));
+    if (!mounted) return;
+    _flashVolumeOsd(hint: fromWheel ? _wheelSwitchHint() : null);
   }
 
   void _toggleMute() async {
     await _toggleMuteFromUser();
+    _flashVolumeOsd();
   }
 
   // Custom Controls
@@ -2018,7 +2253,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
                     VideoPlayerControlButton(
                       icon: PhosphorIconsLight.skipBack,
                       onPressed: () => _seekBackward(10),
-                      tooltip: 'Rewind 10s',
+                      tooltip: context.tr.vpRewind10,
                     ),
                     const SizedBox(width: 4),
                     _buildPlayPauseButton(),
@@ -2026,9 +2261,13 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
                     VideoPlayerControlButton(
                       icon: PhosphorIconsLight.skipForward,
                       onPressed: () => _seekForward(10),
-                      tooltip: 'Forward 10s',
+                      tooltip: context.tr.vpForward10,
                     ),
                     const Spacer(),
+                    if (_hasPlaylist) ...[
+                      _buildPlaylistButton(),
+                      const SizedBox(width: 6),
+                    ],
                     if (widget.allowMuting) _buildVolumeButtonOnly(),
                     const SizedBox(width: 6),
                     _buildAdvancedControlsMenu(),
@@ -2227,6 +2466,10 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
                       _buildPlayPauseButton(),
                       const SizedBox(width: 8),
                       seekSlider,
+                      if (_hasPlaylist) ...[
+                        const SizedBox(width: 8),
+                        _buildPlaylistButton(),
+                      ],
                       if (fullScreenButton != null) ...[
                         const SizedBox(width: 8),
                         fullScreenButton,
@@ -2274,6 +2517,10 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
                     ),
 
                     const SizedBox(width: 8),
+                    if (_hasPlaylist) ...[
+                      _buildPlaylistButton(),
+                      const SizedBox(width: 4),
+                    ],
                     if (showSecondaryActions && widget.allowMuting)
                       _buildVolumeControl(),
                     if (showSecondaryActions) ...[
@@ -2360,12 +2607,12 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
     RouteUtils.showAcrylicDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Audio Tracks'),
-        content: const Text('Audio track selection will be implemented here.'),
+        title: Text(context.tr.vpAudioTracks),
+        content: Text(context.tr.vpAudioTracksStub),
         actions: [
           TextButton(
             onPressed: () => RouteUtils.safePopDialog(context),
-            child: const Text('Close'),
+            child: Text(context.tr.close),
           ),
         ],
       ),
@@ -2919,6 +3166,33 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
     }
   }
 
+  bool get _hasPlaylist =>
+      widget.onPlaylistItemSelected != null &&
+      (widget.playlist?.length ?? 0) > 1;
+
+  Widget _buildPlaylistButton() {
+    return VideoPlayerControlButton(
+      icon: PhosphorIconsLight.playlist,
+      onPressed: _showPlaylist,
+      tooltip: AppLocalizations.of(context)!.videoPlaylist,
+    );
+  }
+
+  Future<void> _showPlaylist() async {
+    final items = widget.playlist;
+    final onSelected = widget.onPlaylistItemSelected;
+    if (items == null || onSelected == null) return;
+    // Keep the controls up while the panel is open.
+    _hideControlsTimer?.cancel();
+    await showVideoPlaylistPanel(
+      context: context,
+      items: items,
+      currentPath: widget.file?.path ?? '',
+      onSelected: onSelected,
+    );
+    if (mounted) _startHideControlsTimer();
+  }
+
   /// Advanced controls menu với popup menu để giảm số nút trên thanh điều khiển
   Widget _buildAdvancedControlsMenu() {
     return VideoPlayerAdvancedMenu(
@@ -3289,10 +3563,8 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
       ).inMilliseconds.clamp(0, maxMs).toDouble();
 
   void _startSeekDrag() {
-    final player = _player;
-    // A preceding drag may have requested play while media_kit still reports its
-    // temporary pause. Capture the requested mode, not that stale snapshot.
-    _resumeAfterSeekDrag = player?.playRequested ?? false;
+    // Playback is left running so the audio follows the seek instead of going
+    // silent for the duration of the drag.
     _seekingTimer?.cancel();
     _hideControlsTimer?.cancel();
     _seekPreviewTimer?.cancel();
@@ -3302,7 +3574,6 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
       _isSeeking = true;
       _seekDragPosition = null;
     });
-    if (player != null) unawaited(player.pause());
   }
 
   void _seekDuringDrag(double value) {
@@ -3318,13 +3589,15 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
     _pendingSeekPreview = null;
     final player = _player;
     if (target == null || player == null) return;
-    unawaited(player.seek(target));
+    // Keyframe previews keep 4K scrubbing responsive; _finishSeekDrag lands
+    // on the exact frame.
+    unawaited(player.seek(target, exact: false));
 
-    // Seeking this often is only safe because _startSeekDrag pauses first: a
-    // paused input reacquires its clock between seeks, where a playing one
-    // cannot and strands the decoder in "no reference clock". Always keep the
-    // newest pointer position, including when the user holds the thumb still.
-    _seekPreviewTimer = Timer(const Duration(milliseconds: 80), () {
+    // Seeks stay throttled because a playing input needs time to reacquire its
+    // clock between seeks, or the decoder strands in "no reference clock".
+    // Always keep the newest pointer position, including when the user holds
+    // the thumb still.
+    _seekPreviewTimer = Timer(const Duration(milliseconds: 150), () {
       _seekPreviewTimer = null;
       if (mounted) _flushSeekPreview();
     });
@@ -3337,8 +3610,6 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
     final target = finalPosition ?? _seekDragPosition;
     final player = _player;
     if (target != null && player != null) unawaited(player.seek(target));
-    if (_resumeAfterSeekDrag && player != null) unawaited(player.play());
-    _resumeAfterSeekDrag = false;
 
     _seekingTimer?.cancel();
     _seekingTimer = Timer(const Duration(milliseconds: 200), () {

@@ -6,11 +6,15 @@ import 'dart:ui';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';
 import 'package:cb_file_manager/utils/app_logger.dart';
 import 'package:uuid/uuid.dart';
+import 'package:flutter/foundation.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'desktop_window_process_launcher.dart';
 import 'window_startup_payload.dart';
 import 'windows_native_tab_drag_drop_service.dart';
+import '../torrent/torrent_launch_request.dart';
+import '../torrent/torrent_service.dart';
+import '../../core/service_locator.dart';
 
 const double kDefaultTabTearOffAnchorX = 140.0;
 const double kDefaultTabTearOffAnchorY = 18.0;
@@ -22,6 +26,7 @@ class DesktopWindowInfo {
   final String title;
   final int tabCount;
   final String role;
+  final int? processId;
 
   const DesktopWindowInfo({
     required this.windowId,
@@ -29,6 +34,7 @@ class DesktopWindowInfo {
     required this.title,
     required this.tabCount,
     this.role = 'normal',
+    this.processId,
   });
 
   factory DesktopWindowInfo.fromJson(Map<String, dynamic> json) {
@@ -38,6 +44,7 @@ class DesktopWindowInfo {
       title: (json['title'] as String?) ?? 'Window',
       tabCount: (json['tabCount'] as int?) ?? 0,
       role: (json['role'] as String?) ?? 'normal',
+      processId: json['processId'] as int?,
     );
   }
 
@@ -47,11 +54,23 @@ class DesktopWindowInfo {
     'title': title,
     'tabCount': tabCount,
     'role': role,
+    'processId': ?processId,
   };
 }
 
 class DesktopWindowingService {
-  static const int _registryPort = 49490;
+  static const int _defaultRegistryPort = 49490;
+  final int _registryPort;
+  final bool _allowE2EPeers;
+
+  DesktopWindowingService()
+    : _registryPort = _defaultRegistryPort,
+      _allowE2EPeers = false;
+
+  /// Real peer/registry sockets on a test-owned port, with no spare processes.
+  @visibleForTesting
+  DesktopWindowingService.forTesting({required this._registryPort})
+    : _allowE2EPeers = true;
   static const Duration _heartbeatInterval = Duration(seconds: 10);
   static const Duration _registryTtl = Duration(seconds: 30);
 
@@ -82,6 +101,7 @@ class DesktopWindowingService {
   StreamSubscription<TabManagerState>? _tabStateSub;
 
   String _lastTitle = 'CB File Hub';
+  int? _torrentLaunchPriority;
 
   String get windowId => _windowId;
 
@@ -98,12 +118,28 @@ class DesktopWindowingService {
       WindowsNativeTabDragDropService.initialize(tabBloc);
     }
 
+    // An integration-test executable starts its test entrypoint in every child
+    // process too. Pre-warming a spare would recursively rerun the suite, while
+    // joining the production registry could target the user's real app window.
+    if (const bool.fromEnvironment('CB_E2E') && !_allowE2EPeers) return;
+
     await _startPeerServerIfNeeded();
     await _ensureRegistryServerOrClient();
     _startHeartbeat();
     _listenToTabUpdates();
+    if (Platform.isWindows &&
+        !_allowE2EPeers &&
+        !const bool.fromEnvironment('CB_E2E')) {
+      WindowsNativeTabDragDropService.onTorrentSources = _openTorrentSources;
+      locator<TorrentService>().addListener(_updateTorrentLaunchRouting);
+      _updateTorrentLaunchRouting();
+    }
 
-    if (Platform.isWindows && !_isSecondaryWindow && _windowRole != 'spare') {
+    if (!const bool.fromEnvironment('CB_E2E') &&
+        !_allowE2EPeers &&
+        Platform.isWindows &&
+        !_isSecondaryWindow &&
+        _windowRole != 'spare') {
       // Pre-warm as early as possible so "new window" feels instant.
       unawaited(ensureSpareWindow());
       _scheduleSpareWarmup();
@@ -111,6 +147,12 @@ class DesktopWindowingService {
   }
 
   Future<void> dispose() async {
+    if (_torrentLaunchPriority != null) {
+      locator<TorrentService>().removeListener(_updateTorrentLaunchRouting);
+      WindowsNativeTabDragDropService.onTorrentSources = null;
+      await WindowsNativeTabDragDropService.setTorrentLaunchPriority(0);
+      _torrentLaunchPriority = null;
+    }
     _tabStateSub?.cancel();
     _tabStateSub = null;
     _heartbeat?.cancel();
@@ -163,6 +205,82 @@ class DesktopWindowingService {
     return windows
         .where((w) => w.windowId != _windowId && w.role != 'spare')
         .toList(growable: false);
+  }
+
+  /// Called before constructing another app shell for a Windows association.
+  /// Prefer the engine owner, then the primary shell, then another normal shell.
+  Future<bool> openTorrentSourcesInExistingWindow(List<String> sources) async {
+    if (sources.isEmpty || !sources.every(TorrentLaunchRequest.isSource)) {
+      return false;
+    }
+    final windows = (await listWindows())
+        .where((w) => w.role == 'normal')
+        .toList();
+    // With one shell there is no owner/primary arbitration to perform.
+    for (final preference
+        in windows.length == 1 ? ['any'] : ['engine', 'primary', 'any']) {
+      for (final window in windows) {
+        // The association process was launched by the user's click. Pass its
+        // foreground permission to the existing shell before asking it to show.
+        if (Platform.isWindows) {
+          await WindowsNativeTabDragDropService.allowForegroundWindow(
+            pid: window.processId,
+          );
+        }
+        final response = await _sendPeerMessage(
+          port: window.port,
+          message: {
+            'type': 'open_torrent_sources',
+            'sources': sources,
+            'preference': preference,
+          },
+        );
+        if (response?['type'] == 'ok') return true;
+      }
+    }
+    return false;
+  }
+
+  void _updateTorrentLaunchRouting() {
+    final priority = _windowRole != 'normal'
+        ? 0
+        : locator<TorrentService>().ownsEngine
+        ? 3
+        : _isSecondaryWindow
+        ? 1
+        : 2;
+    if (_torrentLaunchPriority == priority) return;
+    _torrentLaunchPriority = priority;
+    unawaited(
+      WindowsNativeTabDragDropService.setTorrentLaunchPriority(priority),
+    );
+  }
+
+  void _openTorrentSources(List<String> sources) {
+    final bloc = _tabBloc;
+    if (bloc == null || bloc.isClosed) return;
+    for (final source in sources) {
+      bloc.add(
+        AddTab(path: TorrentLaunchRequest.pathFor(source), name: 'Torrent'),
+      );
+    }
+    // Focus APIs can wait on the OS. Queue the tab switch first, and acknowledge
+    // receipt independently so a slow focus cannot trigger a duplicate launch.
+    unawaited(focusTorrentWindow());
+  }
+
+  /// Show the shell before opening a torrent dialog, preserving maximization.
+  static Future<void> focusTorrentWindow() async {
+    if (!Platform.isWindows && !Platform.isLinux && !Platform.isMacOS) return;
+    try {
+      // window_manager.show restores minimized windows without unmaximizing.
+      await windowManager.show();
+      await windowManager.focus();
+    } catch (_) {}
+    // Also try the native activation path when a window_manager call fails.
+    if (Platform.isWindows) {
+      await WindowsNativeTabDragDropService.forceActivateWindow();
+    }
   }
 
   Future<bool> openNewWindow({
@@ -255,6 +373,7 @@ class DesktopWindowingService {
   }
 
   Future<void> ensureSpareWindow() async {
+    if (_allowE2EPeers || const bool.fromEnvironment('CB_E2E')) return;
     if (!isDesktop) return;
     if (!Platform.isWindows) return;
     if (_isSecondaryWindow) return;
@@ -415,6 +534,31 @@ class DesktopWindowingService {
     Map<String, dynamic> message,
   ) async {
     final type = message['type'];
+    if (type == 'open_torrent_sources') {
+      final sources = (message['sources'] as List?)
+          ?.whereType<String>()
+          .toList();
+      final preference = message['preference'];
+      final eligible =
+          _windowRole == 'normal' &&
+          _tabBloc != null &&
+          (preference == 'engine'
+              ? locator<TorrentService>().ownsEngine
+              : preference == 'primary'
+              ? !_isSecondaryWindow
+              : true);
+      if (!eligible ||
+          sources == null ||
+          sources.isEmpty ||
+          sources.length > 100 ||
+          !sources.every(TorrentLaunchRequest.isSource)) {
+        _writeJsonLine(socket, {'type': 'unavailable'});
+        return;
+      }
+      _openTorrentSources(sources);
+      _writeJsonLine(socket, {'type': 'ok'});
+      return;
+    }
     if (type == 'ping') {
       _writeJsonLine(socket, <String, dynamic>{'type': 'ok'});
       return;
@@ -441,6 +585,7 @@ class DesktopWindowingService {
         }
         if (consumeSpare && _windowRole == 'spare') {
           _windowRole = 'normal';
+          if (_torrentLaunchPriority != null) _updateTorrentLaunchRouting();
           unawaited(_registerSelf());
         }
         _writeJsonLine(socket, <String, dynamic>{'type': 'ok'});
@@ -654,6 +799,7 @@ class DesktopWindowingService {
           title: title,
           tabCount: tabCount,
           role: role,
+          processId: message['processId'] as int?,
         ),
         lastSeen: DateTime.now(),
       );
@@ -740,6 +886,7 @@ class DesktopWindowingService {
       'title': _lastTitle,
       'tabCount': _tabBloc?.state.tabs.length ?? 0,
       'role': _windowRole,
+      'processId': pid,
     });
   }
 

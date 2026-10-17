@@ -55,20 +55,64 @@ class SelectionTagsController extends ChangeNotifier {
   bool _disposed = false;
   int _generation = 0;
   int revision = 0;
-  int _pending = 0;
+  final List<TagEditFailure> _pendingEdits = [];
+  final List<String> _tagOrder = [];
+  List<String> _tagOrderPaths = const [];
   List<String> paths = const [];
   Map<String, List<String>> tagsByPath = {};
   bool loading = false;
   Object? loadError;
   final List<TagEditFailure> failures = [];
-  bool get saving => _pending > 0;
+  bool get saving => _pendingEdits.isNotEmpty;
 
   static String normalize(String tag) => tag.trim().toLowerCase();
+
+  // Display submitted edits immediately, including while a save or a reload
+  // is in flight. The underlying snapshot remains the confirmed on-disk data.
+  Map<String, List<String>> get _displayTags {
+    if (_pendingEdits.isEmpty) return tagsByPath;
+    final display = Map<String, List<String>>.of(tagsByPath);
+    for (final edit in _pendingEdits) {
+      for (final path in edit.paths) {
+        final current = display[path];
+        if (current != null) display[path] = _applyDelta(current, edit);
+      }
+    }
+    return display;
+  }
+
+  static List<String> _applyDelta(List<String> current, TagEditFailure edit) {
+    final next = List<String>.of(current);
+    for (final tag in edit.tags) {
+      if (edit.remove) {
+        next.removeWhere((t) => normalize(t) == normalize(tag));
+      } else if (!next.any((t) => normalize(t) == normalize(tag))) {
+        next.add(tag.trim());
+      }
+    }
+    return next;
+  }
+
+  void _syncTagOrder() {
+    if (!identical(_tagOrderPaths, paths)) {
+      _tagOrderPaths = paths;
+      _tagOrder.clear();
+    }
+    final present = _displayTags.values
+        .expand((tags) => tags)
+        .map(normalize)
+        .toSet();
+    _tagOrder.removeWhere((tag) => !present.contains(tag));
+    final existing = _tagOrder.toSet();
+    // Keep chips in their current positions, including across confirmation
+    // reads. New tags follow the entire selection's existing union.
+    _tagOrder.addAll(present.where((tag) => !existing.contains(tag)));
+  }
 
   Map<String, int> get counts {
     final names = <String, String>{};
     final counts = <String, int>{};
-    for (final tags in tagsByPath.values) {
+    for (final tags in _displayTags.values) {
       for (final tag in tags) {
         names.putIfAbsent(normalize(tag), () => tag);
       }
@@ -76,16 +120,21 @@ class SelectionTagsController extends ChangeNotifier {
         counts[tag] = (counts[tag] ?? 0) + 1;
       }
     }
-    final sorted = counts.keys.toList()..sort();
-    return {for (final tag in sorted) names[tag]!: counts[tag]!};
+    return {
+      for (final tag in _tagOrder)
+        if (counts.containsKey(tag)) names[tag]!: counts[tag]!,
+    };
   }
 
-  bool isCommon(String tag) =>
-      paths.isNotEmpty &&
-      tagsByPath.length == paths.length &&
-      tagsByPath.values.every(
-        (tags) => tags.any((t) => normalize(t) == normalize(tag)),
-      );
+  bool isCommon(String tag) {
+    final display = _displayTags;
+    return paths.isNotEmpty &&
+        paths.every(
+          (path) =>
+              display[path]?.any((t) => normalize(t) == normalize(tag)) ??
+              false,
+        );
+  }
 
   Future<void> select(Iterable<String> selected) async {
     final next = selected.toSet().toList()..sort();
@@ -115,6 +164,7 @@ class SelectionTagsController extends ChangeNotifier {
     }
     revision++;
     tagsByPath = loaded;
+    _syncTagOrder();
     loading = false;
     loadError = error;
     _emit();
@@ -141,7 +191,8 @@ class SelectionTagsController extends ChangeNotifier {
 
   Future<void> _enqueue(TagEditFailure edit) {
     if (edit.paths.isEmpty) return Future.value();
-    _pending++;
+    _pendingEdits.add(edit);
+    _syncTagOrder();
     _emit();
     final previous = _queue;
     final operation = previous == null
@@ -167,14 +218,7 @@ class SelectionTagsController extends ChangeNotifier {
           // Read at execution time so other tags, including edits from dialogs,
           // are preserved. Do not use the potentially stale panel snapshot.
           final current = await _read(path);
-          final next = List<String>.from(current);
-          for (final tag in edit.tags) {
-            if (edit.remove) {
-              next.removeWhere((t) => normalize(t) == normalize(tag));
-            } else if (!next.any((t) => normalize(t) == normalize(tag))) {
-              next.add(tag.trim());
-            }
-          }
+          final next = _applyDelta(current, edit);
           if (!listEquals(current, next)) {
             if (!await _write(path, next)) {
               failed.add(path);
@@ -194,8 +238,15 @@ class SelectionTagsController extends ChangeNotifier {
           TagEditFailure(failed, edit.tags, edit.remove, parent: edit.parent),
         );
       }
-      _pending--;
-      if (!_disposed) await reload();
+      try {
+        if (!_disposed) await reload();
+      } finally {
+        // Keep the optimistic chip through the confirmation read as well.
+        // Failed paths roll back to that snapshot and remain retryable above.
+        _pendingEdits.remove(edit);
+        _syncTagOrder();
+        _emit();
+      }
     }
   }
 

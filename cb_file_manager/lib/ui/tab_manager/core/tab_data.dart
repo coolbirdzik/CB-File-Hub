@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/services/torrent/torrent_launch_request.dart';
 
 /// A class that represents tab data in the file manager
 class TabData {
@@ -11,6 +12,9 @@ class TabData {
 
   /// The current path being displayed in the tab
   final String path;
+
+  /// File-association requests waiting for this torrent tab to handle them.
+  final List<TorrentLaunchRequest> pendingTorrentSources;
 
   /// Icon to display in the tab
   final IconData? icon;
@@ -54,6 +58,7 @@ class TabData {
     required this.id,
     required this.name,
     required this.path,
+    this.pendingTorrentSources = const [],
     this.icon,
     this.isPinned = false,
     this.isLoading = false,
@@ -75,6 +80,7 @@ class TabData {
   TabData copyWith({
     String? name,
     String? path,
+    List<TorrentLaunchRequest>? pendingTorrentSources,
     IconData? icon,
     bool? isPinned,
     bool? isLoading,
@@ -95,6 +101,8 @@ class TabData {
       id: id,
       name: name ?? this.name,
       path: path ?? this.path,
+      pendingTorrentSources:
+          pendingTorrentSources ?? this.pendingTorrentSources,
       icon: icon ?? this.icon,
       isPinned: isPinned ?? this.isPinned,
       isLoading: isLoading ?? this.isLoading,

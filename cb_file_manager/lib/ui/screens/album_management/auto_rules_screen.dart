@@ -7,6 +7,7 @@ import 'package:cb_file_manager/models/objectbox/album.dart';
 import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/ui/utils/route.dart';
+import 'package:cb_file_manager/config/translation_helper.dart';
 
 class AutoRulesScreen extends StatefulWidget {
   final int? scopedAlbumId;
@@ -106,21 +107,19 @@ class _AutoRulesScreenState extends State<AutoRulesScreen> {
     final confirmed = await RouteUtils.showAcrylicDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete Rule'),
-        content: Text(
-          'Are you sure you want to delete the rule "${rule.name}"?',
-        ),
+        title: Text(context.tr.ruleDeleteTitle),
+        content: Text(context.tr.ruleDeleteConfirm(rule.name)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(context.tr.cancel),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             style: TextButton.styleFrom(
               foregroundColor: theme.colorScheme.error,
             ),
-            child: const Text('Delete'),
+            child: Text(context.tr.delete),
           ),
         ],
       ),
@@ -142,7 +141,7 @@ class _AutoRulesScreenState extends State<AutoRulesScreen> {
           IconButton(
             icon: const Icon(PhosphorIconsLight.plus),
             onPressed: _showCreateRuleDialog,
-            tooltip: 'Create New Rule',
+            tooltip: context.tr.ruleCreateNew,
           ),
         ],
       ),
@@ -167,14 +166,14 @@ class _AutoRulesScreenState extends State<AutoRulesScreen> {
           ),
           const SizedBox(height: 16),
           Text(
-            'Auto Album Rules',
+            context.tr.ruleEmptyTitle,
             style: theme.textTheme.headlineSmall?.copyWith(
               color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
             ),
           ),
           const SizedBox(height: 8),
           Text(
-            'Automatically organize your photos by creating rules\nthat match filename patterns',
+            context.tr.ruleEmptyBody,
             style: theme.textTheme.bodyMedium?.copyWith(
               color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
             ),
@@ -186,7 +185,7 @@ class _AutoRulesScreenState extends State<AutoRulesScreen> {
           ElevatedButton.icon(
             onPressed: _showCreateRuleDialog,
             icon: const Icon(PhosphorIconsLight.plus),
-            label: const Text('Create Your First Rule'),
+            label: Text(context.tr.ruleCreateFirst),
             style: ElevatedButton.styleFrom(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
             ),
@@ -199,18 +198,18 @@ class _AutoRulesScreenState extends State<AutoRulesScreen> {
   Widget _buildExampleRules(ThemeData theme) {
     final examples = [
       {
-        'title': 'Screenshots',
-        'description': 'Files containing "screenshot" → Screenshots album',
+        'title': context.tr.ruleExScreenshots,
+        'description': context.tr.ruleExScreenshotsDesc,
         'icon': PhosphorIconsLight.screencast,
       },
       {
-        'title': 'Camera Photos',
-        'description': 'Files starting with "IMG_" → Camera album',
+        'title': context.tr.ruleExCamera,
+        'description': context.tr.ruleExCameraDesc,
         'icon': PhosphorIconsLight.camera,
       },
       {
-        'title': 'Edited Photos',
-        'description': 'Files ending with "_edited" → Edited album',
+        'title': context.tr.ruleExEdited,
+        'description': context.tr.ruleExEditedDesc,
         'icon': PhosphorIconsLight.imageSquare,
       },
     ];
@@ -218,7 +217,7 @@ class _AutoRulesScreenState extends State<AutoRulesScreen> {
     return Column(
       children: [
         Text(
-          'Popular Rule Examples',
+          context.tr.rulePopularExamples,
           style: theme.textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.w600,
           ),
@@ -301,7 +300,7 @@ class _AutoRulesScreenState extends State<AutoRulesScreen> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Album: ${rule.albumName}',
+                        context.tr.ruleAlbumLabel(rule.albumName),
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: theme.colorScheme.primary,
                         ),
@@ -322,23 +321,23 @@ class _AutoRulesScreenState extends State<AutoRulesScreen> {
                     }
                   },
                   itemBuilder: (context) => [
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: 'edit',
                       child: Row(
                         children: [
                           Icon(PhosphorIconsLight.pencilSimple, size: 16),
                           SizedBox(width: 8),
-                          Text('Edit'),
+                          Text(context.tr.edit),
                         ],
                       ),
                     ),
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: 'delete',
                       child: Row(
                         children: [
                           Icon(PhosphorIconsLight.trash, size: 16),
                           SizedBox(width: 8),
-                          Text('Delete'),
+                          Text(context.tr.delete),
                         ],
                       ),
                     ),
@@ -369,7 +368,9 @@ class _AutoRulesScreenState extends State<AutoRulesScreen> {
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        'Condition: ${rule.conditionDisplayName}',
+                        context.tr.ruleConditionLabel(
+                          _conditionLabel(context, rule.condition),
+                        ),
                         style: theme.textTheme.bodySmall?.copyWith(
                           fontWeight: FontWeight.w500,
                         ),
@@ -378,7 +379,7 @@ class _AutoRulesScreenState extends State<AutoRulesScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Pattern: "${rule.pattern}"',
+                    context.tr.rulePatternLabel(rule.pattern),
                     style: theme.textTheme.bodySmall?.copyWith(
                       fontFamily: 'monospace',
                       color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
@@ -392,7 +393,7 @@ class _AutoRulesScreenState extends State<AutoRulesScreen> {
               children: [
                 _buildStatChip(
                   theme,
-                  'Matches',
+                  context.tr.ruleMatches,
                   rule.matchCount.toString(),
                   PhosphorIconsLight.check,
                 ),
@@ -400,7 +401,7 @@ class _AutoRulesScreenState extends State<AutoRulesScreen> {
                 if (rule.lastTriggered != null)
                   _buildStatChip(
                     theme,
-                    'Last triggered',
+                    context.tr.ruleLastTriggered,
                     _formatDate(rule.lastTriggered!),
                     PhosphorIconsLight.clock,
                   ),
@@ -440,13 +441,13 @@ class _AutoRulesScreenState extends State<AutoRulesScreen> {
     final difference = now.difference(date);
 
     if (difference.inDays > 0) {
-      return '${difference.inDays}d ago';
+      return context.tr.ruleDaysAgo(difference.inDays);
     } else if (difference.inHours > 0) {
-      return '${difference.inHours}h ago';
+      return context.tr.ruleHoursAgo(difference.inHours);
     } else if (difference.inMinutes > 0) {
-      return '${difference.inMinutes}m ago';
+      return context.tr.ruleMinutesAgo(difference.inMinutes);
     } else {
-      return 'Just now';
+      return context.tr.ruleJustNow;
     }
   }
 }
@@ -561,8 +562,8 @@ class _CreateAutoRuleDialogState extends State<CreateAutoRuleDialog> {
                     color: theme.colorScheme.primary,
                   ),
                   const SizedBox(width: 12),
-                  const Text(
-                    'Create Auto Rule',
+                  Text(
+                    context.tr.ruleCreateAutoRule,
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
                   ),
                   const Spacer(),
@@ -617,12 +618,12 @@ class _CreateAutoRuleDialogState extends State<CreateAutoRuleDialog> {
                 children: [
                   TextButton(
                     onPressed: () => Navigator.pop(context),
-                    child: const Text('Cancel'),
+                    child: Text(context.tr.cancel),
                   ),
                   const SizedBox(width: 12),
                   ElevatedButton(
                     onPressed: _canCreate() ? _createRule : null,
-                    child: const Text('Create Rule'),
+                    child: Text(context.tr.ruleCreate),
                   ),
                 ],
               ),
@@ -638,14 +639,14 @@ class _CreateAutoRuleDialogState extends State<CreateAutoRuleDialog> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Quick Templates',
+          context.tr.ruleQuickTemplates,
           style: theme.textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.w600,
           ),
         ),
         const SizedBox(height: 8),
         Text(
-          'Choose a pre-made template to get started quickly',
+          context.tr.ruleQuickTemplatesHint,
           style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
           ),
@@ -688,7 +689,7 @@ class _CreateAutoRuleDialogState extends State<CreateAutoRuleDialog> {
             ),
             const SizedBox(height: 12),
             Text(
-              'Examples:',
+              context.tr.ruleExamples,
               style: theme.textTheme.labelSmall?.copyWith(
                 fontWeight: FontWeight.w600,
               ),
@@ -729,7 +730,7 @@ class _CreateAutoRuleDialogState extends State<CreateAutoRuleDialog> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Custom Rule',
+          context.tr.ruleCustom,
           style: theme.textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.w600,
           ),
@@ -737,16 +738,16 @@ class _CreateAutoRuleDialogState extends State<CreateAutoRuleDialog> {
         const SizedBox(height: 16),
         TextField(
           controller: _nameController,
-          decoration: const InputDecoration(
-            labelText: 'Rule Name',
-            hintText: 'e.g., Screenshots to Screenshots Album',
+          decoration: InputDecoration(
+            labelText: context.tr.ruleName,
+            hintText: context.tr.ruleNameHint,
           ),
           onChanged: (_) => setState(() {}),
         ),
         const SizedBox(height: 16),
         if (widget.fixedAlbum == null)
           CbSelect<Album>(
-            label: 'Target Album',
+            label: context.tr.ruleTargetAlbum,
             expand: true,
             value: _selectedAlbum,
             items: [
@@ -758,7 +759,7 @@ class _CreateAutoRuleDialogState extends State<CreateAutoRuleDialog> {
         else
           TextFormField(
             enabled: false,
-            decoration: const InputDecoration(labelText: 'Target Album'),
+            decoration: InputDecoration(labelText: context.tr.ruleTargetAlbum),
             initialValue: widget.fixedAlbum!.name,
           ),
         const SizedBox(height: 16),
@@ -767,7 +768,7 @@ class _CreateAutoRuleDialogState extends State<CreateAutoRuleDialog> {
             Expanded(
               flex: 2,
               child: CbSelect<RuleCondition>(
-                label: 'Condition',
+                label: context.tr.ruleCondition,
                 expand: true,
                 value: _selectedCondition,
                 items: [
@@ -787,7 +788,7 @@ class _CreateAutoRuleDialogState extends State<CreateAutoRuleDialog> {
               child: TextField(
                 controller: _patternController,
                 decoration: InputDecoration(
-                  labelText: 'Pattern',
+                  labelText: context.tr.rulePattern,
                   hintText: _getPatternHint(_selectedCondition),
                 ),
                 onChanged: (_) => setState(() {}),
@@ -835,14 +836,14 @@ class _CreateAutoRuleDialogState extends State<CreateAutoRuleDialog> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Preview',
+          context.tr.rulePreview,
           style: theme.textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.w600,
           ),
         ),
         const SizedBox(height: 8),
         Text(
-          'See which files would match your rule',
+          context.tr.rulePreviewHint,
           style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
           ),
@@ -855,7 +856,7 @@ class _CreateAutoRuleDialogState extends State<CreateAutoRuleDialog> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Test Results:',
+                context.tr.ruleTestResults,
                 style: theme.textTheme.labelMedium?.copyWith(
                   fontWeight: FontWeight.w600,
                 ),
@@ -929,30 +930,30 @@ class _CreateAutoRuleDialogState extends State<CreateAutoRuleDialog> {
   String _getConditionDisplayName(RuleCondition condition) {
     switch (condition) {
       case RuleCondition.contains:
-        return 'Contains';
+        return context.tr.ruleCondContains;
       case RuleCondition.startsWith:
-        return 'Starts with';
+        return context.tr.ruleCondStartsWith;
       case RuleCondition.endsWith:
-        return 'Ends with';
+        return context.tr.ruleCondEndsWith;
       case RuleCondition.equals:
-        return 'Equals';
+        return context.tr.ruleCondEquals;
       case RuleCondition.regex:
-        return 'Regex pattern';
+        return context.tr.ruleCondRegex;
     }
   }
 
   String _getPatternHint(RuleCondition condition) {
     switch (condition) {
       case RuleCondition.contains:
-        return 'e.g., screenshot';
+        return context.tr.ruleHintContains;
       case RuleCondition.startsWith:
-        return 'e.g., IMG_';
+        return context.tr.ruleHintStartsWith;
       case RuleCondition.endsWith:
-        return 'e.g., _edited';
+        return context.tr.ruleHintEndsWith;
       case RuleCondition.equals:
-        return 'e.g., photo';
+        return context.tr.ruleHintEquals;
       case RuleCondition.regex:
-        return r'e.g., ^IMG_\d{4}$';
+        return context.tr.ruleHintRegex;
     }
   }
 }
@@ -1040,8 +1041,8 @@ class _EditAutoRuleDialogState extends State<EditAutoRuleDialog> {
                     color: theme.colorScheme.primary,
                   ),
                   const SizedBox(width: 12),
-                  const Text(
-                    'Edit Auto Rule',
+                  Text(
+                    context.tr.ruleEditAutoRule,
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
                   ),
                   const Spacer(),
@@ -1094,12 +1095,12 @@ class _EditAutoRuleDialogState extends State<EditAutoRuleDialog> {
                 children: [
                   TextButton(
                     onPressed: () => Navigator.pop(context),
-                    child: const Text('Cancel'),
+                    child: Text(context.tr.cancel),
                   ),
                   const SizedBox(width: 12),
                   ElevatedButton(
                     onPressed: _canSave() ? _saveRule : null,
-                    child: const Text('Save Changes'),
+                    child: Text(context.tr.ruleSaveChanges),
                   ),
                 ],
               ),
@@ -1115,7 +1116,7 @@ class _EditAutoRuleDialogState extends State<EditAutoRuleDialog> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Rule Details',
+          context.tr.ruleDetails,
           style: theme.textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.w600,
           ),
@@ -1123,12 +1124,12 @@ class _EditAutoRuleDialogState extends State<EditAutoRuleDialog> {
         const SizedBox(height: 16),
         TextField(
           controller: _nameController,
-          decoration: const InputDecoration(labelText: 'Rule Name'),
+          decoration: InputDecoration(labelText: context.tr.ruleName),
           onChanged: (_) => setState(() {}),
         ),
         const SizedBox(height: 16),
         CbSelect<Album>(
-          label: 'Target Album',
+          label: context.tr.ruleTargetAlbum,
           expand: true,
           value: _selectedAlbum,
           items: [
@@ -1143,7 +1144,7 @@ class _EditAutoRuleDialogState extends State<EditAutoRuleDialog> {
             Expanded(
               flex: 2,
               child: CbSelect<RuleCondition>(
-                label: 'Condition',
+                label: context.tr.ruleCondition,
                 expand: true,
                 value: _selectedCondition,
                 items: [
@@ -1163,7 +1164,7 @@ class _EditAutoRuleDialogState extends State<EditAutoRuleDialog> {
               child: TextField(
                 controller: _patternController,
                 decoration: InputDecoration(
-                  labelText: 'Pattern',
+                  labelText: context.tr.rulePattern,
                   hintText: _getPatternHint(_selectedCondition),
                 ),
                 onChanged: (_) => setState(() {}),
@@ -1191,14 +1192,14 @@ class _EditAutoRuleDialogState extends State<EditAutoRuleDialog> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Preview',
+          context.tr.rulePreview,
           style: theme.textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.w600,
           ),
         ),
         const SizedBox(height: 8),
         Text(
-          'See which files would match your updated rule',
+          context.tr.rulePreviewUpdatedHint,
           style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
           ),
@@ -1211,7 +1212,7 @@ class _EditAutoRuleDialogState extends State<EditAutoRuleDialog> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Test Results:',
+                context.tr.ruleTestResults,
                 style: theme.textTheme.labelMedium?.copyWith(
                   fontWeight: FontWeight.w600,
                 ),
@@ -1308,30 +1309,41 @@ class _EditAutoRuleDialogState extends State<EditAutoRuleDialog> {
   String _getConditionDisplayName(RuleCondition condition) {
     switch (condition) {
       case RuleCondition.contains:
-        return 'Contains';
+        return context.tr.ruleCondContains;
       case RuleCondition.startsWith:
-        return 'Starts with';
+        return context.tr.ruleCondStartsWith;
       case RuleCondition.endsWith:
-        return 'Ends with';
+        return context.tr.ruleCondEndsWith;
       case RuleCondition.equals:
-        return 'Equals';
+        return context.tr.ruleCondEquals;
       case RuleCondition.regex:
-        return 'Regex pattern';
+        return context.tr.ruleCondRegex;
     }
   }
 
   String _getPatternHint(RuleCondition condition) {
     switch (condition) {
       case RuleCondition.contains:
-        return 'e.g., screenshot';
+        return context.tr.ruleHintContains;
       case RuleCondition.startsWith:
-        return 'e.g., IMG_';
+        return context.tr.ruleHintStartsWith;
       case RuleCondition.endsWith:
-        return 'e.g., _edited';
+        return context.tr.ruleHintEndsWith;
       case RuleCondition.equals:
-        return 'e.g., photo';
+        return context.tr.ruleHintEquals;
       case RuleCondition.regex:
-        return r'e.g., ^IMG_\d{4}$';
+        return context.tr.ruleHintRegex;
     }
   }
+}
+
+String _conditionLabel(BuildContext context, RuleCondition condition) {
+  final l10n = context.tr;
+  return switch (condition) {
+    RuleCondition.contains => l10n.ruleCondContains,
+    RuleCondition.startsWith => l10n.ruleCondStartsWith,
+    RuleCondition.endsWith => l10n.ruleCondEndsWith,
+    RuleCondition.equals => l10n.ruleCondEquals,
+    RuleCondition.regex => l10n.ruleCondRegex,
+  };
 }

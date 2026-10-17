@@ -76,8 +76,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   // Use system default app for video (false = in-app player by default)
   bool _useSystemDefaultForVideo = false;
   bool _openVideoInNewWindow = true;
+  VideoWheelAction _videoWheelAction = VideoWheelAction.volume;
   bool _isThemeExpanded = false;
-  bool _isLanguageExpanded = false;
   String _appVersion = '';
   bool _updatesSupported = false;
 
@@ -154,6 +154,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final useSystemDefaultForVideo = await _preferences
           .getUseSystemDefaultForVideo();
       final openVideoInNewWindow = await _preferences.getOpenVideoInNewWindow();
+      final videoWheelAction = await _preferences.getVideoWheelAction();
       final tabInactiveMinutes = await _preferences
           .getTabInactiveThresholdMinutes();
       _preferences.isUsingDatabaseStorage();
@@ -171,6 +172,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _rememberTabWorkspace = rememberTabWorkspace;
           _useSystemDefaultForVideo = useSystemDefaultForVideo;
           _openVideoInNewWindow = openVideoInNewWindow;
+          _videoWheelAction = videoWheelAction;
           _tabInactiveThresholdMinutes = tabInactiveMinutes;
           _isLoading = false;
         });
@@ -319,6 +321,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _tabInactiveThresholdMinutes = clamped;
       });
     }
+  }
+
+  Future<void> _updateVideoWheelAction(VideoWheelAction value) async {
+    await _preferences.setVideoWheelAction(value);
+    if (mounted) setState(() => _videoWheelAction = value);
   }
 
   Future<void> _updateOpenVideoInNewWindow(bool value) async {
@@ -777,6 +784,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
             trailing: Switch(
               value: _openVideoInNewWindow,
               onChanged: _updateOpenVideoInNewWindow,
+            ),
+          ),
+        if (Platform.isWindows || Platform.isLinux || Platform.isMacOS)
+          _buildCompactSettingTile(
+            title: AppLocalizations.of(context)!.videoWheelAction,
+            subtitle: AppLocalizations.of(context)!.videoWheelActionDescription,
+            icon: PhosphorIconsLight.mouseScroll,
+            trailing: CbSelect<VideoWheelAction>(
+              value: _videoWheelAction,
+              onChanged: _updateVideoWheelAction,
+              items: [
+                CbSelectItem(
+                  value: VideoWheelAction.volume,
+                  label: AppLocalizations.of(context)!.videoWheelVolume,
+                ),
+                CbSelectItem(
+                  value: VideoWheelAction.seek,
+                  label: AppLocalizations.of(context)!.videoWheelSeek,
+                ),
+              ],
             ),
           ),
         // Thumbnail Mode Selection
@@ -2196,36 +2223,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Widget _buildLanguageCollapseTile() {
     final l10n = AppLocalizations.of(context)!;
-    final languageLabel = _currentLanguageCode == 'vi'
-        ? l10n.vietnameseLanguage
-        : l10n.englishLanguage;
 
-    return CbExpander(
-      expanded: _isLanguageExpanded,
-      onExpansionChanged: (expanded) => _isLanguageExpanded = expanded,
-      leading: const Icon(PhosphorIconsLight.globe),
-      title: Text(l10n.language),
-      subtitle: Text(languageLabel),
-      children: [
-        RadioGroup<String>(
-          groupValue: _currentLanguageCode,
-          onChanged: (value) {
-            if (value != null) _updateLanguage(value);
-          },
-          child: Column(
-            children: [
-              _buildRadioOption<String>(
-                value: LanguageController.vietnamese,
-                title: Text('🇻🇳  ${l10n.vietnameseLanguage}'),
-              ),
-              _buildRadioOption<String>(
-                value: LanguageController.english,
-                title: Text('🇬🇧  ${l10n.englishLanguage}'),
-              ),
-            ],
-          ),
-        ),
-      ],
+    // Each language is listed by its own name so it can be found without
+    // reading the current one; the localized names stay searchable.
+    String keywordsFor(String code) => switch (code) {
+      LanguageController.vietnamese =>
+        'vi vietnamese ${l10n.vietnameseLanguage} viet nam',
+      LanguageController.turkish => 'tr turkish ${l10n.turkishLanguage} turkce',
+      LanguageController.chinese =>
+        'zh chinese ${l10n.chineseLanguage} 中文 汉语 trung quoc china',
+      _ => 'en english ${l10n.englishLanguage}',
+    };
+
+    return _buildCompactSettingTile(
+      title: l10n.language,
+      subtitle: l10n.selectLanguage,
+      icon: PhosphorIconsLight.globe,
+      trailing: CbSelect<String>(
+        width: 200,
+        value: _currentLanguageCode,
+        onChanged: _updateLanguage,
+        searchable: true,
+        searchPlaceholder: l10n.search,
+        searchEmptyText: l10n.albumNoMatchingResults,
+        searchIcon: PhosphorIconsLight.magnifyingGlass,
+        items: [
+          for (final code in _languageController.supportedLanguages)
+            CbSelectItem(
+              value: code,
+              label: _languageController.getLanguageName(code),
+              keywords: keywordsFor(code),
+            ),
+        ],
+      ),
     );
   }
 

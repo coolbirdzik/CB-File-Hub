@@ -11,6 +11,7 @@ import 'package:cb_file_manager/ui/utils/route.dart';
 
 import 'package:cb_file_manager/bloc/selection/selection.dart';
 import 'package:cb_file_manager/ui/components/common/browser_like_action_handlers.dart';
+import 'package:cb_file_manager/ui/controllers/file_operations_handler.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';
 import 'package:cb_file_manager/ui/tab_manager/components/search_bar.dart'
@@ -72,6 +73,7 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
   List<String> _activeSearchTags = const [];
   Set<String>? _tagMatchedPaths;
   bool _showSearchBar = false;
+  final _searchFocusNode = FocusNode(debugLabel: 'video library search');
   bool _useRegexSearch = false;
   bool _isSearchLoading = false;
   List<FileSystemEntity>? _liveSearchSource;
@@ -128,6 +130,7 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
 
   @override
   void dispose() {
+    _searchFocusNode.dispose();
     _tagRefreshDebounce?.cancel();
     _tagChanges?.cancel();
     _searchRequests.dispose();
@@ -485,6 +488,11 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
     });
   }
 
+  void _openOrFocusSearch() {
+    if (!_showSearchBar) setState(() => _showSearchBar = true);
+    _searchFocusNode.requestFocus();
+  }
+
   void _toggleSelectionMode() {
     _selectionBloc.add(const ToggleSelectionMode());
   }
@@ -528,6 +536,7 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
   }
 
   Widget _buildSearchBar(AppLocalizations l10n) => tab_components.SearchBar(
+    focusNode: _searchFocusNode,
     currentPath: '#video-library/${widget.library.id}',
     tabId: widget.tabId ?? '#video-library/${widget.library.id}',
     initialQuery: _searchQuery,
@@ -650,6 +659,29 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
       currentSearchQuery: trimmedQuery.isEmpty || _activeSearchTags.isNotEmpty
           ? null
           : trimmedQuery,
+    );
+  }
+
+  /// Selected videos still on screen; keyboard focus here always selects, so
+  /// the selection covers the focused item too.
+  List<FileSystemEntity> _selectedVisibleFiles(FileNavigationState state) {
+    final selected = _selectionBloc.state.selectedFilePaths;
+    return _visibleFilesForState(
+      state,
+    ).where((entity) => selected.contains(entity.path)).toList();
+  }
+
+  void _handleCopy(FileNavigationState state) {
+    FileOperationsHandler.copyFilesToClipboard(
+      context: context,
+      entities: _selectedVisibleFiles(state),
+    );
+  }
+
+  void _handleCut(FileNavigationState state) {
+    FileOperationsHandler.cutFilesToClipboard(
+      context: context,
+      entities: _selectedVisibleFiles(state),
     );
   }
 
@@ -813,8 +845,10 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
                       : _showSearchBar
                       ? _closeSearchBar
                       : null,
-                  onSearch: _toggleSearchBar,
+                  onSearch: _openOrFocusSearch,
                   onSelectAll: () => _selectAllVisible(state),
+                  onCopy: () => _handleCopy(state),
+                  onCut: () => _handleCut(state),
                   onDelete: (keyboardController, permanent) =>
                       _handleDelete(keyboardController, permanent),
                 );

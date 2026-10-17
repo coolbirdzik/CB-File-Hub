@@ -6,6 +6,7 @@ import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../../config/languages/app_localizations.dart';
+import 'package:cb_file_manager/config/translation_helper.dart';
 
 /// Callback when sending a message. [text] is the user input, [referencedFiles]
 /// are the paths of files dropped into the chat.
@@ -180,7 +181,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
                               ),
                               const SizedBox(width: 6),
                               Text(
-                                'Drop to mention',
+                                l.aiDropToMention,
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w500,
@@ -204,7 +205,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
                           decoration: InputDecoration(
                             hintText: _mentionedFiles.isEmpty
                                 ? l.askAiToFindFiles
-                                : '${l.askAiToFindFiles} (${_mentionedFiles.length} file${_mentionedFiles.length > 1 ? 's' : ''} attached)',
+                                : '${l.askAiToFindFiles} (${l.aiFilesAttached(_mentionedFiles.length)})',
                             hintStyle: TextStyle(
                               color: theme.colorScheme.onSurfaceVariant
                                   .withValues(alpha: 0.7),
@@ -448,7 +449,7 @@ class _SendButtonState extends State<_SendButton> {
     }
 
     return Tooltip(
-      message: widget.isLoading ? 'Stop generation' : '',
+      message: widget.isLoading ? context.tr.aiStopGeneration : '',
       child: MouseRegion(
         cursor: active ? SystemMouseCursors.click : SystemMouseCursors.basic,
         onEnter: (_) => setState(() => _hovered = true),

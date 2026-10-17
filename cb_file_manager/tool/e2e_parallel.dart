@@ -46,6 +46,7 @@ const _kAllGroups = [
   'FFmpeg Thumbnails',
   'File Drag Drop',
   'Breadcrumb Overflow',
+  'Torrent Library',
 ];
 
 const _kWorkersDir = 'build/e2e_workers';
@@ -69,6 +70,9 @@ const _kFileDragDropGroup = 'File Drag Drop';
 const _kBreadcrumbOverflowE2ETestFile =
     'integration_test/breadcrumb_address_bar_overflow_e2e_test.dart';
 const _kBreadcrumbOverflowGroup = 'Breadcrumb Overflow';
+const _kTorrentLibraryE2ETestFile =
+    'integration_test/torrent_library_e2e_test.dart';
+const _kTorrentLibraryGroup = 'Torrent Library';
 
 Future<void> main(List<String> args) async {
   // ---- Parse args ----
@@ -128,7 +132,6 @@ Future<void> main(List<String> args) async {
 
   if (dryRun) {
     _printDryRun();
-    await _killAllTestProcesses();
     return;
   }
 
@@ -199,6 +202,13 @@ Future<void> main(List<String> args) async {
   }
   await workersDir.create(recursive: true);
 
+  // Torrent checks native restore/focus through real IPC. Other app windows
+  // starting concurrently could steal foreground focus during those asserts.
+  final exclusiveGroups = groups
+      .where((group) => group == _kTorrentLibraryGroup)
+      .toList();
+  groups = groups.where((group) => group != _kTorrentLibraryGroup).toList();
+
   // ---- Warmup build cache, then launch workers in parallel ----
   //
   // On Windows, each `flutter test -d windows` compiles the app via MSBuild.
@@ -246,7 +256,7 @@ Future<void> main(List<String> args) async {
       }());
     }
     await Future.wait(futures);
-  } else {
+  } else if (groups.isNotEmpty) {
     print(
       '[Parallel E2E] Launching ${groups.length} test group(s) '
       '($maxParallel workers max)...\n',
@@ -269,6 +279,15 @@ Future<void> main(List<String> args) async {
       }());
     }
     await Future.wait(futures);
+  }
+
+  for (final group in exclusiveGroups) {
+    print('[Parallel E2E] Running "$group" with exclusive desktop focus.');
+    results[group] = await _runWorker(
+      group,
+      fullStartup: fullStartup,
+      fullScreenshots: fullScreenshots,
+    );
   }
 
   await _retryInfrastructureFailures(
@@ -537,6 +556,8 @@ String _testFileForGroup(String group) {
       return _kFileDragDropE2ETestFile;
     case _kBreadcrumbOverflowGroup:
       return _kBreadcrumbOverflowE2ETestFile;
+    case _kTorrentLibraryGroup:
+      return _kTorrentLibraryE2ETestFile;
     default:
       return _kAppE2ETestFile;
   }

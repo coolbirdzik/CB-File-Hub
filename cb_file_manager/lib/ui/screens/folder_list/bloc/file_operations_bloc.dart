@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:cb_file_manager/config/languages/current_localizations.dart';
 
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -90,7 +91,7 @@ class FileOperationsBloc
         ),
       );
     } catch (e) {
-      emit(state.copyWith(error: 'Error copying: ${e.toString()}'));
+      emit(state.copyWith(error: currentL10n.foErrorCopying(e.toString())));
     }
   }
 
@@ -104,7 +105,7 @@ class FileOperationsBloc
         ),
       );
     } catch (e) {
-      emit(state.copyWith(error: 'Error cutting: ${e.toString()}'));
+      emit(state.copyWith(error: currentL10n.foErrorCutting(e.toString())));
     }
   }
 
@@ -113,7 +114,7 @@ class FileOperationsBloc
     Emitter<FileOperationsState> emit,
   ) async {
     if (!FileOperations().hasClipboardItem) {
-      emit(state.copyWith(error: 'Nothing to paste — clipboard is empty'));
+      emit(state.copyWith(error: currentL10n.foNothingToPaste));
       return;
     }
 
@@ -122,7 +123,7 @@ class FileOperationsBloc
     final isCut = FileOperations().isCutOperation;
     final itemCount = FileOperations().clipboardItemCount;
     final clipboardItems = FileOperations().clipboardItems;
-    final opType = isCut ? 'Moving' : 'Copying';
+    final opType = isCut ? currentL10n.foMovingVerb : currentL10n.foCopyingVerb;
     final firstItemPath = clipboardItems.isNotEmpty
         ? clipboardItems.first.path
         : null;
@@ -132,8 +133,12 @@ class FileOperationsBloc
 
     final progressId = _progressController.begin(
       title: itemCount == 1 && firstItemName != null
-          ? '$opType "$firstItemName"'
-          : '$opType $itemCount items',
+          ? (isCut
+                ? currentL10n.foMovingOne(firstItemName)
+                : currentL10n.foCopyingOne(firstItemName))
+          : (isCut
+                ? currentL10n.foMovingMany(itemCount)
+                : currentL10n.foCopyingMany(itemCount)),
       total: itemCount,
       detail: _pasteDetail(
         action: opType,
@@ -153,8 +158,17 @@ class FileOperationsBloc
           _progressController.update(
             progressId,
             completed: completed,
-            detail:
-                '$opType item $completed of $total to ${event.destinationPath}',
+            detail: isCut
+                ? currentL10n.foMoveProgress(
+                    completed,
+                    total,
+                    event.destinationPath,
+                  )
+                : currentL10n.foCopyProgress(
+                    completed,
+                    total,
+                    event.destinationPath,
+                  ),
           );
         },
       );
@@ -175,8 +189,9 @@ class FileOperationsBloc
 
       _progressController.succeed(
         progressId,
-        detail:
-            '${isCut ? 'Moved' : 'Copied'} $itemCount item${itemCount > 1 ? 's' : ''} to ${event.destinationPath}',
+        detail: isCut
+            ? currentL10n.foMovedItems(itemCount, event.destinationPath)
+            : currentL10n.foCopiedItems(itemCount, event.destinationPath),
       );
 
       emit(
@@ -190,11 +205,14 @@ class FileOperationsBloc
       final navState = navigationBloc.state;
       navigationBloc.add(FileNavigationRefresh(navState.currentPath.path));
     } catch (e) {
-      _progressController.fail(progressId, detail: 'Error: ${e.toString()}');
+      _progressController.fail(
+        progressId,
+        detail: currentL10n.errorWithDetail(e.toString()),
+      );
       emit(
         state.copyWith(
           isProcessing: false,
-          error: 'Error pasting: ${e.toString()}',
+          error: currentL10n.foErrorPasting(e.toString()),
         ),
       );
     }
@@ -213,15 +231,20 @@ class FileOperationsBloc
       ),
     );
     final firstPath = event.filePaths.first;
-    final destinationLabel = event.permanent ? 'permanently' : 'to Trash Bin';
 
     final progressId = _progressController.begin(
       title: event.filePaths.length == 1
-          ? 'Deleting "${path.basename(firstPath)}" $destinationLabel'
-          : 'Deleting ${event.filePaths.length} files $destinationLabel',
+          ? (event.permanent
+                ? currentL10n.foDeletingOnePerm(path.basename(firstPath))
+                : currentL10n.foDeletingOneTrash(path.basename(firstPath)))
+          : (event.permanent
+                ? currentL10n.foDeletingFilesPerm(event.filePaths.length)
+                : currentL10n.foDeletingFilesTrash(event.filePaths.length)),
       total: event.filePaths.length,
       detail: _deleteDetail(
-        action: event.permanent ? 'Permanent delete' : 'Move to Trash Bin',
+        action: event.permanent
+            ? currentL10n.foActionPermanentDelete
+            : currentL10n.foActionMoveToTrash,
         firstPath: firstPath,
         itemCount: event.filePaths.length,
       ),
@@ -248,7 +271,7 @@ class FileOperationsBloc
                 update: () => _progressController.update(
                   progressId,
                   completed: completed,
-                  detail: 'Permanently deleted $completed of $total',
+                  detail: currentL10n.foPermDeletedProgress(completed, total),
                 ),
               );
             },
@@ -264,7 +287,7 @@ class FileOperationsBloc
                 update: () => _progressController.update(
                   progressId,
                   completed: completed,
-                  detail: 'Moved to Trash Bin $completed of $total',
+                  detail: currentL10n.foTrashedProgress(completed, total),
                 ),
               );
             },
@@ -292,8 +315,9 @@ class FileOperationsBloc
     } else {
       _progressController.succeed(
         progressId,
-        detail:
-            '${event.permanent ? 'Permanently deleted' : 'Moved to Trash Bin'} ${event.filePaths.length} file${event.filePaths.length > 1 ? 's' : ''}',
+        detail: event.permanent
+            ? currentL10n.foPermDeletedFiles(event.filePaths.length)
+            : currentL10n.foTrashedFiles(event.filePaths.length),
       );
       emit(
         state.copyWith(
@@ -324,17 +348,19 @@ class FileOperationsBloc
     final firstPath = orderedTargets.first;
     final title = event.permanent
         ? (total == 1
-              ? 'Deleting "${path.basename(firstPath)}" permanently'
-              : 'Deleting $total items permanently')
+              ? currentL10n.foDeletingOnePerm(path.basename(firstPath))
+              : currentL10n.foDeletingItemsPerm(total))
         : (total == 1
-              ? 'Moving "${path.basename(firstPath)}" to Trash Bin'
-              : 'Moving $total items to Trash Bin');
+              ? currentL10n.foMovingOneTrash(path.basename(firstPath))
+              : currentL10n.foMovingItemsTrash(total));
 
     final progressId = _progressController.begin(
       title: title,
       total: total,
       detail: _deleteDetail(
-        action: event.permanent ? 'Permanent delete' : 'Move to Trash Bin',
+        action: event.permanent
+            ? currentL10n.foActionPermanentDelete
+            : currentL10n.foActionMoveToTrash,
         firstPath: firstPath,
         itemCount: total,
       ),
@@ -364,7 +390,7 @@ class FileOperationsBloc
                 update: () => _progressController.update(
                   progressId,
                   completed: completed,
-                  detail: 'Permanently deleted $completed of $t',
+                  detail: currentL10n.foPermDeletedProgress(completed, t),
                 ),
               );
             },
@@ -380,7 +406,7 @@ class FileOperationsBloc
                 update: () => _progressController.update(
                   progressId,
                   completed: completed,
-                  detail: 'Moved to Trash Bin $completed of $t',
+                  detail: currentL10n.foTrashedProgress(completed, t),
                 ),
               );
             },
@@ -409,8 +435,9 @@ class FileOperationsBloc
     } else {
       _progressController.succeed(
         progressId,
-        detail:
-            '${event.permanent ? 'Permanently deleted' : 'Moved to Trash Bin'} $total item${total > 1 ? 's' : ''}',
+        detail: event.permanent
+            ? currentL10n.foPermDeletedItems(total)
+            : currentL10n.foTrashedItems(total),
       );
       emit(
         state.copyWith(
@@ -444,10 +471,10 @@ class FileOperationsBloc
     final paths = exactRetryPaths.toList(growable: false);
     final progressId = _progressController.begin(
       title: paths.length == 1
-          ? 'Deleting "${path.basename(paths.first)}" as administrator'
-          : 'Deleting ${paths.length} items as administrator',
+          ? currentL10n.foAdminDeletingOne(path.basename(paths.first))
+          : currentL10n.foAdminDeletingMany(paths.length),
       total: paths.length,
-      detail: 'Waiting for Windows administrator approval',
+      detail: currentL10n.foAdminWaiting,
       isIndeterminate: true,
       kind: OperationProgressKind.delete,
       sourcePath: paths.first,
@@ -462,8 +489,8 @@ class FileOperationsBloc
 
     if (failed.isEmpty) {
       final message = paths.length == 1
-          ? 'Deleted "${paths.first}" as administrator.'
-          : 'Deleted ${paths.length} items as administrator.';
+          ? currentL10n.foAdminDeletedOne(paths.first)
+          : currentL10n.foAdminDeletedMany(paths.length);
       _progressController.succeed(progressId, detail: message);
       emit(
         state.copyWith(
@@ -474,8 +501,8 @@ class FileOperationsBloc
       );
     } else {
       final message = failed.length == 1
-          ? 'Administrator delete was cancelled or failed for "${failed.first}".'
-          : 'Administrator delete was cancelled or failed for ${failed.length} items.';
+          ? currentL10n.foAdminFailedOne(failed.first)
+          : currentL10n.foAdminFailedMany(failed.length);
       _progressController.fail(progressId, detail: message);
       emit(
         state.copyWith(
@@ -518,7 +545,7 @@ class FileOperationsBloc
       final navState = navigationBloc.state;
       navigationBloc.add(FileNavigationRefresh(navState.currentPath.path));
     } catch (e) {
-      emit(state.copyWith(error: 'Error renaming: ${e.toString()}'));
+      emit(state.copyWith(error: currentL10n.foErrorRenaming(e.toString())));
     }
   }
 
@@ -538,8 +565,8 @@ class FileOperationsBloc
     final parent = path.dirname(firstPath);
     final itemLabel = itemCount == 1
         ? path.basename(firstPath)
-        : '${path.basename(firstPath)} and ${itemCount - 1} more';
-    return '$action: $itemLabel from $parent';
+        : currentL10n.foAndMore(path.basename(firstPath), itemCount - 1);
+    return currentL10n.foDeleteDetail(action, itemLabel, parent);
   }
 
   String _pasteDetail({
@@ -549,38 +576,47 @@ class FileOperationsBloc
     required int itemCount,
   }) {
     if (sourcePath == null) {
-      return '$action $itemCount item${itemCount > 1 ? 's' : ''} to $destinationPath';
+      return currentL10n.foPasteDetailNoSource(
+        action,
+        itemCount,
+        destinationPath,
+      );
     }
     final sourceLabel = itemCount == 1
         ? path.basename(sourcePath)
-        : '${path.basename(sourcePath)} and ${itemCount - 1} more';
-    return '$action $sourceLabel from ${path.dirname(sourcePath)} to $destinationPath';
+        : currentL10n.foAndMore(path.basename(sourcePath), itemCount - 1);
+    return currentL10n.foPasteDetail(
+      action,
+      sourceLabel,
+      path.dirname(sourcePath),
+      destinationPath,
+    );
   }
 
   static String formatDeleteFailure({
     required List<String> failedPaths,
     required Map<String, Object> errorsByPath,
   }) {
-    if (failedPaths.isEmpty) return 'Delete failed';
+    if (failedPaths.isEmpty) return currentL10n.foDeleteFailed;
 
     final firstPath = failedPaths.first;
     final error = errorsByPath[firstPath];
     final itemLabel = failedPaths.length == 1
         ? '"$firstPath"'
-        : '${failedPaths.length} items; first failure: "$firstPath"';
+        : currentL10n.foFirstFailureItems(failedPaths.length, firstPath);
 
     if (error is FileSystemException && error.osError?.errorCode == 5) {
-      return 'Could not delete $itemLabel: Access denied. Check folder permissions or run the app as administrator.';
+      return currentL10n.foCouldNotDeleteAccessDenied(itemLabel);
     }
 
     if (error is FileSystemException) {
       final reason = error.osError?.message.trim();
       if (reason != null && reason.isNotEmpty) {
-        return 'Could not delete $itemLabel: $reason.';
+        return currentL10n.foCouldNotDeleteReason(itemLabel, reason);
       }
     }
 
-    return 'Could not delete $itemLabel.';
+    return currentL10n.foCouldNotDelete(itemLabel);
   }
 
   static List<String> retainApprovedRetryPaths({

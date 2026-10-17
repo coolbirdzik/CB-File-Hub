@@ -1,0 +1,271 @@
+{
+  "$comment": [
+    "Decides which Windows E2E suites CI runs for a change set.",
+    "Used by scripts/ci/e2e_select.mjs (selection) and scripts/ci/e2e_run.mjs (execution).",
+    "Paths are repo-root relative. Rules are checked in order and the FIRST matching rule wins,",
+    "so put specific rules before broad ones. A file no rule matches runs every suite.",
+    "\"suites\": \"all\" runs everything, [] means the file cannot affect E2E.",
+    "Globs: ** matches across directories, * matches within one segment, {a,b} alternatives.",
+    "\"onlyIf\" makes a rule apply only when the file's diff passes a check (see diffConditions in e2e_select.mjs);",
+    "otherwise later rules decide. \"additions\": only added lines. \"version-line\": only the pubspec version: line."
+  ],
+  "suites": {
+    "app": {
+      "description": "Core file manager flows (app_e2e_test, all groups)",
+      "file": "integration_test/app_e2e_test.dart",
+      "command": ["dart", "run", "tool/run_e2e_with_log.dart", "--json-report"]
+    },
+    "smoke": {
+      "description": "App boots and navigates (app_e2e_test, group 01 Navigation only)",
+      "file": "integration_test/app_e2e_test.dart",
+      "command": ["dart", "run", "tool/run_e2e_with_log.dart", "--json-report", "--plain-name", "01 Navigation"]
+    },
+    "video_thumbnails": {
+      "description": "Video grid thumbnails and context menu",
+      "file": "integration_test/video_thumbnails_e2e_test.dart",
+      "command": ["flutter", "test", "integration_test/video_thumbnails_e2e_test.dart", "-d", "windows", "--dart-define=CB_E2E=true"]
+    },
+    "media_kit_playback": {
+      "description": "media_kit video playback and player chrome",
+      "file": "integration_test/media_kit_playback_e2e_test.dart",
+      "command": ["flutter", "test", "integration_test/media_kit_playback_e2e_test.dart", "-d", "windows", "--dart-define=CB_E2E=true", "--reporter", "expanded", "--file-reporter", "json:build/e2e-media-kit-ci.jsonl"]
+    },
+    "ffmpeg_thumbnail": {
+      "description": "Native FFmpeg thumbnail plugin",
+      "file": "integration_test/ffmpeg_thumbnail_e2e_test.dart",
+      "command": ["flutter", "test", "integration_test/ffmpeg_thumbnail_e2e_test.dart", "-d", "windows", "--dart-define=CB_E2E=true"]
+    },
+    "file_drag_drop": {
+      "description": "Explorer and in-app file drag and drop",
+      "file": "integration_test/file_drag_drop_e2e_test.dart",
+      "command": ["flutter", "test", "integration_test/file_drag_drop_e2e_test.dart", "-d", "windows", "--dart-define=CB_E2E=true"]
+    },
+    "breadcrumb_address_bar_overflow": {
+      "description": "Breadcrumb address bar overflow layout",
+      "file": "integration_test/breadcrumb_address_bar_overflow_e2e_test.dart",
+      "command": ["flutter", "test", "integration_test/breadcrumb_address_bar_overflow_e2e_test.dart", "-d", "windows", "--dart-define=CB_E2E=true"]
+    },
+    "torrent_library": {
+      "description": "Torrent library, aria2 engine and qBittorrent import",
+      "file": "integration_test/torrent_library_e2e_test.dart",
+      "command": ["flutter", "test", "integration_test/torrent_library_e2e_test.dart", "--no-pub", "-d", "windows", "--dart-define=CB_E2E=true", "--reporter", "expanded", "--file-reporter", "json:build/e2e-torrent-ci.jsonl"]
+    }
+  },
+  "notInCi": {
+    "integration_test/showcase_screenshots_e2e_test.dart": "Marketing screenshot generator, run locally when refreshing screenshots",
+    "integration_test/semantics_stability_e2e_test.dart": "Not wired into CI yet",
+    "integration_test/tooltip_semantics_e2e_test.dart": "Not wired into CI yet",
+    "integration_test/video_player_chrome_semantics_e2e_test.dart": "Not wired into CI yet",
+    "integration_test/zz_tmp_focus_latency_e2e_test.dart": "Temporary latency probe"
+  },
+  "rules": [
+    {
+      "why": "Release version bump only",
+      "paths": ["cb_file_manager/pubspec.yaml"],
+      "onlyIf": "version-line",
+      "suites": []
+    },
+    {
+      "why": "Only new translation keys: strings the tests match on are unchanged (analyze catches missing overrides)",
+      "paths": ["cb_file_manager/lib/config/languages/**"],
+      "onlyIf": "additions",
+      "suites": ["smoke"]
+    },
+    {
+      "why": "Docs, store copy, release tooling and other platforms never reach the Windows E2E build",
+      "paths": [
+        "**/*.md",
+        "docs/**",
+        "installer/**",
+        "store/**",
+        "website/**",
+        "screenshots/**",
+        "Key/**",
+        ".vscode/**",
+        ".claude/**",
+        ".kilo/**",
+        ".gitnexus/**",
+        ".gitignore",
+        ".gitlab-ci.yml",
+        ".env.example",
+        "justfile",
+        "build.config",
+        ".github/workflows/release.yml",
+        "scripts/tests/**",
+        "scripts/__pycache__/**",
+        "scripts/*.{mjs,py,ps1}",
+        "scripts/{build,release,retag,version,check_quality,capture_screenshots,macos_dev}.sh",
+        "scripts/ci/{generate_release_metadata,publish_github_release}.sh",
+        "cb_file_manager/test/**",
+        "cb_file_manager/{android,ios,macos,linux,web}/**",
+        "cb_file_manager/{analysis_options,devtools_options}.yaml",
+        "cb_file_manager/{.gitignore,.metadata,desktop.ini,logo.psd}",
+        "cb_file_manager/{.github,.vscode,#tags,bin,test_driver}/**",
+        "cb_file_manager/integration_test/showcase_screenshots_e2e_test.dart",
+        "cb_file_manager/integration_test/semantics_stability_e2e_test.dart",
+        "cb_file_manager/integration_test/tooltip_semantics_e2e_test.dart",
+        "cb_file_manager/integration_test/video_player_chrome_semantics_e2e_test.dart",
+        "cb_file_manager/integration_test/zz_tmp_focus_latency_e2e_test.dart",
+        "cb_file_manager/tool/{e2e_allure,e2e_allure_adapter,e2e_dashboard,e2e_parallel,e2e_summarize_failures,capture_torrent_screenshots_test}.dart"
+      ],
+      "suites": []
+    },
+    {
+      "why": "Dependencies, bootstrap, shared config/theme, native build and the E2E harness affect every suite",
+      "paths": [
+        ".github/workflows/build-test.yml",
+        "scripts/ci/e2e_*.mjs",
+        "scripts/fetch_llama_runtime.sh",
+        "mobile_smb_native/**",
+        "cb_file_manager/pubspec.{yaml,lock}",
+        "cb_file_manager/assets/**",
+        "cb_file_manager/windows/**",
+        "cb_file_manager/third_party/phosphor_flutter/**",
+        "cb_file_manager/tool/run_e2e_with_log.dart",
+        "cb_file_manager/lib/main.dart",
+        "cb_file_manager/lib/core/**",
+        "cb_file_manager/lib/e2e/**",
+        "cb_file_manager/lib/config/**",
+        "cb_file_manager/lib/design_system/**",
+        "cb_file_manager/lib/providers/**",
+        "cb_file_manager/integration_test/e2e_{helpers,keys,report,sandbox_paths}.dart",
+        "cb_file_manager/integration_test/e2e_impact.json",
+        "cb_file_manager/integration_test/samples/**"
+      ],
+      "suites": "all"
+    },
+    {
+      "why": "Suite sources select themselves",
+      "paths": ["cb_file_manager/integration_test/app_e2e_test.dart"],
+      "suites": ["app"]
+    },
+    {
+      "paths": ["cb_file_manager/integration_test/video_thumbnails_e2e_test.dart"],
+      "suites": ["video_thumbnails"]
+    },
+    {
+      "paths": ["cb_file_manager/integration_test/media_kit_playback_e2e_test.dart"],
+      "suites": ["media_kit_playback"]
+    },
+    {
+      "paths": ["cb_file_manager/integration_test/ffmpeg_thumbnail_e2e_test.dart"],
+      "suites": ["ffmpeg_thumbnail"]
+    },
+    {
+      "paths": ["cb_file_manager/integration_test/file_drag_drop_e2e_test.dart"],
+      "suites": ["file_drag_drop"]
+    },
+    {
+      "paths": ["cb_file_manager/integration_test/breadcrumb_address_bar_overflow_e2e_test.dart"],
+      "suites": ["breadcrumb_address_bar_overflow"]
+    },
+    {
+      "paths": [
+        "cb_file_manager/integration_test/torrent_library_e2e_test.dart",
+        "cb_file_manager/integration_test/torrent_e2e_fixture.dart"
+      ],
+      "suites": ["torrent_library"]
+    },
+    {
+      "why": "Breadcrumb bar lives inside the folder list, so the core flows cover it too",
+      "paths": ["cb_file_manager/lib/ui/components/common/breadcrumb_address_bar*.dart"],
+      "suites": ["breadcrumb_address_bar_overflow", "app"]
+    },
+    {
+      "why": "Torrent library and the shared SQLite layer it indexes into",
+      "paths": [
+        "cb_file_manager/lib/services/torrent/**",
+        "cb_file_manager/lib/ui/screens/torrent/**",
+        "cb_file_manager/lib/ui/utils/torrent_open_actions.dart",
+        "scripts/fetch_aria2_runtime.sh"
+      ],
+      "suites": ["torrent_library"]
+    },
+    {
+      "paths": ["cb_file_manager/lib/models/database/**"],
+      "suites": ["app", "torrent_library", "video_thumbnails"]
+    },
+    {
+      "why": "Drag and drop services and the native Windows drag bridges",
+      "paths": [
+        "cb_file_manager/lib/services/file_drag_drop/**",
+        "cb_file_manager/lib/services/windowing/windows_{explorer,native_tab}_drag_drop_service.dart",
+        "cb_file_manager/lib/ui/widgets/{file_drag_drop_item,drag_selection_geometry}.dart"
+      ],
+      "suites": ["file_drag_drop", "app"]
+    },
+    {
+      "why": "Playback stack: media_kit backend, player UI, PiP and video windows",
+      "paths": [
+        "cb_file_manager/lib/services/media/**",
+        "cb_file_manager/lib/ui/components/video/**",
+        "cb_file_manager/lib/ui/components/pip_window/**",
+        "cb_file_manager/lib/ui/state/video_ui_state.dart",
+        "cb_file_manager/lib/ui/utils/video_playback_launcher.dart",
+        "cb_file_manager/lib/services/pip_window_service.dart",
+        "cb_file_manager/lib/services/windowing/video_window_service.dart"
+      ],
+      "suites": ["media_kit_playback"]
+    },
+    {
+      "why": "Full-screen gallery player is opened from the thumbnail suite too",
+      "paths": ["cb_file_manager/lib/ui/screens/media_gallery/**"],
+      "suites": ["media_kit_playback", "video_thumbnails"]
+    },
+    {
+      "why": "Thumbnail generation and the video library cache",
+      "paths": [
+        "cb_file_manager/lib/ui/widgets/{lazy_video_thumbnail,thumbnail_loader}.dart",
+        "cb_file_manager/lib/ui/dialogs/{thumbnail_browser,video_frame_picker,folder_thumbnail_picker}_dialog.dart",
+        "cb_file_manager/lib/helpers/media/**",
+        "cb_file_manager/lib/services/video_library_{cache_service,service}.dart"
+      ],
+      "suites": ["video_thumbnails", "app"]
+    },
+    {
+      "why": "Folder list, tabs and file operations exercised by app_e2e_test; most suites open the folder list",
+      "paths": [
+        "cb_file_manager/lib/ui/screens/folder_list/**",
+        "cb_file_manager/lib/ui/tab_manager/**",
+        "cb_file_manager/lib/services/windowing/**"
+      ],
+      "suites": ["app", "video_thumbnails", "file_drag_drop", "torrent_library"]
+    },
+    {
+      "why": "Shared file-manager UI and helpers used by the core flows",
+      "paths": [
+        "cb_file_manager/lib/ui/controllers/**",
+        "cb_file_manager/lib/ui/dialogs/**",
+        "cb_file_manager/lib/ui/menus/**",
+        "cb_file_manager/lib/ui/widgets/**",
+        "cb_file_manager/lib/ui/components/common/**",
+        "cb_file_manager/lib/ui/utils/**",
+        "cb_file_manager/lib/ui/mixins/**",
+        "cb_file_manager/lib/ui/drawer.dart",
+        "cb_file_manager/lib/ui/screens/{files_list,system_screen,system_screen_router}.dart",
+        "cb_file_manager/lib/ui/screens/mixins/**",
+        "cb_file_manager/lib/bloc/selection/**",
+        "cb_file_manager/lib/helpers/**",
+        "cb_file_manager/lib/models/{file_template.dart,objectbox/**}",
+        "cb_file_manager/lib/services/{directory_listing_cache_service,directory_watcher_service,desktop_new_file_service,file_template_service,file_metadata_service}.dart",
+        "cb_file_manager/lib/services/{progress,tab_activity}/**"
+      ],
+      "suites": ["app"]
+    },
+    {
+      "why": "Features with no E2E coverage: only check that the app still boots and navigates",
+      "paths": [
+        "cb_file_manager/lib/bloc/**",
+        "cb_file_manager/lib/models/**",
+        "cb_file_manager/lib/services/**",
+        "cb_file_manager/lib/ui/screens/**",
+        "cb_file_manager/lib/ui/components/**",
+        "cb_file_manager/lib/dev/**",
+        "cb_file_manager/lib/pages/**",
+        "cb_file_manager/lib/utils/**",
+        "cb_file_manager/third_party/xterm/**"
+      ],
+      "suites": ["smoke"]
+    }
+  ]
+}

@@ -2,6 +2,252 @@ import 'app_localizations.dart';
 
 class EnglishLocalizations implements AppLocalizations {
   @override
+  String get torrentOpeningOptions => 'When opening torrents';
+  @override
+  String get torrentShowDownloadDialog =>
+      'Show download options when opening a torrent';
+  @override
+  String get torrentShowDownloadDialogHint =>
+      'When disabled, use the saved download folder and immediate-start preference. Ask for a folder if none has been saved.';
+  @override
+  String get torrentImportMenu => 'Import';
+  @override
+  String torrentImportFrom(String app) => 'Import from $app';
+  @override
+  String get torrentClientImportHint =>
+      'Import saved .torrent files from a detected profile or choose another folder. The selected storage mode applies. Downloaded content is kept.';
+  @override
+  String get torrentClientNotFound =>
+      'No profile found. Choose the folder where this app stores .torrent files.';
+  @override
+  String get torrentClientSourceRequired =>
+      'Choose an existing folder containing .torrent files.';
+  @override
+  String get torrentAddLink => 'Add torrent from link';
+  @override
+  String get torrentLinkHint =>
+      'Paste an HTTP/HTTPS torrent URL or a magnet link.';
+  @override
+  String get torrentRefreshImport => 'Import new torrents (F5)';
+  @override
+  String get torrentStartImmediately => 'Start downloading immediately';
+  @override
+  String get torrentDestinationRequired =>
+      'Choose or enter an absolute download folder path.';
+  @override
+  String get torrentDestinationLocked =>
+      'Stop this task before changing its download folder.';
+  @override
+  String torrentColumn(String column) =>
+      const {
+        'status': 'Download status',
+        'progress': 'Progress',
+        'downSpeed': 'Download speed',
+        'upSpeed': 'Upload speed',
+        'seeds': 'Seeds',
+        'peers': 'Peers',
+        'eta': 'Time remaining',
+        'downloaded': 'Downloaded',
+        'uploaded': 'Uploaded',
+        'ratio': 'Share ratio',
+        'files': 'Files',
+        'group': 'Group',
+        'destination': 'Download folder',
+        'hash': 'Info hash',
+        'remaining': 'Remaining',
+        'tracker': 'Tracker',
+        'trackerCount': 'Trackers',
+        'torrentCreated': 'Torrent created',
+        'createdBy': 'Created by',
+        'comment': 'Comment',
+        'private': 'Privacy',
+        'privateYes': 'Private',
+        'privateNo': 'Public',
+        'pieceSize': 'Piece size',
+        'pieceCount': 'Pieces',
+        'metainfoSize': 'Torrent file size',
+        'torrentFile': 'Torrent file',
+        'source': 'Source',
+        'error': 'Error',
+        'taskId': 'Task ID',
+        'filters': 'Filter torrents',
+        'seedsHint': 'Number of seeders currently connected to this download.',
+        'peersHint': 'Total connected peers, including seeders and web seeds.',
+      }[column] ??
+      column;
+  @override
+  String get torrentStatusLabel => 'Status';
+  @override
+  String get torrents => 'Torrents';
+  @override
+  String get torrentDuplicateTitle => 'Torrent already exists';
+  @override
+  String get torrentDuplicateHint =>
+      'Merge trackers and sources with this torrent? The download status, destination and existing files are kept.';
+  @override
+  String get torrentMerge => 'Merge';
+  @override
+  String get torrentReveal => 'Show in list';
+  @override
+  String torrentSaved(String name) => 'Saved: $name';
+  @override
+  String get torrentCopyMagnet => 'Copy magnet link';
+  @override
+  String get torrentAddMagnet => 'Add magnet link';
+  @override
+  String get torrentDefaultApps => 'Choose Windows defaults';
+  @override
+  String get torrentDefaultAppsHint =>
+      'Choose CB File Hub for .torrent files and MAGNET links in Windows Default apps.';
+  @override
+  String get torrentOrganize => 'Organize torrent files';
+  @override
+  String torrentStorageMode(String mode) =>
+      const {
+        'index': 'Index only, keep originals',
+        'copy': 'Copy to chosen storage folder',
+        'move': 'Move to chosen storage folder',
+      }[mode] ??
+      mode;
+  @override
+  String get torrentSubtitle => 'One library, wherever your files live.';
+  @override
+  String get torrentStorage => 'Torrent storage folder';
+  @override
+  String get torrentStorageHint =>
+      'Copy organizes indexed torrent files by hash. Move shows a confirmation before cleaning existing originals, after verifying the stored copy. Future imports use the selected mode. Download destinations are chosen separately.';
+  @override
+  String get torrentMoveConfirmTitle => 'Move torrents and clean sources?';
+  @override
+  String torrentMoveConfirmHint(int count) =>
+      '$count source .torrent files are listed below. Each original is removed only after its stored copy is verified. Downloaded content and other source files are kept. Future imports will use Move mode.';
+  @override
+  String get torrentMoveConfirm => 'Confirm Move and cleanup';
+  @override
+  String get torrentImport => 'Import .torrent';
+  @override
+  String get qbittorrentImport => 'Import from qBittorrent';
+  @override
+  String get qbittorrentImportHint =>
+      'Find Windows BT_backup folders automatically, or choose a portable profile. Torrent metainfo and .fastresume backups are saved to your chosen folder. Entries missing .torrent are imported as magnets; metadata is fetched when you choose to download.';
+  @override
+  String get qbittorrentChooseSource => 'Choose BT_backup';
+  @override
+  String get qbittorrentRemoveSources =>
+      'Remove torrents from qBittorrent after import';
+  @override
+  String get qbittorrentRemoveHint =>
+      'Clean the matching .torrent and .fastresume files directly. Close qBittorrent first; downloaded content is kept.';
+  @override
+  String get qbittorrentConfirmTitle =>
+      'Remove these torrents from qBittorrent?';
+  @override
+  String qbittorrentConfirmHint(int count) =>
+      'Clean only the $count source files below after the torrent or magnet and resume backup are stored and verified in CB File Hub. Downloaded content and other files are kept. qBittorrent must be closed.';
+  @override
+  String get qbittorrentConfirm => 'Confirm import and cleanup';
+  @override
+  String qbittorrentFound(int torrents, int files) =>
+      '$torrents torrents found · $files source files';
+  @override
+  String qbittorrentProgress(int completed, int total) =>
+      'Importing $completed / $total torrents';
+  @override
+  String qbittorrentResult(int stored, int cleaned, int failed) =>
+      'Stored: $stored · Sources cleaned: $cleaned · Failed: $failed';
+  @override
+  String qbittorrentProblem(String problem) =>
+      const {
+        'running':
+            'Close qBittorrent completely and try again. Uncheck source cleanup to copy while qBittorrent is running.',
+        'sqlite':
+            'This profile contains torrents.db. Cleaning BT_backup cannot remove SQLite entries, so sources were kept. Choose a Fastresume profile.',
+        'changed':
+            'A source changed after preview. Sources were kept; reload the list.',
+        'destination':
+            'Choose torrent storage outside the source BT_backup folder.',
+        'missingMetainfo':
+            'No .torrent file or valid indexed metainfo was found. The qBittorrent .fastresume is kept.',
+        'noSources':
+            'No BT_backup folder found. Choose the qBittorrent data folder.',
+      }[problem] ??
+      problem;
+  @override
+  String get torrentScanFolder => 'Scan folder';
+  @override
+  String get torrentScanSystem => 'Scan all local drives';
+  @override
+  String get torrentAutoImport =>
+      'Automatically import source folders every 5 minutes';
+  @override
+  String get torrentSources => 'Import sources';
+  @override
+  String get torrentEngine => 'Choose aria2c executable';
+  @override
+  String get torrentDownload => 'Download to…';
+  @override
+  String get torrentPause => 'Pause';
+  @override
+  String get torrentResume => 'Resume';
+  @override
+  String get torrentStop => 'Stop download';
+  @override
+  String get torrentGroup => 'Group';
+  @override
+  String get torrentRemove => 'Remove from index';
+  @override
+  String get torrentRemoveHint =>
+      'The download will stop. Torrent metainfo, originals and downloaded files will remain on disk. A future scan can import it again.';
+  @override
+  String get torrentEmpty =>
+      'No torrents found. Import files or scan a folder to begin.';
+  @override
+  String get torrentScanHint =>
+      'Scans .torrent files on all mounted local drives, including torrent client backups. Files are grouped by content and deduplicated. Existing client download locations and sessions are not imported.';
+  @override
+  String get torrentScanLog => 'Open scan error log';
+  @override
+  String get torrentNoStorage =>
+      'Choose where to store torrent metainfo before importing.';
+  @override
+  String get torrentOpenFolder => 'Open download folder';
+  @override
+  String get torrentDesktopOnly =>
+      'Torrent downloads require desktop aria2. Indexing is available on accessible local folders.';
+  @override
+  String torrentStatus(String status) =>
+      const {
+        'library': 'Library',
+        'active': 'Downloading',
+        'waiting': 'Queued',
+        'paused': 'Paused',
+        'complete': 'Completed',
+        'error': 'Failed',
+      }[status] ??
+      status;
+  @override
+  String torrentCategory(String category) =>
+      const {
+        'video': 'Video',
+        'audio': 'Audio',
+        'documents': 'Documents',
+        'other': 'Other',
+      }[category] ??
+      category;
+  @override
+  String torrentScanSummary(
+    int visited,
+    int imported,
+    int duplicates,
+    int failed,
+  ) =>
+      '$visited torrents checked · $imported imported · $duplicates duplicates · $failed errors';
+  @override
+  String get torrentFilesPerPage => 'Files per page';
+  @override
+  String torrentPageSummary(int first, int last, int total) =>
+      '$first–$last of $total torrents';
+  @override
   String get galleryNsfwLabel => 'NSFW content';
   @override
   String get galleryNsfwDescription =>
@@ -782,6 +1028,15 @@ class EnglishLocalizations implements AppLocalizations {
   String get vietnameseLanguage => 'Vietnamese';
   @override
   String get englishLanguage => 'English';
+  @override
+  String get turkishLanguage => 'Turkish';
+  @override
+  String get chineseLanguage => 'Chinese (Simplified)';
+  @override
+  String get languageOnboardingTitle => 'Choose your language';
+  @override
+  String get languageOnboardingDescription =>
+      'Pick the language CB File Hub uses. You can change it later in Settings.';
 
   // Messages
   @override
@@ -816,6 +1071,8 @@ class EnglishLocalizations implements AppLocalizations {
   String get parentTagLabel => 'Parent';
   @override
   String get childTagInputHint => 'Type child tag…';
+  @override
+  String get copyTags => 'Copy tags';
   @override
   String exitTagScope(String parent) => 'Leave "$parent"';
   @override
@@ -936,6 +1193,8 @@ class EnglishLocalizations implements AppLocalizations {
   String get viewFilesWithTag => 'View Files with Tag';
   @override
   String get setThumbnail => 'Set Thumbnail';
+  @override
+  String get removeThumbnail => 'Remove Thumbnail';
   @override
   String get manageHierarchy => 'Manage Hierarchy';
   @override
@@ -1359,6 +1618,45 @@ class EnglishLocalizations implements AppLocalizations {
   String get seekSpeedMedium => 'Medium';
   @override
   String get seekSpeedFast => 'Fast';
+  @override
+  String get videoWheelAction => 'Mouse wheel over video';
+  @override
+  String get videoWheelActionDescription =>
+      'What scrolling over the player does. Middle-click the video to switch.';
+  @override
+  String get videoWheelVolume => 'Volume';
+  @override
+  String get videoWheelSeek => 'Seek';
+  @override
+  String videoWheelModeSwitched(String mode) => 'Mouse wheel: $mode';
+  @override
+  String videoWheelSwitchHint(String mode) => 'Middle-click to switch to $mode';
+  @override
+  String get videoDecoding => 'Video decoding';
+  @override
+  String get videoDecodingAuto => 'Automatic (recommended)';
+  @override
+  String get videoDecodingGpu => 'Always use GPU';
+  @override
+  String get videoDecodingCpu => 'Always use CPU';
+  @override
+  String get videoDecodingAutoDescription =>
+      'Uses the GPU decoder built into this device for smooth playback and lower battery use. Falls back to the CPU if the GPU fails.';
+  @override
+  String get videoDecodingAutoDescriptionWindows =>
+      'Uses the CPU for most videos and switches to the GPU for 4K, so seeking stays smooth. Falls back to the CPU if the GPU fails.';
+  @override
+  String get videoDecodingGpuDescription =>
+      'Decodes every video on the graphics card. Lightest on the CPU, but some drivers fail; playback then switches to the CPU.';
+  @override
+  String get videoDecodingCpuDescription =>
+      'Works on every machine, but 4K videos seek slowly and use more CPU.';
+  @override
+  String get videoDecodingReopenHint =>
+      'Fully applies the next time a video is opened.';
+  @override
+  String get videoDecodingFellBackToCpu =>
+      "The GPU couldn't decode this video, so playback switched to the CPU. You can change this in Video settings.";
   @override
   String get openVideoInNewWindow => 'Open videos in a separate window';
   @override
@@ -2212,6 +2510,8 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get emptyTrash => 'Empty Trash';
   @override
+  String get emptyingTrash => 'Emptying trash…';
+  @override
   String get emptyTrashConfirm =>
       'Are you sure you want to permanently delete all items in the trash? This action cannot be undone.';
   @override
@@ -3055,6 +3355,10 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get folders => 'Folders';
 
+  // Video player playlist
+  @override
+  String get videoPlaylist => 'Playlist';
+
   // Video player screenshot
   @override
   String get takeScreenshot => 'Take Screenshot';
@@ -3532,6 +3836,39 @@ class EnglishLocalizations implements AppLocalizations {
   String get diskCleanerCleanDone => 'Cleanup complete';
   @override
   String get diskCleanerAskAgent => 'Ask CB Agent';
+
+  @override
+  String get diskCleanerSuggestAndSelect => 'Quick review';
+  @override
+  String get diskCleanerAdviceFromScan => 'Based on scan metadata';
+  @override
+  String get diskCleanerAdviceFromAi => 'AI recommendation';
+
+  @override
+  String get diskCleanerAiSelectRecommendationsRequest =>
+      'Give a quick overview from scan metadata: what the data is and whether '
+      'to keep it or consider removing it. Use short group explanations; '
+      'review only a small number of unclear groups with AI. '
+      'Do not read file contents, select files or delete anything. Answer in English.';
+  @override
+  String get diskCleanerAgentAnalysisTitle => 'CB Agent analysis';
+  @override
+  String diskCleanerAgentGroupCount(int count) =>
+      '$count entries assessed together';
+  @override
+  String get diskCleanerAgentInspecting => 'CB Agent is examining this item';
+  @override
+  String get diskCleanerAgentCanClean => 'Can clean';
+  @override
+  String get diskCleanerAgentNeedsReview => 'Review first';
+  @override
+  String get diskCleanerAgentKeep => 'Keep';
+  @override
+  String get diskCleanerAiInspectItemRequest =>
+      'Read get_current_cleaner_scan, then inspect this exact path using '
+      'inspect_cleaner_scan_item and show your assessment on the scan screen '
+      'using set_cleaner_scan_item_analysis with select:false. Explain whether '
+      'to clean, review or keep it. Answer in English.';
   @override
   String get diskCleanerMoveToRecycleBin => 'Move to Recycle Bin';
   @override
@@ -3956,6 +4293,167 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get cleanerAppsUtilityDescription =>
       'Find large or rarely used apps and review their data';
+
+  // Cleaner - cleanup suggestions
+  @override
+  String get cleanerSuggestionsTitle => 'Cleanup suggestions';
+  @override
+  String get cleanerSuggestionsUtilityDescription =>
+      'Scan for things worth cleaning on this drive';
+  @override
+  String get cleanerSuggestionsIntro =>
+      'Finds junk files, leftover installers, old large files and space that '
+      'Windows can reclaim, and explains why each one is suggested. Nothing '
+      'is deleted until you confirm, and files go to the Recycle Bin.';
+  @override
+  String get cleanerSuggestionsScan => 'Scan for suggestions';
+  @override
+  String get cleanerSuggestionsStepJunk =>
+      'Checking caches and temporary files...';
+  @override
+  String get cleanerSuggestionsStepDownloads =>
+      'Checking the Downloads folder...';
+  @override
+  String get cleanerSuggestionsStepSystem => 'Checking Windows system files...';
+  @override
+  String get cleanerSuggestionsStepDiskScan =>
+      'Reviewing the Disk usage results...';
+  @override
+  String cleanerSuggestionsFoundItems(int count) => '$count items found';
+  @override
+  String cleanerSuggestionsFoundSize(String size) => '$size found';
+  @override
+  String get cleanerSuggestionsSourcesTitle => 'Sources checked';
+  @override
+  String get cleanerSuggestionsSourceDownloads => 'Downloads folder';
+  @override
+  String get cleanerSuggestionsSourceSystem => 'Windows system files';
+  @override
+  String get cleanerSuggestionsSourceDiskScan => 'Disk usage results';
+  @override
+  String get cleanerSuggestionsTierClean => 'Safe to clean';
+  @override
+  String get cleanerSuggestionsTierCleanHint =>
+      'Recreated automatically by Windows or apps.';
+  @override
+  String get cleanerSuggestionsTierReview => 'Review before cleaning';
+  @override
+  String get cleanerSuggestionsTierReviewHint =>
+      'Usually removable, but check that you no longer need them.';
+  @override
+  String get cleanerSuggestionsTierGuided => 'Free up with Windows tools';
+  @override
+  String get cleanerSuggestionsTierGuidedHint =>
+      'Do not delete these directly; use the suggested tool instead.';
+  @override
+  String cleanerSuggestionsReclaimable(String size) =>
+      'Up to $size can be freed';
+  @override
+  String cleanerSuggestionsSelected(String size, int count) =>
+      'Selected: $size in $count items';
+  @override
+  String get cleanerSuggestionsNothing =>
+      'Nothing worth cleaning was found on this drive.';
+  @override
+  String get cleanerSuggestionsDiskScanHint =>
+      'Run a Disk usage scan of this drive to also find large unused files, '
+      'node_modules folders and virtual disks.';
+  @override
+  String get cleanerSuggestionsConfirmTitle => 'Move to Recycle Bin?';
+  @override
+  String cleanerSuggestionsConfirmBody(int count, String size) =>
+      '$count items ($size) will be moved to the Recycle Bin. You can restore '
+      'them from there.';
+  @override
+  String cleanerSuggestionsConfirmPersonal(int count) =>
+      '$count of them are your own files, not junk. Make sure you no longer '
+      'need them.';
+  @override
+  String cleanerSuggestionsConfirmRecycleBin(int count) =>
+      '$count items already in the Recycle Bin will be deleted permanently.';
+  @override
+  String cleanerSuggestionsCleaned(String size) =>
+      'Cleaned $size. Files moved to the Recycle Bin still use space until '
+      'it is emptied.';
+  @override
+  String get cleanerSuggestionsCopyCommand => 'Copy command';
+  @override
+  String cleanerSuggestionsCommandCopied(String command) =>
+      'Copied "$command". Run it in Terminal (Admin).';
+  @override
+  String get cleanerSuggestionsOpenSettings => 'Open Windows settings';
+  @override
+  String cleanerSuggestionsShowItems(int count) => 'Show $count items';
+  @override
+  String get cleanerSuggestionsHideItems => 'Hide items';
+  @override
+  String cleanerSuggestionsAtLeast(String size) => 'at least $size';
+  @override
+  String cleanerSuggestionsMoreItems(int count) => '... and $count more';
+  @override
+  String cleanerSuggestionsScanFailed(String error) =>
+      'Could not scan for suggestions: $error';
+  @override
+  String get cleanerSuggestionsJunkScanBusy =>
+      'Another junk scan is running (Quick clean or CB Agent), so caches and '
+      'temporary files were skipped. Scan again when it finishes.';
+  @override
+  String cleanerSuggestionsPartialScan(String error) =>
+      'Part of the scan failed, so some suggestions may be missing: $error';
+  @override
+  String cleanerSuggestionTitle(String id) => switch (id) {
+    'downloads_leftovers' => 'Old installers and archives in Downloads',
+    'old_large_files' => 'Large files not used for a long time',
+    'node_modules' => 'node_modules folders',
+    'hibernation_file' => 'Hibernation file',
+    'previous_windows' => 'Previous Windows installation',
+    'wsl_disk' => 'WSL Linux disk',
+    'docker_data' => 'Docker Desktop data',
+    'virtual_machine_disk' => 'Virtual machine disks',
+    'game_library' => 'Installed games',
+    'phone_backup' => 'iPhone / iPad backups',
+    'android_dev' => 'Android SDK and emulators',
+    'ai_models' => 'Downloaded AI models',
+    _ => id,
+  };
+  @override
+  String cleanerSuggestionDetail(String id) => switch (id) {
+    'downloads_leftovers' =>
+      'Installers, disk images and archives not touched for 30+ days. They '
+          'are usually only needed once.',
+    'old_large_files' =>
+      'Your own large files with no recent activity. Old does not mean '
+          'unneeded: move them to another drive if unsure.',
+    'node_modules' =>
+      'JavaScript dependencies. Remove them from projects you no longer work '
+          'on; "npm install" restores them.',
+    'hibernation_file' =>
+      'Stores memory for hibernate and Fast Startup. Run "powercfg /h off" '
+          'in an admin terminal to remove it if you do not use hibernate.',
+    'previous_windows' =>
+      'Kept after a Windows upgrade so you can roll back. Remove it under '
+          'Storage > Temporary files once the upgrade is stable.',
+    'wsl_disk' =>
+      'Linux virtual disk that does not shrink by itself. Delete files '
+          'inside Linux, run "wsl --shutdown", then compact the disk.',
+    'docker_data' =>
+      'Images, containers and build cache. Check with "docker system df" '
+          'and prune what you no longer need.',
+    'virtual_machine_disk' =>
+      'Virtual machine disks. Remove unused VMs from their VM manager.',
+    'game_library' =>
+      'Uninstall games you no longer play from their launcher; they can be '
+          'downloaded again.',
+    'phone_backup' =>
+      'Device backups from Apple Devices / iTunes. Delete old backups from '
+          'the app.',
+    'android_dev' =>
+      'Remove unused system images and emulators from Android Studio.',
+    'ai_models' =>
+      'Model files from tools like Ollama or LM Studio. Remove models you no '
+          'longer use from the tool.',
+    _ => '',
+  };
   @override
   String get cleanerAppsLoading => 'Analyzing installed apps...';
   @override
@@ -4299,4 +4797,1096 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String unexpectedFileOpenError(String error) =>
       'Unexpected error while opening the file: $error';
+  @override
+  String get enterPath => 'Enter path...';
+  @override
+  String get clearCompleted => 'Clear completed';
+  @override
+  String get running => 'Running';
+  @override
+  String get notifications => 'Notifications';
+  @override
+  String get dismiss => 'Dismiss';
+  @override
+  String get openFileLocation => 'Open file location';
+  @override
+  String get minimize => 'Minimize';
+  @override
+  String get maximize => 'Maximize';
+  @override
+  String get tabInactiveTooltip => 'Inactive (auto-suspended after 60 minutes)';
+  @override
+  String get closeSplitView => 'Close split view';
+  @override
+  String get nothingToShow => 'Nothing to show';
+  @override
+  String get albumNotFound => 'Album not found';
+  @override
+  String get invalidAlbumId => 'Invalid album ID';
+  @override
+  String get videoLibraryNotFound => 'Video library not found';
+  @override
+  String get invalidVideoLibraryId => 'Invalid video library ID';
+  @override
+  String get vpAdvancedControls => 'Advanced Controls';
+  @override
+  String get vpAudioTracks => 'Audio Tracks';
+  @override
+  String get vpAudioTracksStub =>
+      'Audio track selection will be implemented here.';
+  @override
+  String get vpSubtitles => 'Subtitles';
+  @override
+  String get vpPlaybackSpeed => 'Playback Speed';
+  @override
+  String vpPlaybackSpeedValue(String speed) => 'Playback Speed (${speed}x)';
+  @override
+  String get vpPictureInPicture => 'Picture in Picture';
+  @override
+  String get vpExitPip => 'Exit PiP';
+  @override
+  String get vpVideoFilters => 'Video Filters';
+  @override
+  String get vpSleepTimer => 'Sleep Timer';
+  @override
+  String get vpSleepTimerActive => 'Sleep Timer (Active)';
+  @override
+  String get vpVideoSettings => 'Video Settings';
+  @override
+  String get vpReset => 'Reset';
+  @override
+  String get vpResetToDefault => 'Reset to Default';
+  @override
+  String get vpOff => 'Off';
+  @override
+  String vpHoursOption(int hours) => '$hours hour(s)';
+  @override
+  String vpMinutesOption(int minutes) => '$minutes minutes';
+  @override
+  String get vpBrightness => 'Brightness';
+  @override
+  String get vpContrast => 'Contrast';
+  @override
+  String get vpSaturation => 'Saturation';
+  @override
+  String get vpStreamSpeed => 'Stream Speed';
+  @override
+  String get vpBufferInfo => 'Buffer Info';
+  @override
+  String get vpRewind10 => 'Rewind 10s';
+  @override
+  String get vpForward10 => 'Forward 10s';
+  @override
+  String get vpCodec => 'Codec:';
+  @override
+  String get vpAuto => 'Auto';
+  @override
+  String get vpScaleMode => 'Video Scale Mode:';
+  @override
+  String get vpScaleContain => 'Fit to Window (Keep Ratio, No Crop)';
+  @override
+  String get vpScaleCover => 'Cover (Fill & Crop)';
+  @override
+  String get vpScaleFill => 'Fill (Stretch)';
+  @override
+  String get vpScaleFitWidth => 'Fit Width';
+  @override
+  String get vpScaleFitHeight => 'Fit Height';
+  @override
+  String get vpScaleNone => 'None (Original Size)';
+  @override
+  String get vpScaleDown => 'Scale Down';
+  @override
+  String get vpAudioDecoder => 'Audio Decoder:';
+  @override
+  String get vpSoftware => 'Software';
+  @override
+  String get vpHardware => 'Hardware';
+  @override
+  String vpBufferSize(int mb) => 'Buffer Size: ${mb}MB';
+  @override
+  String vpNetworkTimeout(int seconds) => 'Network Timeout: ${seconds}s';
+  @override
+  String get vpSubtitleEncoding => 'Subtitle Encoding:';
+  @override
+  String get vpOutputFormat => 'Video Output Format:';
+  @override
+  String get remove => 'Remove';
+  @override
+  String get cancelSelection => 'Cancel selection';
+  @override
+  String get deselectAll => 'Deselect all';
+  @override
+  String albumRemoveImagesTitle(int count) => 'Remove $count image(s)?';
+  @override
+  String get albumRemoveImagesBody =>
+      'Remove selected images from this album? The original files will not be deleted.';
+  @override
+  String get albumNever => 'Never';
+  @override
+  String albumSmartStatus(int rules, int sources, String last) =>
+      '$rules rules • $sources sources • Last: $last';
+  @override
+  String get albumScanningFiles => 'Scanning files...';
+  @override
+  String albumAddingFiles(int current, int total) =>
+      'Adding files... ($current/$total)';
+  @override
+  String get albumCompleted => 'Completed!';
+  @override
+  String get albumScanning => 'Scanning...';
+  @override
+  String get albumNoScanLocations => 'No scan locations configured';
+  @override
+  String albumScanningFound(int count) => 'Scanning... found $count';
+  @override
+  String albumCompletedFound(int count) => 'Completed! Found $count files';
+  @override
+  String get albumCanceled => 'Canceled';
+  @override
+  String get albumScanLocations => 'Scan Locations';
+  @override
+  String get albumNoLocationsSelected =>
+      'No locations selected. Add folders to scan for this album.';
+  @override
+  String get albumAddFolder => 'Add folder';
+  @override
+  String get albumEditAlbum => 'Edit Album';
+  @override
+  String get albumManageRules => 'Manage Rules';
+  @override
+  String get albumShuffle => 'Shuffle';
+  @override
+  String get albumUnshuffle => 'Unshuffle';
+  @override
+  String get albumAddImagesTooltip => 'Add images';
+  @override
+  String get albumRemoveFromAlbum => 'Remove from album';
+  @override
+  String get albumMoveSelectedToTrash => 'Move selected files to Trash Bin';
+  @override
+  String albumSearchImagesIn(String name) => 'Search images in $name';
+  @override
+  String get albumSmartLabel => 'Smart Album (dynamic by rules)';
+  @override
+  String get albumSources => 'Sources';
+  @override
+  String get albumRescan => 'Rescan';
+  @override
+  String get albumRules => 'Rules';
+  @override
+  String get albumNoImages => 'No images in this album';
+  @override
+  String get albumNoImagesMatch => 'No images match your search';
+  @override
+  String get albumAddImagesHint => 'Add images to start building your album';
+  @override
+  String get albumAddImages => 'Add Images';
+  @override
+  String albumDeleteOneConfirm(String name) =>
+      'Are you sure you want to delete the album "$name"? This action cannot be undone.';
+  @override
+  String albumDeleteManyConfirm(int count) =>
+      'Are you sure you want to delete $count albums? This action cannot be undone.';
+  @override
+  String get albumDeletedOne => 'Album deleted successfully';
+  @override
+  String albumDeletedMany(int count) => '$count albums deleted successfully';
+  @override
+  String albumDeleteFailedCount(int count) =>
+      'Failed to delete $count album(s)';
+  @override
+  String albumImageCount(int count) => '$count images';
+  @override
+  String get albumColumnPrivacy => 'Privacy';
+  @override
+  String get albumPublic => 'Public';
+  @override
+  String albumSourceCount(int count) => '$count source(s)';
+  @override
+  String get albumSourceSettings => 'Source settings';
+  @override
+  String get albumEditAlbumLower => 'Edit album';
+  @override
+  String get albumSetCover => 'Set Cover…';
+  @override
+  String get albumRandomCover => 'Random Cover';
+  @override
+  String get albumOptions => 'Album options';
+  @override
+  String get albumSearchSources => 'Search image sources';
+  @override
+  String get albumSearchAlbums => 'Search albums';
+  @override
+  String get albumNoMatchingResults => 'No matching results';
+  @override
+  String get albumNoSourcesYet => 'No image sources yet';
+  @override
+  String get albumNoAlbumsYet => 'No albums yet';
+  @override
+  String get albumAddSourceHint =>
+      'Add a source to browse images from its folders';
+  @override
+  String get albumCreateFirstHint =>
+      'Create your first album to organize your images';
+  @override
+  String get albumCreateImageSource => 'Create Image Source';
+  @override
+  String get albumCreateAlbum => 'Create Album';
+  @override
+  String get albumBadgeSource => 'Source';
+  @override
+  String get albumNoImagesForCover => 'No images to pick as cover';
+  @override
+  String get albumChooseCover => 'Choose Cover Image';
+  @override
+  String get ruleDeleteTitle => 'Delete Rule';
+  @override
+  String ruleDeleteConfirm(String name) =>
+      'Are you sure you want to delete the rule "$name"?';
+  @override
+  String get ruleCreateNew => 'Create New Rule';
+  @override
+  String get ruleEmptyTitle => 'Auto Album Rules';
+  @override
+  String get ruleEmptyBody =>
+      'Automatically organize your photos by creating rules\nthat match filename patterns';
+  @override
+  String get ruleCreateFirst => 'Create Your First Rule';
+  @override
+  String get ruleExScreenshots => 'Screenshots';
+  @override
+  String get ruleExScreenshotsDesc =>
+      'Files containing "screenshot" → Screenshots album';
+  @override
+  String get ruleExCamera => 'Camera Photos';
+  @override
+  String get ruleExCameraDesc => 'Files starting with "IMG_" → Camera album';
+  @override
+  String get ruleExEdited => 'Edited Photos';
+  @override
+  String get ruleExEditedDesc => 'Files ending with "_edited" → Edited album';
+  @override
+  String get rulePopularExamples => 'Popular Rule Examples';
+  @override
+  String ruleAlbumLabel(String name) => 'Album: $name';
+  @override
+  String ruleConditionLabel(String name) => 'Condition: $name';
+  @override
+  String rulePatternLabel(String pattern) => 'Pattern: "$pattern"';
+  @override
+  String get ruleMatches => 'Matches';
+  @override
+  String get ruleLastTriggered => 'Last triggered';
+  @override
+  String ruleDaysAgo(int n) => '${n}d ago';
+  @override
+  String ruleHoursAgo(int n) => '${n}h ago';
+  @override
+  String ruleMinutesAgo(int n) => '${n}m ago';
+  @override
+  String get ruleJustNow => 'Just now';
+  @override
+  String get ruleCreateAutoRule => 'Create Auto Rule';
+  @override
+  String get ruleCreate => 'Create Rule';
+  @override
+  String get ruleQuickTemplates => 'Quick Templates';
+  @override
+  String get ruleQuickTemplatesHint =>
+      'Choose a pre-made template to get started quickly';
+  @override
+  String get ruleExamples => 'Examples:';
+  @override
+  String get ruleCustom => 'Custom Rule';
+  @override
+  String get ruleName => 'Rule Name';
+  @override
+  String get ruleNameHint => 'e.g., Screenshots to Screenshots Album';
+  @override
+  String get ruleTargetAlbum => 'Target Album';
+  @override
+  String get ruleCondition => 'Condition';
+  @override
+  String get rulePattern => 'Pattern';
+  @override
+  String get rulePreview => 'Preview';
+  @override
+  String get rulePreviewHint => 'See which files would match your rule';
+  @override
+  String get rulePreviewUpdatedHint =>
+      'See which files would match your updated rule';
+  @override
+  String get ruleTestResults => 'Test Results:';
+  @override
+  String get ruleCondContains => 'Contains';
+  @override
+  String get ruleCondStartsWith => 'Starts with';
+  @override
+  String get ruleCondEndsWith => 'Ends with';
+  @override
+  String get ruleCondEquals => 'Equals';
+  @override
+  String get ruleCondRegex => 'Regex pattern';
+  @override
+  String get ruleHintContains => 'e.g., screenshot';
+  @override
+  String get ruleHintStartsWith => 'e.g., IMG_';
+  @override
+  String get ruleHintEndsWith => 'e.g., _edited';
+  @override
+  String get ruleHintEquals => 'e.g., photo';
+  @override
+  String get ruleHintRegex => r'e.g., ^IMG_\d{4}$';
+  @override
+  String get ruleEditAutoRule => 'Edit Auto Rule';
+  @override
+  String get ruleSaveChanges => 'Save Changes';
+  @override
+  String get ruleDetails => 'Rule Details';
+  @override
+  String errorWithDetail(String error) => 'Error: $error';
+  @override
+  String get albumSelectingFiles => 'Selecting files...';
+  @override
+  String get albumAddingSelectedFiles => 'Adding selected files...';
+  @override
+  String get albumAddTo => 'Add to Album';
+  @override
+  String get albumAddFromFolder => 'Add from a folder';
+  @override
+  String get albumAddFromFolderDesc => 'Add all images from a selected folder';
+  @override
+  String get albumAddSelectedPhotos => 'Add selected photos';
+  @override
+  String get albumAddSelectedPhotosDesc => 'Choose specific image files to add';
+  @override
+  String get albumColorOptional => 'Album Color (Optional)';
+  @override
+  String get albumEditTitle => 'Edit Album';
+  @override
+  String get albumCreateTitle => 'Create New Album';
+  @override
+  String get albumNameRequiredLabel => 'Album Name *';
+  @override
+  String get albumNameHint => 'Enter album name';
+  @override
+  String get albumNameRequired => 'Album name is required';
+  @override
+  String get albumNameTooLong => 'Album name must be 50 characters or less';
+  @override
+  String get albumDescriptionLabel => 'Description (Optional)';
+  @override
+  String get albumDescriptionHint => 'Enter album description';
+  @override
+  String get albumDescriptionTooLong =>
+      'Description must be 200 characters or less';
+  @override
+  String get albumDynamicSmart => 'Dynamic (Smart) Album';
+  @override
+  String get albumDynamicSmartDesc =>
+      'Content is defined by Auto Rules. No files are stored explicitly.';
+  @override
+  String get albumAddingFilesToAlbum => 'Adding files to album...';
+  @override
+  String get albumSearchAndSelect => 'Search and Select Images';
+  @override
+  String get albumSearchForImages => 'Search for images...';
+  @override
+  String albumSelectedOfTotal(int selected, int total) =>
+      '$selected of $total selected';
+  @override
+  String get albumDeselectAllCaps => 'Deselect All';
+  @override
+  String get albumLoadingImages => 'Loading images...';
+  @override
+  String get albumNoImagesFound => 'No images found';
+  @override
+  String get albumTryDifferentSearch => 'Try a different search term';
+  @override
+  String albumAddNImages(int count) => 'Add $count image(s)';
+  @override
+  String get albumAddFolderToAlbum => 'Add Folder to Album';
+  @override
+  String get albumAddAllFromFolder =>
+      'Add all images from this folder to the album?';
+  @override
+  String albumFolderName(String name) => 'Folder: $name';
+  @override
+  String get albumIncludeSubfolders => 'Include images from subfolders';
+  @override
+  String get albumAddFolderButton => 'Add Folder';
+  @override
+  String get albumAddingFolder => 'Adding folder to album...';
+  @override
+  String albumImagesCountShort(int count) => '$count image(s)';
+  @override
+  String get albumNoImagesShort => 'No images';
+  @override
+  String get albumCounting => 'Counting...';
+  @override
+  String get albumGoUp => 'Go up';
+  @override
+  String get albumSelectFolderTitle => 'Select Folder';
+  @override
+  String get albumNoFoldersFound => 'No folders found';
+  @override
+  String albumCurrentFolder(String name) => 'Current: $name';
+  @override
+  String get albumAddThisFolder => 'Add This Folder';
+  @override
+  String ivShareFailed(String error) => 'Unable to share image: $error';
+  @override
+  String get ivPrintSent => 'Image sent to the printer';
+  @override
+  String get ivPrintFailed => 'Unable to start printing for this image';
+  @override
+  String get ivDisplayFailed => 'Failed to display image';
+  @override
+  String get ivNoImages => 'No images to display';
+  @override
+  String get previous => 'Previous';
+  @override
+  String get next => 'Next';
+  @override
+  String get ivInfo => 'Info (I)';
+  @override
+  String get ivMore => 'More';
+  @override
+  String get ivZoomOut => 'Zoom out';
+  @override
+  String get ivZoomIn => 'Zoom in';
+  @override
+  String get ivRotateLeft => 'Rotate left';
+  @override
+  String get ivRotateRight => 'Rotate right';
+  @override
+  String get ivEditImage => 'Edit image';
+  @override
+  String get ivPauseSlideshow => 'Pause slideshow';
+  @override
+  String get ivPlaySlideshow => 'Play slideshow';
+  @override
+  String get ivExitFullscreen => 'Exit fullscreen';
+  @override
+  String get ivFullscreen => 'Fullscreen';
+  @override
+  String get ivPrint => 'Print (Ctrl+P)';
+  @override
+  String get ivResetZoom => 'Reset zoom (0)';
+  @override
+  String get ivCopyPath => 'Copy file path';
+  @override
+  String get ivHideThumbnails => 'Hide thumbnails';
+  @override
+  String get ivShowThumbnails => 'Show thumbnails';
+  @override
+  String get edDiscardTitle => 'Discard changes?';
+  @override
+  String get edDiscardBody => 'Your edits have not been saved.';
+  @override
+  String get edDiscard => 'Discard';
+  @override
+  String get edSaveDialogTitle => 'Save edited copy';
+  @override
+  String get edSavedCopy => 'Saved edited copy';
+  @override
+  String edSaveFailed(String error) => 'Unable to save image: $error';
+  @override
+  String edEraseFailed(String error) => 'Unable to erase: $error';
+  @override
+  String get edAddText => 'Add text';
+  @override
+  String get edTypeSomething => 'Type something';
+  @override
+  String get add => 'Add';
+  @override
+  String get edCloseEditor => 'Close editor (Esc)';
+  @override
+  String get edTitle => 'Edit';
+  @override
+  String get edUndo => 'Undo (Ctrl+Z)';
+  @override
+  String get edRedo => 'Redo (Ctrl+Y)';
+  @override
+  String get edHoldToCompare => 'Hold to compare';
+  @override
+  String get edSaving => 'Saving...';
+  @override
+  String get edSaveCopy => 'Save copy';
+  @override
+  String get edToolCrop => 'Crop';
+  @override
+  String get edToolAdjust => 'Adjust';
+  @override
+  String get edToolFilters => 'Filters';
+  @override
+  String get edToolMarkup => 'Markup';
+  @override
+  String get edToolErase => 'Erase';
+  @override
+  String get edAspectRatio => 'Aspect ratio';
+  @override
+  String get edAspectFree => 'Free';
+  @override
+  String get edAspectOriginal => 'Original';
+  @override
+  String get edRotateFlip => 'Rotate & flip';
+  @override
+  String get edFlipHorizontal => 'Flip horizontal';
+  @override
+  String get edFlipVertical => 'Flip vertical';
+  @override
+  String get edLightColour => 'Light & colour';
+  @override
+  String get edExposure => 'Exposure';
+  @override
+  String get edWarmth => 'Warmth';
+  @override
+  String get edTint => 'Tint';
+  @override
+  String get edVignette => 'Vignette';
+  @override
+  String get edStrength => 'Strength';
+  @override
+  String get edFilterVivid => 'Vivid';
+  @override
+  String get edFilterWarm => 'Warm';
+  @override
+  String get edFilterCool => 'Cool';
+  @override
+  String get edFilterFade => 'Fade';
+  @override
+  String get edFilterDramatic => 'Dramatic';
+  @override
+  String get edFilterMono => 'Mono';
+  @override
+  String get edFilterNoir => 'Noir';
+  @override
+  String get edFilterSepia => 'Sepia';
+  @override
+  String get edTool => 'Tool';
+  @override
+  String get edPen => 'Pen';
+  @override
+  String get edHighlighter => 'Highlighter';
+  @override
+  String get edArrow => 'Arrow';
+  @override
+  String get edLine => 'Line';
+  @override
+  String get edRectangle => 'Rectangle';
+  @override
+  String get edEllipse => 'Ellipse';
+  @override
+  String get edText => 'Text';
+  @override
+  String get edEraseMarkup => 'Erase markup';
+  @override
+  String get edColour => 'Colour';
+  @override
+  String get edTextSize => 'Text size';
+  @override
+  String get edSize => 'Size';
+  @override
+  String get edTextHint => 'Click on the picture where the text should go.';
+  @override
+  String get edEraseTitle => 'Erase';
+  @override
+  String get edEraseHint =>
+      'Paint over what you want to remove. It is filled in from its surroundings. Works best on small objects and blemishes.';
+  @override
+  String get edBrush => 'Brush';
+  @override
+  String edOpenFailed(String error) =>
+      'Unable to open this image for editing.\n$error';
+  @override
+  String get edErasing => 'Erasing...';
+  @override
+  String get edOriginal => 'Original';
+  @override
+  String get edDoubleClickReset => 'Double-click to reset';
+  @override
+  String get cachePhotoThumbs => 'Photo thumbnails';
+  @override
+  String get cachePhotoThumbsDesc =>
+      'Generated JPEG previews for image grids and viewers';
+  @override
+  String get cacheVideoThumbs => 'Video thumbnails';
+  @override
+  String get cacheVideoThumbsDesc => 'Cached frame previews for videos';
+  @override
+  String get cacheNetworkThumbs => 'Network thumbnails';
+  @override
+  String get cacheNetworkThumbsDesc => 'SMB / FTP / WebDAV thumbnail cache';
+  @override
+  String get cacheLibrary => 'Video library cache';
+  @override
+  String get cacheLibraryDesc => 'Video library metadata and cached artifacts';
+  @override
+  String get cacheTempFiles => 'Temporary files';
+  @override
+  String get cacheTempFilesDesc => 'Transient downloads and working files';
+  @override
+  String cacheLoadFailed(String error) => 'Failed to load cache info: $error';
+  @override
+  String get cacheOpenFolderFailed =>
+      'Could not open folder in system explorer';
+  @override
+  String cacheEntryCleared(String name) => '$name cleared';
+  @override
+  String cacheEntryClearFailed(String name, String error) =>
+      'Failed to clear $name: $error';
+  @override
+  String get cacheAllCleared => 'All cache cleared';
+  @override
+  String cacheClearFailed(String error) => 'Failed to clear cache: $error';
+  @override
+  String get cacheTotalSize => 'Total size';
+  @override
+  String get cacheFilesLabel => 'Files';
+  @override
+  String get cacheBuckets => 'Buckets';
+  @override
+  String cacheFilesCount(int count) => '$count files';
+  @override
+  String cachePercentOfTotal(String percent) => '$percent% of total cache';
+  @override
+  String dbLoadPrefsFailed(String error) =>
+      'Error loading database preferences: $error';
+  @override
+  String get dbClearAllWarning =>
+      'This will delete all app settings including theme, language, and view preferences. The app may restart.';
+  @override
+  String get dbNoPrefs => 'No preferences stored.';
+  @override
+  String dbRowsCount(int count) => '$count rows';
+  @override
+  String dbRangeOfTotal(int start, int end, int total) =>
+      '$start-$end of $total';
+  @override
+  String get dbRowsPerPage => 'Rows per page';
+  @override
+  String dbPageOf(int page, int total) => 'Page $page / $total';
+  @override
+  String get faNoData => 'No data available';
+  @override
+  String get faShowInHub => 'Show Featured Albums in Gallery Hub';
+  @override
+  String get faAutoSelect => 'Auto-select recent albums';
+  @override
+  String get faAutoSelectDesc =>
+      'Automatically feature your most recent albums';
+  @override
+  String get faMax => 'Max featured albums';
+  @override
+  String get faManual => 'Manually select featured albums';
+  @override
+  String get laNoTokenInClipboard => 'No token found in clipboard';
+  @override
+  String get laRemoveModelConfirm => 'Remove this model from your device?';
+  @override
+  String laOpenLocationFailed(String error) =>
+      'Failed to open location: $error';
+  @override
+  String get laRuntimePending => 'Runtime pending';
+  @override
+  String get laRequiresGguf => 'Requires GGUF';
+  @override
+  String get laInstallFailed => 'Installation Failed';
+  @override
+  String get laDownloading => 'Downloading...';
+  @override
+  String tagTabName(String tag) => 'Tag: $tag';
+  @override
+  String tagThumbnailSet(String tag) => 'Thumbnail set for "$tag"';
+  @override
+  String get tagThumbnailSetFailed => 'Failed to set thumbnail';
+  @override
+  String tagThumbnailRemoved(String tag) => 'Thumbnail removed for "$tag"';
+  @override
+  String get tagThumbnailRemoveFailed => 'Failed to remove thumbnail';
+  @override
+  String tagHasChildren(int count, String children) =>
+      'This tag has $count child tag(s): $children';
+  @override
+  String get tagWhatToDo => 'What would you like to do?';
+  @override
+  String get tagDeleteParentOnly => 'Delete parent only';
+  @override
+  String get tagDeleteParentAndChildren => 'Delete parent and children';
+  @override
+  String tagsDeletedList(int count, String tags) =>
+      'Deleted $count tags: $tags';
+  @override
+  String tagCannotAddChild(String name) =>
+      'Cannot add "$name" - circular reference or error';
+  @override
+  String tagCannotSetParent(String name) =>
+      'Cannot set "$name" as parent - circular reference or error';
+  @override
+  String tagHierarchyTitle(String tag) => 'Hierarchy: "$tag"';
+  @override
+  String get tagNoParents => 'No parent tags';
+  @override
+  String get tagNoChildren => 'No child tags';
+  @override
+  String get tagAddParentHint => 'Add parent...';
+  @override
+  String get tagAddChildHint => 'Add child... (comma-separated)';
+  @override
+  String get tagQuickPicks => 'Quick Picks';
+  @override
+  String get tagQuickPicksDesc => 'Choose from popular and recently used tags';
+  @override
+  String get tagBrowseTreeDesc =>
+      'Browse the tag tree — expand a parent to pick its children.';
+  @override
+  String get tagSearchTitle => 'Search by tag';
+  @override
+  String get tagSearchInputLabel => 'Enter a tag to search';
+  @override
+  String get tagSearchInputHint => 'Example: important, work, personal';
+  @override
+  String get tagSearchGlobal => 'Global search';
+  @override
+  String get tagSearchGlobalDesc => 'Search anywhere on your device';
+  @override
+  String get tagSearchNoTags => 'No tags available';
+  @override
+  String get newMenu => 'New';
+  @override
+  String get customizeMenu => 'Customize...';
+  @override
+  String get fileCreateFailedDetail =>
+      'File may already exist or the destination is not writable';
+  @override
+  String get customizeNewMenuTitle => 'Customize New Menu';
+  @override
+  String folderFilesFolders(int files, int folders) =>
+      '$files files, $folders folders';
+  @override
+  String dndMoved(int count) => 'Moved $count item(s)';
+  @override
+  String get dndFolderIntoItself => 'Cannot move a folder into itself';
+  @override
+  String get dndLocalOnly => 'Drag and drop supports local paths only';
+  @override
+  String get dndDestinationMissing => 'Destination folder is not available';
+  @override
+  String get dndMoveFailed => 'Move failed';
+  @override
+  String get toggleView => 'Toggle view';
+  @override
+  String get folderNameLabelShort => 'Folder name';
+  @override
+  String get vfPickFrame => 'Pick frame from video';
+  @override
+  String get vfExtractFailed =>
+      'Failed to extract frame. Try a different position.';
+  @override
+  String get pause => 'Pause';
+  @override
+  String get play => 'Play';
+  @override
+  String vfPreviewAt(String time) => 'Preview at $time';
+  @override
+  String get preview => 'Preview';
+  @override
+  String get vfUseFrame => 'Use this frame';
+  @override
+  String get cfCsvSpreadsheet => 'CSV Spreadsheet';
+  @override
+  String get cfNoTemplates => 'No templates available';
+  @override
+  String cfNoResultsFor(String query) => 'No results for "$query"';
+  @override
+  String cfExtension(String ext) => 'Extension: $ext';
+  @override
+  String cfCreatesFile(String ext) => 'Creates a$ext file';
+  @override
+  String mpDriveSystem(String letter) => '$letter (System)';
+  @override
+  String mpDriveOther(String letter) => '$letter (Drive)';
+  @override
+  String get tagManageHierarchy => 'Manage Hierarchy';
+  @override
+  String get tagFilterParent => 'Parent tags';
+  @override
+  String get tagFilterChild => 'Child tags';
+  @override
+  String get tagFilterStandalone => 'Standalone';
+  @override
+  String get tagFilterHasThumb => 'Has thumbnail';
+  @override
+  String get tagFilterNoThumb => 'No thumbnail';
+  @override
+  String get tagFilterAll => 'All';
+  @override
+  String get tagFilterTitle => 'Filter tags';
+  @override
+  String get tagManageHierarchyTooltip => 'Manage hierarchy (parent/child)';
+  @override
+  String get tagDoubleClickChildren => 'Double click to open child tags';
+  @override
+  String get tagDoubleClickFiles => 'Double click to open files';
+  @override
+  String get tagHierarchyFormatHelp =>
+      'Use parent:child format for hierarchy\ne.g. Actress:Hung or Actress:Hung,Van';
+  @override
+  String get tagInvalidFormat =>
+      'Invalid format. Use parent:child or parent:child1,child2';
+  @override
+  String get tagNoChildSpecified => 'No child tags specified';
+  @override
+  String tagRelationFailed(String parent, String child) =>
+      'Could not create relationship: $parent -> $child (circular reference?)';
+  @override
+  String tagHierarchyCreated(String parent, String children, int count) =>
+      'Created hierarchy: $parent -> $children ($count relationships)';
+  @override
+  String get tagCircularHierarchy => 'Cannot create circular tag hierarchy';
+  @override
+  String tagMovedUnder(String child, String parent) =>
+      'Moved "$child" under "$parent"';
+  @override
+  String get aiViewRawPayload => 'View raw payload';
+  @override
+  String get aiViewPayload => 'View payload';
+  @override
+  String get aiProviderError => 'Provider error';
+  @override
+  String get aiToolActivity => 'Tool activity';
+  @override
+  String aiContextInfo(int messages, String chars) =>
+      '$messages messages · $chars chars\nContext trimming starts at ~24K chars';
+  @override
+  String get aiAllDrives => 'All Drives';
+  @override
+  String get aiThinking => 'Thinking...';
+  @override
+  String get aiDropToMention => 'Drop to mention';
+  @override
+  String aiFilesAttached(int count) => '$count file(s) attached';
+  @override
+  String get aiStopGeneration => 'Stop generation';
+  @override
+  String aiLinkCopied(String href) => 'Link copied: $href';
+  @override
+  String get aiJustNow => 'Just now';
+  @override
+  String aiMinutesAgo(int n) => '${n}m ago';
+  @override
+  String aiHoursAgo(int n) => '${n}h ago';
+  @override
+  String aiDaysAgo(int n) => '${n}d ago';
+  @override
+  String get aiFileNotFound => 'File not found';
+  @override
+  String get aiOpenFolderTooltip => 'Open folder';
+  @override
+  String get aiOpenFileTooltip => 'Open file';
+  @override
+  String get aiNoPayload =>
+      'No payload captured yet. Send a message first to see the request.';
+  @override
+  String get aiRawApiPayload => 'Raw API payload';
+  @override
+  String get aiCopiedToClipboard => 'Copied to clipboard';
+  @override
+  String get aiStreaming => 'streaming';
+  @override
+  String get aiNonStreaming => 'non-streaming';
+  @override
+  String get aiLoadingContent => 'Loading content...';
+  @override
+  String aiMoreLines(int count) => '... ($count more lines)';
+  @override
+  String get aiToolOk => 'OK';
+  @override
+  String get aiToolFailed => 'FAILED';
+  @override
+  String foErrorCopying(String error) => 'Error copying: $error';
+  @override
+  String foErrorCutting(String error) => 'Error cutting: $error';
+  @override
+  String foErrorPasting(String error) => 'Error pasting: $error';
+  @override
+  String foErrorRenaming(String error) => 'Error renaming: $error';
+  @override
+  String get foNothingToPaste => 'Nothing to paste — clipboard is empty';
+  @override
+  String foMovingOne(String name) => 'Moving "$name"';
+  @override
+  String foCopyingOne(String name) => 'Copying "$name"';
+  @override
+  String foMovingMany(int count) => 'Moving $count items';
+  @override
+  String foCopyingMany(int count) => 'Copying $count items';
+  @override
+  String foMoveProgress(int done, int total, String dest) =>
+      'Moving item $done of $total to $dest';
+  @override
+  String foCopyProgress(int done, int total, String dest) =>
+      'Copying item $done of $total to $dest';
+  @override
+  String foMovedItems(int count, String dest) =>
+      'Moved $count item${count > 1 ? "s" : ""} to $dest';
+  @override
+  String foCopiedItems(int count, String dest) =>
+      'Copied $count item${count > 1 ? "s" : ""} to $dest';
+  @override
+  String get foMovingVerb => 'Moving';
+  @override
+  String get foCopyingVerb => 'Copying';
+  @override
+  String foPasteDetailNoSource(String action, int count, String dest) =>
+      '$action $count item${count > 1 ? "s" : ""} to $dest';
+  @override
+  String foPasteDetail(
+    String action,
+    String source,
+    String from,
+    String dest,
+  ) => '$action $source from $from to $dest';
+  @override
+  String foAndMore(String name, int more) => '$name and $more more';
+  @override
+  String foDeleteDetail(String action, String item, String parent) =>
+      '$action: $item from $parent';
+  @override
+  String get foActionPermanentDelete => 'Permanent delete';
+  @override
+  String get foActionMoveToTrash => 'Move to Trash Bin';
+  @override
+  String foDeletingOnePerm(String name) => 'Deleting "$name" permanently';
+  @override
+  String foDeletingOneTrash(String name) => 'Deleting "$name" to Trash Bin';
+  @override
+  String foDeletingFilesPerm(int count) => 'Deleting $count files permanently';
+  @override
+  String foDeletingFilesTrash(int count) =>
+      'Deleting $count files to Trash Bin';
+  @override
+  String foDeletingItemsPerm(int count) => 'Deleting $count items permanently';
+  @override
+  String foMovingOneTrash(String name) => 'Moving "$name" to Trash Bin';
+  @override
+  String foMovingItemsTrash(int count) => 'Moving $count items to Trash Bin';
+  @override
+  String foPermDeletedProgress(int done, int total) =>
+      'Permanently deleted $done of $total';
+  @override
+  String foTrashedProgress(int done, int total) =>
+      'Moved to Trash Bin $done of $total';
+  @override
+  String foPermDeletedFiles(int count) =>
+      'Permanently deleted $count file${count > 1 ? "s" : ""}';
+  @override
+  String foTrashedFiles(int count) =>
+      'Moved to Trash Bin $count file${count > 1 ? "s" : ""}';
+  @override
+  String foPermDeletedItems(int count) =>
+      'Permanently deleted $count item${count > 1 ? "s" : ""}';
+  @override
+  String foTrashedItems(int count) =>
+      'Moved to Trash Bin $count item${count > 1 ? "s" : ""}';
+  @override
+  String foAdminDeletingOne(String name) => 'Deleting "$name" as administrator';
+  @override
+  String foAdminDeletingMany(int count) =>
+      'Deleting $count items as administrator';
+  @override
+  String get foAdminWaiting => 'Waiting for Windows administrator approval';
+  @override
+  String foAdminDeletedOne(String path) => 'Deleted "$path" as administrator.';
+  @override
+  String foAdminDeletedMany(int count) =>
+      'Deleted $count items as administrator.';
+  @override
+  String foAdminFailedOne(String path) =>
+      'Administrator delete was cancelled or failed for "$path".';
+  @override
+  String foAdminFailedMany(int count) =>
+      'Administrator delete was cancelled or failed for $count items.';
+  @override
+  String get foDeleteFailed => 'Delete failed';
+  @override
+  String foFirstFailureItems(int count, String path) =>
+      '$count items; first failure: "$path"';
+  @override
+  String foCouldNotDeleteAccessDenied(String item) =>
+      'Could not delete $item: Access denied. Check folder permissions or run the app as administrator.';
+  @override
+  String foCouldNotDeleteReason(String item, String reason) =>
+      'Could not delete $item: $reason.';
+  @override
+  String foCouldNotDelete(String item) => 'Could not delete $item.';
+  @override
+  String get fnDirNotExist => 'Directory does not exist';
+  @override
+  String get fnStoragePermission => 'Storage permission required';
+  @override
+  String fnErrorSorting(String error) => 'Error sorting: $error';
+  @override
+  String fnInvalidRegex(String error) => 'Invalid regex: $error';
+  @override
+  String get fnAccessDeniedAdmin =>
+      'Access denied. Try running as administrator.';
+  @override
+  String tsErrorLoadingTags(String error) => 'Error loading tags: $error';
+  @override
+  String tsErrorAddingTag(String error) => 'Error adding tag: $error';
+  @override
+  String tsErrorRemovingTag(String error) => 'Error removing tag: $error';
+  @override
+  String tsErrorBatchAdding(String error) => 'Error batch adding tag: $error';
+  @override
+  String tsTagSearchError(String error) => 'Tag search error: $error';
+  @override
+  String tsGlobalTagSearchError(String error) =>
+      'Global tag search error: $error';
+  @override
+  String tsMultiTagSearchError(String error) =>
+      'Multi-tag search error: $error';
+  @override
+  String tsGlobalMultiTagSearchError(String error) =>
+      'Global multi-tag search error: $error';
+  @override
+  String get jlTemp => 'TEMP';
+  @override
+  String get jlBrowser => 'BROWSER';
+  @override
+  String get jlRecycle => 'RECYCLE';
+  @override
+  String get jlThumbs => 'THUMBS';
+  @override
+  String get jlAppCache => 'APP CACHE';
+  @override
+  String get jlCrashLog => 'CRASH/LOG';
+  @override
+  String get jlWinUpdate => 'WIN UPDATE';
+  @override
+  String get jlPrefetch => 'PREFETCH';
+  @override
+  String get jlDelivery => 'DELIVERY';
+  @override
+  String get jlDevCache => 'DEV CACHE';
+  @override
+  String get jlJunk => 'JUNK';
+  @override
+  String get treeLoadFailedRetry => 'Failed to load. Tap to retry.';
+  @override
+  String cleanerRefreshFailed(String error) => 'Refresh failed: $error';
+  @override
+  String cleanerLoadPropsFailed(String error) =>
+      'Failed to load properties: $error';
+  @override
+  String get aiProviderNameHint => 'My OpenAI';
+  @override
+  String get aiSystemPromptHint => 'Optional custom system prompt...';
+  @override
+  String get vlNameHint => 'My Movies';
+  @override
+  String get vlDescriptionHint => 'Personal movie collection';
 }

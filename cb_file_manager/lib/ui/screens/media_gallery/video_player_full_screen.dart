@@ -14,6 +14,7 @@ import 'package:window_manager/window_manager.dart';
 import 'package:cb_file_manager/ui/components/video/video_player/video_info_dialog.dart';
 import 'package:cb_file_manager/ui/components/video/video_player/video_player.dart';
 import 'package:cb_file_manager/ui/components/video/video_player/video_player_app_bar.dart';
+import 'package:cb_file_manager/ui/components/video/video_player/video_playlist.dart';
 
 class VideoPlayerFullScreen extends StatefulWidget {
   /// Local file (use when path is available, e.g. file:// on Android).
@@ -49,6 +50,10 @@ String _shortName(String? contentUri) {
 }
 
 class _VideoPlayerFullScreenState extends State<VideoPlayerFullScreen> {
+  /// The file playing now; starts as [VideoPlayerFullScreen.file] and moves
+  /// when an entry is picked from the playlist.
+  late File? _currentFile = widget.file;
+  List<File>? _playlist;
   Map<String, dynamic>? _videoMetadata;
   bool _isFullScreen = false;
   bool _showAppBar = true; // Control app bar visibility
@@ -113,6 +118,57 @@ class _VideoPlayerFullScreenState extends State<VideoPlayerFullScreen> {
       // Inner VideoPlayer drives overlay visibility; just keep app bar visible initially.
       setState(() => _showAppBar = true);
     });
+    _loadPlaylist();
+  }
+
+  @override
+  void didUpdateWidget(covariant VideoPlayerFullScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // The video window reuses this widget for a newly opened path.
+    if (widget.file?.path != oldWidget.file?.path) {
+      _currentFile = widget.file;
+      _videoMetadata = null;
+      _loadPlaylist();
+    }
+  }
+
+  Future<void> _loadPlaylist() async {
+    final file = _currentFile;
+    if (file == null) return;
+    final folder = file.parent.path;
+    // Reloaded on every switch so a sort changed in the folder view meanwhile
+    // carries over. A list for the same folder stays up until then; one for
+    // another folder drops out (this runs right before a build).
+    if (_playlist?.isNotEmpty != true ||
+        !pathlib.equals(_playlist!.first.parent.path, folder)) {
+      _playlist = null;
+    }
+    final items = await VideoPlaylist.fromFolder(file);
+    if (!mounted || !identical(_currentFile, file)) return;
+    setState(() => _playlist = items);
+  }
+
+  /// The playlist entry after [_currentFile], if any.
+  File? get _nextVideo {
+    final items = _playlist;
+    final current = _currentFile;
+    if (items == null || current == null) return null;
+    final index = items.indexWhere((f) => pathlib.equals(f.path, current.path));
+    if (index < 0 || index + 1 >= items.length) return null;
+    return items[index + 1];
+  }
+
+  void _playNextVideo() {
+    final next = _nextVideo;
+    if (next != null && mounted) _playFromPlaylist(next);
+  }
+
+  void _playFromPlaylist(File file) {
+    setState(() {
+      _currentFile = file;
+      _videoMetadata = null;
+    });
+    _loadPlaylist();
   }
 
   @override
@@ -157,11 +213,11 @@ class _VideoPlayerFullScreenState extends State<VideoPlayerFullScreen> {
           : ((_isFullScreen && !_showAppBar) || _inAndroidPip
                 ? null // Hide app bar completely when in fullscreen and _showAppBar is false
                 : VideoPlayerAppBar(
-                    title: widget.file != null
-                        ? pathlib.basename(widget.file!.path)
+                    title: _currentFile != null
+                        ? pathlib.basename(_currentFile!.path)
                         : _shortName(widget.contentUri),
                     actions: [
-                      if (widget.file != null)
+                      if (_currentFile != null)
                         IconButton(
                           icon: const Icon(
                             PhosphorIconsLight.info,
@@ -214,7 +270,8 @@ class _VideoPlayerFullScreenState extends State<VideoPlayerFullScreen> {
   void _onVideoInitialized(Map<String, dynamic> metadata) {
     setState(() => _videoMetadata = metadata);
     widget.onVideoMetadata?.call(metadata);
-    if (Platform.isAndroid || Platform.isIOS) {
+    // A video that followed on in fullscreen keeps the immersive mode.
+    if ((Platform.isAndroid || Platform.isIOS) && !_isFullScreen) {
       SystemChrome.setEnabledSystemUIMode(
         SystemUiMode.manual,
         overlays: [SystemUiOverlay.top, SystemUiOverlay.bottom],
@@ -250,13 +307,14 @@ class _VideoPlayerFullScreenState extends State<VideoPlayerFullScreen> {
   }
 
   Widget _buildPlayer(BuildContext context) {
-    if (widget.file != null) {
+    final file = _currentFile;
+    if (file != null) {
       return VideoPlayer.file(
         // Keyed by source: switching files builds a fresh player instead of
         // tearing down and re-opening the live one (which races pending
         // callbacks into "Player has been disposed").
-        key: ValueKey<String>(widget.file!.path),
-        file: widget.file!,
+        key: ValueKey<String>(file.path),
+        file: file,
         autoPlay: true,
         showControls: true,
         allowFullScreen: true,
@@ -264,6 +322,12 @@ class _VideoPlayerFullScreenState extends State<VideoPlayerFullScreen> {
         onError: _onVideoError,
         onFullScreenChanged: _onFullScreenChanged,
         onControlVisibilityChanged: _onControlVisibilityChanged,
+        playlist: _playlist,
+        onPlaylistItemSelected: _playFromPlaylist,
+        hasNextVideo: _nextVideo != null,
+        onNextVideo: _playNextVideo,
+        // A replacement player picks up the fullscreen state it inherits.
+        initiallyFullScreen: _isFullScreen,
         onOpenFolder: (folderPath, highlightedFileName) {
           Navigator.of(context).pop({
             'action': 'openFolder',
@@ -287,11 +351,12 @@ class _VideoPlayerFullScreenState extends State<VideoPlayerFullScreen> {
   }
 
   void _showVideoInfo(BuildContext context) {
-    if (widget.file == null) return;
+    final file = _currentFile;
+    if (file == null) return;
     RouteUtils.showAcrylicDialog(
       context: context,
       builder: (context) =>
-          VideoInfoDialog(file: widget.file!, videoMetadata: _videoMetadata),
+          VideoInfoDialog(file: file, videoMetadata: _videoMetadata),
     );
   }
 }

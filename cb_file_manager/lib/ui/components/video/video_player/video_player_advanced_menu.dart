@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../../config/languages/app_localizations.dart';
+import '../../../../config/translation_helper.dart';
 
 /// Shared menu tile: icon + title, dense, zero padding. Used by [VideoPlayerAdvancedMenu].
 class _VideoPlayerMenuTile extends StatelessWidget {
@@ -89,7 +90,7 @@ class VideoPlayerAdvancedMenu extends StatelessWidget {
           size: 24,
         ),
         color: Colors.black.withValues(alpha: 0.9),
-        tooltip: 'Advanced Controls',
+        tooltip: context.tr.vpAdvancedControls,
         onSelected: (String value) {
           switch (value) {
             case 'screenshot':
@@ -127,11 +128,11 @@ class VideoPlayerAdvancedMenu extends StatelessWidget {
             ),
           ),
           if (Platform.isWindows)
-            const PopupMenuItem<String>(
+            PopupMenuItem<String>(
               value: 'audio_tracks',
               child: _VideoPlayerMenuTile(
                 icon: PhosphorIconsLight.musicNotes,
-                title: 'Audio Tracks',
+                title: context.tr.vpAudioTracks,
               ),
             ),
           PopupMenuItem<String>(
@@ -139,7 +140,7 @@ class VideoPlayerAdvancedMenu extends StatelessWidget {
             enabled: hasSubtitles,
             child: _VideoPlayerMenuTile(
               icon: PhosphorIconsLight.subtitles,
-              title: 'Subtitles',
+              title: context.tr.vpSubtitles,
               iconColor: hasSubtitles ? Colors.white : Colors.grey,
               titleColor: hasSubtitles ? Colors.white : Colors.grey,
             ),
@@ -148,7 +149,9 @@ class VideoPlayerAdvancedMenu extends StatelessWidget {
             value: 'speed',
             child: _VideoPlayerMenuTile(
               icon: PhosphorIconsLight.speedometer,
-              title: 'Playback Speed (${playbackSpeed}x)',
+              title: AppLocalizations.of(
+                context,
+              )!.vpPlaybackSpeedValue(playbackSpeed.toString()),
             ),
           ),
           PopupMenuItem<String>(
@@ -157,14 +160,16 @@ class VideoPlayerAdvancedMenu extends StatelessWidget {
               icon: isPictureInPicture
                   ? PhosphorIconsLight.pictureInpicture
                   : PhosphorIconsLight.pictureInpicture,
-              title: isPictureInPicture ? 'Exit PiP' : 'Picture in Picture',
+              title: isPictureInPicture
+                  ? context.tr.vpExitPip
+                  : context.tr.vpPictureInPicture,
             ),
           ),
-          const PopupMenuItem<String>(
+          PopupMenuItem<String>(
             value: 'filters',
             child: _VideoPlayerMenuTile(
               icon: PhosphorIconsLight.slidersHorizontal,
-              title: 'Video Filters',
+              title: context.tr.vpVideoFilters,
             ),
           ),
           PopupMenuItem<String>(
@@ -172,18 +177,18 @@ class VideoPlayerAdvancedMenu extends StatelessWidget {
             child: _VideoPlayerMenuTile(
               icon: PhosphorIconsLight.moon,
               title: sleepDuration != null
-                  ? 'Sleep Timer (Active)'
-                  : 'Sleep Timer',
+                  ? context.tr.vpSleepTimerActive
+                  : context.tr.vpSleepTimer,
               iconColor: sleepDuration != null ? Colors.orange : Colors.white,
               titleColor: sleepDuration != null ? Colors.orange : Colors.white,
             ),
           ),
           const PopupMenuDivider(),
-          const PopupMenuItem<String>(
+          PopupMenuItem<String>(
             value: 'settings',
             child: _VideoPlayerMenuTile(
               icon: PhosphorIconsLight.gear,
-              title: 'Video Settings',
+              title: context.tr.vpVideoSettings,
             ),
           ),
         ],

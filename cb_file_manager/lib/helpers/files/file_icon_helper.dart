@@ -44,7 +44,7 @@ class FileIconHelper {
   static final Map<String, Widget> _extensionIconCache = {};
 
   /// Track in-flight warmup to avoid duplicate batch calls.
-  static Future<void>? _warmupFuture;
+  static final Map<String, Future<void>> _extensionWarmups = {};
 
   /// Pre-warm icon cache for all extensions visible in the current list.
   /// Call once after listing arrives, before items render.
@@ -56,22 +56,48 @@ class FileIconHelper {
     if (!Platform.isWindows) return;
 
     // Filter to only non-media extensions that aren't already cached
-    final missing = extensions.where((ext) {
-      if (ext.isEmpty) return false;
-      final normalizedExt = ext.startsWith('.') ? ext : '.$ext';
-      final category = FileTypeRegistry.getCategory(normalizedExt);
-      if (category == FileCategory.image || category == FileCategory.video) {
-        return false;
-      }
-      return !_extensionIconCache.containsKey('${ext}_$size');
-    }).toList();
+    final missing = extensions
+        .map((ext) => ext.toLowerCase())
+        .map((ext) => ext.isEmpty || ext.startsWith('.') ? ext : '.$ext')
+        .toSet()
+        .where((ext) {
+          if (ext.isEmpty) return false;
+          final normalizedExt = ext.startsWith('.') ? ext : '.$ext';
+          final category = FileTypeRegistry.getCategory(normalizedExt);
+          if (category == FileCategory.image ||
+              category == FileCategory.video) {
+            return false;
+          }
+          return !_extensionIconCache.containsKey('${ext}_$size');
+        })
+        .toList();
 
     if (missing.isEmpty) return;
 
-    // Avoid duplicate concurrent warmups
-    _warmupFuture = _doWarmup(missing, size);
-    await _warmupFuture;
-    _warmupFuture = null;
+    final waiting = <Future<void>>{};
+    final fresh = <String>[];
+    for (final ext in missing) {
+      final pending = _extensionWarmups['${ext}_$size'];
+      if (pending == null) {
+        fresh.add(ext);
+      } else {
+        waiting.add(pending);
+      }
+    }
+    if (fresh.isNotEmpty) {
+      final job = _doWarmup(fresh, size);
+      for (final ext in fresh) {
+        _extensionWarmups['${ext}_$size'] = job;
+      }
+      waiting.add(
+        job.whenComplete(() {
+          for (final ext in fresh) {
+            _extensionWarmups.remove('${ext}_$size');
+          }
+        }),
+      );
+    }
+    await Future.wait(waiting);
   }
 
   static Future<void> _doWarmup(List<String> extensions, int size) async {
@@ -184,10 +210,20 @@ class FileIconHelper {
     return _extensionIconCache['${extension}_$size'];
   }
 
+  static Widget? getCachedIconForFile(File file, {int size = 24}) =>
+      getExtensionIconSync(_getFileExtension(file), size: size);
+
   /// Get an icon for a file. If possible, return the icon of the default application.
   /// If no default app is found, return an appropriate icon based on file type.
   static Future<Widget> getIconForFile(File file, {double size = 24}) async {
     final String extension = _getFileExtension(file);
+    // Torrent indexes do not go through the normal folder BLoC's icon warmup.
+    // Ask Windows for the associated file-type icon, including virtual magnets.
+    if (Platform.isWindows && extension == '.torrent') {
+      await warmExtensionIcons({extension}, size: size.ceil());
+    }
+    final nativeIcon = getExtensionIconSync(extension, size: size.ceil());
+    if (nativeIcon != null) return nativeIcon;
 
     // For APK files, use file-specific cache key to avoid cache conflicts
     final String cacheKey = extension == 'apk'
@@ -272,8 +308,8 @@ class FileIconHelper {
     }
 
     // Fallback to generic file type icons using registry
-    final iconData = FileTypeRegistry.getIcon('.$extension');
-    final iconColor = FileTypeRegistry.getColor('.$extension');
+    final iconData = FileTypeRegistry.getIcon(extension);
+    final iconColor = FileTypeRegistry.getColor(extension);
 
     final icon = Icon(iconData, size: size, color: iconColor);
 
@@ -326,6 +362,17 @@ class FileIconHelper {
   /// Clear the icon cache
   static void clearCache() {
     _iconCache.clear();
+    _appPathCache.clear();
+    _extensionIconCache.clear();
+  }
+
+  static void invalidateExtension(String extension) {
+    final ext = extension.toLowerCase().startsWith('.')
+        ? extension.toLowerCase()
+        : '.${extension.toLowerCase()}';
+    _appPathCache.remove(ext);
+    _iconCache.removeWhere((key, _) => key.startsWith('${ext}_'));
+    _extensionIconCache.removeWhere((key, _) => key.startsWith('${ext}_'));
   }
 
   /// Clear cache for APK files specifically

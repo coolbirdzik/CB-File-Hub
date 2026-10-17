@@ -175,6 +175,17 @@ abstract interface class LocalAiConversationRuntime {
   });
 }
 
+/// Optional direct-response mode for bounded classification tasks. General chat
+/// continues to use the model's normal reasoning configuration.
+abstract interface class LocalAiDirectConversationRuntime {
+  Stream<String> sendDirectConversationStream({
+    required InstalledLocalModel model,
+    required List<Map<String, String>> messages,
+    String? systemPrompt,
+    int maxTokens = 4096,
+  });
+}
+
 /// Result of an advisory inference request.
 class AdvisorSuggestion {
   final String itemPath;

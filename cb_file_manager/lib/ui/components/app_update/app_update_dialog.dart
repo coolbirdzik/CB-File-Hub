@@ -13,8 +13,8 @@ import 'package:cb_file_manager/ui/utils/format_utils.dart';
 ///
 /// Startup checks never open this on their own: a found update shows in the
 /// Status Center (the toolbar bell), where [AppUpdateStatusCard] drives the
-/// download and install. This dialog is for reading what changed and for the
-/// explicit "Check for updates" action in Settings.
+/// download and install, with release notes expanded inline. This dialog is
+/// retained for the explicit "Check for updates" action in Settings/mobile.
 Future<void> showAppUpdateDialog(BuildContext context) {
   final service = AppUpdateService.instance;
   if (!service.hasUpdate && service.phase != AppUpdatePhase.checking) {
@@ -228,7 +228,7 @@ class AppUpdateDialog extends StatelessWidget {
 
 /// The update entry in the Status Center: what is available and the one
 /// action that moves it forward (download, install), with live progress.
-class AppUpdateStatusCard extends StatelessWidget {
+class AppUpdateStatusCard extends StatefulWidget {
   const AppUpdateStatusCard({super.key});
 
   /// Whether the Status Center has an update entry to show.
@@ -237,12 +237,21 @@ class AppUpdateStatusCard extends StatelessWidget {
       (service.phase == AppUpdatePhase.error && service.update != null);
 
   @override
+  State<AppUpdateStatusCard> createState() => _AppUpdateStatusCardState();
+}
+
+class _AppUpdateStatusCardState extends State<AppUpdateStatusCard> {
+  bool _notesExpanded = false;
+
+  @override
   Widget build(BuildContext context) {
     final service = AppUpdateService.instance;
     return ListenableBuilder(
       listenable: service,
       builder: (context, _) {
-        if (!isVisible(service)) return const SizedBox.shrink();
+        if (!AppUpdateStatusCard.isVisible(service)) {
+          return const SizedBox.shrink();
+        }
         return _buildCard(context, service);
       },
     );
@@ -258,7 +267,10 @@ class AppUpdateStatusCard extends StatelessWidget {
       label: l10n.updateReleaseNotes,
       variant: CbButtonVariant.ghost,
       size: CbButtonSize.sm,
-      onPressed: () => showAppUpdateDialog(context),
+      icon: _notesExpanded
+          ? PhosphorIconsLight.caretUp
+          : PhosphorIconsLight.caretDown,
+      onPressed: () => setState(() => _notesExpanded = !_notesExpanded),
     );
 
     final (_Tone tone, IconData icon, String title) = switch (service.phase) {
@@ -399,6 +411,12 @@ class AppUpdateStatusCard extends StatelessWidget {
               runSpacing: CbSpacing.xs,
               children: actions,
             ),
+          ],
+          if (hasNotes && _notesExpanded) ...[
+            const SizedBox(height: CbSpacing.md),
+            const Divider(height: 1),
+            const SizedBox(height: CbSpacing.md),
+            ReleaseNotesView(notes: update.releaseNotes),
           ],
         ],
       ),

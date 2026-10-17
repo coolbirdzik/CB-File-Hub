@@ -23,6 +23,9 @@ class SelectionSummaryTooltip extends StatefulWidget {
   final List<String> selectedFolderPaths;
   final bool showTotalSize;
 
+  /// Indexed collections can supply the same cached size their columns use.
+  final int? totalSizeOverride;
+
   const SelectionSummaryTooltip({
     super.key,
     required this.selectedFileCount,
@@ -30,6 +33,7 @@ class SelectionSummaryTooltip extends StatefulWidget {
     required this.selectedFilePaths,
     required this.selectedFolderPaths,
     this.showTotalSize = true,
+    this.totalSizeOverride,
   });
 
   @override
@@ -50,7 +54,8 @@ class _SelectionSummaryTooltipState extends State<SelectionSummaryTooltip> {
   @override
   void didUpdateWidget(SelectionSummaryTooltip oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!listEquals(oldWidget.selectedFilePaths, widget.selectedFilePaths) ||
+    if (oldWidget.totalSizeOverride != widget.totalSizeOverride ||
+        !listEquals(oldWidget.selectedFilePaths, widget.selectedFilePaths) ||
         !listEquals(
           oldWidget.selectedFolderPaths,
           widget.selectedFolderPaths,
@@ -61,6 +66,10 @@ class _SelectionSummaryTooltipState extends State<SelectionSummaryTooltip> {
 
   Future<void> _calculateSize() async {
     final generation = ++_calculationGeneration;
+    if (widget.totalSizeOverride != null) {
+      _totalSize = widget.totalSizeOverride;
+      return;
+    }
     if (!widget.showTotalSize) {
       if (mounted) setState(() => _totalSize = null);
       return;
@@ -119,12 +128,16 @@ class _SelectionSummaryTooltipState extends State<SelectionSummaryTooltip> {
       decoration: CbDecorations.bar(context),
       child: Row(
         children: [
-          Text(
-            text,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w400,
-              color: Theme.of(context).textTheme.bodyMedium?.color,
+          Expanded(
+            child: Text(
+              text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w400,
+                color: Theme.of(context).textTheme.bodyMedium?.color,
+              ),
             ),
           ),
         ],

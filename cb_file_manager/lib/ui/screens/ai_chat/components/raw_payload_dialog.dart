@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../../bloc/ai_agent/ai_agent_state.dart';
+import 'package:cb_file_manager/config/translation_helper.dart';
 
 /// Debug dialog showing the raw API payload last sent to the provider.
 ///
@@ -32,7 +33,7 @@ class RawPayloadDialog extends StatelessWidget {
     final theme = Theme.of(context);
     final payload = state.lastApiPayload;
     final pretty = payload == null
-        ? 'No payload captured yet. Send a message first to see the request.'
+        ? context.tr.aiNoPayload
         : const JsonEncoder.withIndent('  ').convert(payload);
 
     return Padding(
@@ -49,7 +50,7 @@ class RawPayloadDialog extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Text(
-                'Raw API payload',
+                context.tr.aiRawApiPayload,
                 style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w600,
                 ),
@@ -57,15 +58,15 @@ class RawPayloadDialog extends StatelessWidget {
               const Spacer(),
               IconButton(
                 icon: const Icon(PhosphorIconsLight.copy, size: 18),
-                tooltip: 'Copy JSON',
+                tooltip: context.tr.copyJson,
                 onPressed: payload == null
                     ? null
                     : () {
                         Clipboard.setData(ClipboardData(text: pretty));
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Copied to clipboard'),
-                            duration: Duration(seconds: 1),
+                          SnackBar(
+                            content: Text(context.tr.aiCopiedToClipboard),
+                            duration: const Duration(seconds: 1),
                           ),
                         );
                       },
@@ -80,7 +81,7 @@ class RawPayloadDialog extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               '${payload['providerId']} · ${payload['modelName']} · '
-              '${payload['stream'] == true ? 'streaming' : 'non-streaming'}',
+              '${payload['stream'] == true ? context.tr.aiStreaming : context.tr.aiNonStreaming}',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),

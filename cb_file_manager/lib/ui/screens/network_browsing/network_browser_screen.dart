@@ -74,6 +74,7 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
     with SingleTickerProviderStateMixin {
   static const bool _enableVerboseLogs = false;
   late SearchTextController _searchController;
+  final _searchFocusNode = FocusNode(debugLabel: 'network search');
 
   late SelectionBloc _selectionBloc;
   bool _showSearchBar = false;
@@ -232,6 +233,7 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
   void dispose() {
     // Clean up resources
     _searchController.dispose();
+    _searchFocusNode.dispose();
     _scrollController.dispose();
     _selectionBloc.close();
 
@@ -650,6 +652,11 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
     _showSearchTip(context);
   }
 
+  void _openOrFocusSearch() {
+    if (!_showSearchBar) setState(() => _showSearchBar = true);
+    _searchFocusNode.requestFocus();
+  }
+
   void _navigateToPath(String path, {bool updateHistory = true}) {
     if (!path.startsWith('#network/')) {
       if (updateHistory) {
@@ -910,7 +917,7 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
             onMouseForward: _handleMouseForwardButton,
             onRefresh: _refreshFileList,
             onSelectAll: () => _selectAll(networkState),
-            onSearch: () => _toggleSearchBar(context),
+            onSearch: _openOrFocusSearch,
             onEscape: selectionState.selectedCount > 0
                 ? _clearSelection
                 : _showSearchBar
@@ -935,6 +942,7 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
       height: 40,
       child: SearchTextField(
         controller: _searchController,
+        focusNode: _searchFocusNode,
         autofocus: true,
         decoration: InputDecoration(
           hintText: AppLocalizations.of(context)!.searchByFilename,

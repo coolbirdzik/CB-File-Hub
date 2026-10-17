@@ -18,7 +18,11 @@ import '../../services/ai/ai_chat_history_service.dart';
 import '../../services/ai/ai_provider_service.dart';
 import '../../services/ai/providers/ai_provider.dart';
 import '../../services/ai/tool_executor.dart';
+import '../../services/ai/cleaner_review_run.dart';
+import '../../services/disk_cleaner/cleaner_agent_review.dart';
+import '../../services/disk_cleaner/disk_cleaner_service.dart';
 import '../../services/local_ai/local_ai_advisor_service.dart';
+import '../../services/local_ai/llama_cpp_chat_client.dart';
 import '../../utils/app_logger.dart';
 import 'ai_agent_event.dart';
 import 'ai_agent_state.dart';
@@ -44,6 +48,7 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
   int? _activeGenerationId;
   StreamSubscription<String>? _activeStreamSubscription;
   Completer<void>? _activeStreamCompleter;
+  Future<void>? _initializationFuture;
 
   AiAgentBloc({
     required this._providerService,
@@ -104,7 +109,7 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
           )
           .then((_) {
             // Refresh conversation list so sidebar stays current
-            add(const RefreshConversations());
+            if (!isClosed) add(const RefreshConversations());
           });
     }
   }
@@ -114,6 +119,13 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
   // ---------------------------------------------------------------------------
 
   Future<void> _onInitialize(
+    InitializeAiAgent event,
+    Emitter<AiAgentState> emit,
+  ) {
+    return _initializationFuture = _initializeAgent(event, emit);
+  }
+
+  Future<void> _initializeAgent(
     InitializeAiAgent event,
     Emitter<AiAgentState> emit,
   ) async {
@@ -177,7 +189,31 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
     Emitter<AiAgentState> emit,
   ) async {
     if (event.message.trim().isEmpty && event.referencedFiles.isEmpty) return;
+    // Cleaner can enqueue a message immediately after creating its tab's bloc.
+    // Wait for history and model restoration before choosing an inference path.
+    await _initializationFuture;
+    if (emit.isDone || state.isLoading) return;
+    await _synchronizeModelSelection(emit);
+    if (emit.isDone) return;
     if (state.isLoading) return;
+
+    if (event.startNewConversation) {
+      // Reset here, after initialization and before generation. Separate
+      // NewConversation + SendMessage events can race while loading history.
+      emit(
+        state.copyWith(
+          conversationId: _uuid.v4(),
+          messages: const [],
+          results: const [],
+          clearError: true,
+          clearThinking: true,
+          clearToolActivity: true,
+          clearCurrentToolCalls: true,
+          clearLastApiPayload: true,
+          clearApproval: true,
+        ),
+      );
+    }
 
     final generationId = ++_generationSequence;
     _activeGenerationId = generationId;
@@ -185,6 +221,11 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
       currentPath: state.currentPath,
       isCancelled: () => _activeGenerationId != generationId,
     );
+
+    if (event.reviewEntireCleanerScan) {
+      await _onCleanerFullReview(event, emit, generationId);
+      return;
+    }
 
     if (_isLocalAiSelected()) {
       await _onLocalAiSendMessage(event, emit, generationId);
@@ -198,6 +239,7 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
       id: _uuid.v4(),
       role: AiMessageRole.user,
       content: event.message,
+      reviewEntireCleanerScan: event.reviewEntireCleanerScan,
       timestamp: DateTime.now(),
       referencedFiles: referencedFiles.isNotEmpty ? referencedFiles : null,
     );
@@ -238,6 +280,7 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
       final systemPrompt = _buildSystemPrompt();
       int toolRound = 0;
       var repairAttempts = 0;
+      var continuationAttempts = 0;
       final seenToolSignatures = <String>{};
       final executedMutations = <String>{};
       // Messages shown in the UI (grows with explanation + results)
@@ -245,6 +288,7 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
 
       // Tool-calling loop: AI responds -> if tool_call -> execute -> feed back -> repeat
       while (toolRound <= ToolExecutor.maxToolCalls) {
+        _ensureGenerationActive(generationId);
         toolRound++;
 
         activity.add('> Calling AI provider (round $toolRound)...');
@@ -286,6 +330,16 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
 
         // Check if AI wants to call tools
         if (!ToolExecutor.hasToolCalls(responseText)) {
+          if (endsWithPendingInspection(responseText)) {
+            if (++continuationAttempts > 2) {
+              throw StateError(
+                'The agent described an inspection but did not carry it out. '
+                'Please retry.',
+              );
+            }
+            _requestInspectionContinuation(apiMessages, responseText);
+            continue;
+          }
           final content = _stripJsonBlocks(_stripToolCallTags(responseText));
           final results = _parseSearchResults(
             stripAssistantReasoning(responseText),
@@ -635,6 +689,293 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
     }
   }
 
+  Future<void> _onCleanerFullReview(
+    SendMessage event,
+    Emitter<AiAgentState> emit,
+    int generationId,
+  ) async {
+    final userMessage = AiMessage(
+      id: _uuid.v4(),
+      role: AiMessageRole.user,
+      content: event.message,
+      timestamp: DateTime.now(),
+      reviewEntireCleanerScan: true,
+      cleanerReviewLanguageCode: event.cleanerReviewLanguageCode,
+    );
+    final messages = [...state.messages, userMessage];
+    final assistantId = _uuid.v4();
+    final local = _isLocalAiSelected();
+    String? providerId = local ? _localAiProviderId : null;
+    final now = DateTime.now();
+    void showProgress(String text, {bool loading = true, String? error}) {
+      if (emit.isDone || _activeGenerationId != generationId) return;
+      emit(
+        state.copyWith(
+          messages: [
+            ...messages,
+            AiMessage(
+              id: assistantId,
+              role: AiMessageRole.assistant,
+              content: text,
+              timestamp: now,
+              isLoading: loading,
+              error: error,
+            ),
+          ],
+          isLoading: loading,
+          error: error,
+          clearError: error == null,
+          clearThinking: true,
+          clearApproval: true,
+          clearCurrentToolCalls: true,
+          clearToolActivity: true,
+          activeProviderId: providerId,
+        ),
+      );
+    }
+
+    CleanerReviewRun? run;
+    try {
+      showProgress(switch (event.cleanerReviewLanguageCode) {
+        'vi' => 'Đang nhận diện nhanh dữ liệu từ kết quả quét…',
+        'tr' => 'Tarama meta verilerinden hızlı bir genel bakış hazırlanıyor…',
+        'zh' => '正在根据扫描元数据准备快速概览…',
+        _ => 'Preparing a quick overview from scan metadata…',
+      });
+      run = CleanerReviewRun(
+        _toolExecutor.ownerTabId,
+        languageCode: event.cleanerReviewLanguageCode,
+      );
+      final review = run.review;
+      await review.prepareGroups(
+        checkActive: () {
+          _ensureGenerationActive(generationId);
+          run!.requireActiveContext();
+        },
+      );
+      final evidenceBudget = local
+          ? ((_localAiService?.getMaxContextTokens() ?? 4096) * 2).clamp(
+              1200,
+              6000,
+            )
+          : 6000;
+      final activeRun = run;
+      final aiGroups = activeRun.quickAiGroups();
+      final aiGroupSet = aiGroups.toSet();
+      final scanGroups = review.groups
+          .where(
+            (group) =>
+                !aiGroupSet.contains(group) &&
+                (group.analysis == null || group.usedFallback),
+          )
+          .toList();
+      // Apply metadata recommendations in bounded UI batches without calling
+      // the model. Yield between batches so Stop and repaint remain responsive.
+      for (var start = 0; start < scanGroups.length; start += 32) {
+        _ensureGenerationActive(generationId);
+        activeRun.requireActiveContext();
+        final batch = scanGroups.sublist(
+          start,
+          (start + 32).clamp(0, scanGroups.length),
+        );
+        DiskCleanerService.instance.inspectFullReviewGroups(
+          ownerTabId: _toolExecutor.ownerTabId,
+          review: review,
+          groups: batch,
+        );
+        for (final group in batch) {
+          _ensureGenerationActive(generationId);
+          activeRun.requireActiveContext();
+          DiskCleanerService.instance.applyFullReviewGroup(
+            ownerTabId: _toolExecutor.ownerTabId,
+            review: review,
+            group: group,
+            analysis: activeRun.scanAssessmentFor(group),
+          );
+        }
+        showProgress(activeRun.progressText(null));
+        await Future<void>.delayed(Duration.zero);
+      }
+      Future<String> generateAssessment(List<CleanerReviewGroup> groups) async {
+        _ensureGenerationActive(generationId);
+        activeRun.requireActiveContext();
+        final prompt = activeRun.promptForBatch(groups);
+        final requestMessages = [
+          AiMessage(
+            id: _uuid.v4(),
+            role: AiMessageRole.user,
+            content: prompt,
+            timestamp: DateTime.now(),
+          ),
+        ];
+        emit(
+          state.copyWith(
+            lastApiPayload: _buildPayloadSnapshot(
+              messages: requestMessages,
+              systemPrompt: CleanerReviewRun.systemPrompt,
+              providerId: providerId,
+              modelName: state.selectedModelName,
+              stream: local,
+            ),
+          ),
+        );
+        String response;
+        if (local) {
+          final localService = _localAiService;
+          if (localService == null) {
+            throw StateError('Local AI service is not available.');
+          }
+          final buffer = StringBuffer();
+          try {
+            await _consumeGenerationStream(
+              generationId: generationId,
+              stream: localService.sendChatMessageStream(
+                message: prompt,
+                messages: [
+                  {'role': 'user', 'content': prompt},
+                ],
+                systemPrompt: CleanerReviewRun.systemPrompt,
+                directResponse: true,
+              ),
+              onChunk: (chunk) {
+                if (!chunk.startsWith('[STATUS]')) buffer.write(chunk);
+              },
+            );
+          } on LocalAiMissingAnswerException {
+            // A completed empty/truncated generation is an invalid verdict,
+            // not a transport failure or a reason to abandon the whole scan.
+            // Preserve complete entries already streamed before truncation.
+            _ensureGenerationActive(generationId);
+          }
+          response = buffer.toString();
+        } else {
+          final result = await _providerService.chat(
+            requestMessages,
+            systemPrompt: CleanerReviewRun.systemPrompt,
+            preferredProviderId: state.selectedProviderId,
+            preferredModelName: state.selectedModelName,
+          );
+          providerId = result.providerId;
+          response = result.response.content;
+        }
+        _ensureGenerationActive(generationId);
+        activeRun.requireActiveContext();
+        return response;
+      }
+
+      void applyAssessments(String response, List<CleanerReviewGroup> groups) {
+        final assessments = activeRun.parseBatchAssessments(response, groups);
+        for (final group in groups) {
+          final analysis = assessments[group.id];
+          if (analysis == null) continue;
+          _ensureGenerationActive(generationId);
+          activeRun.requireActiveContext();
+          DiskCleanerService.instance.applyFullReviewGroup(
+            ownerTabId: _toolExecutor.ownerTabId,
+            review: review,
+            group: group,
+            analysis: analysis,
+          );
+        }
+        showProgress(activeRun.progressText(null));
+      }
+
+      var aiUnavailable = false;
+      Future<void> assessGroups(List<CleanerReviewGroup> groups) async {
+        String? response;
+        try {
+          response = await generateAssessment(groups);
+        } catch (_) {
+          // Stop and stale scans still abort. Provider failures end model work,
+          // leaving a usable conservative overview from scan metadata.
+          _ensureGenerationActive(generationId);
+          activeRun.requireActiveContext();
+          aiUnavailable = true;
+        }
+        if (response != null) applyAssessments(response, groups);
+        final pending = groups
+            .where((group) => group.analysis == null || group.usedFallback)
+            .toList();
+        if (pending.isEmpty) return;
+        // A quick overview never recursively retries invalid model output.
+        // Conservative scan recommendations are useful without an AI verdict.
+        for (final group in pending) {
+          if (group.analysis != null && !group.usedFallback) continue;
+          _ensureGenerationActive(generationId);
+          activeRun.requireActiveContext();
+          DiskCleanerService.instance.applyFullReviewGroup(
+            ownerTabId: _toolExecutor.ownerTabId,
+            review: review,
+            group: group,
+            analysis: activeRun.scanAssessmentFor(group),
+          );
+        }
+      }
+
+      for (final batch
+          in activeRun
+              .batches(maxEvidenceChars: evidenceBudget, groups: aiGroups)
+              .take(CleanerReviewRun.maxAiBatches)) {
+        _ensureGenerationActive(generationId);
+        activeRun.requireActiveContext();
+        showProgress(activeRun.batchProgressText(batch));
+        DiskCleanerService.instance.inspectFullReviewGroups(
+          ownerTabId: _toolExecutor.ownerTabId,
+          review: review,
+          groups: batch,
+        );
+        _ensureGenerationActive(generationId);
+        await Future<void>.delayed(Duration.zero);
+        await assessGroups(batch);
+        _ensureGenerationActive(generationId);
+        showProgress(activeRun.progressText(null));
+        await Future<void>.delayed(Duration.zero);
+        if (aiUnavailable) break;
+      }
+      // Small context windows can exhaust the call budget before 24 groups.
+      final remaining = aiGroups
+          .where((group) => group.analysis == null || group.usedFallback)
+          .toList();
+      if (remaining.isNotEmpty) {
+        _ensureGenerationActive(generationId);
+        activeRun.requireActiveContext();
+        DiskCleanerService.instance.inspectFullReviewGroups(
+          ownerTabId: _toolExecutor.ownerTabId,
+          review: review,
+          groups: remaining,
+        );
+        for (final group in remaining) {
+          _ensureGenerationActive(generationId);
+          activeRun.requireActiveContext();
+          DiskCleanerService.instance.applyFullReviewGroup(
+            ownerTabId: _toolExecutor.ownerTabId,
+            review: review,
+            group: group,
+            analysis: activeRun.scanAssessmentFor(group),
+          );
+        }
+      }
+      showProgress(run.summary(), loading: false);
+    } on _GenerationStopped {
+      return;
+    } catch (error) {
+      if (_activeGenerationId != generationId) return;
+      final progress = run == null
+          ? ''
+          : '\n${run.review.reviewed} / ${run.review.total}';
+      showProgress(
+        '${switch (event.cleanerReviewLanguageCode) {
+          'vi' => 'Phân tích chưa hoàn tất',
+          'tr' => 'Analiz tamamlanmadı',
+          'zh' => '分析未完成',
+          _ => 'Review incomplete',
+        }}$progress',
+        loading: false,
+        error: error.toString(),
+      );
+    }
+  }
+
   Future<void> _onLocalAiSendMessage(
     SendMessage event,
     Emitter<AiAgentState> emit,
@@ -657,6 +998,7 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
       id: _uuid.v4(),
       role: AiMessageRole.user,
       content: event.message,
+      reviewEntireCleanerScan: event.reviewEntireCleanerScan,
       timestamp: DateTime.now(),
       referencedFiles: referencedFiles.isNotEmpty ? referencedFiles : null,
     );
@@ -694,6 +1036,7 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
       final systemPrompt = _buildSystemPrompt();
       var toolRound = 0;
       var repairAttempts = 0;
+      var continuationAttempts = 0;
       var uiMessages = List<AiMessage>.of(displayMessages);
       // Signatures of tool-call rounds already executed, to detect stuck loops
       // where a small local model keeps calling the same tool with the same
@@ -702,6 +1045,7 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
       final executedMutations = <String>{};
 
       while (toolRound <= ToolExecutor.maxToolCalls) {
+        _ensureGenerationActive(generationId);
         toolRound++;
         activity.add('> Calling Local AI (round $toolRound)...');
         emit(
@@ -811,6 +1155,25 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
         final reasoning = extractAssistantReasoning(rawBuffer.toString());
         final responseText = stripAssistantReasoning(rawBuffer.toString());
         if (!ToolExecutor.hasToolCalls(responseText)) {
+          if (endsWithPendingInspection(responseText)) {
+            if (++continuationAttempts > 2) {
+              throw StateError(
+                'The agent described an inspection but did not carry it out. '
+                'Please retry.',
+              );
+            }
+            _requestInspectionContinuation(apiMessages, responseText);
+            // Replace the provisional streamed promise on the next round.
+            emit(
+              state.copyWith(
+                messages: uiMessages,
+                thinkingText: state.thinkingPhrases.isNotEmpty
+                    ? state.thinkingPhrases.first
+                    : 'Thinking...',
+              ),
+            );
+            continue;
+          }
           final rawContent = responseText;
           final displayContent = _stripJsonBlocks(
             _stripToolCallTags(rawContent),
@@ -1676,7 +2039,6 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
     if (state.isLoading) return;
 
     final trimmed = event.content.trim();
-    if (trimmed.isEmpty) return;
 
     final index = state.messages.indexWhere(
       (m) => m.id == event.messageId && m.role == AiMessageRole.user,
@@ -1686,6 +2048,7 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
     final original = state.messages[index];
     final referencedFiles =
         original.referencedFiles?.map((f) => f.path).toList() ?? const [];
+    if (trimmed.isEmpty && referencedFiles.isEmpty) return;
 
     emit(
       state.copyWith(
@@ -1698,7 +2061,16 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
       ),
     );
 
-    add(SendMessage(trimmed, referencedFiles: referencedFiles));
+    add(
+      SendMessage(
+        trimmed,
+        referencedFiles: referencedFiles,
+        reviewEntireCleanerScan:
+            original.reviewEntireCleanerScan &&
+            trimmed == original.content.trim(),
+        cleanerReviewLanguageCode: original.cleanerReviewLanguageCode,
+      ),
+    );
   }
 
   void _onChangeSearchScope(
@@ -1784,35 +2156,22 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
     );
   }
 
-  Future<void> _onRetryLastMessage(
-    RetryLastMessage event,
-    Emitter<AiAgentState> emit,
-  ) async {
-    // Find the last user message
-    final lastUserMessage = state.messages.lastWhere(
-      (m) => m.role == AiMessageRole.user,
-      orElse: () => AiMessage(
-        id: '',
-        role: AiMessageRole.user,
-        content: '',
-        timestamp: DateTime.now(),
-      ),
-    );
-    if (lastUserMessage.content.isEmpty) return;
-
-    // Remove the last assistant message (error response) if present
-    final messages = [...state.messages];
-    if (messages.isNotEmpty && messages.last.role == AiMessageRole.assistant) {
-      messages.removeLast();
+  void _onRetryLastMessage(RetryLastMessage event, Emitter<AiAgentState> emit) {
+    if (state.isLoading) return;
+    var index = event.messageId == null
+        ? state.messages.length - 1
+        : state.messages.indexWhere((message) => message.id == event.messageId);
+    while (index >= 0 && state.messages[index].role != AiMessageRole.user) {
+      index--;
     }
+    if (index < 0) return;
 
-    emit(state.copyWith(messages: messages, clearError: true));
-    add(
-      SendMessage(
-        lastUserMessage.content,
-        referencedFiles:
-            lastUserMessage.referencedFiles?.map((f) => f.path).toList() ?? [],
-      ),
+    final original = state.messages[index];
+    // Share Edit + Send behavior: retain attachments and earlier history,
+    // remove this turn and its subsequent responses before sending it again.
+    _onEditMessage(
+      EditMessage(messageId: original.id, content: original.content),
+      emit,
     );
   }
 
@@ -2514,6 +2873,36 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
     );
   }
 
+  void _requestInspectionContinuation(
+    List<AiMessage> messages,
+    String response,
+  ) {
+    messages.add(
+      AiMessage(
+        id: _uuid.v4(),
+        role: AiMessageRole.assistant,
+        content: stripAssistantReasoning(response),
+        timestamp: DateTime.now(),
+      ),
+    );
+    messages.add(
+      AiMessage(
+        id: _uuid.v4(),
+        role: AiMessageRole.user,
+        content:
+            'Your last response only announced an inspection. Continue the '
+            'latest user request now: call the appropriate tool using '
+            '<tool_call>{"name":"tool_name","arguments":{...}}</tool_call> '
+            'with valid JSON, read its result, then answer. For the current '
+            'Cleaner scan, start with get_current_cleaner_scan if you have not '
+            'read it yet. Do not repeat a promise or invent results. If a tool '
+            'cannot help or user input is required, explain the specific '
+            'blocker. This continuation grants no additional authorization.',
+        timestamp: DateTime.now(),
+      ),
+    );
+  }
+
   // ---------------------------------------------------------------------------
   // Response parsing
   // ---------------------------------------------------------------------------
@@ -2862,6 +3251,31 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
       );
       return const _ResolvedModelSelection();
     }
+  }
+
+  Future<void> _synchronizeModelSelection(Emitter<AiAgentState> emit) async {
+    if (state.providerModelCatalogs.isEmpty) return;
+    final persisted = await _loadPersistedSelection();
+    if (emit.isDone || state.isLoading) return;
+    // Conversations belong to tabs; the user's model choice is shared. A tab
+    // kept alive before the user picked Qwen must not retain its old provider.
+    final catalogs = _mergeLocalAiCatalog(
+      state.providerModelCatalogs
+          .where((catalog) => catalog.providerId != _localAiProviderId)
+          .toList(),
+    );
+    final selection = _resolveModelSelection(
+      catalogs: catalogs,
+      selectedProviderId: persisted.providerId ?? state.selectedProviderId,
+      selectedModelName: persisted.modelName ?? state.selectedModelName,
+    );
+    emit(
+      state.copyWith(
+        providerModelCatalogs: catalogs,
+        selectedProviderId: selection.providerId,
+        selectedModelName: selection.modelName,
+      ),
+    );
   }
 
   String? _defaultModelForCatalog(AiProviderModelCatalog catalog) {

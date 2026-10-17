@@ -8,6 +8,7 @@ import '../../../../config/languages/app_localizations.dart';
 import '../../../../models/ai/ai_message.dart';
 import '../../../../services/ai/assistant_response_text.dart';
 import 'referenced_file_card.dart';
+import 'package:cb_file_manager/config/translation_helper.dart';
 
 /// A single chat message bubble (user or assistant).
 ///
@@ -149,8 +150,9 @@ class _ChatMessageBubbleState extends State<ChatMessageBubble> {
                   _displayContent.isNotEmpty)
                 _MessageActions(
                   canEdit: canEdit,
-                  isVisible: showActions,
+                  isVisible: showActions || (!isUser && widget.onRetry != null),
                   onEdit: _startInlineEdit,
+                  onRetry: _isEditing ? null : widget.onRetry,
                   onCopy: () => _copyMessage(context),
                 ),
               // Referenced file cards shown below the message
@@ -399,7 +401,7 @@ class _ChatMessageBubbleState extends State<ChatMessageBubble> {
           Clipboard.setData(ClipboardData(text: href));
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Link copied: $href'),
+              content: Text(context.tr.aiLinkCopied(href)),
               duration: const Duration(seconds: 2),
               behavior: SnackBarBehavior.floating,
             ),
@@ -429,19 +431,14 @@ class _ChatMessageBubbleState extends State<ChatMessageBubble> {
             ),
           ],
         ),
-        if (widget.onRetry != null)
+        if (widget.onRetry != null && !widget.message.isLoading)
           Padding(
             padding: const EdgeInsets.only(top: 6),
-            child: InkWell(
-              onTap: widget.onRetry,
-              child: Text(
-                'Retry',
-                style: TextStyle(
-                  color: colorScheme.primary,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
+            child: TextButton.icon(
+              key: const ValueKey('chat-error-retry'),
+              onPressed: widget.onRetry,
+              icon: const Icon(PhosphorIconsLight.arrowClockwise, size: 15),
+              label: Text(AppLocalizations.of(context)!.retryMessage),
             ),
           ),
       ],
@@ -454,12 +451,14 @@ class _MessageActions extends StatelessWidget {
   final bool isVisible;
   final VoidCallback onEdit;
   final VoidCallback onCopy;
+  final VoidCallback? onRetry;
 
   const _MessageActions({
     required this.canEdit,
     required this.isVisible,
     required this.onEdit,
     required this.onCopy,
+    this.onRetry,
   });
 
   @override
@@ -481,6 +480,19 @@ class _MessageActions extends StatelessWidget {
                   tooltip: l.edit,
                   icon: PhosphorIconsLight.pencilSimple,
                   onPressed: onEdit,
+                ),
+              if (onRetry != null)
+                IconButton(
+                  key: const ValueKey('chat-message-retry'),
+                  tooltip: l.retryMessage,
+                  icon: const Icon(PhosphorIconsLight.arrowClockwise, size: 15),
+                  onPressed: onRetry,
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 28,
+                    minHeight: 28,
+                  ),
                 ),
               _UserActionButton(
                 tooltip: l.copy,

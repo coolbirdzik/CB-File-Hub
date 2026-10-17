@@ -34,7 +34,6 @@ abstract class _VideoPlayerSettingsHost extends _VideoPlayerVolumeHost {
   String get _videoScaleMode;
   set _videoScaleMode(String v);
   bool get _hardwareAcceleration;
-  set _hardwareAcceleration(bool v);
   String get _videoDecoder;
   set _videoDecoder(String v);
   String get _audioDecoder;
@@ -49,6 +48,8 @@ abstract class _VideoPlayerSettingsHost extends _VideoPlayerVolumeHost {
   set _videoOutputFormat(String v);
   int get _videoSeekSpeed;
   set _videoSeekSpeed(int v);
+  VideoWheelAction get _videoWheelAction;
+  set _videoWheelAction(VideoWheelAction v);
 
   // Methods from main state that the mixin delegates to
   void _cancelSleepTimer();
@@ -65,7 +66,7 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
     RouteUtils.showAcrylicDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Subtitles'),
+        title: Text(context.tr.vpSubtitles),
         content: SubtitleDialogContent(
           tracks: _subtitleTracks,
           selected: _selectedSubtitleTrack,
@@ -74,7 +75,7 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
         actions: [
           TextButton(
             onPressed: () => RouteUtils.safePopDialog(context),
-            child: const Text('Cancel'),
+            child: Text(context.tr.cancel),
           ),
         ],
       ),
@@ -85,7 +86,7 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
     RouteUtils.showAcrylicDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Playback Speed'),
+        title: Text(context.tr.vpPlaybackSpeed),
         content: PlaybackSpeedDialogContent(
           current: _playbackSpeed,
           onSelect: (v) {
@@ -96,7 +97,7 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
         actions: [
           TextButton(
             onPressed: () => RouteUtils.safePopDialog(context),
-            child: const Text('Cancel'),
+            child: Text(context.tr.cancel),
           ),
         ],
       ),
@@ -108,7 +109,7 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Video Filters'),
+          title: Text(context.tr.vpVideoFilters),
           content: VideoFiltersDialogContent(
             brightness: _brightness,
             contrast: _contrast,
@@ -136,11 +137,11 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
                 });
                 setDialogState(() {});
               },
-              child: const Text('Reset'),
+              child: Text(context.tr.vpReset),
             ),
             TextButton(
               onPressed: () => RouteUtils.safePopDialog(context),
-              child: const Text('Close'),
+              child: Text(context.tr.close),
             ),
           ],
         ),
@@ -152,7 +153,7 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
     RouteUtils.showAcrylicDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Sleep Timer'),
+        title: Text(context.tr.vpSleepTimer),
         content: SleepTimerDialogContent(
           selected: _sleepDuration,
           onSelect: (v) {
@@ -166,7 +167,7 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
         actions: [
           TextButton(
             onPressed: () => RouteUtils.safePopDialog(context),
-            child: const Text('Cancel'),
+            child: Text(context.tr.cancel),
           ),
         ],
       ),
@@ -189,22 +190,22 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
                     .withValues(alpha: 0.82);
             return AlertDialog(
               backgroundColor: acrylicBg,
-              title: const Text('Video Settings'),
+              title: Text(context.tr.vpVideoSettings),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Codec Selection
-                    const Text(
-                      'Codec:',
+                    Text(
+                      context.tr.vpCodec,
                       style: TextStyle(fontWeight: FontWeight.bold),
                     ),
                     CbSelect<String>(
                       value: _selectedCodec,
                       expand: true,
-                      items: const [
-                        CbSelectItem(value: 'auto', label: 'Auto'),
+                      items: [
+                        CbSelectItem(value: 'auto', label: context.tr.vpAuto),
                         CbSelectItem(value: 'h264', label: 'H.264'),
                         CbSelectItem(value: 'h265', label: 'H.265/HEVC'),
                         CbSelectItem(value: 'vp9', label: 'VP9'),
@@ -219,30 +220,42 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
                     const SizedBox(height: 16),
 
                     // Video Scale Mode
-                    const Text(
-                      'Video Scale Mode:',
+                    Text(
+                      context.tr.vpScaleMode,
                       style: TextStyle(fontWeight: FontWeight.bold),
                     ),
                     CbSelect<String>(
                       value: _videoScaleMode,
                       expand: true,
-                      items: const [
+                      items: [
                         CbSelectItem(
                           value: 'contain',
-                          label: 'Fit to Window (Keep Ratio, No Crop)',
+                          label: context.tr.vpScaleContain,
                         ),
                         CbSelectItem(
                           value: 'cover',
-                          label: 'Cover (Fill & Crop)',
+                          label: context.tr.vpScaleCover,
                         ),
-                        CbSelectItem(value: 'fill', label: 'Fill (Stretch)'),
-                        CbSelectItem(value: 'fitWidth', label: 'Fit Width'),
-                        CbSelectItem(value: 'fitHeight', label: 'Fit Height'),
+                        CbSelectItem(
+                          value: 'fill',
+                          label: context.tr.vpScaleFill,
+                        ),
+                        CbSelectItem(
+                          value: 'fitWidth',
+                          label: context.tr.vpScaleFitWidth,
+                        ),
+                        CbSelectItem(
+                          value: 'fitHeight',
+                          label: context.tr.vpScaleFitHeight,
+                        ),
                         CbSelectItem(
                           value: 'none',
-                          label: 'None (Original Size)',
+                          label: context.tr.vpScaleNone,
                         ),
-                        CbSelectItem(value: 'scaleDown', label: 'Scale Down'),
+                        CbSelectItem(
+                          value: 'scaleDown',
+                          label: context.tr.vpScaleDown,
+                        ),
                       ],
                       onChanged: (value) {
                         setDialogState(() => _videoScaleMode = value);
@@ -252,85 +265,27 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
                     ),
                     const SizedBox(height: 16),
 
-                    // Hardware Acceleration
-                    SwitchListTile(
-                      title: const Text('Hardware Acceleration'),
-                      subtitle: const Text('Use GPU for video decoding'),
-                      value: _hardwareAcceleration,
-                      onChanged: (value) {
-                        setDialogState(() {
-                          _hardwareAcceleration = value;
-                          _videoDecoder = value ? 'hardware' : 'software';
-                        });
-                        setState(() {
-                          _hardwareAcceleration = value;
-                          _videoDecoder = value ? 'hardware' : 'software';
-                          if (_player != null) {
-                            _videoController = PlaybackVideoController(
-                              _player!,
-                              configuration: _buildVideoControllerConfig(),
-                            );
-                          }
-                        });
-                        _saveSettings();
-                      },
-                    ),
-
-                    // Video Decoder
-                    const Text(
-                      'Video Decoder:',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    CbSelect<String>(
-                      value: _videoDecoder,
-                      expand: true,
-                      items: const [
-                        CbSelectItem(value: 'auto', label: 'Auto'),
-                        CbSelectItem(value: 'software', label: 'Software'),
-                        CbSelectItem(value: 'hardware', label: 'Hardware'),
-                      ],
-                      onChanged: (value) {
-                        setDialogState(() {
-                          _videoDecoder = value;
-                          if (value == 'software') {
-                            _hardwareAcceleration = false;
-                          }
-                          if (value == 'hardware') {
-                            _hardwareAcceleration = true;
-                          }
-                        });
-                        setState(() {
-                          _videoDecoder = value;
-                          if (value == 'software') {
-                            _hardwareAcceleration = false;
-                          }
-                          if (value == 'hardware') {
-                            _hardwareAcceleration = true;
-                          }
-                          if (_player != null) {
-                            _videoController = PlaybackVideoController(
-                              _player!,
-                              configuration: _buildVideoControllerConfig(),
-                            );
-                          }
-                        });
-                        _saveSettings();
-                      },
-                    ),
+                    _buildVideoDecodingSection(context, setDialogState),
                     const SizedBox(height: 16),
 
                     // Audio Decoder
-                    const Text(
-                      'Audio Decoder:',
+                    Text(
+                      context.tr.vpAudioDecoder,
                       style: TextStyle(fontWeight: FontWeight.bold),
                     ),
                     CbSelect<String>(
                       value: _audioDecoder,
                       expand: true,
-                      items: const [
-                        CbSelectItem(value: 'auto', label: 'Auto'),
-                        CbSelectItem(value: 'software', label: 'Software'),
-                        CbSelectItem(value: 'hardware', label: 'Hardware'),
+                      items: [
+                        CbSelectItem(value: 'auto', label: context.tr.vpAuto),
+                        CbSelectItem(
+                          value: 'software',
+                          label: context.tr.vpSoftware,
+                        ),
+                        CbSelectItem(
+                          value: 'hardware',
+                          label: context.tr.vpHardware,
+                        ),
                       ],
                       onChanged: (value) {
                         setDialogState(() => _audioDecoder = value);
@@ -342,7 +297,7 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
 
                     // Buffer Size
                     VideoPlayerLabeledSlider(
-                      label: 'Buffer Size: ${_bufferSize}MB',
+                      label: context.tr.vpBufferSize(_bufferSize),
                       value: _bufferSize.toDouble(),
                       min: 1,
                       max: 100,
@@ -356,7 +311,7 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
 
                     // Network Timeout
                     VideoPlayerLabeledSlider(
-                      label: 'Network Timeout: ${_networkTimeout}s',
+                      label: context.tr.vpNetworkTimeout(_networkTimeout),
                       value: _networkTimeout.toDouble(),
                       min: 5,
                       max: 120,
@@ -369,14 +324,14 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
                     ),
 
                     // Subtitle Encoding
-                    const Text(
-                      'Subtitle Encoding:',
+                    Text(
+                      context.tr.vpSubtitleEncoding,
                       style: TextStyle(fontWeight: FontWeight.bold),
                     ),
                     CbSelect<String>(
                       value: _subtitleEncoding,
                       expand: true,
-                      items: const [
+                      items: [
                         CbSelectItem(value: 'utf-8', label: 'UTF-8'),
                         CbSelectItem(value: 'utf-16', label: 'UTF-16'),
                         CbSelectItem(value: 'iso-8859-1', label: 'ISO-8859-1'),
@@ -394,15 +349,15 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
                     const SizedBox(height: 16),
 
                     // Video Output Format
-                    const Text(
-                      'Video Output Format:',
+                    Text(
+                      context.tr.vpOutputFormat,
                       style: TextStyle(fontWeight: FontWeight.bold),
                     ),
                     CbSelect<String>(
                       value: _videoOutputFormat,
                       expand: true,
-                      items: const [
-                        CbSelectItem(value: 'auto', label: 'Auto'),
+                      items: [
+                        CbSelectItem(value: 'auto', label: context.tr.vpAuto),
                         CbSelectItem(value: 'yuv420p', label: 'YUV420P'),
                         CbSelectItem(value: 'rgb24', label: 'RGB24'),
                       ],
@@ -444,6 +399,37 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
                         ),
                       ],
                     ),
+                    const SizedBox(height: 16),
+
+                    // Mouse wheel action
+                    Text(
+                      AppLocalizations.of(context)!.videoWheelAction,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    CbSelect<VideoWheelAction>(
+                      value: _videoWheelAction,
+                      expand: true,
+                      items: [
+                        CbSelectItem(
+                          value: VideoWheelAction.volume,
+                          label: AppLocalizations.of(context)!.videoWheelVolume,
+                        ),
+                        CbSelectItem(
+                          value: VideoWheelAction.seek,
+                          label: AppLocalizations.of(context)!.videoWheelSeek,
+                        ),
+                      ],
+                      onChanged: (value) {
+                        setDialogState(() => _videoWheelAction = value);
+                        setState(() => _videoWheelAction = value);
+                        _saveSettings();
+                      },
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      AppLocalizations.of(context)!.videoWheelActionDescription,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
                   ],
                 ),
               ),
@@ -453,11 +439,11 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
                     _resetSettings();
                     setDialogState(() {});
                   },
-                  child: const Text('Reset to Default'),
+                  child: Text(context.tr.vpResetToDefault),
                 ),
                 TextButton(
                   onPressed: () => RouteUtils.safePopDialog(context),
-                  child: const Text('Close'),
+                  child: Text(context.tr.close),
                 ),
               ],
             );
@@ -474,6 +460,67 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
       _player!.setRate(speed);
       setState(() => _playbackSpeed = speed);
     }
+  }
+
+  /// One user-facing decoder choice; see [PlaybackVideoConfiguration.forDecoder].
+  Widget _buildVideoDecodingSection(
+    BuildContext context,
+    StateSetter setDialogState,
+  ) {
+    final l10n = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final mode = switch (_videoDecoder) {
+      'hardware' || 'software' => _videoDecoder,
+      _ => 'auto',
+    };
+    final description = switch (mode) {
+      'hardware' => l10n.videoDecodingGpuDescription,
+      'software' => l10n.videoDecodingCpuDescription,
+      _ when !kIsWeb && Platform.isWindows =>
+        l10n.videoDecodingAutoDescriptionWindows,
+      _ => l10n.videoDecodingAutoDescription,
+    };
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          l10n.videoDecoding,
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 4),
+        CbSelect<String>(
+          value: mode,
+          expand: true,
+          items: [
+            CbSelectItem(value: 'auto', label: l10n.videoDecodingAuto),
+            CbSelectItem(value: 'hardware', label: l10n.videoDecodingGpu),
+            CbSelectItem(value: 'software', label: l10n.videoDecodingCpu),
+          ],
+          onChanged: (value) {
+            setState(() {
+              _videoDecoder = value;
+              if (_player != null) {
+                _videoController = PlaybackVideoController(
+                  _player!,
+                  configuration: _buildVideoControllerConfig(),
+                );
+              }
+            });
+            setDialogState(() {});
+            _saveSettings();
+          },
+        ),
+        const SizedBox(height: 6),
+        Text(description, style: theme.textTheme.bodySmall),
+        const SizedBox(height: 2),
+        Text(
+          l10n.videoDecodingReopenHint,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
   }
 
   // ── Persistence ───────────────────────────────────────────────────────────
@@ -498,6 +545,7 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
       );
       await prefs.setVideoPlayerString('video_scale_mode', _videoScaleMode);
       await prefs.setVideoSeekSpeed(_videoSeekSpeed);
+      await prefs.setVideoWheelAction(_videoWheelAction);
       debugPrint('Video player settings saved successfully');
     } catch (e) {
       debugPrint('Error saving video player settings: $e');
@@ -509,46 +557,40 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
       final prefs = UserPreferences.instance;
       await prefs.init();
 
-      // Retain the existing Windows software-decoding migration preference.
-      // Users can still enable media_kit hardware decoding explicitly.
+      // An earlier one-time migration forced 'software' on every Windows
+      // install, indistinguishable from a real choice. 'auto' now keeps the
+      // CPU for normal videos there too, adding only GPU decoding for 4K with
+      // a live CPU fallback, so move those installs to it once.
       if (!kIsWeb && Platform.isWindows) {
         final migrated =
             await prefs.getVideoPlayerBool(
-              'hw_accel_windows_migrated',
+              'video_decoder_auto_migrated',
               defaultValue: false,
             ) ??
             false;
         if (!migrated) {
-          await prefs.setVideoPlayerBool('hardware_acceleration', false);
-          await prefs.setVideoPlayerString('video_decoder', 'software');
-          await prefs.setVideoPlayerBool('hw_accel_windows_migrated', true);
-          debugPrint(
-            'VideoPlayer: applied one-time Windows HW-accel safety migration',
-          );
+          final current = await prefs.getVideoPlayerString('video_decoder');
+          if (current != 'hardware') {
+            await prefs.setVideoPlayerString('video_decoder', 'auto');
+          }
+          await prefs.setVideoPlayerBool('video_decoder_auto_migrated', true);
         }
       }
 
-      // Preserve the established Windows default across the backend migration.
-      final hwAccelDefault = kIsWeb ? true : !Platform.isWindows;
       // The reads are independent; issue them together so the player (which
       // waits for these settings) is created sooner.
       final (
+        (codec, videoDecoder, audioDecoder, videoOutputFormat, videoScaleMode),
         (
-          codec,
-          hardwareAcceleration,
-          videoDecoder,
-          audioDecoder,
-          videoOutputFormat,
-          videoScaleMode,
+          bufferSize,
+          networkTimeout,
+          subtitleEncoding,
+          videoSeekSpeed,
+          videoWheelAction,
         ),
-        (bufferSize, networkTimeout, subtitleEncoding, videoSeekSpeed),
       ) = await (
         (
           prefs.getVideoPlayerString('video_codec', defaultValue: 'auto'),
-          prefs.getVideoPlayerBool(
-            'hardware_acceleration',
-            defaultValue: hwAccelDefault,
-          ),
           prefs.getVideoPlayerString('video_decoder', defaultValue: 'auto'),
           prefs.getVideoPlayerString('audio_decoder', defaultValue: 'auto'),
           prefs.getVideoPlayerString(
@@ -568,10 +610,10 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
             defaultValue: 'utf-8',
           ),
           prefs.getVideoSeekSpeed(),
+          prefs.getVideoWheelAction(),
         ).wait,
       ).wait;
       _selectedCodec = codec ?? 'auto';
-      _hardwareAcceleration = hardwareAcceleration ?? hwAccelDefault;
       _videoDecoder = videoDecoder ?? 'auto';
       _audioDecoder = audioDecoder ?? 'auto';
       _bufferSize = bufferSize ?? 10;
@@ -580,10 +622,7 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
       _videoOutputFormat = videoOutputFormat ?? 'auto';
       _videoScaleMode = videoScaleMode ?? 'contain';
       _videoSeekSpeed = videoSeekSpeed;
-
-      // Keep hardware acceleration in sync with explicit decoder choice
-      if (_videoDecoder == 'software') _hardwareAcceleration = false;
-      if (_videoDecoder == 'hardware') _hardwareAcceleration = true;
+      _videoWheelAction = videoWheelAction;
 
       debugPrint('Video player settings loaded successfully');
     } catch (e) {
@@ -594,7 +633,6 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
   void _resetSettings() {
     setState(() {
       _selectedCodec = 'auto';
-      _hardwareAcceleration = kIsWeb ? true : !Platform.isWindows;
       _videoDecoder = 'auto';
       _audioDecoder = 'auto';
       _bufferSize = 10;
@@ -603,6 +641,7 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
       _videoOutputFormat = 'auto';
       _videoScaleMode = 'contain';
       _videoSeekSpeed = 1;
+      _videoWheelAction = VideoWheelAction.volume;
     });
     _saveSettings();
   }

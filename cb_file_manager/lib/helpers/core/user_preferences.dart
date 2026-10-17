@@ -21,6 +21,9 @@ enum TagThumbnailFitMode { contain, cover }
 
 enum FileThumbnailFitMode { cover, contain }
 
+/// What the mouse wheel does over the video player.
+enum VideoWheelAction { volume, seek }
+
 /// A class to manage user preferences for the application
 class UserPreferences {
   // Singleton instance with getter
@@ -59,6 +62,7 @@ class UserPreferences {
   static const String _videoPlayerVolumeKey = 'video_player_volume';
   static const String _videoPlayerMuteKey = 'video_player_mute';
   static const String _videoSeekSpeedKey = 'video_seek_speed';
+  static const String _videoWheelActionKey = 'video_wheel_action';
   static const String _drawerPinnedKey = 'drawer_pinned';
   static const String _themePreferenceKey = 'theme_preference';
   static const String _keySearchTipShown = 'search_tip_shown';
@@ -1092,6 +1096,23 @@ class UserPreferences {
   /// Save video seek speed preference
   Future<bool> setVideoSeekSpeed(int speed) async {
     return await _savePreference<int>(_videoSeekSpeedKey, speed.clamp(0, 2));
+  }
+
+  /// Get the mouse wheel action over the video player (default: volume)
+  Future<VideoWheelAction> getVideoWheelAction() async {
+    final stored = await _getPreference<String>(
+      _videoWheelActionKey,
+      defaultValue: VideoWheelAction.volume.name,
+    );
+    return VideoWheelAction.values.firstWhere(
+      (action) => action.name == stored,
+      orElse: () => VideoWheelAction.volume,
+    );
+  }
+
+  /// Save the mouse wheel action over the video player
+  Future<bool> setVideoWheelAction(VideoWheelAction action) async {
+    return await _savePreference<String>(_videoWheelActionKey, action.name);
   }
 
   /// Get drawer pinned state

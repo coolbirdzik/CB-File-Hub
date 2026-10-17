@@ -49,7 +49,8 @@ class _ThumbnailOnlyState extends State<ThumbnailOnly>
   @override
   void didUpdateWidget(ThumbnailOnly oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.file.path != oldWidget.file.path) {
+    if (widget.file.path != oldWidget.file.path ||
+        widget.iconSize != oldWidget.iconSize) {
       final extension = p.extension(widget.file.path).toLowerCase();
       final category = FileTypeRegistry.getCategory(extension);
       final isVideo = category == FileCategory.video;
@@ -78,20 +79,25 @@ class _ThumbnailOnlyState extends State<ThumbnailOnly>
     if (!isVideo && !isImage && widget.file is File) {
       return RepaintBoundary(
         child: Center(
-          child: FutureBuilder<Widget>(
-            future: _iconFuture,
-            builder: (context, snapshot) {
-              if (snapshot.hasData) {
-                return snapshot.data!;
-              }
-              // Show generic icon while loading
-              return Icon(
-                genericIcon,
-                size: widget.iconSize,
-                color: Theme.of(context).colorScheme.secondary,
-              );
-            },
-          ),
+          child:
+              FileIconHelper.getCachedIconForFile(
+                widget.file as File,
+                size: widget.iconSize.ceil(),
+              ) ??
+              FutureBuilder<Widget>(
+                future: _iconFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.hasData) {
+                    return snapshot.data!;
+                  }
+                  // Show generic icon while loading
+                  return Icon(
+                    genericIcon,
+                    size: widget.iconSize,
+                    color: Theme.of(context).colorScheme.secondary,
+                  );
+                },
+              ),
         ),
       );
     }

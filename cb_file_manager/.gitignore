@@ -37,6 +37,7 @@ lib/generated_plugin_registrant.dart
 # These large binaries (~69MB) are downloaded at build time by
 # scripts/fetch_llama_runtime.sh, not committed to git.
 /windows/llama/
+/windows/aria2/
 
 # Exceptions to above rules.
 !/packages/flutter_tools/test/data/dart_dependencies_test/**/.packages

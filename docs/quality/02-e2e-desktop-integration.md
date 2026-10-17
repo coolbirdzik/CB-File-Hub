@@ -131,11 +131,20 @@ flutter test integration_test -d windows --dart-define=CB_E2E=true --reporter ex
 
 ## CI
 
-The root workflow runs **Windows E2E** after analysis:
+The root workflow (`.github/workflows/build-test.yml`) runs **Windows E2E** after analysis, but only the suites a change can affect:
 
-`flutter test integration_test -d windows --dart-define=CB_E2E=true`
+1. **`e2e-select`** (Ubuntu, `scripts/ci/e2e_select.mjs`) maps changed paths to suites using the ordered, first-match rules in `cb_file_manager/integration_test/e2e_impact.json`.
+   - Pushes to `develop` diff against the last green push run on the branch (falling back to the push range); PRs into `develop` diff the PR merge commit against its base.
+   - Pushes and PRs to `main` select **every** suite.
+   - Docs, store copy, unit tests and other platforms select nothing; shared inputs (`pubspec.*`, `lib/main.dart`, `lib/core`, `lib/config` incl. localizations, `lib/design_system`, `windows/`, the E2E harness) select everything; feature areas without E2E coverage run the `smoke` suite (`app_e2e_test` group `01 Navigation`); a path no rule matches selects everything.
+   - Suites that already passed on the same source fingerprint (hash of the `cb_file_manager`, `mobile_smb_native`, workflow and fetch-script trees) are skipped. The record is an `e2e-pass-<fingerprint>-<suites>` cache key saved by the Windows job; only keys from branch pushes or the same PR count.
+2. **`e2e-windows`** is skipped when nothing is selected. Otherwise `scripts/ci/e2e_run.mjs` runs each selected suite in its own `flutter test` process, keeps going after a failure, and uploads all reports as one `e2e-diagnostics-*` artifact.
 
-See `.github/workflows/build-test.yml` (job `e2e-windows`).
+Force a full run (selection and pass records ignored) with **Run workflow** → `full_e2e`, the `e2e:full` PR label, or `[e2e full]` in the head commit message. The job summary lists each suite's status and which rule each changed file hit.
+
+Check locally what CI would run: `just e2e-affected` (or `node scripts/ci/e2e_select.mjs <base>`).
+
+When you add an `integration_test/*_e2e_test.dart` file, add it to `e2e_impact.json` under `suites` (plus a rule) or `notInCi`; `scripts/tests/e2e_select.test.mjs` fails otherwise, and also fails when a tracked `lib/` file matches no rule.
 
 ## Test groups
 

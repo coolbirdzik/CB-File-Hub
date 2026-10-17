@@ -1,6 +1,14 @@
 import 'dart:convert';
 import 'dart:io';
 
+import '../../utils/app_logger.dart';
+
+/// The transport completed but generation supplied no usable answer. Callers
+/// doing bounded classification can retry or mark the item for manual review.
+class LocalAiMissingAnswerException extends StateError {
+  LocalAiMissingAnswerException(super.message);
+}
+
 /// Uses the GGUF's own chat template instead of assuming every model is ChatML.
 class LlamaCppChatClient {
   final HttpClient httpClient;
@@ -12,12 +20,10 @@ class LlamaCppChatClient {
     required List<Map<String, String>> messages,
     required int maxResponseTokens,
     String catalogId = '',
+    bool? enableThinking,
   }) async* {
-    final request = await httpClient.postUrl(
+    final response = await _openResponse(
       baseUri.resolve('/v1/chat/completions'),
-    );
-    request.headers.contentType = ContentType.json;
-    request.add(
       utf8.encode(
         jsonEncode({
           'messages': messages,
@@ -26,12 +32,10 @@ class LlamaCppChatClient {
           'cache_prompt': true,
           // Keep reasoning separate so it can be displayed in a disclosure.
           'reasoning_format': 'auto',
-          ..._generationParameters(catalogId),
+          ..._generationParameters(catalogId, enableThinking: enableThinking),
         }),
       ),
     );
-
-    final response = await request.close();
     if (response.statusCode != 200) {
       final body = await response.transform(utf8.decoder).join();
       throw StateError(
@@ -85,7 +89,7 @@ class LlamaCppChatClient {
         }
         finished = true;
         if (choice['finish_reason'] == 'length' && !hasContent) {
-          throw StateError(
+          throw LocalAiMissingAnswerException(
             'The local model reached its response limit without an answer.',
           );
         }
@@ -97,20 +101,55 @@ class LlamaCppChatClient {
       );
     }
     if (!hasContent) {
-      throw StateError('The local model returned no answer. Please retry.');
+      throw LocalAiMissingAnswerException(
+        'The local model returned no answer. Please retry.',
+      );
+    }
+  }
+
+  Future<HttpClientResponse> _openResponse(Uri uri, List<int> body) async {
+    for (var attempt = 0; ; attempt++) {
+      HttpClientRequest? request;
+      try {
+        request = await httpClient.postUrl(uri);
+        // SSE completion/cancellation can leave a pooled socket whose peer has
+        // already closed it. Each inference round needs a fresh connection.
+        request.persistentConnection = false;
+        request.headers.contentType = ContentType.json;
+        request.add(body);
+        return await request.close();
+      } on HttpException {
+        request?.abort();
+        if (attempt > 0) rethrow;
+      } on SocketException {
+        request?.abort();
+        if (attempt > 0) rethrow;
+      }
+      // Only retry while waiting for headers. Once streaming starts, replaying
+      // a request could duplicate visible output or tool calls.
+      AppLogger.warning(
+        '[LocalAI] Connection failed before response headers; '
+        'retrying once on a fresh connection.',
+      );
     }
   }
 
   /// Publisher sampling recommendations for the curated model families.
   /// Existing Qwen3/unknown models retain the original thinking configuration.
-  static Map<String, dynamic> _generationParameters(String catalogId) {
+  static Map<String, dynamic> _generationParameters(
+    String catalogId, {
+    bool? enableThinking,
+  }) {
     final name = catalogId.split('/').last.toLowerCase();
     final instructOnly = name.startsWith('qwen3-4b-instruct-2507');
     final qwen35 = name.startsWith('qwen3.5-');
     // The 2B release defaults to non-thinking; reserve explicit reasoning for 4B.
-    final direct = instructOnly || name.startsWith('qwen3.5-2b-');
+    final direct =
+        enableThinking == false ||
+        instructOnly ||
+        name.startsWith('qwen3.5-2b-');
     return {
-      'chat_template_kwargs': {'enable_thinking': !direct},
+      'chat_template_kwargs': {'enable_thinking': enableThinking ?? !direct},
       'temperature': direct ? 0.7 : (qwen35 ? 1.0 : 0.6),
       'top_k': 20,
       'top_p': direct ? 0.8 : 0.95,

@@ -7,6 +7,27 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 class BrowserLikeKeyboardShortcuts {
+  static KeyEventResult handleSearch({
+    required bool isDesktop,
+    required KeyEvent? event,
+    VoidCallback? onSearch,
+  }) {
+    final commandPressed =
+        HardwareKeyboard.instance.isControlPressed ||
+        (Platform.isMacOS && HardwareKeyboard.instance.isMetaPressed);
+    if (isDesktop &&
+        onSearch != null &&
+        (event is KeyDownEvent || event is KeyRepeatEvent) &&
+        commandPressed &&
+        !HardwareKeyboard.instance.isAltPressed &&
+        !HardwareKeyboard.instance.isShiftPressed &&
+        event!.logicalKey == LogicalKeyboardKey.keyF) {
+      onSearch();
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
   static bool isTextInputFocused() {
     final focusedContext = FocusManager.instance.primaryFocus?.context;
     if (focusedContext == null) {
@@ -29,6 +50,12 @@ class BrowserLikeKeyboardShortcuts {
     VoidCallback? onRename,
     VoidCallback? onSearch,
   }) {
+    final searchResult = handleSearch(
+      isDesktop: isDesktop,
+      event: event,
+      onSearch: onSearch,
+    );
+    if (searchResult != KeyEventResult.ignored) return searchResult;
     if (!isDesktop || event == null || isTextInputFocused()) {
       return KeyEventResult.ignored;
     }
@@ -60,11 +87,6 @@ class BrowserLikeKeyboardShortcuts {
 
     if (isCtrl && key == LogicalKeyboardKey.keyA && onSelectAll != null) {
       onSelectAll();
-      return KeyEventResult.handled;
-    }
-
-    if (isCtrl && key == LogicalKeyboardKey.keyF && onSearch != null) {
-      onSearch();
       return KeyEventResult.handled;
     }
 
@@ -127,17 +149,14 @@ class BrowserLikeKeyboardShortcuts {
     onScrollToIndex,
     KeyEvent? event,
   }) {
+    final searchResult = handleSearch(
+      isDesktop: isDesktop,
+      event: event,
+      onSearch: onSearch,
+    );
+    if (searchResult != KeyEventResult.ignored) return searchResult;
     if (!isDesktop || event == null || isTextInputFocused()) {
       return KeyEventResult.ignored;
-    }
-
-    // Handle Ctrl+F for search before delegating to keyboard controller.
-    if (onSearch != null &&
-        event is KeyDownEvent &&
-        HardwareKeyboard.instance.isControlPressed &&
-        event.logicalKey == LogicalKeyboardKey.keyF) {
-      onSearch();
-      return KeyEventResult.handled;
     }
 
     return keyboardController.handleKeyEvent(

@@ -8,6 +8,9 @@ import 'package:cb_file_manager/models/local_ai/local_ai_advisor_model.dart';
 import 'package:cb_file_manager/services/ai/ai_provider_service.dart';
 import 'package:cb_file_manager/services/ai/providers/ai_provider.dart';
 import 'package:cb_file_manager/services/ai/tool_executor.dart';
+import 'package:cb_file_manager/services/disk_cleaner/disk_cleaner_service.dart';
+import 'package:cb_file_manager/services/disk_cleaner/disk_tree_node.dart';
+import 'package:cb_file_manager/services/disk_cleaner/cleaner_agent_review.dart';
 import 'package:cb_file_manager/services/local_ai/llama_cpp_chat_client.dart';
 import 'package:cb_file_manager/services/local_ai/local_ai_advisor_service.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -181,6 +184,38 @@ void main() {
     expect(await File(p.join(sandbox.path, 'backup.txt')).exists(), true);
   });
 
+  test(
+    'remote inspection announcements continue without executing prose',
+    () async {
+      final provider = _Remote([
+        'Để xem vị trí Docker, tôi sẽ kiểm tra scan đang hoạt động:',
+        call('get_context', {}),
+        'The working directory is available.',
+      ]);
+      final bloc = AiAgentBloc(providerService: provider, toolExecutor: tools);
+      addTearDown(bloc.close);
+      bloc.add(const SendMessage('Check the working context'));
+      await until(() => provider.requests.length == 3 && !bloc.state.isLoading);
+      expect(bloc.state.error, isNull);
+      expect(tools.calls.map((call) => call.name), ['get_context']);
+      expect(provider.requests[1].last.content, contains('only announced'));
+      expect(
+        bloc.state.messages.last.content,
+        'The working directory is available.',
+      );
+    },
+  );
+
+  test('remote repeated inspection promises have a bounded failure', () async {
+    final provider = _Remote(List.filled(3, 'I will check the current scan:'));
+    final bloc = AiAgentBloc(providerService: provider, toolExecutor: tools);
+    addTearDown(bloc.close);
+    bloc.add(const SendMessage('Check the scan'));
+    await until(() => provider.requests.length == 3 && !bloc.state.isLoading);
+    expect(tools.calls, isEmpty);
+    expect(bloc.state.error, contains('did not carry it out'));
+  });
+
   test('a failed operation stops the remaining calls in its batch', () async {
     final runtime = _Runtime([
       '${call('copy_file', {'source': 'missing.txt', 'destination': 'copy.txt'})}${call('write_file', {'path': 'should-not-exist.txt', 'content': 'x'})}',
@@ -218,7 +253,696 @@ void main() {
     );
   });
 
+  for (final useLocal in [false, true]) {
+    test(
+      '48 unknown Cleaner groups limit AI to 24 and explain the rest from metadata (${useLocal ? 'local' : 'remote'})',
+      () async {
+        const owner = 'batch-speed-harness';
+        final cleaner = DiskCleanerService.instance;
+        tools = _Tools(tags, ownerTabId: owner);
+        final root = DiskTreeNode(
+          name: 'C:',
+          fullPath: r'C:\',
+          children: List.generate(
+            48,
+            (i) => DiskTreeNode(
+              name: 'data.unknown',
+              fullPath: 'C:\\scope$i\\data.unknown',
+              isFile: true,
+              sizeBytes: 48 - i,
+            ),
+          ),
+        );
+        var focuses = 0;
+        var acceptedGroups = 0;
+        void publish() => cleaner.publishCleanerScanContext(
+          ownerTabId: owner,
+          root: root,
+          reviewItem: (_, _) {
+            focuses++;
+            publish();
+            return true;
+          },
+          reviewGroup: (_, _) {
+            acceptedGroups++;
+            return true;
+          },
+        );
+        publish();
+        addTearDown(() => cleaner.clearCleanerScanContext(owner));
+        late _Runtime runtime;
+        late _Remote provider;
+        final requestedBatches = <List<String>>[];
+        String respond() {
+          final prompt = useLocal
+              ? runtime.requests.last.last['content']!
+              : provider.requests.last.single.content;
+          expect(prompt.length, lessThan(8000));
+          final evidence =
+              jsonDecode(
+                    prompt.substring(
+                      prompt.indexOf('\nEvidence: ') + '\nEvidence: '.length,
+                    ),
+                  )
+                  as List;
+          final ids = evidence
+              .map((data) => data['group_id'] as String)
+              .toList();
+          requestedBatches.add(ids);
+          return jsonEncode({
+            'assessments': [
+              for (final id in ids)
+                {
+                  'group_id': id,
+                  'decision': 'KEEP',
+                  'reason': 'Unknown ownership; keep user data.',
+                },
+            ],
+          });
+        }
+
+        runtime = _Runtime([], respond: respond);
+        provider = _Remote([], respond: respond);
+        final bloc = useLocal
+            ? await local(runtime)
+            : AiAgentBloc(providerService: provider, toolExecutor: tools);
+        if (!useLocal) addTearDown(bloc.close);
+        bloc.add(
+          const SendMessage('Review all', reviewEntireCleanerScan: true),
+        );
+        await until(() => requestedBatches.isNotEmpty && !bloc.state.isLoading);
+        expect(bloc.state.error, isNull);
+        expect(requestedBatches, hasLength(3));
+        expect(requestedBatches.every((batch) => batch.length == 8), isTrue);
+        expect(
+          requestedBatches.expand((batch) => batch).toSet(),
+          hasLength(24),
+        );
+        expect(focuses, 4); // One metadata batch and three AI batches.
+        expect(acceptedGroups, 48);
+        final review = cleaner.fullCleanerReview(owner)!;
+        expect(review.isComplete, isTrue);
+        expect(review.groups.where((g) => g.analysis!.fromScan), hasLength(24));
+        expect(
+          review.groups.where((g) => !g.analysis!.fromScan).map((g) => g.scope),
+          List.generate(24, (i) => 'C:\\scope$i'),
+        );
+        expect(
+          review.groups.every((g) => !g.analysis!.selectForCleanup),
+          isTrue,
+        );
+        expect(tools.calls, isEmpty);
+      },
+    );
+
+    test(
+      'full Cleaner review Stop blocks late tools and Retry resumes pending items '
+      '(${useLocal ? 'local' : 'remote'})',
+      () async {
+        const owner = 'stop-review-harness';
+        final cleaner = DiskCleanerService.instance;
+        tools = _Tools(tags, ownerTabId: owner);
+        final files = List.generate(
+          9,
+          (i) => DiskTreeNode(
+            name: 'data.unknown',
+            fullPath: 'C:\\scope$i\\data.unknown',
+            isFile: true,
+            sizeBytes: 9 - i,
+          ),
+        );
+        final first = files.first;
+        final second = files.last;
+        final root = DiskTreeNode(
+          name: 'C:',
+          fullPath: r'C:\',
+          children: files,
+        );
+        final assessed = <String>[];
+        final focused = <String>[];
+        void publish() => cleaner.publishCleanerScanContext(
+          ownerTabId: owner,
+          root: root,
+          reviewItem: (node, analysis) {
+            if (analysis == null) focused.add(node.fullPath);
+            if (analysis != null) assessed.add(node.fullPath);
+            publish();
+            return true;
+          },
+          reviewGroup: (group, analysis) {
+            assessed.addAll(group.nodes.map((n) => n.fullPath));
+            publish();
+            return true;
+          },
+        );
+        publish();
+        addTearDown(() => cleaner.clearCleanerScanContext(owner));
+        final waiting = Completer<void>();
+        final gate = Completer<void>();
+        var round = 0;
+        Future<String> respond() async {
+          final group = cleaner
+              .fullCleanerReview(owner)!
+              .groups
+              .firstWhere((g) => g.analysis == null);
+          round++;
+          if (round == 2) {
+            waiting.complete();
+            await gate.future;
+          }
+          return jsonEncode({
+            'group_id': group.id,
+            'decision': 'KEEP',
+            'reason': 'No evidence that these personal files are disposable.',
+          });
+        }
+
+        final bloc = useLocal
+            ? await local(_Runtime([], asyncRespond: respond))
+            : AiAgentBloc(
+                providerService: _Remote([], asyncRespond: respond),
+                toolExecutor: tools,
+              );
+        if (!useLocal) addTearDown(bloc.close);
+        bloc.add(
+          const SendMessage('Review all', reviewEntireCleanerScan: true),
+        );
+        await until(() => waiting.isCompleted);
+        bloc.add(const StopGeneration());
+        await until(() => !bloc.state.isLoading);
+        final review = cleaner.fullCleanerReview(owner)!;
+        expect(review.reviewed, 8);
+        expect(review.next, same(second));
+        expect(tools.calls, isEmpty);
+        expect(focused, [first.fullPath, second.fullPath]);
+        final original = bloc.state.messages.firstWhere(
+          (m) => m.role == AiMessageRole.user,
+        );
+        expect(
+          AiMessage.fromJson(original.toJson()).reviewEntireCleanerScan,
+          isTrue,
+        );
+        gate.complete();
+        bloc.add(const RetryLastMessage());
+        await until(() => round >= 3 && !bloc.state.isLoading);
+        expect(bloc.state.error, isNull);
+        expect(cleaner.fullCleanerReview(owner), same(review));
+        expect(review.isComplete, isTrue);
+        expect(assessed, files.map((n) => n.fullPath));
+        expect(tools.calls, isEmpty);
+        expect(focused, [first.fullPath, second.fullPath, second.fullPath]);
+      },
+    );
+
+    test('quick Cleaner overview replaces early summaries with metadata advice '
+        '(${useLocal ? 'local' : 'remote'})', () async {
+      const owner = 'full-review-harness';
+      final cleaner = DiskCleanerService.instance;
+      tools = _Tools(tags, ownerTabId: owner);
+      final files = List.generate(
+        25,
+        (i) => DiskTreeNode(
+          name: 'file$i.txt',
+          fullPath: 'C:\\Data\\file$i.txt',
+          isFile: true,
+          sizeBytes: i + 1,
+        ),
+      );
+      final folder = DiskTreeNode(
+        name: 'Data',
+        fullPath: r'C:\Data',
+        children: files,
+      );
+      final root = DiskTreeNode(
+        name: 'C:',
+        fullPath: r'C:\',
+        children: [
+          folder,
+          ...List.generate(
+            12,
+            (i) => DiskTreeNode(name: 'Other$i', fullPath: 'C:\\Other$i'),
+          ),
+        ],
+      );
+      final assessed = <String>[];
+      void publish() => cleaner.publishCleanerScanContext(
+        ownerTabId: owner,
+        root: root,
+        reviewItem: (node, analysis) {
+          if (analysis != null) assessed.add(node.fullPath);
+          publish();
+          return true;
+        },
+        reviewGroup: (group, analysis) {
+          assessed.addAll(group.nodes.map((n) => n.fullPath));
+          publish();
+          return true;
+        },
+      );
+      publish();
+      addTearDown(() => cleaner.clearCleanerScanContext(owner));
+      var round = 0;
+      String respond() {
+        round++;
+        // Unsupported final answers get conservative scan advice, without
+        // repeated model requests or claiming the AI reviewed the data.
+        if (round <= 3) return 'Review finished.';
+        final review = cleaner.fullCleanerReview(owner)!;
+        return jsonEncode({
+          'assessments': [
+            for (final group in review.groups.where((g) => g.analysis == null))
+              {
+                'group_id': group.id,
+                'decision': 'KEEP',
+                'reason':
+                    'Personal data without evidence that it is disposable.',
+              },
+          ],
+        });
+      }
+
+      final runtime = _Runtime([], respond: respond);
+      final provider = _Remote([], respond: respond);
+      final bloc = useLocal
+          ? await local(runtime)
+          : AiAgentBloc(providerService: provider, toolExecutor: tools);
+      if (!useLocal) addTearDown(bloc.close);
+      bloc.add(
+        const SendMessage(
+          'Review the entire Cleaner scan',
+          reviewEntireCleanerScan: true,
+        ),
+      );
+      await until(() => round > 0 && !bloc.state.isLoading);
+      expect(bloc.state.error, isNull);
+      expect(
+        assessed,
+        unorderedEquals([
+          folder.fullPath,
+          ...files.map((f) => f.fullPath),
+          ...root.children.skip(1).map((n) => n.fullPath),
+        ]),
+      );
+      expect(cleaner.fullCleanerReview(owner)!.remaining, 0);
+      expect(round, 1);
+      expect(
+        bloc.state.messages.last.content,
+        contains('Quick overview ready'),
+      );
+      expect(
+        bloc.state.messages.last.content,
+        contains('0 with AI recommendations'),
+      );
+      expect(
+        cleaner
+            .fullCleanerReview(owner)!
+            .groups
+            .every(
+              (g) => g.analysis!.fromScan && !g.analysis!.selectForCleanup,
+            ),
+        isTrue,
+      );
+      expect(
+        tools.calls.every((c) => !ToolExecutor.dangerousTools.contains(c.name)),
+        isTrue,
+      );
+    });
+
+    test('quick Cleaner overview explains known folders without calling AI '
+        '(${useLocal ? 'local' : 'remote'})', () async {
+      const owner = 'stalled-review-harness';
+      final cleaner = DiskCleanerService.instance;
+      tools = _Tools(tags, ownerTabId: owner);
+      cleaner.publishCleanerScanContext(
+        ownerTabId: owner,
+        root: DiskTreeNode(
+          name: 'C:',
+          fullPath: r'C:\',
+          children: [DiskTreeNode(name: 'data', fullPath: r'C:\data')],
+        ),
+        reviewItem: (_, _) => true,
+        reviewGroup: (_, _) => true,
+      );
+      addTearDown(() => cleaner.clearCleanerScanContext(owner));
+      var round = 0;
+      String respond() {
+        round++;
+        return 'Done.';
+      }
+
+      final bloc = useLocal
+          ? await local(_Runtime([], respond: respond))
+          : AiAgentBloc(
+              providerService: _Remote([], respond: respond),
+              toolExecutor: tools,
+            );
+      if (!useLocal) addTearDown(bloc.close);
+      bloc.add(const SendMessage('Review all', reviewEntireCleanerScan: true));
+      await until(
+        () => bloc.state.messages.length >= 2 && !bloc.state.isLoading,
+      );
+      expect(round, 0);
+      expect(bloc.state.error, isNull);
+      final review = cleaner.fullCleanerReview(owner)!;
+      expect(review.remaining, 0);
+      expect(review.reviewed, 1);
+      expect(review.isComplete, isTrue);
+      expect(review.groups.single.usedFallback, isFalse);
+      expect(review.groups.single.analysis!.fromScan, isTrue);
+      expect(
+        review.groups.single.analysis!.decision,
+        CleanerItemDecision.review,
+      );
+      expect(review.groups.single.analysis!.selectForCleanup, isFalse);
+      expect(
+        bloc.state.messages.last.content,
+        contains('Quick overview ready'),
+      );
+      expect(tools.calls, isEmpty);
+    });
+  }
+
+  test(
+    'malformed eight-group AI batch uses metadata without recursive retries',
+    () async {
+      const owner = 'split-batch-review';
+      final cleaner = DiskCleanerService.instance;
+      tools = _Tools(tags, ownerTabId: owner);
+      cleaner.publishCleanerScanContext(
+        ownerTabId: owner,
+        root: DiskTreeNode(
+          name: 'C:',
+          fullPath: r'C:\',
+          children: List.generate(
+            8,
+            (i) => DiskTreeNode(
+              name: 'data.unknown',
+              fullPath: 'C:\\scope$i\\data.unknown',
+              isFile: true,
+              sizeBytes: 8 - i,
+            ),
+          ),
+        ),
+        reviewItem: (_, _) => true,
+        reviewGroup: (_, _) => true,
+      );
+      addTearDown(() => cleaner.clearCleanerScanContext(owner));
+      late _Remote provider;
+      provider = _Remote(
+        [],
+        respond: () {
+          final prompt = provider.requests.last.single.content;
+          final evidence = jsonDecode(prompt.split('Evidence: ').last) as List;
+          if (evidence.length > 1) return 'Invalid batch response.';
+          return jsonEncode({
+            'group_id': evidence.single['group_id'],
+            'decision': 'KEEP',
+            'reason': 'User data.',
+          });
+        },
+      );
+      final bloc = AiAgentBloc(providerService: provider, toolExecutor: tools);
+      addTearDown(bloc.close);
+      bloc.add(const SendMessage('Review all', reviewEntireCleanerScan: true));
+      await until(() => provider.requests.isNotEmpty && !bloc.state.isLoading);
+      expect(bloc.state.error, isNull);
+      final review = cleaner.fullCleanerReview(owner)!;
+      expect(review.reviewed, 8);
+      expect(review.unresolvedItems, 0);
+      expect(provider.requests.length, 1);
+      expect(
+        review.groups.every(
+          (g) => g.analysis!.fromScan && !g.analysis!.selectForCleanup,
+        ),
+        isTrue,
+      );
+      expect(tools.calls, isEmpty);
+    },
+  );
+
+  test(
+    '598142-entry Cleaner scan preserves 8 reviews and labels the rest as metadata advice',
+    () async {
+      const owner = 'large-review-harness';
+      final cleaner = DiskCleanerService.instance;
+      tools = _Tools(tags, ownerTabId: owner);
+      final files = List.generate(
+        598141,
+        (i) => DiskTreeNode(
+          name: 'file$i.txt',
+          fullPath: i < 7
+              ? 'E:\\prior$i.txt'
+              : 'E:\\reco\\ShinodaYu\\file$i.txt',
+          isFile: true,
+          sizeBytes: 1,
+        ),
+      );
+      final folder = DiskTreeNode(
+        name: 'ShinodaYu',
+        fullPath: r'E:\reco\ShinodaYu',
+        children: files.skip(7).toList(),
+      );
+      final root = DiskTreeNode(
+        name: 'E:',
+        fullPath: r'E:\',
+        children: [...files.take(7), folder],
+      );
+      var acceptedGroups = 0;
+      void publish() => cleaner.publishCleanerScanContext(
+        ownerTabId: owner,
+        root: root,
+        reviewItem: (_, _) {
+          publish();
+          return true;
+        },
+        reviewGroup: (group, analysis) {
+          acceptedGroups++;
+          expect(analysis.decision, CleanerItemDecision.review);
+          expect(analysis.selectForCleanup, isFalse);
+          publish();
+          return true;
+        },
+      );
+      publish();
+      addTearDown(() => cleaner.clearCleanerScanContext(owner));
+      final review = cleaner.beginFullCleanerReview(owner);
+      await review.prepareGroups(checkActive: () {});
+      final previousGroups = review.groups.take(2).toList();
+      const previousAnalysis = CleanerItemAnalysis(
+        decision: CleanerItemDecision.review,
+        reason: 'Previously accepted AI recommendation; retain user data.',
+      );
+      cleaner.inspectFullReviewGroups(
+        ownerTabId: owner,
+        review: review,
+        groups: previousGroups,
+      );
+      for (final group in previousGroups) {
+        cleaner.applyFullReviewGroup(
+          ownerTabId: owner,
+          review: review,
+          group: group,
+          analysis: previousAnalysis,
+        );
+      }
+      expect(review.reviewed, 8);
+      acceptedGroups = 0;
+      var rounds = 0;
+      final remote = _Remote(
+        [],
+        respond: () {
+          rounds++;
+          return 'I will continue inspecting.';
+        },
+      );
+      final bloc = AiAgentBloc(providerService: remote, toolExecutor: tools);
+      addTearDown(bloc.close);
+      final elapsed = Stopwatch()..start();
+      bloc.add(const SendMessage('Review all', reviewEntireCleanerScan: true));
+      await until(() => rounds > 0 && !bloc.state.isLoading);
+      expect(bloc.state.error, isNull);
+      expect(review.reviewed, 598142);
+      expect(review.remaining, 0);
+      expect(review.isComplete, isTrue);
+      expect(acceptedGroups, 1);
+      expect(rounds, 1);
+      expect(review.groups.last.nodes, hasLength(598134));
+      expect(review.groups.last.analysis!.fromScan, isTrue);
+      expect(
+        previousGroups.every((g) => identical(g.analysis, previousAnalysis)),
+        isTrue,
+      );
+      expect(files.every((file) => !file.isSelectedForDeletion), isTrue);
+      expect(tools.calls, isEmpty);
+      expect(
+        remote.requests.every(
+          (r) => r.length == 1 && r.single.content.length < 8000,
+        ),
+        isTrue,
+      );
+      expect(
+        bloc.state.messages.last.content,
+        contains('1 groups explained from scan metadata'),
+      );
+      expect(
+        bloc.state.messages.last.content,
+        contains('2 with AI recommendations'),
+      );
+      print(
+        'CLEANER 598142 elapsed_ms=${elapsed.elapsedMilliseconds} requests=$rounds',
+      );
+    },
+  );
+
+  test(
+    'local response-budget exhaustion explains all groups from metadata without splitting',
+    () async {
+      const owner = 'empty-local-review';
+      final cleaner = DiskCleanerService.instance;
+      tools = _Tools(tags, ownerTabId: owner);
+      final root = DiskTreeNode(
+        name: 'C:',
+        fullPath: r'C:\',
+        children: List.generate(
+          9,
+          (i) => DiskTreeNode(
+            name: 'data.unknown',
+            fullPath: 'C:\\scope$i\\data.unknown',
+            isFile: true,
+            sizeBytes: 9 - i,
+          ),
+        ),
+      );
+      void publish() => cleaner.publishCleanerScanContext(
+        ownerTabId: owner,
+        root: root,
+        reviewItem: (_, _) {
+          publish();
+          return true;
+        },
+        reviewGroup: (_, _) {
+          publish();
+          return true;
+        },
+      );
+      publish();
+      addTearDown(() => cleaner.clearCleanerScanContext(owner));
+      var requests = 0;
+      final runtime = _Runtime(
+        [],
+        asyncRespond: () async {
+          if (++requests <= 2) {
+            throw LocalAiMissingAnswerException('Response budget exhausted');
+          }
+          final group = cleaner
+              .fullCleanerReview(owner)!
+              .groups
+              .firstWhere((g) => g.analysis == null);
+          return jsonEncode({
+            'group_id': group.id,
+            'decision': 'KEEP',
+            'reason': 'User data.',
+          });
+        },
+      );
+      final bloc = await local(runtime);
+      bloc.add(const SendMessage('Review all', reviewEntireCleanerScan: true));
+      await until(() => requests > 0 && !bloc.state.isLoading);
+      expect(requests, 2); // One bounded attempt per batch, without splitting.
+      expect(bloc.state.error, isNull);
+      final review = cleaner.fullCleanerReview(owner)!;
+      expect(review.isComplete, isTrue);
+      expect(review.groups.first.usedFallback, isFalse);
+      expect(review.groups.last.usedFallback, isFalse);
+      expect(review.groups.first.analysis!.selectForCleanup, isFalse);
+      expect(review.groups.every((g) => g.analysis!.fromScan), isTrue);
+    },
+  );
+
   final liveUrl = Platform.environment['CB_LOCAL_CHAT_TEST_URL'];
+  test(
+    'live local model full Cleaner groups',
+    () async {
+      const owner = 'live-group-review';
+      final cleaner = DiskCleanerService.instance;
+      tools = _Tools(tags, ownerTabId: owner);
+      final cache = DiskTreeNode(
+        name: 'cache.tmp',
+        fullPath: r'C:\Temp\cache.tmp',
+        isFile: true,
+        sizeBytes: 10000,
+        junkCategoryId: 'windows_temp',
+      );
+      final personal = DiskTreeNode(
+        name: 'photo.jpg',
+        fullPath: r'C:\Data\photo.jpg',
+        isFile: true,
+        sizeBytes: 100000000,
+      );
+      final paging = DiskTreeNode(
+        name: 'pagefile.sys',
+        fullPath: r'C:\pagefile.sys',
+        isFile: true,
+        sizeBytes: 1000000000,
+      );
+      final root = DiskTreeNode(
+        name: 'C:',
+        fullPath: r'C:\',
+        children: [cache, personal, paging],
+      );
+      void publish() => cleaner.publishCleanerScanContext(
+        ownerTabId: owner,
+        root: root,
+        reviewItem: (_, _) {
+          publish();
+          return true;
+        },
+        reviewGroup: (group, analysis) {
+          for (final node in group.nodes) {
+            node.isSelectedForDeletion = analysis.selectForCleanup;
+          }
+          publish();
+          return true;
+        },
+      );
+      publish();
+      addTearDown(() => cleaner.clearCleanerScanContext(owner));
+      final runtime = _Runtime([], liveUrl: liveUrl);
+      final bloc = await local(runtime);
+      final elapsed = Stopwatch()..start();
+      bloc.add(
+        const SendMessage(
+          'Phân tích toàn bộ',
+          reviewEntireCleanerScan: true,
+          cleanerReviewLanguageCode: 'vi',
+        ),
+      );
+      await until(
+        () => bloc.state.messages.length >= 2 && !bloc.state.isLoading,
+        timeout: const Duration(seconds: 150),
+      );
+      expect(bloc.state.error, isNull);
+      final review = cleaner.fullCleanerReview(owner)!;
+      expect(review.isComplete, isTrue);
+      expect(review.groups.where((g) => g.usedFallback), isEmpty);
+      expect(
+        review.groups.every((g) => g.analysis!.reason != 'a concrete reason'),
+        isTrue,
+      );
+      expect(personal.isSelectedForDeletion, isFalse);
+      expect(paging.isSelectedForDeletion, isFalse);
+      print(
+        'LIVE CLEANER elapsed_ms=${elapsed.elapsedMilliseconds}, groups=${review.groups.length}, requests=${runtime.requests.length}, '
+        'decisions=${review.groups.map((g) => g.analysis!.decision.name).toList()}',
+      );
+      print(
+        'LIVE CLEANER reasons=${review.groups.map((g) => g.analysis!.reason).toList()}',
+      );
+    },
+    skip: liveUrl == null,
+    timeout: const Timeout(Duration(minutes: 3)),
+  );
+
   for (final scenario in ['files', 'tags', 'read', 'manage']) {
     test(
       'live local model common workflow: $scenario',
@@ -242,7 +966,10 @@ void main() {
         });
         addTearDown(subscription.cancel);
         bloc.add(SendMessage(prompt));
-        await until(() => runtime.requests.isNotEmpty && !bloc.state.isLoading);
+        await until(
+          () => runtime.requests.isNotEmpty && !bloc.state.isLoading,
+          timeout: const Duration(seconds: 150),
+        );
         expect(bloc.state.error, isNull);
         final names = tools.calls.map((c) => c.name).toList();
         print(
@@ -274,7 +1001,7 @@ void main() {
 
 class _Tools extends ToolExecutor {
   final calls = <ToolCall>[];
-  _Tools(MemoryAgentTags tags) : super(tagStore: tags);
+  _Tools(MemoryAgentTags tags, {super.ownerTabId}) : super(tagStore: tags);
   @override
   Future<ToolResult> execute(ToolCall call) async {
     calls.add(call);
@@ -286,7 +1013,9 @@ class _Remote extends AiProviderService {
   final List<String> responses;
   final requests = <List<AiMessage>>[];
   int streamCalls = 0;
-  _Remote(this.responses);
+  final String Function()? respond;
+  final Future<String> Function()? asyncRespond;
+  _Remote(this.responses, {this.respond, this.asyncRespond});
   @override
   Future<bool> get hasConfiguredProvider async => false;
   @override
@@ -297,8 +1026,11 @@ class _Remote extends AiProviderService {
     String? preferredModelName,
   }) async {
     requests.add(List.of(messages));
+    final content = asyncRespond != null
+        ? await asyncRespond!()
+        : respond?.call() ?? responses[requests.length - 1];
     return AiChatResult(
-      response: AiChatResponse(content: responses[requests.length - 1]),
+      response: AiChatResponse(content: content),
       providerId: 'test',
     );
   }
@@ -316,18 +1048,47 @@ class _Remote extends AiProviderService {
 }
 
 class _Runtime extends LocalAiChatRuntime
-    implements LocalAiConversationRuntime {
+    implements LocalAiConversationRuntime, LocalAiDirectConversationRuntime {
   final List<String> responses;
   final String? liveUrl;
   final requests = <List<Map<String, String>>>[];
   final http = _RealHttp().createHttpClient(null);
-  _Runtime(this.responses, {this.liveUrl});
+  final String Function()? respond;
+  final Future<String> Function()? asyncRespond;
+  _Runtime(this.responses, {this.liveUrl, this.respond, this.asyncRespond});
   @override
   Stream<String> sendConversationStream({
     required InstalledLocalModel model,
     required List<Map<String, String>> messages,
     String? systemPrompt,
     int maxTokens = 4096,
+  }) => _streamConversation(
+    model: model,
+    messages: messages,
+    systemPrompt: systemPrompt,
+    maxTokens: maxTokens,
+  );
+
+  @override
+  Stream<String> sendDirectConversationStream({
+    required InstalledLocalModel model,
+    required List<Map<String, String>> messages,
+    String? systemPrompt,
+    int maxTokens = 4096,
+  }) => _streamConversation(
+    model: model,
+    messages: messages,
+    systemPrompt: systemPrompt,
+    maxTokens: maxTokens,
+    direct: true,
+  );
+
+  Stream<String> _streamConversation({
+    required InstalledLocalModel model,
+    required List<Map<String, String>> messages,
+    String? systemPrompt,
+    int maxTokens = 4096,
+    bool direct = false,
   }) {
     requests.add(List.of(messages));
     if (liveUrl != null) {
@@ -339,9 +1100,11 @@ class _Runtime extends LocalAiChatRuntime
         ],
         maxResponseTokens: 2048,
         catalogId: model.catalogId,
+        enableThinking: direct ? false : null,
       );
     }
-    return Stream.value(responses[requests.length - 1]);
+    if (asyncRespond != null) return Stream.fromFuture(asyncRespond!());
+    return Stream.value(respond?.call() ?? responses[requests.length - 1]);
   }
 
   @override
@@ -366,8 +1129,11 @@ class _Runtime extends LocalAiChatRuntime
 
 class _RealHttp extends HttpOverrides {}
 
-Future<void> until(bool Function() condition) async {
-  final deadline = DateTime.now().add(const Duration(seconds: 150));
+Future<void> until(
+  bool Function() condition, {
+  Duration timeout = const Duration(seconds: 20),
+}) async {
+  final deadline = DateTime.now().add(timeout);
   while (DateTime.now().isBefore(deadline)) {
     if (condition()) return;
     await Future<void>.delayed(const Duration(milliseconds: 10));

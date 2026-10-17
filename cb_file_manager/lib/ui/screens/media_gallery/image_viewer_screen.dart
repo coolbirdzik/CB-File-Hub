@@ -20,6 +20,7 @@ import 'package:cb_file_manager/helpers/files/external_app_helper.dart';
 import 'package:cb_file_manager/helpers/files/windows_shell_context_menu.dart';
 import 'image_editor/image_editor_screen.dart';
 import 'widgets/image_viewer_chrome.dart';
+import 'package:cb_file_manager/config/translation_helper.dart';
 
 class ImageViewerScreen extends StatefulWidget {
   final File file;
@@ -647,7 +648,9 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
     try {
       await SharePlus.instance.share(ShareParams(files: [XFile(file.path)]));
     } catch (error) {
-      if (mounted) AppToast.error(context, 'Unable to share image: $error');
+      if (mounted) {
+        AppToast.error(context, context.tr.ivShareFailed(error.toString()));
+      }
     }
   }
 
@@ -669,9 +672,9 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
     }
     if (!mounted) return;
     if (started) {
-      AppToast.success(context, 'Image sent to the printer');
+      AppToast.success(context, context.tr.ivPrintSent);
     } else {
-      AppToast.error(context, 'Unable to start printing for this image');
+      AppToast.error(context, context.tr.ivPrintFailed);
     }
   }
 
@@ -752,7 +755,7 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
           ),
           const SizedBox(height: 16),
           Text(
-            'Failed to display image',
+            context.tr.ivDisplayFailed,
             style: TextStyle(
               color: Colors.white.withValues(alpha: 0.85),
               fontSize: 15,
@@ -776,7 +779,7 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
   @override
   Widget build(BuildContext context) {
     if (_allImages.isEmpty) {
-      return const Scaffold(body: Center(child: Text('No images to display')));
+      return Scaffold(body: Center(child: Text(context.tr.ivNoImages)));
     }
 
     return KeyboardListener(
@@ -977,7 +980,7 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
                   hiddenOffset: const Offset(-0.5, 0),
                   child: ViewerIconButton(
                     icon: PhosphorIconsLight.caretLeft,
-                    tooltip: 'Previous',
+                    tooltip: context.tr.previous,
                     filled: true,
                     size: 48,
                     iconSize: 22,
@@ -996,7 +999,7 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
                   hiddenOffset: const Offset(0.5, 0),
                   child: ViewerIconButton(
                     icon: PhosphorIconsLight.caretRight,
-                    tooltip: 'Next',
+                    tooltip: context.tr.next,
                     filled: true,
                     size: 48,
                     iconSize: 22,
@@ -1046,7 +1049,7 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
             children: [
               ViewerIconButton(
                 icon: PhosphorIconsLight.arrowLeft,
-                tooltip: 'Back',
+                tooltip: context.tr.back,
                 onPressed: () => RouteUtils.safePopDialog(context),
               ),
               const SizedBox(width: 10),
@@ -1102,7 +1105,7 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
               const SizedBox(width: 8),
               ViewerIconButton(
                 icon: PhosphorIconsLight.info,
-                tooltip: 'Info (I)',
+                tooltip: context.tr.ivInfo,
                 active: _showInfo,
                 onPressed: _toggleInfo,
               ),
@@ -1110,7 +1113,7 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
               Builder(
                 builder: (buttonContext) => ViewerIconButton(
                   icon: PhosphorIconsLight.dotsThreeVertical,
-                  tooltip: 'More',
+                  tooltip: context.tr.ivMore,
                   onPressed: () => _showMoreMenu(buttonContext),
                 ),
               ),
@@ -1208,30 +1211,30 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
             children: [
               ViewerIconButton(
                 icon: PhosphorIconsLight.magnifyingGlassMinus,
-                tooltip: 'Zoom out',
+                tooltip: context.tr.ivZoomOut,
                 onPressed: _zoomOut,
               ),
               _buildZoomLabel(),
               ViewerIconButton(
                 icon: PhosphorIconsLight.magnifyingGlassPlus,
-                tooltip: 'Zoom in',
+                tooltip: context.tr.ivZoomIn,
                 onPressed: _zoomIn,
               ),
               const ViewerToolbarDivider(),
               ViewerIconButton(
                 icon: PhosphorIconsLight.arrowCounterClockwise,
-                tooltip: 'Rotate left',
+                tooltip: context.tr.ivRotateLeft,
                 onPressed: _rotateImageLeft,
               ),
               ViewerIconButton(
                 icon: PhosphorIconsLight.arrowClockwise,
-                tooltip: 'Rotate right',
+                tooltip: context.tr.ivRotateRight,
                 onPressed: _rotateImage,
               ),
               const ViewerToolbarDivider(),
               ViewerIconButton(
                 icon: PhosphorIconsLight.slidersHorizontal,
-                tooltip: 'Edit image',
+                tooltip: context.tr.ivEditImage,
                 onPressed: _toggleEditMode,
               ),
               ViewerIconButton(
@@ -1239,8 +1242,8 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
                     ? PhosphorIconsLight.pause
                     : PhosphorIconsLight.play,
                 tooltip: _slideshowPlaying
-                    ? 'Pause slideshow'
-                    : 'Play slideshow',
+                    ? context.tr.ivPauseSlideshow
+                    : context.tr.ivPlaySlideshow,
                 active: _slideshowPlaying,
                 onPressed: _allImages.length > 1 ? _toggleSlideshow : null,
               ),
@@ -1248,23 +1251,25 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
                 icon: _isFullscreen
                     ? PhosphorIconsLight.arrowsIn
                     : PhosphorIconsLight.arrowsOut,
-                tooltip: _isFullscreen ? 'Exit fullscreen' : 'Fullscreen',
+                tooltip: _isFullscreen
+                    ? context.tr.ivExitFullscreen
+                    : context.tr.ivFullscreen,
                 onPressed: _toggleFullscreen,
               ),
               const ViewerToolbarDivider(),
               ViewerIconButton(
                 icon: PhosphorIconsLight.shareFat,
-                tooltip: 'Share',
+                tooltip: context.tr.share,
                 onPressed: _shareImage,
               ),
               ViewerIconButton(
                 icon: PhosphorIconsLight.printer,
-                tooltip: 'Print (Ctrl+P)',
+                tooltip: context.tr.ivPrint,
                 onPressed: _printImage,
               ),
               ViewerIconButton(
                 icon: PhosphorIconsLight.trash,
-                tooltip: 'Delete',
+                tooltip: context.tr.delete,
                 color: const Color(0xFFFF8A80),
                 onPressed: () => _deleteImage(context),
               ),
@@ -1281,7 +1286,7 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
       builder: (context, matrix, _) {
         final percent = (matrix.getMaxScaleOnAxis() * 100).round();
         return Tooltip(
-          message: 'Reset zoom (0)',
+          message: context.tr.ivResetZoom,
           waitDuration: const Duration(milliseconds: 450),
           child: MouseRegion(
             cursor: SystemMouseCursors.click,
@@ -1386,12 +1391,12 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
           PhosphorIconsLight.arrowSquareOut,
           '${l10n.openWith}...',
         ),
-        _menuItem('copy_path', PhosphorIconsLight.copy, 'Copy file path'),
+        _menuItem('copy_path', PhosphorIconsLight.copy, l10n.ivCopyPath),
         if (_allImages.length > 1)
           _menuItem(
             'toggle_thumbs',
             PhosphorIconsLight.squaresFour,
-            _showThumbnailStrip ? 'Hide thumbnails' : 'Show thumbnails',
+            _showThumbnailStrip ? l10n.ivHideThumbnails : l10n.ivShowThumbnails,
           ),
         const PopupMenuDivider(height: 8),
         _menuItem(

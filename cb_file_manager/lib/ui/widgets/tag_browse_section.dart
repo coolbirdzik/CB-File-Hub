@@ -147,6 +147,7 @@ class _TagBrowseSectionState extends State<TagBrowseSection> {
     _load();
     _loadLayoutPrefs();
     _hierarchyManager.addListener(_handleHierarchyChanged);
+    _colorManager.addListener(_handleColorChanged);
   }
 
   @override
@@ -228,6 +229,7 @@ class _TagBrowseSectionState extends State<TagBrowseSection> {
   void dispose() {
     _singleTapTimer?.cancel();
     _hierarchyManager.removeListener(_handleHierarchyChanged);
+    _colorManager.removeListener(_handleColorChanged);
     _searchController.dispose();
     super.dispose();
   }
@@ -237,9 +239,14 @@ class _TagBrowseSectionState extends State<TagBrowseSection> {
     _load();
   }
 
+  void _handleColorChanged() {
+    if (mounted) setState(() {});
+  }
+
   Future<void> _load() async {
     try {
       await Future.wait([
+        _colorManager.initialize(),
         _hierarchyManager.initialize(),
         _thumbnailManager.initialize(),
       ]);

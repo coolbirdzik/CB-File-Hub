@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:cb_file_manager/services/album_service.dart';
+import 'package:cb_file_manager/config/translation_helper.dart';
 
 class BatchAddDialog extends StatefulWidget {
   final int albumId;
@@ -39,7 +40,7 @@ class _BatchAddDialogState extends State<BatchAddDialog> {
       if (mounted) {
         setState(() {
           _isProcessing = false;
-          _statusMessage = 'Error: $e';
+          _statusMessage = context.tr.errorWithDetail(e.toString());
         });
       }
     }
@@ -48,14 +49,14 @@ class _BatchAddDialogState extends State<BatchAddDialog> {
   Future<void> _addSelectedFiles() async {
     setState(() {
       _isProcessing = true;
-      _statusMessage = 'Selecting files...';
+      _statusMessage = context.tr.albumSelectingFiles;
     });
 
     try {
       final picked = await FilePicker.pickFiles(type: FileType.image);
 
       if (picked.isNotEmpty) {
-        setState(() => _statusMessage = 'Adding selected files...');
+        setState(() => _statusMessage = context.tr.albumAddingSelectedFiles);
 
         final filePaths = picked
             .map((f) => f.path)
@@ -81,7 +82,7 @@ class _BatchAddDialogState extends State<BatchAddDialog> {
       if (mounted) {
         setState(() {
           _isProcessing = false;
-          _statusMessage = 'Error: $e';
+          _statusMessage = context.tr.errorWithDetail(e.toString());
         });
       }
     }
@@ -90,7 +91,7 @@ class _BatchAddDialogState extends State<BatchAddDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Add to Album'),
+      title: Text(context.tr.albumAddTo),
       content: _isProcessing
           ? Column(
               mainAxisSize: MainAxisSize.min,
@@ -105,15 +106,15 @@ class _BatchAddDialogState extends State<BatchAddDialog> {
               children: [
                 ListTile(
                   leading: const Icon(PhosphorIconsLight.folderOpen),
-                  title: const Text('Add from a folder'),
-                  subtitle: const Text('Add all images from a selected folder'),
+                  title: Text(context.tr.albumAddFromFolder),
+                  subtitle: Text(context.tr.albumAddFromFolderDesc),
                   onTap: _addFromFolder,
                 ),
                 const Divider(),
                 ListTile(
                   leading: const Icon(PhosphorIconsLight.images),
-                  title: const Text('Add selected photos'),
-                  subtitle: const Text('Choose specific image files to add'),
+                  title: Text(context.tr.albumAddSelectedPhotos),
+                  subtitle: Text(context.tr.albumAddSelectedPhotosDesc),
                   onTap: _addSelectedFiles,
                 ),
               ],
@@ -123,7 +124,7 @@ class _BatchAddDialogState extends State<BatchAddDialog> {
           : [
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
+                child: Text(context.tr.cancel),
               ),
             ],
     );

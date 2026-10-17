@@ -1,0 +1,16 @@
+CB File Hub kết hợp quản lý tập tin, thư viện đa phương tiện và lưu trữ mạng trong một ứng dụng.
+
+- Duyệt thư mục theo tab, chia đôi khung xem, ghim vị trí và khôi phục phiên làm việc.
+- Chọn chế độ danh sách, lưới, chi tiết, cây hoặc cột. Tìm kiếm, sắp xếp, chọn nhiều và tải mục theo nhu cầu khi thư mục lớn.
+- Xem ảnh, chỉnh sửa ảnh và duyệt thư viện video. Phát đa phương tiện với phụ đề, track âm thanh và cửa sổ nổi trên máy tính.
+- Sắp xếp bộ sưu tập bằng tag, album và quy tắc tạo album tự động.
+- Kết nối lưu trữ SMB, FTP, SFTP và WebDAV. Quản lý kết nối SSH và dùng terminal tích hợp.
+- Quản lý file .torrent và magnet trong thư viện chung có tìm kiếm. Hợp nhất mục trùng, sao chép magnet và chọn nơi lưu file.
+- Trên máy tính, tải torrent, chọn thư mục đích, tạm dừng và tiếp tục. Nhập torrent từ ứng dụng khác, gồm bản sao lưu qBittorrent trên Windows.
+- Nhờ CB Agent tìm và sắp xếp tập tin. Có thể dùng mô hình GGUF tương thích ngay trên máy tính.
+- Kiểm tra và xóa file không cần thiết bằng công cụ dọn ổ đĩa Windows.
+- Duyệt và giải nén ZIP cùng các định dạng được hỗ trợ. Công cụ 7z/RAR bổ sung dùng 7-Zip đã cài trên Windows.
+- Sao lưu cài đặt và tag, với các tích hợp Google Drive, Dropbox và OneDrive khả dụng.
+- Chọn giao diện sáng/tối, màu nhấn và ngôn ngữ hiển thị.
+
+Tính năng tùy thuộc nền tảng. Dịch vụ mạng, sao lưu đám mây và AI có thể cần tài khoản hoặc thiết lập thêm.

@@ -165,7 +165,12 @@ class _VideoWindowAppState extends State<VideoWindowApp> with WindowListener {
               GlobalWidgetsLocalizations.delegate,
               GlobalCupertinoLocalizations.delegate,
             ],
-            supportedLocales: const [Locale('vi', ''), Locale('en', '')],
+            supportedLocales: const [
+              Locale('vi', ''),
+              Locale('en', ''),
+              Locale('tr', ''),
+              Locale('zh', ''),
+            ],
             // Keep the same route/window; VideoPlayerFullScreen updates the
             // source from didUpdateWidget when this path changes.
             home: VideoPlayerFullScreen(

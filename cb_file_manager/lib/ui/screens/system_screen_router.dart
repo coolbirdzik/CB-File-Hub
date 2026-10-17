@@ -1,4 +1,6 @@
 import 'ssh/ssh_workspace_screen.dart';
+import 'torrent/torrent_screen.dart';
+import '../../services/torrent/torrent_launch_request.dart';
 import 'ssh/ssh_terminal_screen.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -83,6 +85,12 @@ class SystemScreenRouter {
   ) {
     // Create a cache key from the tab ID and path
     final String cacheKey = '$tabId:$path';
+    if (path.startsWith('#torrents?')) {
+      return TorrentScreen(
+        tabId: tabId,
+        initialSource: TorrentLaunchRequest.sourceFromPath(path),
+      );
+    }
 
     // 1. Handle static paths
     switch (path) {
@@ -94,6 +102,8 @@ class SystemScreenRouter {
         return GalleryHubScreen(tabId: tabId);
       case '#video':
         return VideoHubScreen(tabId: tabId);
+      case '#torrents':
+        return TorrentScreen(tabId: tabId);
       case '#albums':
         return AlbumManagementScreen(tabId: tabId);
       case '#auto-rules':
@@ -127,7 +137,7 @@ class SystemScreenRouter {
             cacheKey: cacheKey,
           );
         }
-        return const CbAgentCleanerScreen();
+        return CbAgentCleanerScreen(tabId: tabId);
     }
 
     // 2. Handle dynamic paths
@@ -178,11 +188,13 @@ class SystemScreenRouter {
             _syncTabName(context, tabId, snapshot.data!.name);
             return AlbumDetailScreen(album: snapshot.data!, tabId: tabId);
           }
-          return const Center(child: Text('Album not found'));
+          return Center(child: Text(context.tr.albumNotFound));
         },
       );
     }
-    return const Center(child: Text('Invalid album ID'));
+    return Builder(
+      builder: (context) => Center(child: Text(context.tr.invalidAlbumId)),
+    );
   }
 
   /// Names the tab after the loaded album or library. Back/forward and tab
@@ -263,11 +275,14 @@ class SystemScreenRouter {
               tabId: tabId,
             );
           }
-          return const Center(child: Text('Video library not found'));
+          return Center(child: Text(context.tr.videoLibraryNotFound));
         },
       );
     }
-    return const Center(child: Text('Invalid video library ID'));
+    return Builder(
+      builder: (context) =>
+          Center(child: Text(context.tr.invalidVideoLibraryId)),
+    );
   }
 
   static Widget _handleVideoLibrarySettingsRoute(String path, String tabId) {
@@ -291,11 +306,14 @@ class SystemScreenRouter {
               tabId: tabId,
             );
           }
-          return const Center(child: Text('Video library not found'));
+          return Center(child: Text(context.tr.videoLibraryNotFound));
         },
       );
     }
-    return const Center(child: Text('Invalid video library ID'));
+    return Builder(
+      builder: (context) =>
+          Center(child: Text(context.tr.invalidVideoLibraryId)),
+    );
   }
 
   static Widget _handleSearchRoute(

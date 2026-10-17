@@ -15,6 +15,7 @@ import '../widgets/image_viewer_chrome.dart';
 import 'crop_view.dart';
 import 'edit_model.dart';
 import 'edit_renderer.dart';
+import 'package:cb_file_manager/config/translation_helper.dart';
 
 enum EditorTool { crop, adjust, filters, markup, erase }
 
@@ -306,12 +307,12 @@ class ImageEditorScreenState extends State<ImageEditorScreen> {
       final discard = await showDialog<bool>(
         context: context,
         builder: (context) => _EditorDialog(
-          title: 'Discard changes?',
-          content: const Text(
-            'Your edits have not been saved.',
+          title: context.tr.edDiscardTitle,
+          content: Text(
+            context.tr.edDiscardBody,
             style: TextStyle(color: Colors.white70),
           ),
-          confirmLabel: 'Discard',
+          confirmLabel: context.tr.edDiscard,
           destructive: true,
         ),
       );
@@ -324,13 +325,14 @@ class ImageEditorScreenState extends State<ImageEditorScreen> {
     final current = _state;
     if (current == null || _saving || _erasing) return;
     setState(() => _saving = true);
+    final saveDialogTitle = context.tr.edSaveDialogTitle;
     try {
       final rendered = await renderEdit(current);
       final extension = encodedExtension(pathlib.extension(widget.file.path));
       final bytes = await encodeImage(rendered, extension);
       rendered.dispose();
       final uri = await FilePicker.saveFile(
-        dialogTitle: 'Save edited copy',
+        dialogTitle: saveDialogTitle,
         fileName:
             '${pathlib.basenameWithoutExtension(widget.file.path)}_edited'
             '$extension',
@@ -341,10 +343,12 @@ class ImageEditorScreenState extends State<ImageEditorScreen> {
       );
       if (!mounted || uri == null) return;
       setState(() => _savedIndex = _historyIndex);
-      AppToast.success(context, 'Saved edited copy');
+      AppToast.success(context, context.tr.edSavedCopy);
       if (uri.scheme == 'file') widget.onSaved?.call(File(uri.toFilePath()));
     } catch (error) {
-      if (mounted) AppToast.error(context, 'Unable to save image: $error');
+      if (mounted) {
+        AppToast.error(context, context.tr.edSaveFailed(error.toString()));
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -544,7 +548,9 @@ class ImageEditorScreenState extends State<ImageEditorScreen> {
       if (!mounted) return;
       _update(_state!.copyWith(image: image));
     } catch (error) {
-      if (mounted) AppToast.error(context, 'Unable to erase: $error');
+      if (mounted) {
+        AppToast.error(context, context.tr.edEraseFailed(error.toString()));
+      }
     } finally {
       _eraseMask.value = const <StrokeAnnotation>[];
       if (mounted) setState(() => _erasing = false);
@@ -556,7 +562,7 @@ class ImageEditorScreenState extends State<ImageEditorScreen> {
     final text = await showDialog<String>(
       context: context,
       builder: (context) => _EditorDialog(
-        title: 'Add text',
+        title: context.tr.edAddText,
         content: TextField(
           controller: controller,
           autofocus: true,
@@ -564,7 +570,7 @@ class ImageEditorScreenState extends State<ImageEditorScreen> {
           style: const TextStyle(color: Colors.white),
           cursorColor: Colors.white,
           decoration: InputDecoration(
-            hintText: 'Type something',
+            hintText: context.tr.edTypeSomething,
             hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.4)),
             enabledBorder: UnderlineInputBorder(
               borderSide: BorderSide(
@@ -577,7 +583,7 @@ class ImageEditorScreenState extends State<ImageEditorScreen> {
           ),
           onSubmitted: (value) => Navigator.of(context).pop(value),
         ),
-        confirmLabel: 'Add',
+        confirmLabel: context.tr.add,
         confirmValue: () => controller.text,
       ),
     );
@@ -731,7 +737,7 @@ class ImageEditorScreenState extends State<ImageEditorScreen> {
         children: [
           ViewerIconButton(
             icon: PhosphorIconsLight.x,
-            tooltip: 'Close editor (Esc)',
+            tooltip: context.tr.edCloseEditor,
             onPressed: _close,
           ),
           const SizedBox(width: 10),
@@ -740,8 +746,8 @@ class ImageEditorScreenState extends State<ImageEditorScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
-                  'Edit',
+                Text(
+                  context.tr.edTitle,
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 16,
@@ -762,12 +768,12 @@ class ImageEditorScreenState extends State<ImageEditorScreen> {
           ),
           ViewerIconButton(
             icon: PhosphorIconsLight.arrowUUpLeft,
-            tooltip: 'Undo (Ctrl+Z)',
+            tooltip: context.tr.edUndo,
             onPressed: _canUndo && !_erasing ? _undo : null,
           ),
           ViewerIconButton(
             icon: PhosphorIconsLight.arrowUUpRight,
-            tooltip: 'Redo (Ctrl+Y)',
+            tooltip: context.tr.edRedo,
             onPressed: _canRedo && !_erasing ? _redo : null,
           ),
           Listener(
@@ -778,7 +784,7 @@ class ImageEditorScreenState extends State<ImageEditorScreen> {
             onPointerCancel: (_) => setState(() => _comparing = false),
             child: ViewerIconButton(
               icon: PhosphorIconsLight.squareHalf,
-              tooltip: 'Hold to compare',
+              tooltip: context.tr.edHoldToCompare,
               active: _comparing,
               onPressed: loaded ? () {} : null,
             ),
@@ -810,20 +816,49 @@ class ImageEditorScreenState extends State<ImageEditorScreen> {
                       size: 18,
                     ),
             ),
-            label: Text(_saving ? 'Saving...' : 'Save copy'),
+            label: Text(_saving ? context.tr.edSaving : context.tr.edSaveCopy),
           ),
         ],
       ),
     );
   }
 
+  String _aspectLabel(_AspectOption aspect) => switch (aspect.id) {
+    'free' => context.tr.edAspectFree,
+    'original' => context.tr.edAspectOriginal,
+    _ => aspect.label,
+  };
+
+  String _adjustmentLabel(String label) => switch (label) {
+    'Exposure' => context.tr.edExposure,
+    'Brightness' => context.tr.vpBrightness,
+    'Contrast' => context.tr.vpContrast,
+    'Saturation' => context.tr.vpSaturation,
+    'Warmth' => context.tr.edWarmth,
+    'Tint' => context.tr.edTint,
+    'Vignette' => context.tr.edVignette,
+    _ => label,
+  };
+
   Widget _buildToolTabs() {
-    const tabs = <(EditorTool, IconData, String)>[
-      (EditorTool.crop, PhosphorIconsLight.crop, 'Crop'),
-      (EditorTool.adjust, PhosphorIconsLight.slidersHorizontal, 'Adjust'),
-      (EditorTool.filters, PhosphorIconsLight.magicWand, 'Filters'),
-      (EditorTool.markup, PhosphorIconsLight.pencilSimple, 'Markup'),
-      (EditorTool.erase, PhosphorIconsLight.eraser, 'Erase'),
+    final tabs = <(EditorTool, IconData, String)>[
+      (EditorTool.crop, PhosphorIconsLight.crop, context.tr.edToolCrop),
+      (
+        EditorTool.adjust,
+        PhosphorIconsLight.slidersHorizontal,
+        context.tr.edToolAdjust,
+      ),
+      (
+        EditorTool.filters,
+        PhosphorIconsLight.magicWand,
+        context.tr.edToolFilters,
+      ),
+      (
+        EditorTool.markup,
+        PhosphorIconsLight.pencilSimple,
+        context.tr.edToolMarkup,
+      ),
+      (EditorTool.erase, PhosphorIconsLight.eraser, context.tr.edToolErase),
     ];
     return Row(
       children: [
@@ -884,41 +919,41 @@ class ImageEditorScreenState extends State<ImageEditorScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        const _SectionLabel('Aspect ratio'),
+        _SectionLabel(context.tr.edAspectRatio),
         Wrap(
           spacing: 6,
           runSpacing: 6,
           children: [
             for (final aspect in _aspects)
               _EditorChip(
-                label: aspect.label,
+                label: _aspectLabel(aspect),
                 selected: _aspectId == aspect.id,
                 onTap: () => _selectAspect(aspect.id),
               ),
           ],
         ),
         const SizedBox(height: 14),
-        const _SectionLabel('Rotate & flip'),
+        _SectionLabel(context.tr.edRotateFlip),
         Row(
           children: [
             ViewerIconButton(
               icon: PhosphorIconsLight.arrowCounterClockwise,
-              tooltip: 'Rotate left',
+              tooltip: context.tr.ivRotateLeft,
               onPressed: () => _rotate(clockwise: false),
             ),
             ViewerIconButton(
               icon: PhosphorIconsLight.arrowClockwise,
-              tooltip: 'Rotate right',
+              tooltip: context.tr.ivRotateRight,
               onPressed: () => _rotate(clockwise: true),
             ),
             ViewerIconButton(
               icon: PhosphorIconsLight.flipHorizontal,
-              tooltip: 'Flip horizontal',
+              tooltip: context.tr.edFlipHorizontal,
               onPressed: () => _updateGeometry((g) => g.flippedHorizontally()),
             ),
             ViewerIconButton(
               icon: PhosphorIconsLight.flipVertical,
-              tooltip: 'Flip vertical',
+              tooltip: context.tr.edFlipVertical,
               onPressed: () => _updateGeometry((g) => g.flippedVertically()),
             ),
             const Spacer(),
@@ -943,7 +978,7 @@ class ImageEditorScreenState extends State<ImageEditorScreen> {
       children: [
         Row(
           children: [
-            const Expanded(child: _SectionLabel('Light & colour')),
+            Expanded(child: _SectionLabel(context.tr.edLightColour)),
             _ResetButton(
               enabled: !adjustments.isIdentity,
               onPressed: () => _update(
@@ -954,7 +989,7 @@ class ImageEditorScreenState extends State<ImageEditorScreen> {
         ),
         for (final spec in _adjustmentSpecs)
           _EditorSlider(
-            label: spec.label,
+            label: _adjustmentLabel(spec.label),
             icon: spec.icon,
             value: spec.read(adjustments),
             min: spec.min,
@@ -980,7 +1015,7 @@ class ImageEditorScreenState extends State<ImageEditorScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        const _SectionLabel('Filters'),
+        _SectionLabel(context.tr.edToolFilters),
         SizedBox(
           height: 104,
           child: ListView.separated(
@@ -1008,7 +1043,7 @@ class ImageEditorScreenState extends State<ImageEditorScreen> {
               : Padding(
                   padding: const EdgeInsets.only(top: 10),
                   child: _EditorSlider(
-                    label: 'Strength',
+                    label: context.tr.edStrength,
                     icon: PhosphorIconsLight.circleHalf,
                     value: current.filterStrength,
                     min: 0,
@@ -1027,21 +1062,25 @@ class ImageEditorScreenState extends State<ImageEditorScreen> {
   }
 
   Widget _buildMarkupOptions() {
-    const tools = <(MarkupTool, IconData, String)>[
-      (MarkupTool.pen, PhosphorIconsLight.pencilSimple, 'Pen'),
-      (MarkupTool.highlighter, PhosphorIconsLight.highlighter, 'Highlighter'),
-      (MarkupTool.arrow, PhosphorIconsLight.arrowUpRight, 'Arrow'),
-      (MarkupTool.line, PhosphorIconsLight.lineSegment, 'Line'),
-      (MarkupTool.rectangle, PhosphorIconsLight.square, 'Rectangle'),
-      (MarkupTool.ellipse, PhosphorIconsLight.circle, 'Ellipse'),
-      (MarkupTool.text, PhosphorIconsLight.textT, 'Text'),
-      (MarkupTool.eraser, PhosphorIconsLight.eraser, 'Erase markup'),
+    final tools = <(MarkupTool, IconData, String)>[
+      (MarkupTool.pen, PhosphorIconsLight.pencilSimple, context.tr.edPen),
+      (
+        MarkupTool.highlighter,
+        PhosphorIconsLight.highlighter,
+        context.tr.edHighlighter,
+      ),
+      (MarkupTool.arrow, PhosphorIconsLight.arrowUpRight, context.tr.edArrow),
+      (MarkupTool.line, PhosphorIconsLight.lineSegment, context.tr.edLine),
+      (MarkupTool.rectangle, PhosphorIconsLight.square, context.tr.edRectangle),
+      (MarkupTool.ellipse, PhosphorIconsLight.circle, context.tr.edEllipse),
+      (MarkupTool.text, PhosphorIconsLight.textT, context.tr.edText),
+      (MarkupTool.eraser, PhosphorIconsLight.eraser, context.tr.edEraseMarkup),
     ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        const _SectionLabel('Tool'),
+        _SectionLabel(context.tr.edTool),
         Wrap(
           spacing: 2,
           runSpacing: 2,
@@ -1064,7 +1103,7 @@ class ImageEditorScreenState extends State<ImageEditorScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const _SectionLabel('Colour'),
+                _SectionLabel(context.tr.edColour),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
@@ -1083,7 +1122,9 @@ class ImageEditorScreenState extends State<ImageEditorScreen> {
         ),
         const SizedBox(height: 8),
         _EditorSlider(
-          label: _markupTool == MarkupTool.text ? 'Text size' : 'Size',
+          label: _markupTool == MarkupTool.text
+              ? context.tr.edTextSize
+              : context.tr.edSize,
           icon: PhosphorIconsLight.circle,
           value: _markupSize,
           min: 2,
@@ -1095,9 +1136,9 @@ class ImageEditorScreenState extends State<ImageEditorScreen> {
         AnimatedSwitcher(
           duration: ViewerMotion.medium,
           child: _markupTool == MarkupTool.text
-              ? const _Hint(
-                  key: ValueKey<String>('text-hint'),
-                  text: 'Click on the picture where the text should go.',
+              ? _Hint(
+                  key: const ValueKey<String>('text-hint'),
+                  text: context.tr.edTextHint,
                 )
               : const SizedBox.shrink(key: ValueKey<String>('no-hint')),
         ),
@@ -1110,15 +1151,11 @@ class ImageEditorScreenState extends State<ImageEditorScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        const _SectionLabel('Erase'),
-        const _Hint(
-          text:
-              'Paint over what you want to remove. It is filled in from '
-              'its surroundings. Works best on small objects and blemishes.',
-        ),
+        _SectionLabel(context.tr.edEraseTitle),
+        _Hint(text: context.tr.edEraseHint),
         const SizedBox(height: 8),
         _EditorSlider(
-          label: 'Brush',
+          label: context.tr.edBrush,
           icon: PhosphorIconsLight.paintBrush,
           value: _brushSize,
           min: 8,
@@ -1138,7 +1175,7 @@ class ImageEditorScreenState extends State<ImageEditorScreen> {
       child = Center(
         key: const ValueKey<String>('error'),
         child: Text(
-          'Unable to open this image for editing.\n$_loadError',
+          context.tr.edOpenFailed(_loadError.toString()),
           textAlign: TextAlign.center,
           style: const TextStyle(color: Colors.white70),
         ),
@@ -1211,7 +1248,7 @@ class ImageEditorScreenState extends State<ImageEditorScreen> {
                         const SizedBox(width: 8),
                       ],
                       Text(
-                        _erasing ? 'Erasing...' : 'Original',
+                        _erasing ? context.tr.edErasing : context.tr.edOriginal,
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 12.5,
@@ -1491,7 +1528,7 @@ class _ResetButton extends StatelessWidget {
           visualDensity: VisualDensity.compact,
         ),
         icon: const Icon(PhosphorIconsLight.arrowsClockwise, size: 16),
-        label: const Text('Reset'),
+        label: Text(context.tr.vpReset),
       ),
     );
   }
@@ -1632,7 +1669,7 @@ class _EditorSlider extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Tooltip(
-                  message: 'Double-click to reset',
+                  message: context.tr.edDoubleClickReset,
                   waitDuration: const Duration(milliseconds: 800),
                   child: GestureDetector(
                     onDoubleTap: onReset,
@@ -1680,6 +1717,20 @@ class _EditorSlider extends StatelessWidget {
     );
   }
 }
+
+String _filterName(BuildContext context, ImageFilterPreset preset) =>
+    switch (preset.id) {
+      'none' => context.tr.edOriginal,
+      'vivid' => context.tr.edFilterVivid,
+      'warm' => context.tr.edFilterWarm,
+      'cool' => context.tr.edFilterCool,
+      'fade' => context.tr.edFilterFade,
+      'dramatic' => context.tr.edFilterDramatic,
+      'mono' => context.tr.edFilterMono,
+      'noir' => context.tr.edFilterNoir,
+      'sepia' => context.tr.edFilterSepia,
+      _ => preset.name,
+    };
 
 class _FilterTile extends StatelessWidget {
   final ImageFilterPreset preset;
@@ -1743,7 +1794,7 @@ class _FilterTile extends StatelessWidget {
                 fontSize: 11.5,
                 fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
               ),
-              child: Text(preset.name),
+              child: Text(_filterName(context, preset)),
             ),
           ],
         ),
@@ -1821,7 +1872,7 @@ class _EditorDialog extends StatelessWidget {
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
           style: TextButton.styleFrom(foregroundColor: Colors.white70),
-          child: const Text('Cancel'),
+          child: Text(context.tr.cancel),
         ),
         FilledButton(
           onPressed: () =>

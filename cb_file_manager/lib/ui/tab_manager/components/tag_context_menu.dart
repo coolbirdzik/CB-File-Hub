@@ -23,6 +23,7 @@ import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';
 import 'package:cb_file_manager/ui/utils/route.dart';
 import 'package:cb_file_manager/ui/widgets/tag_chip.dart';
 import 'package:cb_file_manager/utils/app_logger.dart';
+import 'package:cb_file_manager/config/translation_helper.dart';
 
 /// Shared context menu for a tag, used both by the tag management screen and by
 /// tags shown as folder-like cards in the search results grid/list.
@@ -118,6 +119,14 @@ List<ContextMenuSection> _buildTagContextMenuSections(
           onSelected: (ctx) =>
               showTagThumbnailPicker(ctx, tag, onChanged: onChanged),
         ),
+        if (TagThumbnailManager.instance.getThumbnailSync(tag) != null)
+          ContextMenuAction(
+            id: 'remove_thumbnail',
+            label: l10n.removeThumbnail,
+            icon: PhosphorIconsLight.imageSquare,
+            onSelected: (ctx) =>
+                removeTagThumbnail(ctx, tag, onChanged: onChanged),
+          ),
         ContextMenuAction(
           id: 'hierarchy',
           label: l10n.manageHierarchy,
@@ -157,7 +166,11 @@ void openTagSearchTab(BuildContext context, String tag) {
       tabBloc.add(SwitchToTab(existingTab.id));
     } else {
       tabBloc.add(
-        AddTab(path: tagSearchPath, name: 'Tag: $tag', switchToTab: true),
+        AddTab(
+          path: tagSearchPath,
+          name: context.tr.tagTabName(tag),
+          switchToTab: true,
+        ),
       );
     }
   } catch (e) {
@@ -281,95 +294,9 @@ Future<void> showTagColorPickerDialog(
   onChanged?.call();
 }
 
-/// Set / replace / remove the thumbnail for [tag].
-Future<void> showTagThumbnailPicker(
-  BuildContext context,
-  String tag, {
-  VoidCallback? onChanged,
-}) async {
-  final thumbnailManager = TagThumbnailManager.instance;
-  final currentThumbnail = thumbnailManager.getThumbnailSync(tag);
-  final theme = Theme.of(context);
-  final l10n = AppLocalizations.of(context)!;
-
-  final result = await RouteUtils.showAcrylicDialog<String?>(
-    context: context,
-    builder: (context) {
-      return AlertDialog(
-        title: Text('${l10n.setThumbnail}: "$tag"'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 160,
-              height: 160,
-              decoration: CbDecorations.card(context, radius: 16),
-              child: currentThumbnail != null
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(15),
-                      child: Image.file(
-                        File(currentThumbnail),
-                        width: 160,
-                        height: 160,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) => Center(
-                          child: Icon(
-                            PhosphorIconsLight.imageSquare,
-                            size: 48,
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
-                    )
-                  : Center(
-                      child: Icon(
-                        PhosphorIconsLight.image,
-                        size: 48,
-                        color: theme.colorScheme.onSurfaceVariant.withValues(
-                          alpha: 0.5,
-                        ),
-                      ),
-                    ),
-            ),
-          ],
-        ),
-        actions: [
-          if (currentThumbnail != null)
-            TextButton(
-              onPressed: () => Navigator.of(context).pop('remove'),
-              child: Text(
-                l10n.delete,
-                style: TextStyle(color: theme.colorScheme.error),
-              ),
-            ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(null),
-            child: Text(l10n.cancel),
-          ),
-          ElevatedButton.icon(
-            onPressed: () => Navigator.of(context).pop('browse'),
-            icon: const Icon(PhosphorIconsLight.folderOpen, size: 18),
-            label: Text(l10n.browse),
-          ),
-        ],
-      );
-    },
-  );
-
-  if (!context.mounted) return;
-  if (result == 'browse') {
-    await _pickThumbnailFromBrowser(context, tag, onChanged: onChanged);
-  } else if (result == 'remove') {
-    final toast = AppToast.capture(context);
-    await thumbnailManager.deleteThumbnail(tag);
-    toast.success('Thumbnail removed for "$tag"');
-    onChanged?.call();
-  }
-}
-
 /// Opens the shared thumbnail browser (folders + tag search, with inline
 /// video-frame extraction) and applies the chosen image as the tag thumbnail.
-Future<void> _pickThumbnailFromBrowser(
+Future<void> showTagThumbnailPicker(
   BuildContext context,
   String tag, {
   VoidCallback? onChanged,
@@ -378,21 +305,41 @@ Future<void> _pickThumbnailFromBrowser(
     final imagePath = await showThumbnailBrowserDialog(
       context,
       title: '${AppLocalizations.of(context)!.setThumbnail}: "$tag"',
+      initialTagQuery: tag,
     );
     if (imagePath == null) return;
 
     final ok = await TagThumbnailManager.instance.setThumbnail(tag, imagePath);
     if (context.mounted) {
       if (ok) {
-        AppToast.success(context, 'Thumbnail set for "$tag"');
+        AppToast.success(context, context.tr.tagThumbnailSet(tag));
         onChanged?.call();
       } else {
-        AppToast.error(context, 'Failed to set thumbnail');
+        AppToast.error(context, context.tr.tagThumbnailSetFailed);
       }
     }
   } catch (e) {
     AppLogger.error('Error picking thumbnail: $e');
-    if (context.mounted) AppToast.error(context, 'Error: $e');
+    if (context.mounted) {
+      AppToast.error(context, context.tr.errorWithDetail(e.toString()));
+    }
+  }
+}
+
+/// Removes the thumbnail association for [tag].
+Future<void> removeTagThumbnail(
+  BuildContext context,
+  String tag, {
+  VoidCallback? onChanged,
+}) async {
+  final l10n = context.tr;
+  final toast = AppToast.capture(context);
+  final ok = await TagThumbnailManager.instance.deleteThumbnail(tag);
+  if (ok) {
+    toast.success(l10n.tagThumbnailRemoved(tag));
+    onChanged?.call();
+  } else {
+    toast.error(l10n.tagThumbnailRemoveFailed);
   }
 }
 
@@ -440,12 +387,10 @@ Future<void> confirmDeleteTagFromAllFiles(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'This tag has ${children.length} child tag${children.length > 1 ? "s" : ""}: ${children.join(", ")}',
-            ),
+            Text(l10n.tagHasChildren(children.length, children.join(", "))),
             const SizedBox(height: 16),
-            const Text(
-              'What would you like to do?',
+            Text(
+              l10n.tagWhatToDo,
               style: TextStyle(fontWeight: FontWeight.w600),
             ),
           ],
@@ -457,12 +402,12 @@ Future<void> confirmDeleteTagFromAllFiles(
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop('keep_children'),
-            child: const Text('Delete parent only'),
+            child: Text(l10n.tagDeleteParentOnly),
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop('delete_all'),
             child: Text(
-              'Delete parent and children',
+              l10n.tagDeleteParentAndChildren,
               style: TextStyle(color: theme.colorScheme.error),
             ),
           ),
@@ -491,7 +436,7 @@ Future<void> confirmDeleteTagFromAllFiles(
         );
       }
       toast.success(
-        'Deleted ${tagsToDelete.length} tags: ${tagsToDelete.join(", ")}',
+        l10n.tagsDeletedList(tagsToDelete.length, tagsToDelete.join(", ")),
       );
       onChanged?.call();
     }
@@ -655,11 +600,7 @@ class _ManageHierarchyDialogState extends State<_ManageHierarchyDialog> {
       if (mounted) setState(() => _childSuggestions = []);
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Cannot add "$childName" - circular reference or error',
-          ),
-        ),
+        SnackBar(content: Text(context.tr.tagCannotAddChild(childName))),
       );
     }
   }
@@ -690,11 +631,7 @@ class _ManageHierarchyDialogState extends State<_ManageHierarchyDialog> {
       if (mounted) setState(() => _parentSuggestions = []);
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Cannot set "$parentName" as parent - circular reference or error',
-          ),
-        ),
+        SnackBar(content: Text(context.tr.tagCannotSetParent(parentName))),
       );
     }
   }
@@ -721,7 +658,7 @@ class _ManageHierarchyDialogState extends State<_ManageHierarchyDialog> {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              'Hierarchy: "${widget.tag}"',
+              context.tr.tagHierarchyTitle(widget.tag),
               style: const TextStyle(fontSize: 18),
             ),
           ),
@@ -748,7 +685,7 @@ class _ManageHierarchyDialogState extends State<_ManageHierarchyDialog> {
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Text(
-                    'No parent tags',
+                    context.tr.tagNoParents,
                     style: TextStyle(
                       fontSize: 13,
                       color: theme.colorScheme.onSurfaceVariant.withValues(
@@ -789,7 +726,7 @@ class _ManageHierarchyDialogState extends State<_ManageHierarchyDialog> {
               const SizedBox(height: 6),
               _buildAutocompleteInput(
                 controller: _setParentController,
-                hint: 'Add parent...',
+                hint: context.tr.tagAddParentHint,
                 suggestions: _parentSuggestions,
                 onChanged: _updateParentSuggestions,
                 onSubmit: _addParent,
@@ -813,7 +750,7 @@ class _ManageHierarchyDialogState extends State<_ManageHierarchyDialog> {
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Text(
-                    'No child tags',
+                    context.tr.tagNoChildren,
                     style: TextStyle(
                       fontSize: 13,
                       color: theme.colorScheme.onSurfaceVariant.withValues(
@@ -854,7 +791,7 @@ class _ManageHierarchyDialogState extends State<_ManageHierarchyDialog> {
               const SizedBox(height: 6),
               _buildAutocompleteInput(
                 controller: _addChildController,
-                hint: 'Add child... (comma-separated)',
+                hint: context.tr.tagAddChildHint,
                 suggestions: _childSuggestions,
                 onChanged: _updateChildSuggestions,
                 onSubmit: (value) async {
@@ -874,7 +811,7 @@ class _ManageHierarchyDialogState extends State<_ManageHierarchyDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Done'),
+          child: Text(context.tr.done),
         ),
       ],
     );

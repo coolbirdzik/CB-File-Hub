@@ -32,6 +32,7 @@ Run from repo root via `just` (requires Git Bash on Windows):
 | Show all recipes         | `just`                                              |
 | Install deps             | `just deps`                                         |
 | Fetch llama.cpp runtime  | `just fetch-llama`                                  |
+| Fetch aria2 torrent runtime | `just fetch-aria2`                               |
 | Run macOS dev build      | `just macos-dev` (own permissions + hot reload)     |
 | Unit/widget tests        | `just test`                                         |
 | E2E tests (parallel)     | `just e2e-parallel`                                 |
@@ -42,7 +43,8 @@ Run from repo root via `just` (requires Git Bash on Windows):
 | E2E plain output (debug) | `just e2e-plain`                                    |
 | E2E serial (debug order) | `just e2e-serial`                                   |
 | List all E2E test names  | `just e2e-list`                                     |
-| Analyze                  | `just analyze`                                      |
+| CI format, analysis, unit/widget tests | `just analyze`                            |
+| Static analysis only     | `just lint`                                         |
 | Format                   | `just format`                                       |
 | Format + analyze         | `just verify`                                       |
 | Clean                    | `just clean`                                        |
@@ -72,7 +74,17 @@ flutter test integration_test -d windows --dart-define=CB_E2E=true  # E2E
 
 ## CI pipeline order
 
-CI runs: **format check -> analyze -> unit tests -> E2E (Windows) -> build**. Match this locally with `just verify` before pushing.
+CI runs: **format check -> analyze -> unit tests -> E2E (Windows) -> build**.
+Windows E2E is selective: `scripts/ci/e2e_select.mjs` maps changed paths to
+suites via `cb_file_manager/integration_test/e2e_impact.json` (`main` always runs
+every suite) and skips suites already passed on identical source. Preview with
+`just e2e-affected`; keep `e2e_impact.json` in sync when adding E2E files or new
+`lib/` areas (see `docs/quality/02-e2e-desktop-integration.md`).
+Run `just analyze` before pushing to match the CI analyze job (including
+unit/widget tests, excluding E2E). Both use `scripts/check_quality.sh` and stop
+on the first failure. `just verify` runs only format check and static analysis;
+`just lint` runs only static analysis. Local checks use the host OS; the CI
+analyze job runs on Ubuntu, so platform-specific failures still need a Linux run.
 
 ## Architecture notes
 
@@ -85,6 +97,7 @@ CI runs: **format check -> analyze -> unit tests -> E2E (Windows) -> build**. Ma
 - **Streaming:** Built-in HTTP media server via `shelf` (`lib/services/streaming/`).
 - **Network browsing:** SMB/CIFS via local `mobile_smb_native` FFI plugin, plus FTP support.
 - **Windows native:** Uses `win32` FFI, acrylic backdrop, native tab drag-drop, PiP windowing.
+- **Torrent library:** `lib/services/torrent/` indexes metainfo in the shared SQLite DB; `#torrents` supports index/copy/move storage modes and per-torrent payload destinations. aria2 runs as an authenticated loopback subprocess. Windows builds bundle its pinned runtime from `windows/aria2/` (git-ignored); run `just fetch-aria2` before direct Flutter Windows builds on a clean checkout. Other desktop platforms use an installed or user-selected aria2c. See `docs/features/10-torrent-library.md`.
 
 ## Feature flags (compile-time)
 

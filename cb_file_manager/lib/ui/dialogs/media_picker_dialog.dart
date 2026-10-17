@@ -20,6 +20,7 @@ import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:path/path.dart' as path;
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:visibility_detector/visibility_detector.dart';
+import 'package:cb_file_manager/config/translation_helper.dart';
 
 typedef MediaPickerFileMatcher = bool Function(String path);
 
@@ -272,7 +273,7 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
     if (home != null && home.isNotEmpty && Directory(home).existsSync()) {
       quick.add(
         _SidebarEntry(
-          label: 'Home',
+          label: context.tr.home,
           path: path.normalize(home),
           icon: PhosphorIconsLight.house,
         ),
@@ -323,7 +324,9 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
     }
     if (Platform.isWindows && p.contains(':')) {
       final letter = p.split(r'\')[0];
-      return p.startsWith('C:') ? '$letter (System)' : '$letter (Drive)';
+      return p.startsWith('C:')
+          ? context.tr.mpDriveSystem(letter)
+          : context.tr.mpDriveOther(letter);
     }
     return p;
   }

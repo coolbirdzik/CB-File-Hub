@@ -324,6 +324,12 @@ class LocalAiAdvisorService {
   /// Marks a model as the active model for inference.
   Future<void> setSelectedModel(String catalogId) async {
     await _prefs.setString(_selectedModelIdKey, catalogId);
+    final model = getSelectedModel();
+    if (model != null) {
+      // Settings and the chat picker must restore the same explicit choice.
+      await _prefs.setString('ai_chat_last_provider_id', '__local_ai__');
+      await _prefs.setString('ai_chat_last_model_name', model.displayName);
+    }
     AppLogger.info('[LocalAI] Selected model: $catalogId');
   }
 
@@ -545,6 +551,7 @@ class LocalAiAdvisorService {
     required String message,
     String? systemPrompt,
     List<Map<String, String>>? messages,
+    bool directResponse = false,
   }) async* {
     final model = getSelectedModel();
     if (model == null) {
@@ -555,6 +562,18 @@ class LocalAiAdvisorService {
         ? _ggufChatRuntime
         : _chatRuntime;
 
+    if (directResponse &&
+        messages != null &&
+        runtime is LocalAiDirectConversationRuntime) {
+      yield* (runtime as LocalAiDirectConversationRuntime)
+          .sendDirectConversationStream(
+            model: model,
+            messages: messages,
+            systemPrompt: systemPrompt,
+            maxTokens: getMaxContextTokens(),
+          );
+      return;
+    }
     if (messages != null && runtime is LocalAiConversationRuntime) {
       yield* (runtime as LocalAiConversationRuntime).sendConversationStream(
         model: model,

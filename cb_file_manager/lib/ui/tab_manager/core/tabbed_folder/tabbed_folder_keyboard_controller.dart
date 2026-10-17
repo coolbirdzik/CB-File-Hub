@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:cb_file_manager/ui/components/common/file_entry_presentation.dart';
 
 import 'package:cb_file_manager/bloc/selection/selection.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
@@ -690,6 +691,11 @@ class TabbedFolderKeyboardController {
   }
 
   String _getItemName(FileSystemEntity item) {
+    final context = focusNode.context;
+    final displayName = context
+        ?.getInheritedWidgetOfExactType<FileEntryPresentation>()
+        ?.names[item.path];
+    if (displayName != null) return displayName;
     // Robust name extraction handling mixed separators
     return item.path.split(RegExp(r'[/\\]')).last;
   }

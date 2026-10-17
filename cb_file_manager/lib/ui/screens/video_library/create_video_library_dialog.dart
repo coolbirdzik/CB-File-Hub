@@ -110,7 +110,7 @@ class _CreateVideoLibraryDialogState extends State<CreateVideoLibraryDialog> {
                 controller: _nameController,
                 decoration: InputDecoration(
                   labelText: '${localizations.fileName} *',
-                  hintText: 'My Movies',
+                  hintText: localizations.vlNameHint,
                 ),
               ),
               const SizedBox(height: 16),
@@ -120,7 +120,7 @@ class _CreateVideoLibraryDialogState extends State<CreateVideoLibraryDialog> {
                 controller: _descriptionController,
                 decoration: InputDecoration(
                   labelText: localizations.aboutTagsDescription,
-                  hintText: 'Personal movie collection',
+                  hintText: localizations.vlDescriptionHint,
                 ),
                 maxLines: 2,
               ),

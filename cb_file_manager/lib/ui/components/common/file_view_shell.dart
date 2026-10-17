@@ -83,7 +83,7 @@ class FileViewShell extends StatefulWidget {
   final VoidCallback? onPaste;
   final VoidCallback? onRename;
 
-  /// `Ctrl+F` — open / toggle the search bar.
+  /// `Ctrl+F` — open the search bar or focus its existing input.
   final VoidCallback? onSearch;
 
   final bool enableKeyboardShortcuts;

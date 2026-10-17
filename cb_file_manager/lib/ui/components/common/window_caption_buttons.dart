@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:window_manager/window_manager.dart';
+import 'package:cb_file_manager/config/translation_helper.dart';
 
 /// Reusable Windows/Mac/Linux window caption buttons: Minimize, Maximize/Restore, Close
 /// Matches styling used in the tabbed UI's title bar.
@@ -41,7 +42,7 @@ class WindowCaptionButtons extends StatelessWidget {
           const SizedBox(width: 8),
           _CaptionButton(
             icon: PhosphorIconsLight.minus,
-            tooltip: 'Minimize',
+            tooltip: context.tr.minimize,
             theme: effectiveTheme,
             onPressed: () async {
               try {
@@ -51,7 +52,7 @@ class WindowCaptionButtons extends StatelessWidget {
           ),
           _CaptionButton(
             icon: PhosphorIconsLight.square, // Will be replaced dynamically
-            tooltip: 'Maximize',
+            tooltip: context.tr.maximize,
             theme: effectiveTheme,
             listensMaximize: true,
             onPressed: () async {
@@ -67,7 +68,7 @@ class WindowCaptionButtons extends StatelessWidget {
           ),
           _CaptionButton(
             icon: PhosphorIconsLight.x,
-            tooltip: 'Close',
+            tooltip: context.tr.close,
             isCloseButton: true,
             theme: effectiveTheme,
             onPressed: () async {

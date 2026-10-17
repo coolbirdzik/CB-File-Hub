@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'app_localizations.dart';
+import 'chinese_localizations.dart';
 import 'english_localizations.dart';
+import 'turkish_localizations.dart';
 import 'vietnamese_localizations.dart';
 
 class AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
@@ -8,7 +10,7 @@ class AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
 
   @override
   bool isSupported(Locale locale) {
-    return ['en', 'vi'].contains(locale.languageCode);
+    return ['en', 'vi', 'tr', 'zh'].contains(locale.languageCode);
   }
 
   @override
@@ -17,6 +19,10 @@ class AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
     switch (locale.languageCode) {
       case 'en':
         return EnglishLocalizations();
+      case 'tr':
+        return TurkishLocalizations();
+      case 'zh':
+        return ChineseLocalizations();
       case 'vi':
       default:
         return VietnameseLocalizations();

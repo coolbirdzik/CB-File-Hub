@@ -31,10 +31,17 @@
   height preferences still provide the initial defaults.
 - Drag the grip in a pane header over another pane. Its nearest edge chooses
   left, right, above, or below; the shaded half shows the destination before release.
+- While dragging, a thin strip appears along each outer edge of the whole layout.
+  Dropping on it docks the pane across the full width (top/bottom) or full height
+  (left/right), e.g. Properties & Tags as a full-width bar under Files and Preview.
 - Drag any divider to resize the adjoining panes immediately with the pointer.
   No size overlay appears during the drag. Updates remain local to the active split,
   reuse its mounted contents, and repaint panes separately. The final proportions
   are shared and saved on release; cancelling restores the previous sizes.
+- Each divider stores the pixel size of the pane side away from the file list, so
+  Preview and Properties & Tags keep their own widths (or heights) independently:
+  a divider only moves its two neighbours, and a narrower window shrinks the file
+  list. Layouts saved with the older proportion format still load.
 - Grid, Masonry, and Tiles keep the existing item delegate while the column
   count and thumbnail size are unchanged. Cell measurement reuses the thumbnail
   subtree as gutters resize, instead of rebuilding every video tile per pixel.

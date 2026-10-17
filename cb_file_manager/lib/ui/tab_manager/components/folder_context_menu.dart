@@ -336,7 +336,7 @@ class FolderContextMenu {
         actions: <ContextMenuAction>[
           ContextMenuAction(
             id: 'new_submenu',
-            label: 'New',
+            label: l10n.newMenu,
             icon: PhosphorIconsLight.filePlus,
             loadChildSections: (_) async {
               final sections = await _buildCreateSections(
@@ -449,7 +449,7 @@ class FolderContextMenu {
       ),
       ContextMenuAction(
         id: 'customize_new_menu',
-        label: 'Customize...',
+        label: l10n.customizeMenu,
         icon: PhosphorIconsLight.slidersHorizontal,
         onSelected: (_) => _showDesktopNewMenuCustomizationDialog(
           context: context,
@@ -464,7 +464,7 @@ class FolderContextMenu {
         actions: [
           ContextMenuAction(
             id: 'new_submenu',
-            label: 'New',
+            label: l10n.newMenu,
             icon: PhosphorIconsLight.filePlus,
             childSections: [
               ContextMenuSection(actions: quickCreateActions),
@@ -518,11 +518,7 @@ class FolderContextMenu {
     );
 
     if (createdPath == null) {
-      toast.error(
-        l10n.errorCreatingFile(
-          'File may already exist or the destination is not writable',
-        ),
-      );
+      toast.error(l10n.errorCreatingFile(l10n.fileCreateFailedDetail));
       return;
     }
 
@@ -563,7 +559,9 @@ class FolderContextMenu {
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (dialogContext, setState) => AlertDialog(
-          title: const Text('Customize New Menu'),
+          title: Text(
+            AppLocalizations.of(dialogContext)!.customizeNewMenuTitle,
+          ),
           content: SizedBox(
             width: 460,
             height: 520,
@@ -886,7 +884,9 @@ class FolderContextMenu {
                   ),
                   ListTile(
                     title: Text(l10n.folderPropertyContent),
-                    subtitle: Text('$fileCount files, $folderCount folders'),
+                    subtitle: Text(
+                      l10n.folderFilesFolders(fileCount, folderCount),
+                    ),
                   ),
                   ListTile(
                     title: Text(l10n.folderPropertySizeDirectChildren),

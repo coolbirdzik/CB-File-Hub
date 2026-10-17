@@ -6,6 +6,7 @@ import 'package:cb_file_manager/helpers/tags/tag_manager.dart';
 import 'package:cb_file_manager/helpers/core/text_utils.dart';
 import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import '../../utils/route.dart';
+import 'package:cb_file_manager/config/translation_helper.dart';
 
 /// Dialog for searching files by tag
 class TagSearchDialog extends StatefulWidget {
@@ -95,7 +96,7 @@ class _TagSearchDialogState extends State<TagSearchDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Tìm kiếm theo tag'),
+      title: Text(context.tr.tagSearchTitle),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -121,9 +122,9 @@ class _TagSearchDialogState extends State<TagSearchDialog> {
                     controller: controller,
                     enabled: !_isSearching,
                     focusNode: focusNode,
-                    decoration: const InputDecoration(
-                      labelText: 'Nhập tag để tìm kiếm',
-                      hintText: 'Ví dụ: important, work, personal',
+                    decoration: InputDecoration(
+                      labelText: context.tr.tagSearchInputLabel,
+                      hintText: context.tr.tagSearchInputHint,
                     ),
                     onSubmitted: (_) => _performSearch(),
                   );
@@ -131,8 +132,8 @@ class _TagSearchDialogState extends State<TagSearchDialog> {
           ),
           const SizedBox(height: 16),
           SwitchListTile(
-            title: const Text('Tìm kiếm toàn cục'),
-            subtitle: const Text('Tìm kiếm bất kỳ đâu trên thiết bị của bạn'),
+            title: Text(context.tr.tagSearchGlobal),
+            subtitle: Text(context.tr.tagSearchGlobalDesc),
             value: _isGlobalSearch,
             onChanged: (value) {
               setState(() {
@@ -161,7 +162,7 @@ class _TagSearchDialogState extends State<TagSearchDialog> {
                   .toList(),
             )
           else
-            const Text('Không có tag nào hiện có'),
+            Text(context.tr.tagSearchNoTags),
         ],
       ),
       actions: [
@@ -169,7 +170,7 @@ class _TagSearchDialogState extends State<TagSearchDialog> {
           onPressed: () {
             RouteUtils.safePopDialog(context);
           },
-          child: const Text('HỦY'),
+          child: Text(context.tr.cancel.toUpperCase()),
         ),
         ElevatedButton(
           onPressed: _isSearching ? null : _performSearch,
@@ -179,7 +180,7 @@ class _TagSearchDialogState extends State<TagSearchDialog> {
                   height: 20,
                   child: CircularProgressIndicator(strokeWidth: 2.0),
                 )
-              : const Text('TÌM KIẾM'),
+              : Text(context.tr.search.toUpperCase()),
         ),
       ],
     );

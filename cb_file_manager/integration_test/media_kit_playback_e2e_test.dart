@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
 
@@ -14,9 +15,11 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:media_kit_video/media_kit_video.dart' as mk;
+import 'e2e_helpers.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  registerE2EAppSandbox();
 
   // A missing/unavailable audio device (headless CI runner, no sound card)
   // does not stop mpv decoding and playing video, it just plays silently —
@@ -29,14 +32,19 @@ void main() {
     return lower.contains('audio device') || lower.contains('no sound');
   }
 
-  Future<void> waitFor(WidgetTester tester, bool Function() condition) async {
+  Future<void> waitFor(
+    WidgetTester tester,
+    bool Function() condition, {
+    String reason = 'media_kit did not reach the expected state',
+    String Function()? diagnostics,
+  }) async {
     for (var i = 0; i < 300 && !condition(); i++) {
       await tester.pump(const Duration(milliseconds: 100));
     }
     expect(
       condition(),
       isTrue,
-      reason: 'media_kit did not reach the expected state',
+      reason: '$reason${diagnostics == null ? '' : '\n${diagnostics()}'}',
     );
   }
 
@@ -346,6 +354,31 @@ void main() {
     ) async {
       final surfaceKey = GlobalKey();
       final errors = <String>[];
+      var stage = 'mount';
+      PlaybackPlayer? observedPlayer;
+      Map<String, Object?> stateSnapshot() => {
+        'stage': stage,
+        'playing': observedPlayer?.state.playing,
+        'position': observedPlayer?.state.position.toString(),
+        'duration': observedPlayer?.state.duration.toString(),
+        'buffering': observedPlayer?.state.buffering,
+        'width': observedPlayer?.state.width,
+        'height': observedPlayer?.state.height,
+        'errors': errors,
+      };
+      Future<void> waitForPlayback(
+        String label,
+        bool Function() condition,
+      ) async {
+        stage = label;
+        await waitFor(
+          tester,
+          condition,
+          reason: label,
+          diagnostics: () => jsonEncode(stateSnapshot()),
+        );
+      }
+
       const smbSource = String.fromEnvironment('CB_E2E_SMB_URL');
       final video = smbSource.isEmpty
           ? app.VideoPlayer.url(
@@ -374,23 +407,25 @@ void main() {
         ),
       );
       try {
-        await waitFor(
-          tester,
+        await waitForPlayback(
+          'video widget mounted',
           () => find.byType(mk.Video).evaluate().isNotEmpty,
         );
         final controller = tester
             .widget<mk.Video>(find.byType(mk.Video))
             .controller
             .player;
-        await waitFor(
-          tester,
-          () => controller.state.position.inMilliseconds > 500,
-        );
         final playback = tester
             .widget<PlaybackVideo>(find.byType(PlaybackVideo))
             .controller
             .player;
+        observedPlayer = playback;
+        await waitForPlayback(
+          'initial playback position',
+          () => controller.state.position.inMilliseconds > 500,
+        );
         Future<void> checkVisibleFrame(String label) async {
+          stage = label;
           debugPrint(
             'Checking $label: ${controller.state.playing}, '
             '${controller.state.position}, size=${controller.state.videoParams}',
@@ -470,14 +505,23 @@ void main() {
             if (step == 9 || step == 18) {
               // Keep the pointer down: a release-only seek must fail here.
               final requested = tester.widget<Slider>(sliderFinder).value;
-              await waitFor(
-                tester,
+              // Drag previews are keyframe seeks (exact: false), and the
+              // fixture has a keyframe every 3 s, so the preview can land up
+              // to one GOP from the thumb: at 0.75 the thumb asks for ~22.5 s
+              // and mpv may show the 21 s keyframe. Still far tighter than
+              // the distance from the pre-drag position, so a release-only
+              // seek keeps failing here.
+              await waitForPlayback(
+                'drag-$fraction-step-$step preview position',
                 () =>
                     (controller.state.position.inMilliseconds - requested)
-                        .abs() <
-                    1500,
+                        .abs() <=
+                    3000,
               );
-              await waitFor(tester, () => !controller.state.playing);
+              await waitForPlayback(
+                'drag preview paused',
+                () => !controller.state.playing,
+              );
               // Allow the last throttled preview to land, then hold still.
               // The picture must stay at this position until another move
               // or release, even if playback was active before the drag.
@@ -498,8 +542,8 @@ void main() {
           debugPrint(
             'Seek requested: $target; current: ${controller.state.position}',
           );
-          await waitFor(
-            tester,
+          await waitForPlayback(
+            'seek-$fraction released playback/position',
             () =>
                 controller.state.playing == !paused &&
                 (controller.state.position.inMilliseconds - target).abs() <
@@ -533,8 +577,8 @@ void main() {
           } else {
             await playback.play();
           }
-          await waitFor(
-            tester,
+          await waitForPlayback(
+            'keyboard seek reset to 10 seconds (${scenario.key.keyLabel}, paused=${scenario.paused})',
             () =>
                 controller.state.playing == !scenario.paused &&
                 (controller.state.position.inSeconds - 10).abs() <= 1,
@@ -561,8 +605,8 @@ void main() {
               await tester.sendKeyRepeatEvent(scenario.key);
               await tester.pump(const Duration(milliseconds: 100));
             }
-            await waitFor(
-              tester,
+            await waitForPlayback(
+              'keyboard seek preview (${scenario.key.keyLabel}, paused=${scenario.paused})',
               () =>
                   !controller.state.playing &&
                   (scenario.key == LogicalKeyboardKey.arrowRight
@@ -575,16 +619,60 @@ void main() {
           } finally {
             await tester.sendKeyUpEvent(scenario.key);
           }
-          await waitFor(
-            tester,
+          await waitForPlayback(
+            'keyboard seek released playback (paused=${scenario.paused})',
             () => controller.state.playing == !scenario.paused,
           );
           if (!scenario.paused) {
             final releasedAt = controller.state.position;
-            await waitFor(tester, () => controller.state.position > releasedAt);
+            await waitForPlayback(
+              'keyboard seek resumed position',
+              () => controller.state.position > releasedAt,
+            );
           }
         }
         expect(errors, isEmpty);
+      } catch (error, stackTrace) {
+        // The GitHub reporter otherwise collapses this into only the test name.
+        // Keep the original assertion and stack, plus the Flutter surface rather
+        // than a decoder screenshot which could hide a texture regression.
+        debugPrint('Media Kit failure: ${jsonEncode(stateSnapshot())}');
+        debugPrint('$error\n$stackTrace');
+        try {
+          final directory = Directory('build/e2e-media-kit');
+          await directory.create(recursive: true);
+          await File(
+            '${directory.path}/streamed-seek-failure.json',
+          ).writeAsString(
+            const JsonEncoder.withIndent('  ').convert({
+              ...stateSnapshot(),
+              'error': error.toString(),
+              'stackTrace': stackTrace.toString(),
+            }),
+          );
+          await tester.pump();
+          final boundary = surfaceKey.currentContext?.findRenderObject();
+          if (boundary is RenderRepaintBoundary && !boundary.debugNeedsPaint) {
+            final image = await boundary.toImage(pixelRatio: 1);
+            try {
+              final png = await image.toByteData(
+                format: ui.ImageByteFormat.png,
+              );
+              if (png != null) {
+                await File(
+                  '${directory.path}/streamed-seek-failure.png',
+                ).writeAsBytes(png.buffer.asUint8List());
+              }
+            } finally {
+              image.dispose();
+            }
+          }
+        } catch (diagnosticError) {
+          debugPrint(
+            'Could not save Media Kit failure diagnostics: $diagnosticError',
+          );
+        }
+        rethrow;
       } finally {
         await tester.pumpWidget(const SizedBox.shrink());
         await tester.pump(const Duration(milliseconds: 300));

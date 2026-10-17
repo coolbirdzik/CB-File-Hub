@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:math' as math;
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/helpers/tags/tag_color_manager.dart';
 
@@ -20,7 +21,12 @@ class TagChip extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: TagColorManager.instance,
+    builder: (context, _) => _buildChip(context),
+  );
+
+  Widget _buildChip(BuildContext context) {
     final theme = Theme.of(context);
     final isDarkMode = theme.brightness == Brightness.dark;
 
@@ -32,9 +38,10 @@ class TagChip extends StatelessWidget {
     final Color tagColor =
         customColor ?? TagColorManager.instance.getTagColor(tagName);
 
-    final Color displayColor = isDarkMode
-        ? Color.alphaBlend(Colors.white.withValues(alpha: 0.3), tagColor)
-        : tagColor;
+    final Color displayColor = TagChipStyle.background(
+      tagColor,
+      isDark: isDarkMode,
+    );
     final Color foregroundColor = TagChipStyle.readableOn(displayColor);
 
     return InkWell(
@@ -42,15 +49,19 @@ class TagChip extends StatelessWidget {
       borderRadius: BorderRadius.circular(20),
       child: Chip(
         materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        labelStyle: TextStyle(
-          fontSize: isCompact ? 11 : 12,
+        labelStyle: TagChipStyle.labelStyle(context).copyWith(
+          fontSize: isCompact ? 11 : TagChipStyle.fontSize,
           color: foregroundColor,
-          fontWeight: FontWeight.w500,
         ),
         label: Text(tag, overflow: TextOverflow.ellipsis, maxLines: 1),
         backgroundColor: displayColor,
-        visualDensity: isCompact ? VisualDensity.compact : null,
-        padding: isCompact ? const EdgeInsets.all(1) : const EdgeInsets.all(2),
+        visualDensity: isCompact
+            ? VisualDensity.compact
+            : VisualDensity.standard,
+        labelPadding: const EdgeInsets.symmetric(horizontal: 8),
+        padding: isCompact
+            ? const EdgeInsets.all(1)
+            : const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
         deleteIconColor: foregroundColor,
         deleteIcon: onDeleted != null
             ? Icon(PhosphorIconsLight.x, size: 14, color: foregroundColor)
@@ -65,25 +76,48 @@ class TagChip extends StatelessWidget {
 
 /// The shared colour recipe for every tag chip in the app.
 ///
-/// Flat: a chip is a translucent tint of its tag colour with no outline;
-/// hover steps the tint up instead of darkening a border. Keeping the recipe
+/// Flat: a chip uses its tag colour with no outline; hover adjusts its shade.
+/// Keeping the recipe
 /// here is what lets the inline chips, the chips-input chips and the tag
 /// management chips stay the same object in three places.
 class TagChipStyle {
   const TagChipStyle._();
 
   static const double radius = 16;
+  static const double fontSize = 13;
+  static const double lineHeight = 1.25;
+  static const double iconSize = 14;
+  static const double iconExtent = 20;
+  static const padding = EdgeInsets.symmetric(horizontal: 10, vertical: 6);
 
-  /// Translucent tint of [tagColor] for a chip at rest or [hovered].
-  static Color tint(
+  static TextStyle labelStyle(BuildContext context) =>
+      Theme.of(context).textTheme.bodyMedium!.copyWith(
+        fontSize: fontSize,
+        height: lineHeight,
+        fontWeight: FontWeight.w500,
+      );
+
+  /// The editor inside a parent chip has the same height as a single-line tag,
+  /// including when the user increases the system text size.
+  static double height(BuildContext context) =>
+      math.max(
+        iconExtent,
+        MediaQuery.textScalerOf(context).scale(fontSize) * lineHeight,
+      ) +
+      padding.vertical;
+
+  /// Matches file-list chips, including their lighter shade in dark mode.
+  static Color background(
     Color tagColor, {
     required bool isDark,
     bool hovered = false,
   }) {
-    final double alpha = hovered
-        ? (isDark ? 0.34 : 0.28)
-        : (isDark ? 0.24 : 0.18);
-    return tagColor.withValues(alpha: alpha);
+    final base = isDark
+        ? Color.alphaBlend(Colors.white.withValues(alpha: 0.3), tagColor)
+        : tagColor;
+    return hovered
+        ? Color.alphaBlend(Colors.white.withValues(alpha: 0.08), base)
+        : base;
   }
 
   static BoxDecoration decoration(
@@ -92,7 +126,7 @@ class TagChipStyle {
     bool hovered = false,
   }) {
     return BoxDecoration(
-      color: tint(tagColor, isDark: isDark, hovered: hovered),
+      color: background(tagColor, isDark: isDark, hovered: hovered),
       borderRadius: BorderRadius.circular(radius),
     );
   }

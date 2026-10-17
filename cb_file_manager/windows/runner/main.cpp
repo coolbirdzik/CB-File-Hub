@@ -4,6 +4,7 @@
 
 #include "flutter_window.h"
 #include "utils.h"
+#include "torrent_launch.h"
 #include "fc_native_video_thumbnail_plugin.h"
 
 // Function to get the primary monitor work area dimensions
@@ -142,6 +143,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   // every thread the Dart VM spawns inherits it.
   ::SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOOPENFILEERRORBOX);
 
+  auto command_line_arguments = GetCommandLineArguments();
+  if (TryForwardTorrentLaunch(command_line_arguments)) return EXIT_SUCCESS;
+
   // Initialize COM, so that it is available for use in the library and/or
   // plugins.
   ::CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
@@ -161,9 +165,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
       project.set_impeller_switch(flutter::ImpellerSwitch::Disabled);
     }
   }
-
-  std::vector<std::string> command_line_arguments =
-      GetCommandLineArguments();
 
   project.set_dart_entrypoint_arguments(std::move(command_line_arguments));
 

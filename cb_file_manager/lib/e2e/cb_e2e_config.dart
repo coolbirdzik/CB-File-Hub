@@ -4,6 +4,8 @@ import '../helpers/tags/tag_manager.dart';
 import '../models/database/database_manager.dart';
 import '../services/directory_watcher_service.dart';
 import '../services/windowing/window_startup_payload.dart';
+import '../services/windowing/desktop_windowing_service.dart';
+import '../services/torrent/torrent_service.dart';
 
 /// Enabled when running integration tests with `--dart-define=CB_E2E=true`.
 const bool kCbE2E = bool.fromEnvironment('CB_E2E', defaultValue: false);
@@ -45,6 +47,8 @@ class CbE2EConfig {
   CbE2EConfig._();
 
   static WindowStartupPayload? startupPayload;
+  static TorrentService? torrentService;
+  static DesktopWindowingService? desktopWindowingService;
 
   /// Acquires the E2E serialization semaphore. Must be called at the start of each
   /// test's body (before `runCbFileApp`) to prevent the next test from starting
@@ -71,6 +75,8 @@ class CbE2EConfig {
 
   static void clear() {
     startupPayload = null;
+    torrentService = null;
+    desktopWindowingService = null;
   }
 }
 

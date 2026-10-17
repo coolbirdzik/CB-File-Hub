@@ -82,13 +82,13 @@ Future<void> waitForFileRowVisible(
 }) async {
   await pumpUntilFound(
     tester,
-    find.byKey(ValueKey('file-grid-item-$absolutePath')),
+    find.byWidgetPredicate(
+      (widget) =>
+          widget.key == ValueKey('file-grid-item-$absolutePath') ||
+          widget.key == ValueKey('file-item-$absolutePath'),
+      description: 'file row in the active list or grid: $absolutePath',
+    ),
     timeout: timeout,
-  );
-  await pumpUntilFound(
-    tester,
-    find.byKey(ValueKey('file-item-$absolutePath')),
-    timeout: const Duration(milliseconds: 200),
   );
   expectFileRowVisible(absolutePath);
 }
@@ -103,13 +103,13 @@ Future<void> waitForFolderRowVisible(
 }) async {
   await pumpUntilFound(
     tester,
-    find.byKey(ValueKey('folder-grid-item-$absolutePath')),
+    find.byWidgetPredicate(
+      (widget) =>
+          widget.key == ValueKey('folder-grid-item-$absolutePath') ||
+          widget.key == ValueKey('folder-item-$absolutePath'),
+      description: 'folder row in the active list or grid: $absolutePath',
+    ),
     timeout: timeout,
-  );
-  await pumpUntilFound(
-    tester,
-    find.byKey(ValueKey('folder-item-$absolutePath')),
-    timeout: const Duration(milliseconds: 200),
   );
   expectFolderRowVisible(absolutePath);
 }

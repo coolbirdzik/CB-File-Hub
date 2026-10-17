@@ -10,6 +10,8 @@ class LanguageController {
   // Available languages
   static const String vietnamese = 'vi';
   static const String english = 'en';
+  static const String turkish = 'tr';
+  static const String chinese = 'zh';
 
   // Default language
   static const String defaultLanguage = english;
@@ -47,11 +49,20 @@ class LanguageController {
         return 'Tiếng Việt';
       case english:
         return 'English';
+      case turkish:
+        return 'Türkçe';
+      case chinese:
+        return '简体中文';
       default:
         return 'Unknown';
     }
   }
 
   // Get all supported languages
-  List<String> get supportedLanguages => [vietnamese, english];
+  List<String> get supportedLanguages => [
+    vietnamese,
+    english,
+    turkish,
+    chinese,
+  ];
 }

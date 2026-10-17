@@ -29,12 +29,17 @@ class CbSelectItem<T> {
 
   final bool enabled;
 
+  /// Extra text matched by a searchable select's filter, beyond [label] — an
+  /// alias, a translation, a code. Never shown.
+  final String? keywords;
+
   const CbSelectItem({
     required this.value,
     required this.label,
     this.triggerLabel,
     this.icon,
     this.enabled = true,
+    this.keywords,
   });
 }
 
@@ -107,6 +112,21 @@ class CbSelect<T> extends StatefulWidget {
   final String? tooltip;
   final FocusNode? focusNode;
 
+  /// Puts a filter field at the top of the menu. Typing narrows the rows by
+  /// label and [CbSelectItem.keywords]; Up/Down/Enter still drive the list
+  /// while the field has focus. For long or unfamiliar lists — languages,
+  /// time zones — where scanning by eye is slower than typing.
+  final bool searchable;
+
+  /// Placeholder for the filter field. Only used when [searchable].
+  final String? searchPlaceholder;
+
+  /// Shown when the filter matches nothing. Only used when [searchable].
+  final String? searchEmptyText;
+
+  /// Glyph at the start of the filter row. Only used when [searchable].
+  final IconData searchIcon;
+
   const CbSelect({
     super.key,
     required this.items,
@@ -123,6 +143,10 @@ class CbSelect<T> extends StatefulWidget {
     this.width,
     this.tooltip,
     this.focusNode,
+    this.searchable = false,
+    this.searchPlaceholder,
+    this.searchEmptyText,
+    this.searchIcon = Icons.search_rounded,
   });
 
   /// Convenience constructor for a plain list of values labelled by
@@ -223,6 +247,7 @@ class _CbSelectState<T> extends State<CbSelect<T>> {
       _CbSelectRoute<T>(
         rect: rect,
         openedBelow: rect.top >= anchor.bottom,
+        fitContent: widget.searchable,
         capturedThemes: InheritedTheme.capture(
           from: context,
           to: navigator.context,
@@ -233,6 +258,10 @@ class _CbSelectState<T> extends State<CbSelect<T>> {
           rowHeight: _height,
           textStyle: _textStyle,
           iconSize: _iconSize,
+          searchable: widget.searchable,
+          searchPlaceholder: widget.searchPlaceholder,
+          searchEmptyText: widget.searchEmptyText,
+          searchIcon: widget.searchIcon,
           onSelected: (item) => widget.onChanged?.call(item.value),
         ),
       ),
@@ -252,8 +281,11 @@ class _CbSelectState<T> extends State<CbSelect<T>> {
       math.max(screen.width - margin * 2, 1),
     );
 
+    // A searchable menu carries a filter row above the list.
     final double contentHeight =
-        widget.items.length * _height + CbSpacing.xs * 2;
+        widget.items.length * _height +
+        CbSpacing.xs * 2 +
+        (widget.searchable ? _height + CbSpacing.xs : 0);
     final double spaceBelow = screen.height - anchor.bottom - gap - margin;
     final double spaceAbove = anchor.top - gap - margin;
 
@@ -346,6 +378,7 @@ class _CbSelectState<T> extends State<CbSelect<T>> {
     final String text = selected == null
         ? widget.placeholder ?? ''
         : selected.triggerLabel ?? selected.label;
+    final bool fillsWidth = widget.expand || widget.width != null;
 
     Widget trigger = CbPressable(
       key: _triggerKey,
@@ -359,6 +392,12 @@ class _CbSelectState<T> extends State<CbSelect<T>> {
         final Color labelColor = selected == null && !state.disabled
             ? c.textTertiary
             : paint.foreground;
+        final Widget labelText = Text(
+          text,
+          style: _textStyle.copyWith(color: labelColor),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        );
 
         return AnimatedContainer(
           duration: CbDurations.instant,
@@ -385,20 +424,19 @@ class _CbSelectState<T> extends State<CbSelect<T>> {
             // `Row` or `Wrap` is laid out with unbounded width, and a flex
             // child under unbounded constraints is only an error when the
             // flex itself asks for `max`.
-            mainAxisSize: widget.expand ? MainAxisSize.max : MainAxisSize.min,
+            mainAxisSize: fillsWidth ? MainAxisSize.max : MainAxisSize.min,
             children: [
               if (selected?.icon != null) ...[
                 Icon(selected!.icon, size: _iconSize, color: paint.foreground),
                 const SizedBox(width: CbSpacing.sm),
               ],
-              Flexible(
-                child: Text(
-                  text,
-                  style: _textStyle.copyWith(color: labelColor),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
+              // A trigger with a set width has room to spare: the label takes
+              // it so the chevron sits on the trailing edge like a native
+              // combo box, rather than trailing right after short text.
+              if (fillsWidth)
+                Expanded(child: labelText)
+              else
+                Flexible(child: labelText),
               const SizedBox(width: CbSpacing.sm),
               // The chevron is drawn rather than taken from an icon font, so
               // its weight matches the hairline borders around it at any size.
@@ -469,11 +507,17 @@ class _CbSelectRoute<T> extends PopupRoute<void> {
   final Widget menu;
   final CapturedThemes capturedThemes;
 
+  /// Sizes the popover to its content, up to [rect]'s height, instead of
+  /// pinning it to [rect]. A filtered list shrinks as rows drop out; a fixed
+  /// box would leave a hollow tail under the last match.
+  final bool fitContent;
+
   _CbSelectRoute({
     required this.rect,
     required this.openedBelow,
     required this.menu,
     required this.capturedThemes,
+    this.fitContent = false,
   });
 
   @override
@@ -503,6 +547,42 @@ class _CbSelectRoute<T> extends PopupRoute<void> {
       CurveTween(curve: CbCurves.standard),
     );
 
+    final Widget popover = FadeTransition(
+      opacity: curved,
+      child: AnimatedBuilder(
+        animation: curved,
+        builder: (context, child) {
+          // A 4px rise out of the trigger rather than a grow-from-centre:
+          // the popover should read as attached to the control it
+          // belongs to, not as a surface of its own.
+          final double dy = (1 - curved.value) * (openedBelow ? -4 : 4);
+          return Transform.translate(offset: Offset(0, dy), child: child);
+        },
+        child: capturedThemes.wrap(menu),
+      ),
+    );
+
+    if (fitContent) {
+      return LayoutBuilder(
+        builder: (context, constraints) => Stack(
+          children: [
+            Positioned(
+              left: rect.left,
+              width: rect.width,
+              // Anchored on the edge nearest the trigger, so a menu opened
+              // upwards shrinks away from the trigger rather than towards it.
+              top: openedBelow ? rect.top : null,
+              bottom: openedBelow ? null : constraints.maxHeight - rect.bottom,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxHeight: rect.height),
+                child: popover,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Stack(
       children: [
         Positioned(
@@ -510,20 +590,7 @@ class _CbSelectRoute<T> extends PopupRoute<void> {
           top: rect.top,
           width: rect.width,
           height: rect.height,
-          child: FadeTransition(
-            opacity: curved,
-            child: AnimatedBuilder(
-              animation: curved,
-              builder: (context, child) {
-                // A 4px rise out of the trigger rather than a grow-from-centre:
-                // the popover should read as attached to the control it
-                // belongs to, not as a surface of its own.
-                final double dy = (1 - curved.value) * (openedBelow ? -4 : 4);
-                return Transform.translate(offset: Offset(0, dy), child: child);
-              },
-              child: capturedThemes.wrap(menu),
-            ),
-          ),
+          child: popover,
         ),
       ],
     );
@@ -544,6 +611,10 @@ class _CbSelectMenu<T> extends StatefulWidget {
   final double rowHeight;
   final TextStyle textStyle;
   final double iconSize;
+  final bool searchable;
+  final String? searchPlaceholder;
+  final String? searchEmptyText;
+  final IconData searchIcon;
   final ValueChanged<CbSelectItem<T>> onSelected;
 
   const _CbSelectMenu({
@@ -552,7 +623,11 @@ class _CbSelectMenu<T> extends StatefulWidget {
     required this.rowHeight,
     required this.textStyle,
     required this.iconSize,
+    required this.searchable,
+    required this.searchIcon,
     required this.onSelected,
+    this.searchPlaceholder,
+    this.searchEmptyText,
   });
 
   @override
@@ -562,14 +637,22 @@ class _CbSelectMenu<T> extends StatefulWidget {
 class _CbSelectMenuState<T> extends State<_CbSelectMenu<T>> {
   late final ScrollController _scrollController;
   final FocusNode _focusNode = FocusNode(debugLabel: 'CbSelect menu');
+  final TextEditingController _query = TextEditingController();
+  late final FocusNode _searchFocusNode;
+  late List<CbSelectItem<T>> _visible;
   late int _highlighted;
 
   @override
   void initState() {
     super.initState();
-    _highlighted = widget.items.indexWhere(
-      (item) => item.value == widget.value,
+    _visible = widget.items;
+    // The field owns focus while it is open, so the list keys have to be
+    // taken here, ahead of the text editing shortcuts, not from a parent.
+    _searchFocusNode = FocusNode(
+      debugLabel: 'CbSelect search',
+      onKeyEvent: _onKey,
     );
+    _highlighted = _visible.indexWhere((item) => item.value == widget.value);
     // Open with the selected row already in view, so a long list does not
     // start at the top with the current value somewhere off-screen.
     _scrollController = ScrollController(
@@ -583,16 +666,35 @@ class _CbSelectMenuState<T> extends State<_CbSelectMenu<T>> {
   void dispose() {
     _scrollController.dispose();
     _focusNode.dispose();
+    _searchFocusNode.dispose();
+    _query.dispose();
     super.dispose();
   }
 
+  void _onQueryChanged(String raw) {
+    final String query = raw.trim().toLowerCase();
+    setState(() {
+      _visible = query.isEmpty
+          ? widget.items
+          : [
+              for (final item in widget.items)
+                if ('${item.label} ${item.keywords ?? ''}'
+                    .toLowerCase()
+                    .contains(query))
+                  item,
+            ];
+      _highlighted = _visible.indexWhere((item) => item.enabled);
+    });
+    if (_scrollController.hasClients) _scrollController.jumpTo(0);
+  }
+
   void _move(int delta) {
-    if (widget.items.isEmpty) return;
+    if (_visible.isEmpty) return;
     int next = _highlighted < 0 ? (delta > 0 ? -1 : 0) : _highlighted;
-    for (int i = 0; i < widget.items.length; i++) {
-      next = (next + delta) % widget.items.length;
-      if (next < 0) next += widget.items.length;
-      if (widget.items[next].enabled) break;
+    for (int i = 0; i < _visible.length; i++) {
+      next = (next + delta) % _visible.length;
+      if (next < 0) next += _visible.length;
+      if (_visible[next].enabled) break;
     }
     setState(() => _highlighted = next);
     _revealHighlighted();
@@ -621,8 +723,8 @@ class _CbSelectMenuState<T> extends State<_CbSelectMenu<T>> {
   }
 
   void _commit() {
-    if (_highlighted < 0 || _highlighted >= widget.items.length) return;
-    final item = widget.items[_highlighted];
+    if (_highlighted < 0 || _highlighted >= _visible.length) return;
+    final item = _visible[_highlighted];
     if (!item.enabled) return;
     _select(item);
   }
@@ -638,6 +740,14 @@ class _CbSelectMenuState<T> extends State<_CbSelectMenu<T>> {
     // `LogicalKeyboardKey` overrides `==`, so these cannot be switch cases.
     final LogicalKeyboardKey key = event.logicalKey;
 
+    // With a filter field, Space, Home and End belong to the text.
+    if (widget.searchable &&
+        (key == LogicalKeyboardKey.space ||
+            key == LogicalKeyboardKey.home ||
+            key == LogicalKeyboardKey.end)) {
+      return KeyEventResult.ignored;
+    }
+
     if (key == LogicalKeyboardKey.arrowDown) {
       _move(1);
     } else if (key == LogicalKeyboardKey.arrowUp) {
@@ -646,7 +756,7 @@ class _CbSelectMenuState<T> extends State<_CbSelectMenu<T>> {
       setState(() => _highlighted = 0);
       _revealHighlighted();
     } else if (key == LogicalKeyboardKey.end) {
-      setState(() => _highlighted = widget.items.length - 1);
+      setState(() => _highlighted = _visible.length - 1);
       _revealHighlighted();
     } else if (key == LogicalKeyboardKey.enter ||
         key == LogicalKeyboardKey.numpadEnter ||
@@ -666,26 +776,107 @@ class _CbSelectMenuState<T> extends State<_CbSelectMenu<T>> {
     final tokens = context.cb;
     final c = tokens.colors;
 
+    final Widget list = ListView.builder(
+      controller: _scrollController,
+      shrinkWrap: widget.searchable,
+      padding: const EdgeInsets.symmetric(vertical: CbSpacing.xs),
+      itemExtent: widget.rowHeight,
+      itemCount: _visible.length,
+      itemBuilder: (context, index) => _row(c, index),
+    );
+
     return Focus(
       focusNode: _focusNode,
-      autofocus: true,
+      autofocus: !widget.searchable,
       onKeyEvent: _onKey,
       child: Container(
         decoration: CbDecorations.floating(context),
         clipBehavior: Clip.antiAlias,
-        child: ListView.builder(
-          controller: _scrollController,
-          padding: const EdgeInsets.symmetric(vertical: CbSpacing.xs),
-          itemExtent: widget.rowHeight,
-          itemCount: widget.items.length,
-          itemBuilder: (context, index) => _row(c, index),
-        ),
+        child: widget.searchable
+            // The popover lives in the Navigator's overlay, above any Material
+            // ancestor; the filter field's TextField needs one.
+            ? Material(
+                type: MaterialType.transparency,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _searchHeader(c),
+                    Flexible(
+                      child: _visible.isEmpty
+                          ? Padding(
+                              padding: const EdgeInsets.all(CbSpacing.md),
+                              child: Text(
+                                widget.searchEmptyText ?? '',
+                                textAlign: TextAlign.center,
+                                style: widget.textStyle.copyWith(
+                                  color: c.textTertiary,
+                                ),
+                              ),
+                            )
+                          : list,
+                    ),
+                  ],
+                ),
+              )
+            : list,
+      ),
+    );
+  }
+
+  /// The filter row: a flat strip one step up the fill ramp, running the full
+  /// width of the popover. No field chrome and no focus indicator — the menu
+  /// is the container and the caret is the focus cue. A boxed input inside a
+  /// popover stacks a second surface on the first.
+  Widget _searchHeader(CbColorTokens c) {
+    return Container(
+      height: widget.rowHeight + CbSpacing.xs,
+      color: c.fillSubtle,
+      padding: const EdgeInsets.symmetric(horizontal: CbSpacing.md),
+      child: Row(
+        children: [
+          Icon(widget.searchIcon, size: CbSizes.iconMd, color: c.iconSubtle),
+          const SizedBox(width: CbSpacing.sm),
+          Expanded(
+            child: TextField(
+              controller: _query,
+              focusNode: _searchFocusNode,
+              autofocus: true,
+              autocorrect: false,
+              enableSuggestions: false,
+              textInputAction: TextInputAction.search,
+              onChanged: _onQueryChanged,
+              style: widget.textStyle.copyWith(color: c.textPrimary),
+              cursorColor: c.accent.base,
+              cursorWidth: CbStrokes.hairline,
+              cursorRadius: const Radius.circular(CbRadii.xs),
+              // `collapsed` strips the Material decorator; the strip above
+              // does the drawing. Every state border is cleared so the app's
+              // input theme cannot draw one back in.
+              decoration:
+                  InputDecoration.collapsed(
+                    hintText: widget.searchPlaceholder,
+                    hintStyle: widget.textStyle.copyWith(color: c.textTertiary),
+                  ).copyWith(
+                    isDense: true,
+                    filled: false,
+                    contentPadding: EdgeInsets.zero,
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    disabledBorder: InputBorder.none,
+                    errorBorder: InputBorder.none,
+                    focusedErrorBorder: InputBorder.none,
+                  ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _row(CbColorTokens c, int index) {
-    final item = widget.items[index];
+    final item = _visible[index];
     final bool isSelected = item.value == widget.value;
     final bool isActive = index == _highlighted && item.enabled;
 

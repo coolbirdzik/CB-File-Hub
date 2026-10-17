@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -468,21 +471,38 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
 
     final suggestions = widget.suggestions;
 
-    // The replacement characters represent existing chips and must not be
-    // included when selecting the editable draft. Otherwise, typing after
-    // Ctrl/Cmd+A removes those placeholders while the chips are still present,
-    // causing the new text to render on top of the existing tags.
+    // Select everything, chips included: the chips are highlighted by
+    // [ChipsInputEditingController.buildTextSpan], copy/cut take their names,
+    // and typing or deleting replaces them like any other selection.
     final isSelectAll =
         event.logicalKey == LogicalKeyboardKey.keyA &&
         (HardwareKeyboard.instance.isControlPressed ||
             HardwareKeyboard.instance.isMetaPressed);
     if (isSelectAll) {
-      final draftStart = countPrefixReplacements(controller.text);
       controller.selection = TextSelection(
-        baseOffset: draftStart,
+        baseOffset: 0,
         extentOffset: controller.text.length,
       );
       return KeyEventResult.handled;
+    }
+
+    // Chips sit in the text as placeholder characters, so the editor's own
+    // clipboard actions would copy those instead of the tag names.
+    final hardware = HardwareKeyboard.instance;
+    if ((hardware.isControlPressed || hardware.isMetaPressed) &&
+        !hardware.isAltPressed &&
+        !hardware.isShiftPressed) {
+      if (event.logicalKey == LogicalKeyboardKey.keyC && copyTags()) {
+        return KeyEventResult.handled;
+      }
+      if (event.logicalKey == LogicalKeyboardKey.keyX && _cutTags()) {
+        return KeyEventResult.handled;
+      }
+      if (event.logicalKey == LogicalKeyboardKey.keyV &&
+          widget.onSubmitted != null) {
+        unawaited(_paste(SelectionChangedCause.keyboard));
+        return KeyEventResult.handled;
+      }
     }
 
     final bool scopeEnabled = widget.onScopeChanged != null;
@@ -606,6 +626,183 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
     return KeyEventResult.ignored;
   }
 
+  // ── Clipboard ──
+
+  /// Separates tags in copied text, and splits pasted text back into tags.
+  static const String tagSeparator = ', ';
+  static final RegExp _pastedTagSeparator = RegExp(r'[,;\n\r\t]+');
+
+  /// Splits clipboard text into tag names; empty when it is not a tag list.
+  /// "parent:child1, child2" stays whole: the field submits it as one
+  /// hierarchy entry.
+  static List<String> splitPastedTags(String text) {
+    if (text.contains(':')) return const <String>[];
+    return text
+        .split(_pastedTagSeparator)
+        .map((tag) => tag.trim())
+        .where((tag) => tag.isNotEmpty)
+        .toList();
+  }
+
+  /// The chips and the draft text covered by the editor's selection.
+  ({List<T> chips, String draft}) _selectedParts() {
+    final selection = controller.selection;
+    if (!selection.isValid || selection.isCollapsed) {
+      return (chips: <T>[], draft: '');
+    }
+    final text = controller.text;
+    final start = selection.start.clamp(0, text.length);
+    final end = selection.end.clamp(0, text.length);
+    final prefix = controller
+        .prefixFor(valueCount: widget.values.length)
+        .length
+        .clamp(0, widget.values.length);
+    final chips = widget.values.sublist(
+      math.min(start, prefix),
+      math.min(end, prefix),
+    );
+    final draft = text
+        .substring(math.max(start, prefix), math.max(end, prefix))
+        .replaceAll(
+          String.fromCharCode(
+            ChipsInputEditingController.kObjectReplacementChar,
+          ),
+          '',
+        );
+    return (chips: chips, draft: draft);
+  }
+
+  /// Copies the tag names, joined by [tagSeparator]: the selected chips with
+  /// any selected draft text, or every tag when no text is selected. Returns
+  /// false, leaving the editor to copy, when only draft text is selected or
+  /// there is nothing to copy.
+  bool copyTags() {
+    final parts = _selectedParts();
+    final List<String> items;
+    if (parts.chips.isNotEmpty) {
+      final draft = parts.draft.trim();
+      items = <String>[
+        for (final chip in parts.chips) '$chip',
+        if (draft.isNotEmpty) draft,
+      ];
+    } else if (parts.draft.isEmpty && widget.values.isNotEmpty) {
+      items = <String>[for (final value in widget.values) '$value'];
+    } else {
+      return false;
+    }
+    unawaited(Clipboard.setData(ClipboardData(text: items.join(tagSeparator))));
+    return true;
+  }
+
+  /// Cuts a selection that covers chips: copies it, then removes those tags
+  /// and the selected draft text. Plain draft selections are left to the
+  /// editor.
+  bool _cutTags() {
+    final parts = _selectedParts();
+    if (parts.chips.isEmpty || !copyTags()) return false;
+    final selection = controller.selection;
+    final prefixLength = controller
+        .prefixFor(valueCount: widget.values.length)
+        .length;
+    final draft = controller.textWithoutReplacements;
+    final draftStart = (selection.start - prefixLength).clamp(0, draft.length);
+    final draftEnd = (selection.end - prefixLength).clamp(0, draft.length);
+    final remainingDraft =
+        draft.substring(0, draftStart) + draft.substring(draftEnd);
+    final remaining = <T>[...widget.values];
+    for (final chip in parts.chips) {
+      remaining.remove(chip);
+    }
+    final prefix = controller.prefixFor(valueCount: remaining.length);
+    // The tags go through onChanged below; keep the text listener from
+    // reading the shorter placeholder run as a second removal.
+    _previousSelection = null;
+    controller.value = TextEditingValue(
+      text: '$prefix$remainingDraft',
+      selection: TextSelection.collapsed(offset: prefix.length + draftStart),
+    );
+    widget.onChanged(remaining);
+    widget.onTextChanged?.call(remainingDraft);
+    return true;
+  }
+
+  /// Pastes a tag list (as [copyTags] writes it) as separate tags through
+  /// [ChipsInput.onSubmitted]. Anything else, or a paste into a draft that
+  /// keeps text outside the selection, is pasted as text by the editor.
+  Future<void> _paste(SelectionChangedCause cause) async {
+    final editable = _focusNode.context
+        ?.findAncestorStateOfType<EditableTextState>();
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    if (!mounted) return;
+    final tags = splitPastedTags(data?.text ?? '');
+    final draft = controller.textWithoutReplacements;
+    final draftReplaced =
+        draft.trim().isEmpty || _selectedParts().draft == draft;
+    final onSubmitted = widget.onSubmitted;
+    if (tags.length < 2 || !draftReplaced || onSubmitted == null) {
+      await editable?.pasteText(cause);
+      return;
+    }
+    editable?.hideToolbar();
+    for (final tag in tags) {
+      onSubmitted(tag);
+    }
+    _clearDraft();
+    _focusNode.requestFocus();
+  }
+
+  Widget _buildContextMenu(
+    BuildContext context,
+    EditableTextState editableTextState,
+  ) {
+    final items = <ContextMenuButtonItem>[
+      for (final item in editableTextState.contextMenuButtonItems)
+        switch (item.type) {
+          ContextMenuButtonType.copy => item.copyWith(
+            onPressed: () {
+              if (copyTags()) {
+                editableTextState.hideToolbar();
+              } else {
+                item.onPressed?.call();
+              }
+            },
+          ),
+          ContextMenuButtonType.cut => item.copyWith(
+            onPressed: () {
+              if (_cutTags()) {
+                editableTextState.hideToolbar();
+              } else {
+                item.onPressed?.call();
+              }
+            },
+          ),
+          ContextMenuButtonType.paste when widget.onSubmitted != null =>
+            item.copyWith(
+              onPressed: () => unawaited(_paste(SelectionChangedCause.toolbar)),
+            ),
+          _ => item,
+        },
+    ];
+    // Without a selection the editor offers no Copy; the tags still can be.
+    if (widget.values.isNotEmpty &&
+        !items.any((item) => item.type == ContextMenuButtonType.copy)) {
+      items.insert(
+        0,
+        ContextMenuButtonItem(
+          label: AppLocalizations.of(context)!.copyTags,
+          onPressed: () {
+            copyTags();
+            editableTextState.hideToolbar();
+          },
+        ),
+      );
+    }
+    return AdaptiveTextSelectionToolbar.buttonItems(
+      anchors: editableTextState.contextMenuAnchors,
+      buttonItems: items,
+    );
+  }
+
   // ── Text listener ──
 
   void _textListener() {
@@ -628,11 +825,12 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
         if (cursorStart == cursorEnd) {
           values.removeRange(cursorStart - 1, cursorEnd);
         } else {
-          if (cursorStart > cursorEnd) {
-            values.removeRange(cursorEnd, cursorStart);
-          } else {
-            values.removeRange(cursorStart, cursorEnd);
-          }
+          // The selection can also cover the draft after the chips.
+          final start = math
+              .min(cursorStart, cursorEnd)
+              .clamp(0, values.length);
+          final end = math.max(cursorStart, cursorEnd).clamp(0, values.length);
+          values.removeRange(start, end);
         }
         widget.onChanged(values);
       }
@@ -657,6 +855,7 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
   @override
   Widget build(BuildContext context) {
     controller.chipBuilder = widget.chipBuilder;
+    controller.showChipSelection = _focusNode.hasFocus;
     controller.updateValues(<T>[...widget.values]);
     final parent = widget.scopeParent;
     final decoration = widget.decoration.copyWith(
@@ -675,7 +874,11 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
           ? widget.style
           : Theme.of(context).textTheme.bodyMedium!
                 .merge(widget.style)
-                .copyWith(fontSize: 13, color: childColor),
+                .copyWith(
+                  fontSize: TagChipStyle.fontSize,
+                  height: TagChipStyle.lineHeight,
+                  color: childColor,
+                ),
       strutStyle: parent == null
           ? widget.strutStyle ??
                 const StrutStyle(
@@ -692,6 +895,7 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
       textAlignVertical: parent == null ? null : TextAlignVertical.center,
       controller: controller,
       focusNode: _focusNode,
+      contextMenuBuilder: _buildContextMenu,
       inputFormatters: const [_ChipPrefixTextInputFormatter()],
       decoration: parent == null
           ? decoration
@@ -754,7 +958,10 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         for (final tag in widget.values)
-                          widget.chipBuilder(context, tag),
+                          KeyedSubtree(
+                            key: ValueKey<T>(tag),
+                            child: widget.chipBuilder(context, tag),
+                          ),
                         TagScopeChip(
                           parent: parent,
                           onExit: _exitScope,
@@ -792,6 +999,10 @@ class ChipsInputEditingController<T> extends TextEditingController {
 
   List<T> values;
   bool editingChild;
+
+  /// Whether chips covered by [selection] are drawn as selected. Set from the
+  /// field's focus, since an unfocused editor paints no selection either.
+  bool showChipSelection = false;
 
   void updateChildMode(bool enabled) {
     if (editingChild == enabled) return;
@@ -856,15 +1067,42 @@ class ChipsInputEditingController<T> extends TextEditingController {
     // Create a list to hold all spans
     final List<InlineSpan> spans = <InlineSpan>[];
 
+    // Chips inside the selection get a tint and ring: the editor paints its
+    // selection behind inline widgets, where the opaque chips would hide it.
+    final selection = this.selection;
+    final selectionStart = showChipSelection && selection.isValid
+        ? selection.start
+        : 0;
+    final selectionEnd = showChipSelection && selection.isValid
+        ? selection.end
+        : 0;
+    final primary = Theme.of(context).colorScheme.primary;
+
     // Chips are centered in the row; the forced strut in ChipsInputState
     // provides the vertical breathing room, so no per-row offsets are needed.
     for (int i = 0; i < values.length; i++) {
+      final selected = i >= selectionStart && i < selectionEnd;
       spans.add(
         WidgetSpan(
           alignment: PlaceholderAlignment.middle,
           child: Padding(
+            // Never transfer a deleted chip's animation/hover state to the
+            // next tag at this placeholder position (opacity 0/isDeleting).
+            key: ValueKey<T>(values[i]),
             padding: const EdgeInsets.only(right: 4),
-            child: chipBuilder(context, values[i]),
+            // Always present, so selecting does not rebuild the chip's state.
+            child: DecoratedBox(
+              key: ValueKey<String>('chips-input-selection-$i'),
+              position: DecorationPosition.foreground,
+              decoration: BoxDecoration(
+                color: selected ? primary.withValues(alpha: .3) : null,
+                border: selected
+                    ? Border.all(color: primary, width: 1.5)
+                    : null,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: chipBuilder(context, values[i]),
+            ),
           ),
         ),
       );
@@ -963,14 +1201,10 @@ class TagScopeChip extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final isDark = theme.brightness == Brightness.dark;
     final tagColor = TagColorManager.instance.getTagColor(parent);
-    final foreground = TagChipStyle.readableOn(
-      Color.alphaBlend(
-        TagChipStyle.tint(tagColor, isDark: isDark),
-        theme.colorScheme.surface,
-      ),
+    final color = TagChipStyle.readableOn(
+      TagChipStyle.background(tagColor, isDark: isDark),
     );
-    final color = foreground == Colors.white ? Colors.white : tagColor;
-    final textStyle = theme.textTheme.bodyMedium!.copyWith(fontSize: 13);
+    final textStyle = TagChipStyle.labelStyle(context);
     double measure(String text, TextStyle style) {
       final painter = TextPainter(
         text: TextSpan(text: text, style: style),
@@ -998,13 +1232,13 @@ class TagScopeChip extends StatelessWidget {
     final inputWidth =
         measure(draft.isEmpty ? l10n.childTagInputHint : draft, textStyle) + 16;
     final width =
-        (labelWidth + parentWidth + inputWidth.clamp(80.0, maxWidth) + 52)
+        (labelWidth + parentWidth + inputWidth.clamp(80.0, maxWidth) + 60)
             .clamp(0.0, maxWidth);
 
     return Container(
       width: width,
-      constraints: const BoxConstraints(minHeight: 36),
-      padding: const EdgeInsets.only(left: 8, right: 4),
+      constraints: BoxConstraints(minHeight: TagChipStyle.height(context)),
+      padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: TagChipStyle.decoration(tagColor, isDark: isDark),
       child: Row(
         children: [
@@ -1120,15 +1354,9 @@ class _TagInputChipState extends State<TagInputChip>
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final tagColor = TagColorManager.instance.getTagColor(widget.tag);
-    final foregroundColor = TagChipStyle.readableOn(
-      Color.alphaBlend(
-        TagChipStyle.tint(tagColor, isDark: isDark),
-        Theme.of(context).colorScheme.surface,
-      ),
+    final contentColor = TagChipStyle.readableOn(
+      TagChipStyle.background(tagColor, isDark: isDark, hovered: isHovered),
     );
-    final contentColor = foregroundColor == Colors.white
-        ? Colors.white
-        : tagColor;
 
     final chip = AnimatedBuilder(
       animation: _controller,
@@ -1150,10 +1378,7 @@ class _TagInputChipState extends State<TagInputChip>
                         ? null
                         : () => widget.onSelected(widget.tag),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
-                      ),
+                      padding: TagChipStyle.padding,
                       decoration: TagChipStyle.decoration(
                         tagColor,
                         isDark: isDark,
@@ -1162,10 +1387,13 @@ class _TagInputChipState extends State<TagInputChip>
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(
-                            PhosphorIconsLight.tag,
-                            size: 14,
-                            color: contentColor,
+                          SizedBox.square(
+                            dimension: TagChipStyle.iconExtent,
+                            child: Icon(
+                              PhosphorIconsLight.tag,
+                              size: TagChipStyle.iconSize,
+                              color: contentColor,
+                            ),
                           ),
                           const SizedBox(width: 4),
                           Flexible(
@@ -1173,11 +1401,9 @@ class _TagInputChipState extends State<TagInputChip>
                               widget.label ?? widget.tag,
                               overflow: TextOverflow.ellipsis,
                               maxLines: 1,
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                                color: contentColor,
-                              ),
+                              style: TagChipStyle.labelStyle(
+                                context,
+                              ).copyWith(color: contentColor),
                             ),
                           ),
                           const SizedBox(width: 6),

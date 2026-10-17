@@ -10,6 +10,8 @@ add_executable(${BINARY_NAME} WIN32
   "flutter_window.cpp"
   "main.cpp"
   "utils.cpp"
+  "torrent_launch.cpp"
+  "torrent_launch.h"
   "win32_window.cpp"
   "${FLUTTER_MANAGED_DIR}/generated_plugin_registrant.cc"
   "fc_native_video_thumbnail_plugin.cpp"

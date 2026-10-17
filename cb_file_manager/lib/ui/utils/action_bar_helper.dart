@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cb_file_manager/ui/utils/base_screen.dart';
 import 'package:cb_file_manager/ui/utils/route.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:cb_file_manager/config/translation_helper.dart';
 
 /// Helper class to standardize app bar functionality across the application
 class ActionBarHelper {
@@ -94,7 +95,7 @@ class ActionBarHelper {
     Function(int) onSegmentTap,
   ) {
     if (pathSegments.isEmpty) {
-      return const Text('Home');
+      return Text(context.tr.home);
     }
 
     return SingleChildScrollView(
@@ -128,7 +129,7 @@ class ActionBarHelper {
         icon: const Icon(PhosphorIconsLight.x),
         onPressed: onClose,
       ),
-      title: Text('$selectedCount selected'),
+      title: Text(context.tr.itemsSelected(selectedCount)),
       actions: actions,
       backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.85),
     );

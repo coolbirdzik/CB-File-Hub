@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:cb_file_manager/design_system/cb_design_system.dart';
+import '../components/common/file_entry_presentation.dart';
 import 'package:cb_file_manager/helpers/files/file_type_registry.dart';
 import 'package:cb_file_manager/ui/widgets/thumbnail_loader.dart';
 import 'package:flutter/material.dart';
@@ -71,7 +72,10 @@ class _FileDragDropItemState extends State<FileDragDropItem> {
   @override
   Widget build(BuildContext context) {
     final path = widget.path;
-    final selectedPaths = widget.selectedPaths;
+    if (FileEntryPresentation.isVirtual(context, path)) return widget.child;
+    final selectedPaths = widget.selectedPaths
+        .where((path) => !FileEntryPresentation.isVirtual(context, path))
+        .toSet();
     final child = widget.child;
     final payload = selectedPaths.contains(path)
         ? <String>[

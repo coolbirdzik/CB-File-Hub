@@ -212,3 +212,5 @@ msix_config:
   install_certificate: false
   architecture: x64
   capabilities: internetClient, privateNetworkClientServer
+  file_extension: .torrent
+  protocol_activation: magnet
