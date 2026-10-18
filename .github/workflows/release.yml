@@ -706,18 +706,19 @@ jobs:
           name: android-aab
           path: ${{ env.PROJECT_DIR }}/build/app/outputs/bundle/release/*.aab
 
-      - name: Prepare Google Play descriptions in the release edit
+      - name: Prepare Google Play descriptions and images in the release edit
         id: play_listing
         if: (github.event.inputs.play_track || vars.GOOGLE_PLAY_TRACK || 'internal') != 'internalsharing'
         env:
           GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
           GOOGLE_PLAY_PACKAGE_NAME: ${{ vars.GOOGLE_PLAY_PACKAGE_NAME || 'com.cbv.filehub' }}
           STORE_LISTINGS_DIR: store/listings
+          GOOGLE_PLAY_UPDATE_IMAGES: ${{ vars.GOOGLE_PLAY_UPDATE_IMAGES || 'true' }}
         run: |
           EDIT_ID="$(node scripts/google_play_listings.mjs prepare)"
           echo "edit_id=$EDIT_ID" >> "$GITHUB_OUTPUT"
 
-      - name: Submit AAB and descriptions to Google Play
+      - name: Submit AAB, descriptions and images to Google Play
         id: submit_play
         uses: r0adkll/upload-google-play@v1.1.5
         with:

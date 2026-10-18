@@ -90,7 +90,63 @@ function loadMicrosoftImages(locale, directory, entries) {
   return images;
 }
 
-function loadListingContent(directory = defaultListingsDirectory) {
+// Only these configured types are managed; omitted types stay untouched.
+// https://support.google.com/googleplay/android-developer/answer/9866151
+const playScreenshotSize = (width, height) => Math.min(width, height) >= 320 &&
+  Math.max(width, height) <= 3840 && Math.max(width, height) <= 2 * Math.min(width, height);
+const googleImageRules = {
+  phoneScreenshots: { max: 8, size: '320–3840 px per side, longest side at most twice the shortest', fits: playScreenshotSize },
+  sevenInchScreenshots: { max: 8, size: '320–3840 px per side, longest side at most twice the shortest', fits: playScreenshotSize },
+  featureGraphic: { max: 1, size: '1024x500', fits: (w, h) => w === 1024 && h === 500 },
+  icon: { max: 1, size: '512x512', fits: (w, h) => w === 512 && h === 512 },
+};
+
+function loadGoogleImages(locale, directory, entries) {
+  if (entries === undefined) return undefined;
+  if (!entries || typeof entries !== 'object' || Array.isArray(entries) || !Object.keys(entries).length) {
+    throw new Error(`${locale}: googlePlayImages must be a non-empty image-type map`);
+  }
+  return Object.fromEntries(Object.entries(entries).map(([type, files]) => {
+    const label = `${locale}: googlePlayImages.${type}`;
+    const rule = googleImageRules[type];
+    if (!rule) throw new Error(`${label}: unsupported image type; use ${Object.keys(googleImageRules).join(', ')}`);
+    if (!Array.isArray(files) || files.length < 1 || files.length > rule.max) {
+      throw new Error(`${label}: provide 1–${rule.max} PNG files (omit a type to leave it unchanged)`);
+    }
+    const hashes = new Set();
+    return [type, files.map((file) => {
+      if (typeof file !== 'string' || !file.endsWith('.png') || path.isAbsolute(file) || /^[a-z]+:/i.test(file)) {
+        throw new Error(`${label}: file must be a relative .png path`);
+      }
+      const source = path.resolve(directory, file);
+      if (!fs.existsSync(source)) throw new Error(`${label}: ${file} not found`);
+      // A conservative local cap for all artwork; icons have Play's 1 MiB cap.
+      const maxBytes = (type === 'icon' ? 1 : 8) * 1024 * 1024;
+      if (fs.statSync(source).size > maxBytes) throw new Error(`${label}: ${file} exceeds ${maxBytes / 1024 / 1024} MiB`);
+      const data = fs.readFileSync(source);
+      const size = readPngSize(data);
+      if (!size) throw new Error(`${label}: ${file} is not a PNG image`);
+      if (!rule.fits(size.width, size.height)) throw new Error(`${label}: must be ${rule.size}, got ${size.width}x${size.height}`);
+      if (data[24] !== 8 || (type === 'icon' ? data[25] !== 6 : data[25] !== 2)) {
+        throw new Error(`${label}: use ${type === 'icon' ? '32-bit RGBA' : '24-bit RGB without alpha'} PNG`);
+      }
+      // RGB PNGs can also declare transparency using a tRNS chunk.
+      for (let offset = 8; offset + 12 <= data.length;) {
+        const length = data.readUInt32BE(offset);
+        if (type !== 'icon' && data.toString('ascii', offset + 4, offset + 8) === 'tRNS') {
+          throw new Error(`${label}: PNG must not contain transparency`);
+        }
+        offset += 12 + length;
+      }
+      const sha256 = crypto.createHash('sha256').update(data).digest('hex');
+      if (hashes.has(sha256)) throw new Error(`${label}: duplicate image ${file}`);
+      hashes.add(sha256);
+      return { source, sha256, contentType: 'image/png', ...size };
+    })];
+  }));
+}
+
+function loadListingContent(directory = defaultListingsDirectory, { playImages = false } = {}) {
   const listings = {};
   const playLanguages = new Set();
   for (const file of fs.readdirSync(directory).filter((name) => name.endsWith('.json')).sort()) {
@@ -127,6 +183,7 @@ function loadListingContent(directory = defaultListingsDirectory) {
     listings[locale] = {
       description, shortDescription, googlePlayLanguage: entry.googlePlayLanguage,
       features, images: loadMicrosoftImages(locale, directory, entry.microsoftStoreImages),
+      googleImages: playImages ? loadGoogleImages(locale, directory, entry.googlePlayImages) : undefined,
     };
   }
   for (const locale of requiredStoreLocales) {
@@ -148,6 +205,12 @@ export function loadGooglePlayListings(directory = defaultListingsDirectory) {
   return Object.fromEntries(Object.values(loadListingContent(directory))
     .map(({ googlePlayLanguage, shortDescription, description }) =>
       [googlePlayLanguage, { shortDescription, fullDescription: description }]));
+}
+
+export function loadGooglePlayImages(directory = defaultListingsDirectory) {
+  return Object.fromEntries(Object.values(loadListingContent(directory, { playImages: true }))
+    .filter(({ googleImages }) => googleImages !== undefined)
+    .map(({ googlePlayLanguage, googleImages }) => [googlePlayLanguage, googleImages]));
 }
 
 // Replace the listing's images of the managed types (the types present in the
@@ -227,9 +290,18 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
         ...image, source: path.relative(process.cwd(), source).replaceAll('\\', '/'),
       }));
     }
+    const googlePlayImages = loadGooglePlayImages(directory);
+    for (const types of Object.values(googlePlayImages)) {
+      for (const [type, images] of Object.entries(types)) {
+        types[type] = images.map(({ source, ...image }) => ({
+          ...image, source: path.relative(process.cwd(), source).replaceAll('\\', '/'),
+        }));
+      }
+    }
     console.log(JSON.stringify({
       microsoft,
       googlePlay: loadGooglePlayListings(directory),
+      googlePlayImages,
     }, null, 2));
   } catch (error) {
     console.error(error.message);

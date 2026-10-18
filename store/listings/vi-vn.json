@@ -2,6 +2,26 @@
   "descriptionFile": "vi-vn.txt",
   "shortDescription": "Quản lý tập tin, ảnh, video, torrent và lưu trữ mạng trong một ứng dụng.",
   "googlePlayLanguage": "vi",
+  "googlePlayImages": {
+    "phoneScreenshots": [
+      "../../screenshots/promo/vi/mobile/01_mobile_trang_chu.png",
+      "../../screenshots/promo/vi/mobile/02_mobile_luoi_file.png",
+      "../../screenshots/promo/vi/mobile/03_mobile_tab.png",
+      "../../screenshots/promo/vi/mobile/04_mobile_tag.png"
+    ],
+    "sevenInchScreenshots": [
+      "../../screenshots/promo/vi/tablet7/01_tablet7_trang_chu.png",
+      "../../screenshots/promo/vi/tablet7/02_tablet7_luoi_file.png",
+      "../../screenshots/promo/vi/tablet7/03_tablet7_tab.png",
+      "../../screenshots/promo/vi/tablet7/04_tablet7_tag.png"
+    ],
+    "featureGraphic": [
+      "../../screenshots/promo/vi/feature_graphic.png"
+    ],
+    "icon": [
+      "../../cb_file_manager/android/app/src/main/res/playstore-icon.png"
+    ]
+  },
   "microsoftStoreImages": [
     {
       "file": "../../screenshots/promo/vi/desktop/01_duyet_tap_tin.png",

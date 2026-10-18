@@ -7,7 +7,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import test from 'node:test';
 import {
-  loadStoreListings, loadGooglePlayListings, applyStoreListings, requiredStoreLocales,
+  loadStoreListings, loadGooglePlayListings, loadGooglePlayImages, applyStoreListings, requiredStoreLocales,
 } from '../store_listings.mjs';
 import { writeStoredZip } from '../stored_zip.mjs';
 
@@ -22,13 +22,15 @@ const englishBase = {
   ],
 };
 
-function makePng(width, height) {
+function makePng(width, height, colorType = 2) {
   const png = Buffer.alloc(33);
   Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(png);
   png.writeUInt32BE(13, 8);
   png.write('IHDR', 12, 'ascii');
   png.writeUInt32BE(width, 16);
   png.writeUInt32BE(height, 20);
+  png[24] = 8;
+  png[25] = colorType;
   return png;
 }
 
@@ -81,6 +83,91 @@ test('MSIX manifest declares exactly the Store listing languages', () => {
   assert.ok(line, 'msix_config.languages is missing');
   const languages = line[1].split(',').map((language) => language.trim()).sort();
   assert.deepEqual(languages, [...requiredStoreLocales].sort());
+});
+
+test('Play artwork covers all languages with phone/tablet screenshots, feature graphic and icon', () => {
+  const images = loadGooglePlayImages();
+  assert.deepEqual(Object.keys(images).sort(), ['en-US', 'tr-TR', 'vi', 'zh-CN']);
+  for (const [language, groups] of Object.entries(images)) {
+    assert.deepEqual(Object.fromEntries(Object.entries(groups).map(([type, files]) => [type, files.length])), {
+      phoneScreenshots: 4, sevenInchScreenshots: 4, featureGraphic: 1, icon: 1,
+    });
+    for (const files of Object.values(groups)) {
+      for (const file of files) {
+        assert.match(file.sha256, /^[a-f0-9]{64}$/);
+        assert.equal(file.contentType, 'image/png');
+        assert.ok(!file.source.includes(`${path.sep}desktop${path.sep}`), language);
+      }
+    }
+  }
+  assert.notEqual(images.vi.phoneScreenshots[0].sha256, images['en-US'].phoneScreenshots[0].sha256);
+  assert.deepEqual(images['tr-TR'], images['en-US']);
+  assert.deepEqual(images['zh-CN'], images['en-US']);
+});
+
+test('Play artwork validation rejects invalid dimensions, color, transparency, counts and paths', (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cb-play-images-'));
+  t.after(() => {
+    assert.equal(path.dirname(directory), path.resolve(os.tmpdir()));
+    assert.ok(path.basename(directory).startsWith('cb-play-images-'));
+    fs.rmSync(directory, { recursive: true, force: true });
+  });
+  for (const locale of requiredStoreLocales) {
+    const entry = JSON.parse(fs.readFileSync(path.join(repo, 'store/listings', `${locale}.json`), 'utf8'));
+    entry.microsoftStoreImages = entry.microsoftStoreImages.map((image) => ({
+      ...image, file: path.resolve(repo, 'store/listings', image.file),
+    }));
+    delete entry.googlePlayImages;
+    fs.writeFileSync(path.join(directory, `${locale}.json`), JSON.stringify(entry));
+    fs.copyFileSync(path.join(repo, 'store/listings', `${locale}.txt`), path.join(directory, `${locale}.txt`));
+  }
+  const entryPath = path.join(directory, 'en-us.json');
+  const entry = JSON.parse(fs.readFileSync(entryPath, 'utf8'));
+  const write = (images) => fs.writeFileSync(entryPath, JSON.stringify({ ...entry, googlePlayImages: images }));
+  const pngs = {
+    'phone.png': makePng(1440, 2560),
+    'small.png': makePng(319, 600),
+    'wide.png': makePng(320, 1000),
+    'huge.png': makePng(2160, 3841),
+    'icon.png': makePng(512, 512, 6),
+    'rgb-icon.png': makePng(512, 512),
+    'alpha.png': makePng(1440, 2560, 6),
+    'feature.png': makePng(1024, 500),
+    'fake.png': Buffer.from('not a PNG'),
+    'big-icon.png': Buffer.concat([makePng(512, 512, 6), Buffer.alloc(1024 * 1024)]),
+  };
+  const transparency = Buffer.alloc(12);
+  transparency.write('tRNS', 4, 'ascii');
+  pngs['transparent.png'] = Buffer.concat([makePng(1440, 2560), transparency]);
+  for (const [file, bytes] of Object.entries(pngs)) fs.writeFileSync(path.join(directory, file), bytes);
+  assert.deepEqual(loadGooglePlayImages(directory), {}, 'omitted artwork leaves all image types unmanaged');
+  for (const [images, error] of [
+    [{}, /non-empty image-type map/],
+    [[], /non-empty image-type map/],
+    [{ tvBanner: ['phone.png'] }, /unsupported image type/],
+    [{ phoneScreenshots: [] }, /provide 1–8/],
+    [{ phoneScreenshots: Array(9).fill('phone.png') }, /provide 1–8/],
+    [{ featureGraphic: ['feature.png', 'feature.png'] }, /provide 1–1/],
+    [{ phoneScreenshots: ['phone.png', 'phone.png'] }, /duplicate image/],
+    [{ icon: ['missing.png'] }, /not found/],
+    [{ icon: ['fake.png'] }, /not a PNG/],
+    [{ icon: ['rgb-icon.png'] }, /32-bit RGBA/],
+    [{ icon: ['big-icon.png'] }, /exceeds 1 MiB/],
+    [{ phoneScreenshots: ['small.png'] }, /got 319x600/],
+    [{ phoneScreenshots: ['wide.png'] }, /got 320x1000/],
+    [{ phoneScreenshots: ['huge.png'] }, /got 2160x3841/],
+    [{ featureGraphic: ['phone.png'] }, /1024x500/],
+    [{ phoneScreenshots: ['alpha.png'] }, /24-bit RGB/],
+    [{ phoneScreenshots: ['transparent.png'] }, /must not contain transparency/],
+    [{ icon: [path.join(directory, 'icon.png')] }, /relative .png path/],
+    [{ icon: ['https://example.test/icon.png'] }, /relative .png path/],
+  ]) {
+    write(images);
+    assert.throws(() => loadGooglePlayImages(directory), error);
+  }
+  write({ phoneScreenshots: ['phone.png'], sevenInchScreenshots: ['phone.png'],
+    featureGraphic: ['feature.png'], icon: ['icon.png'] });
+  assert.equal(Object.keys(loadGooglePlayImages(directory)['en-US']).length, 4);
 });
 
 test('every listing ships localized screenshots and the shared hero art', () => {

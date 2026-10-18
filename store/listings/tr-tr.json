@@ -2,6 +2,26 @@
   "descriptionFile": "tr-tr.txt",
   "shortDescription": "Dosya, fotoğraf, video, torrent ve uzak depolamayı tek uygulamada yönetin.",
   "googlePlayLanguage": "tr-TR",
+  "googlePlayImages": {
+    "phoneScreenshots": [
+      "../../screenshots/promo/mobile/01_mobile_home.png",
+      "../../screenshots/promo/mobile/02_mobile_grid.png",
+      "../../screenshots/promo/mobile/03_mobile_tabs.png",
+      "../../screenshots/promo/mobile/04_mobile_tags.png"
+    ],
+    "sevenInchScreenshots": [
+      "../../screenshots/promo/tablet7/01_tablet7_home.png",
+      "../../screenshots/promo/tablet7/02_tablet7_grid.png",
+      "../../screenshots/promo/tablet7/03_tablet7_tabs.png",
+      "../../screenshots/promo/tablet7/04_tablet7_tags.png"
+    ],
+    "featureGraphic": [
+      "../../screenshots/promo/feature_graphic.png"
+    ],
+    "icon": [
+      "../../cb_file_manager/android/app/src/main/res/playstore-icon.png"
+    ]
+  },
   "microsoftStoreImages": [
     {
       "file": "../../screenshots/promo/tr/desktop/01_dosya_tarayici.png",
