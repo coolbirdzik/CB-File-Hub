@@ -824,6 +824,50 @@ class TagManager {
     }
   }
 
+  /// Read persisted tags for selected paths and their descendants.
+  /// File operations must capture this before moving the source directories.
+  static Future<Map<String, List<String>>> getTagsForPathTrees(
+    List<String> roots,
+  ) async {
+    await initialize();
+    final directoryRoots = <String>[];
+    final fileRoots = <String>[];
+    for (final root in roots) {
+      if (await FileSystemEntity.type(root, followLinks: false) ==
+          FileSystemEntityType.directory) {
+        directoryRoots.add(pathlib.normalize(root));
+      } else {
+        fileRoots.add(root);
+      }
+    }
+    final result = await getTagsForFiles(fileRoots);
+    if (directoryRoots.isEmpty) return result;
+    bool includes(String path) {
+      final normalized = pathlib.normalize(path);
+      return directoryRoots.any(
+        (root) =>
+            pathlib.equals(root, normalized) ||
+            pathlib.isWithin(root, normalized),
+      );
+    }
+
+    if (_useDatabase && _databaseManager != null) {
+      for (final row in await _databaseManager!.getAllFileTagsRaw()) {
+        final path = row['filePath'] as String;
+        if (includes(path)) {
+          result[path] = {...?result[path], row['tag'] as String}.toList();
+        }
+      }
+    } else {
+      for (final entry in (await _loadGlobalTags()).entries) {
+        if (includes(entry.key)) {
+          result[entry.key] = List<String>.from(entry.value);
+        }
+      }
+    }
+    return result;
+  }
+
   /// Gets all unique tags across all files
   ///
   /// Returns a set of unique tags

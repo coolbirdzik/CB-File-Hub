@@ -8,6 +8,10 @@
 // regressions. Passed suite ids are written to the `passed` step output; the
 // workflow saves them as an `e2e-pass-<fingerprint>-<passed>` cache marker.
 //
+// A suite's output is captured to build/e2e-logs/<id>.log (uploaded with the
+// E2E diagnostics) and echoed to the job log only when the suite fails, so a
+// green run stays a few lines long.
+//
 // Usage: node scripts/ci/e2e_run.mjs --suites app,media_kit_playback
 
 import fs from 'node:fs';
@@ -16,6 +20,7 @@ import { spawnSync } from 'node:child_process';
 import { loadConfig, repoRoot } from './e2e_select.mjs';
 
 const projectDir = path.join(repoRoot, 'cb_file_manager');
+const logDir = path.join(projectDir, 'build', 'e2e-logs');
 
 function killApp() {
   if (process.platform !== 'win32') return;
@@ -43,19 +48,35 @@ if (requested.length === 0) {
   process.exit(0);
 }
 
+fs.mkdirSync(logDir, { recursive: true });
 const results = [];
 for (const [id, suite] of Object.entries(config.suites)) {
   if (!requested.includes(id)) continue;
-  const commandLine = suite.command.map(quote).join(' ');
-  console.log(`::group::E2E ${id}: ${commandLine}`);
+  // 2>&1 keeps stderr interleaved with stdout in the captured log.
+  const commandLine = `${suite.command.map(quote).join(' ')} 2>&1`;
   killApp();
   const started = Date.now();
-  const result = spawnSync(commandLine, { cwd: projectDir, stdio: 'inherit', shell: true });
+  const result = spawnSync(commandLine, {
+    cwd: projectDir,
+    encoding: 'utf8',
+    maxBuffer: 1024 * 1024 * 1024,
+    shell: true,
+  });
   killApp();
   const seconds = Math.round((Date.now() - started) / 1000);
-  console.log('::endgroup::');
+  const output = `${result.stdout ?? ''}${result.error ? `
+${result.error}
+` : ''}`;
+  fs.writeFileSync(path.join(logDir, `${id}.log`), output);
   const ok = result.status === 0;
-  if (!ok) console.log(`::error::E2E suite ${id} failed (exit ${result.status ?? result.signal})`);
+  if (ok) {
+    console.log(`E2E ${id}: passed (${seconds}s)`);
+  } else {
+    console.log(`::group::E2E ${id}: ${commandLine}`);
+    console.log(output);
+    console.log('::endgroup::');
+    console.log(`::error::E2E suite ${id} failed (exit ${result.status ?? result.signal})`);
+  }
   results.push({ id, ok, seconds });
 }
 

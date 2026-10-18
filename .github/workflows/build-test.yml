@@ -158,6 +158,7 @@ jobs:
             ${{ env.PROJECT_DIR }}/build/e2e_report.jsonl
             ${{ env.PROJECT_DIR }}/build/e2e_report/
             ${{ env.PROJECT_DIR }}/build/e2e_failed_tests.txt
+            ${{ env.PROJECT_DIR }}/build/e2e-logs/
             ${{ env.PROJECT_DIR }}/build/e2e-media-kit-ci.jsonl
             ${{ env.PROJECT_DIR }}/build/e2e-media-kit/
             ${{ env.PROJECT_DIR }}/build/e2e-torrent-ci.jsonl

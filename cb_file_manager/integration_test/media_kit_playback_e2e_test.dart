@@ -10,7 +10,6 @@ import 'package:cb_file_manager/config/languages/app_localizations_delegate.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
@@ -53,7 +52,6 @@ void main() {
   ).absolute;
 
   Future<void> exercise(WidgetTester tester, String source) async {
-    debugPrint('media_kit test platform: $defaultTargetPlatform');
     final player = PlaybackPlayer();
     final errors = <String>[];
     final subscription = player.stream.error.listen((e) {
@@ -383,6 +381,7 @@ void main() {
       Map<String, Object?> stateSnapshot() => {
         'stage': stage,
         'playing': observedPlayer?.state.playing,
+        'completed': observedPlayer?.state.completed,
         'position': observedPlayer?.state.position.toString(),
         'duration': observedPlayer?.state.duration.toString(),
         'buffering': observedPlayer?.state.buffering,
@@ -450,10 +449,6 @@ void main() {
         );
         Future<void> checkVisibleFrame(String label) async {
           stage = label;
-          debugPrint(
-            'Checking $label: ${controller.state.playing}, '
-            '${controller.state.position}, size=${controller.state.videoParams}',
-          );
           final boundary =
               surfaceKey.currentContext!.findRenderObject()!
                   as RenderRepaintBoundary;
@@ -489,7 +484,6 @@ void main() {
               greaterThan(0.1),
               reason: 'Black Flutter video surface at $label',
             );
-            debugPrint('Visible video pixels at $label: ${visible / count}');
           } finally {
             image.dispose();
           }
@@ -572,9 +566,6 @@ void main() {
           }
           await gesture.up();
           final target = controller.state.duration.inMilliseconds * fraction;
-          debugPrint(
-            'Seek requested: $target; current: ${controller.state.position}',
-          );
           await waitForPlayback(
             'seek-$fraction released playback/position',
             () =>
@@ -600,7 +591,11 @@ void main() {
         // Hold real keyboard events: previews must move before key-up, and
         // releasing must restore the state from before the hold.
         for (final scenario in [
-          (key: LogicalKeyboardKey.arrowRight, paused: false, ticks: 4),
+          // Three ticks preview +12 s from 10 s. More would park the preview at
+          // the end of the 30 s clip while playing; the EOF event can then land
+          // after the next scenario's reset and leave state.playing false while
+          // mpv is running.
+          (key: LogicalKeyboardKey.arrowRight, paused: false, ticks: 3),
           (key: LogicalKeyboardKey.arrowLeft, paused: false, ticks: 20),
           (key: LogicalKeyboardKey.arrowLeft, paused: true, ticks: 20),
         ]) {

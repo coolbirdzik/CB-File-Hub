@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:cb_file_manager/helpers/tags/file_operation_tags.dart';
 
 import 'package:cb_file_manager/helpers/files/windows_file_operations.dart';
 import 'package:cb_file_manager/services/directory_listing_cache_service.dart';
@@ -159,6 +160,7 @@ class FileDragDropMoveService {
     List<String> sources,
     String destination,
   ) async {
+    final tags = await FileOperationTags.capture(sources);
     try {
       for (final source in sources) {
         final target = p.join(destination, p.basename(source));
@@ -168,6 +170,12 @@ class FileDragDropMoveService {
         } else {
           await File(source).rename(target);
         }
+        await tags.apply(
+          source: source,
+          destination: target,
+          isMove: true,
+          recursive: true,
+        );
       }
       return true;
     } catch (_) {

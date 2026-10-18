@@ -7,10 +7,12 @@
 #include <shlobj.h>
 #include <shobjidl.h>
 #include <shldisp.h>
+#include <sherrors.h>
 #include <exdisp.h>
 #include <oleauto.h>
 #include <windows.h>
 #include <wrl/client.h>
+#include <wrl/implements.h>
 
 #include <atomic>
 #include <chrono>
@@ -57,7 +59,7 @@ namespace file_operations_plugin
 
         // Tracks method-channel results whose native work runs on a detached
         // worker thread. flutter::MethodResult is NOT thread-safe, so the
-        // worker only records its boolean outcome here and posts
+        // worker only records its outcome and completed transfers here and posts
         // kOperationCompleteMessage; the result itself is always completed on
         // the platform thread. Used by deleteItems, copyItems and moveItems.
         struct PendingRequestManager
@@ -66,13 +68,14 @@ namespace file_operations_plugin
             std::unordered_map<uint64_t,
                                std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>>>
                 results;
-            std::unordered_map<uint64_t, bool> status;
+            std::unordered_map<uint64_t, flutter::EncodableValue> status;
         };
 
         bool TrySetRequestStatus(
             const std::shared_ptr<PendingRequestManager> &manager,
             uint64_t request_id,
-            bool ok)
+            bool ok,
+            const flutter::EncodableList *items = nullptr)
         {
             if (!manager)
             {
@@ -86,7 +89,11 @@ namespace file_operations_plugin
                 return false;
             }
 
-            manager->status[request_id] = ok;
+            manager->status[request_id] = items
+                ? flutter::EncodableValue(flutter::EncodableMap{
+                      {flutter::EncodableValue("success"), flutter::EncodableValue(ok)},
+                      {flutter::EncodableValue("items"), flutter::EncodableValue(*items)}})
+                : flutter::EncodableValue(ok);
             return true;
         }
 
@@ -100,7 +107,7 @@ namespace file_operations_plugin
             }
 
             std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result;
-            bool ok = false;
+            flutter::EncodableValue status(false);
 
             {
                 std::lock_guard<std::mutex> lock(manager->mutex);
@@ -120,14 +127,14 @@ namespace file_operations_plugin
 
                 if (status_it != manager->status.end())
                 {
-                    ok = status_it->second;
+                    status = std::move(status_it->second);
                     manager->status.erase(status_it);
                 }
             }
 
             if (result)
             {
-                result->Success(flutter::EncodableValue(ok));
+                result->Success(status);
             }
         }
 
@@ -314,12 +321,80 @@ namespace file_operations_plugin
             return result_ok;
         }
 
+        // Advise once for the entire operation, including children of folders.
+        // Record the shell's actual target instead of guessing after conflicts.
+        class TransferProgressSink : public Microsoft::WRL::RuntimeClass<
+            Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>,
+            IFileOperationProgressSink>
+        {
+        public:
+            explicit TransferProgressSink(flutter::EncodableList *items) : items_(items) {}
+
+            IFACEMETHODIMP StartOperations() override { return S_OK; }
+            IFACEMETHODIMP FinishOperations(HRESULT) override { return S_OK; }
+            IFACEMETHODIMP PreRenameItem(DWORD, IShellItem *, LPCWSTR) override { return S_OK; }
+            IFACEMETHODIMP PostRenameItem(DWORD, IShellItem *, LPCWSTR, HRESULT, IShellItem *) override { return S_OK; }
+            IFACEMETHODIMP PreMoveItem(DWORD, IShellItem *, IShellItem *, LPCWSTR) override { return S_OK; }
+            IFACEMETHODIMP PostMoveItem(DWORD, IShellItem *source, IShellItem *, LPCWSTR,
+                                       HRESULT hr, IShellItem *target) override
+            {
+                Record(source, target, hr);
+                return S_OK;
+            }
+            IFACEMETHODIMP PreCopyItem(DWORD, IShellItem *, IShellItem *, LPCWSTR) override { return S_OK; }
+            IFACEMETHODIMP PostCopyItem(DWORD, IShellItem *source, IShellItem *, LPCWSTR,
+                                       HRESULT hr, IShellItem *target) override
+            {
+                Record(source, target, hr);
+                return S_OK;
+            }
+            IFACEMETHODIMP PreDeleteItem(DWORD, IShellItem *) override { return S_OK; }
+            IFACEMETHODIMP PostDeleteItem(DWORD, IShellItem *, HRESULT, IShellItem *) override { return S_OK; }
+            IFACEMETHODIMP PreNewItem(DWORD, IShellItem *, LPCWSTR) override { return S_OK; }
+            IFACEMETHODIMP PostNewItem(DWORD, IShellItem *, LPCWSTR, LPCWSTR, DWORD, HRESULT, IShellItem *) override { return S_OK; }
+            IFACEMETHODIMP UpdateProgress(UINT, UINT) override { return S_OK; }
+            IFACEMETHODIMP ResetTimer() override { return S_OK; }
+            IFACEMETHODIMP PauseTimer() override { return S_OK; }
+            IFACEMETHODIMP ResumeTimer() override { return S_OK; }
+
+        private:
+            static std::string Path(IShellItem *item)
+            {
+                PWSTR path = nullptr;
+                if (!item || FAILED(item->GetDisplayName(SIGDN_FILESYSPATH, &path))) return {};
+                const int size = WideCharToMultiByte(CP_UTF8, 0, path, -1, nullptr, 0, nullptr, nullptr);
+                std::string utf8(static_cast<size_t>(size), '\0');
+                if (size > 0)
+                {
+                    WideCharToMultiByte(CP_UTF8, 0, path, -1, utf8.data(), size, nullptr, nullptr);
+                    utf8.pop_back();
+                }
+                CoTaskMemFree(path);
+                return utf8;
+            }
+
+            void Record(IShellItem *source, IShellItem *target, HRESULT hr)
+            {
+                // Skipped/failed items have no newly created shell item.
+                if (FAILED(hr) || hr == COPYENGINE_S_USER_IGNORED || !target) return;
+                const auto from = Path(source);
+                const auto to = Path(target);
+                if (from.empty() || to.empty()) return;
+                items_->emplace_back(flutter::EncodableMap{
+                    {flutter::EncodableValue("source"), flutter::EncodableValue(from)},
+                    {flutter::EncodableValue("destination"), flutter::EncodableValue(to)}});
+            }
+
+            flutter::EncodableList *items_;
+        };
+
         // Perform file operation using IFileOperation with progress dialog
         bool PerformFileOperation(
             HWND hwnd,
             const std::vector<std::wstring> &source_paths,
             const std::wstring &destination_path,
-            bool is_move)
+            bool is_move,
+            flutter::EncodableList *items)
         {
 
             ScopedComApartment apartment(
@@ -363,6 +438,11 @@ namespace file_operations_plugin
             }
 
             // Add each source item to the operation
+            auto sink = Microsoft::WRL::Make<TransferProgressSink>(items);
+            DWORD cookie = 0;
+            hr = pfo->Advise(sink.Get(), &cookie);
+            if (FAILED(hr)) return false;
+
             for (const auto &source : source_paths)
             {
                 Microsoft::WRL::ComPtr<IShellItem> psiSource;
@@ -393,6 +473,7 @@ namespace file_operations_plugin
 
             // Perform the operation (this shows the native progress dialog)
             hr = pfo->PerformOperations();
+            pfo->Unadvise(cookie);
 
             if (FAILED(hr))
             {
@@ -765,6 +846,9 @@ namespace file_operations_plugin
 
                 std::wstring destination = Utf8ToWide(*dest_path);
                 bool is_move = (method == "moveItems");
+                const auto details_it = arguments->find(flutter::EncodableValue("returnResults"));
+                const bool return_results = details_it != arguments->end() &&
+                    std::get_if<bool>(&details_it->second) && std::get<bool>(details_it->second);
 
                 const uint64_t request_id = next_request_id_++;
                 auto pending_request_manager = pending_request_manager_;
@@ -776,13 +860,14 @@ namespace file_operations_plugin
                 HWND completion_window = top_level_window_;
                 std::thread(
                     [pending_request_manager, request_id, completion_window,
-                     source_paths = std::move(source_paths), destination, is_move]() mutable
+                     source_paths = std::move(source_paths), destination, is_move, return_results]() mutable
                     {
                         bool success = false;
+                        flutter::EncodableList items;
                         try
                         {
                             success = PerformFileOperation(
-                                nullptr, source_paths, destination, is_move);
+                                nullptr, source_paths, destination, is_move, &items);
                         }
                         catch (...)
                         {
@@ -790,7 +875,8 @@ namespace file_operations_plugin
                         }
 
                         if (!TrySetRequestStatus(
-                                pending_request_manager, request_id, success))
+                                pending_request_manager, request_id, success,
+                                return_results ? &items : nullptr))
                         {
                             return;
                         }

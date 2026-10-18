@@ -15,6 +15,8 @@ import 'package:ffi/ffi.dart';
 
 // local files
 import 'package:cb_file_manager/services/drive/windows_volume_probe.dart';
+import 'package:cb_file_manager/helpers/files/windows_file_operations.dart';
+import 'package:cb_file_manager/helpers/tags/file_operation_tags.dart';
 
 import 'io_extensions.dart';
 import 'text_utils.dart';
@@ -731,26 +733,20 @@ class FileOperations {
   // Try Windows native paste operation
   Future<bool?> _pasteWithWindowsNative(String destinationPath) async {
     try {
-      // Dynamic import to avoid issues on non-Windows platforms
       final sources = _clipboardItems.map((e) => e.path).toList();
-
-      // Use process to call the native method channel
-      const channel = MethodChannel('cb_file_manager/file_operations');
-      final methodName = _isCut ? 'moveItems' : 'copyItems';
-
-      final result = await channel.invokeMethod<bool>(methodName, {
-        'sources': sources,
-        'destination': destinationPath,
-      });
-
-      return result;
-    } catch (e) {
+      return await WindowsFileOperations.transferItems(
+        sources: sources,
+        destination: destinationPath,
+        isMove: _isCut,
+      );
+    } on MissingPluginException {
+      return null;
+    } on PlatformException catch (e) {
       debugPrint('Windows native file operation failed: $e');
       return null; // null means fallback to Dart implementation
     }
   }
 
-  // Dart implementation of paste with progress callback
   // Dart implementation of paste with progress callback
   Future<List<FileSystemEntity>> _pasteWithDart(
     String destinationPath, {
@@ -759,6 +755,9 @@ class FileOperations {
     List<FileSystemEntity> results = [];
     final total = _clipboardItems.length;
     int completed = 0;
+    final tags = await FileOperationTags.capture(
+      _clipboardItems.map((item) => item.path).toList(),
+    );
 
     onProgress?.call(0, total);
 
@@ -818,6 +817,11 @@ class FileOperations {
               // Fall back to copy + delete
               debugPrint('rename() failed, falling back to copy+delete: $e');
               result = await file.copy(uniquePath);
+              await tags.apply(
+                source: file.path,
+                destination: result.path,
+                isMove: false,
+              );
               await file.delete();
             }
           } else {
@@ -857,6 +861,11 @@ class FileOperations {
 
               // Copy the file
               await entity.copy(newEntityPath);
+              await tags.apply(
+                source: entity.path,
+                destination: newEntityPath,
+                isMove: false,
+              );
             } else if (entity is Directory) {
               // Create directory
               await Directory(newEntityPath).create(recursive: true);
@@ -877,6 +886,12 @@ class FileOperations {
 
         if (result != null) {
           results.add(result);
+          await tags.apply(
+            source: item.path,
+            destination: result.path,
+            isMove: _isCut,
+            recursive: item is Directory,
+          );
         }
 
         // Update progress after each item

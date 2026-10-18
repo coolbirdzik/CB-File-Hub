@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 
 import '../../utils/app_logger.dart';
+import '../tags/file_operation_tags.dart';
 
 /// Helper class for Windows-native file operations with progress dialog
 class WindowsFileOperations {
@@ -25,11 +26,11 @@ class WindowsFileOperations {
     }
 
     try {
-      final result = await _channel.invokeMethod<bool>('copyItems', {
-        'sources': sources,
-        'destination': destination,
-      });
-      return result ?? false;
+      return await transferItems(
+        sources: sources,
+        destination: destination,
+        isMove: false,
+      );
     } catch (e) {
       return false;
     }
@@ -46,14 +47,34 @@ class WindowsFileOperations {
     }
 
     try {
-      final result = await _channel.invokeMethod<bool>('moveItems', {
-        'sources': sources,
-        'destination': destination,
-      });
-      return result ?? false;
+      return await transferItems(
+        sources: sources,
+        destination: destination,
+        isMove: true,
+      );
     } catch (e) {
       return false;
     }
+  }
+
+  /// Transfer files and reconcile tags for each item actually completed by the
+  /// shell, including partial completion and names chosen in conflict dialogs.
+  static Future<bool> transferItems({
+    required List<String> sources,
+    required String destination,
+    required bool isMove,
+  }) async {
+    final tags = await FileOperationTags.capture(sources);
+    final result = await _channel.invokeMapMethod<String, dynamic>(
+      isMove ? 'moveItems' : 'copyItems',
+      {'sources': sources, 'destination': destination, 'returnResults': true},
+    );
+    final items = result?['items'] as List? ?? const [];
+    await tags.applyCompleted({
+      for (final item in items)
+        item['source'] as String: item['destination'] as String,
+    }, isMove: isMove);
+    return result?['success'] == true;
   }
 
   /// Delete files/folders using Windows native IFileOperation in a single
