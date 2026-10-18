@@ -654,6 +654,7 @@ class FileOperations {
   // Store the current clipboard items (for copy/cut operations)
   List<FileSystemEntity> _clipboardItems = [];
   bool _isCut = false; // Flag to determine if operation is cut or copy
+  int _clipboardRevision = 0;
 
   // Getter to check if clipboard has items
   bool get hasClipboardItem => _clipboardItems.isNotEmpty;
@@ -677,32 +678,33 @@ class FileOperations {
 
   // Set clipboard with file or folder
   void copyToClipboard(FileSystemEntity entity) {
-    _clipboardItems = [entity];
-    _isCut = false;
+    copyFilesToClipboard([entity]);
   }
 
   // Set clipboard with multiple files or folders
   void copyFilesToClipboard(List<FileSystemEntity> entities) {
     _clipboardItems = List.from(entities);
     _isCut = false;
+    _clipboardRevision++;
   }
 
   // Set clipboard for cut operation
   void cutToClipboard(FileSystemEntity entity) {
-    _clipboardItems = [entity];
-    _isCut = true;
+    cutFilesToClipboard([entity]);
   }
 
   // Set clipboard for cut operation with multiple files
   void cutFilesToClipboard(List<FileSystemEntity> entities) {
     _clipboardItems = List.from(entities);
     _isCut = true;
+    _clipboardRevision++;
   }
 
   // Clear clipboard after operation
   void clearClipboard() {
     _clipboardItems = [];
     _isCut = false;
+    _clipboardRevision++;
   }
 
   // Paste files or folders from clipboard to destination using Windows native operations when available
@@ -712,14 +714,26 @@ class FileOperations {
   }) async {
     if (_clipboardItems.isEmpty) return [];
 
+    // Each paste owns its inputs across every await, including native fallback.
+    // A different task may replace or clear the app-wide clipboard meanwhile.
+    final items = clipboardItems;
+    final isCut = _isCut;
+    final revision = _clipboardRevision;
+
+    void clearCompletedCut() {
+      if (isCut && revision == _clipboardRevision) clearClipboard();
+    }
+
     // On Windows, try to use native file operations with progress dialog
     if (Platform.isWindows) {
-      final nativeResult = await _pasteWithWindowsNative(destinationPath);
+      final nativeResult = await _pasteWithWindowsNative(
+        destinationPath,
+        items: items,
+        isCut: isCut,
+      );
       if (nativeResult != null) {
         // Native operation was used (success or cancelled)
-        if (_isCut && nativeResult) {
-          clearClipboard();
-        }
+        if (nativeResult) clearCompletedCut();
         // Return empty list since Windows handles the operation
         // The files are already copied/moved
         return [];
@@ -727,17 +741,27 @@ class FileOperations {
       // Fall through to Dart implementation if native failed
     }
 
-    return _pasteWithDart(destinationPath, onProgress: onProgress);
+    return _pasteWithDart(
+      destinationPath,
+      items: items,
+      isCut: isCut,
+      onCompleted: clearCompletedCut,
+      onProgress: onProgress,
+    );
   }
 
   // Try Windows native paste operation
-  Future<bool?> _pasteWithWindowsNative(String destinationPath) async {
+  Future<bool?> _pasteWithWindowsNative(
+    String destinationPath, {
+    required List<FileSystemEntity> items,
+    required bool isCut,
+  }) async {
     try {
-      final sources = _clipboardItems.map((e) => e.path).toList();
+      final sources = items.map((e) => e.path).toList();
       return await WindowsFileOperations.transferItems(
         sources: sources,
         destination: destinationPath,
-        isMove: _isCut,
+        isMove: isCut,
       );
     } on MissingPluginException {
       return null;
@@ -750,19 +774,22 @@ class FileOperations {
   // Dart implementation of paste with progress callback
   Future<List<FileSystemEntity>> _pasteWithDart(
     String destinationPath, {
+    required List<FileSystemEntity> items,
+    required bool isCut,
+    required void Function() onCompleted,
     void Function(int completed, int total)? onProgress,
   }) async {
     List<FileSystemEntity> results = [];
-    final total = _clipboardItems.length;
+    final total = items.length;
     int completed = 0;
     final tags = await FileOperationTags.capture(
-      _clipboardItems.map((item) => item.path).toList(),
+      items.map((item) => item.path).toList(),
     );
 
     onProgress?.call(0, total);
 
     try {
-      for (final item in _clipboardItems) {
+      for (final item in items) {
         final filename = pathlib.basename(item.path);
         final newPath = pathlib.join(destinationPath, filename);
 
@@ -808,7 +835,7 @@ class FileOperations {
             continue;
           }
 
-          if (_isCut) {
+          if (isCut) {
             // Move operation - try rename first (faster for same drive)
             try {
               result = await file.rename(uniquePath);
@@ -875,7 +902,7 @@ class FileOperations {
           result = newDirectory;
 
           // If cut operation, delete original directory
-          if (_isCut) {
+          if (isCut) {
             try {
               await directory.delete(recursive: true);
             } catch (e) {
@@ -889,7 +916,7 @@ class FileOperations {
           await tags.apply(
             source: item.path,
             destination: result.path,
-            isMove: _isCut,
+            isMove: isCut,
             recursive: item is Directory,
           );
         }
@@ -900,9 +927,7 @@ class FileOperations {
       }
 
       // Clear clipboard if it was a cut operation
-      if (_isCut) {
-        clearClipboard();
-      }
+      onCompleted();
 
       return results;
     } catch (e) {

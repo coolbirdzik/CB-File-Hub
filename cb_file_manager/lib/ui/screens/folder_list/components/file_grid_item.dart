@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:cb_file_manager/ui/widgets/file_tags_tooltip.dart';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -276,6 +277,13 @@ class _FileGridItemState extends State<FileGridItem> {
 
   @override
   Widget build(BuildContext context) {
+    return FileTagsTooltip(
+      path: widget.file.path,
+      child: _buildSelection(context),
+    );
+  }
+
+  Widget _buildSelection(BuildContext context) {
     final immediateSelection = widget.immediateSelectionListenable;
     if (immediateSelection == null) {
       return _buildItem(context, widget.isSelected);

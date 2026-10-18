@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'file_drag_drop_item.dart';
+import 'file_tags_tooltip.dart';
 import '../components/common/file_entry_presentation.dart';
 
 import 'package:flutter/material.dart';
@@ -424,16 +425,19 @@ class _MillerColumnsViewState extends State<MillerColumnsView> {
       selectedPaths: selectionState.allSelectedPaths.toSet(),
       onStartFileDrag: widget.onStartFileDrag,
       onMoveItemsToFolder: widget.onMoveItemsToFolder,
-      child: _MillerFileRow(
-        key: ValueKey('miller-file-${file.path}'),
-        file: file,
-        isSelected: isSelected,
-        lastSelectedPath: selectionState.lastSelectedPath,
-        showAddTagToFileDialog: widget.showAddTagToFileDialog,
-        onDeleteFile: widget.onDeleteFile,
-        onTapFile: () => _onFileTap(columnIndex, file),
-        onOpenFile: () => _onFileDoubleTap(file),
-        toggleFileSelection: widget.toggleFileSelection,
+      child: FileTagsTooltip(
+        path: file.path,
+        child: _MillerFileRow(
+          key: ValueKey('miller-file-${file.path}'),
+          file: file,
+          isSelected: isSelected,
+          lastSelectedPath: selectionState.lastSelectedPath,
+          showAddTagToFileDialog: widget.showAddTagToFileDialog,
+          onDeleteFile: widget.onDeleteFile,
+          onTapFile: () => _onFileTap(columnIndex, file),
+          onOpenFile: () => _onFileDoubleTap(file),
+          toggleFileSelection: widget.toggleFileSelection,
+        ),
       ),
     );
   }

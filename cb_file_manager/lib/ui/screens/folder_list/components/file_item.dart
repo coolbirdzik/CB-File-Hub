@@ -1,5 +1,6 @@
 import 'package:cb_file_manager/ui/widgets/compact_file_list_content.dart';
 import 'dart:io';
+import 'package:cb_file_manager/ui/widgets/file_tags_tooltip.dart';
 import 'dart:async'; // Thêm import cho StreamSubscription
 // For lerpDouble
 // For more responsive animations
@@ -415,6 +416,10 @@ class _FileItemState extends State<FileItem> {
 
   @override
   Widget build(BuildContext context) {
+    return FileTagsTooltip(path: widget.file.path, child: _buildItem(context));
+  }
+
+  Widget _buildItem(BuildContext context) {
     final bool isVideo = FileTypeUtils.isVideoFile(widget.file.path);
     final bool isImage = FileTypeUtils.isImageFile(widget.file.path);
     final bool isBeingCut = ItemInteractionStyle.isBeingCut(widget.file.path);

@@ -64,6 +64,7 @@ class FileOperationsBloc
   final OperationProgressController _progressController;
   final void Function(Set<String> paths)? onPathsDeleted;
   final bool Function()? isShowingSearchResults;
+  int _processingOperationCount = 0;
 
   FileOperationsBloc({
     required this.navigationBloc,
@@ -118,7 +119,8 @@ class FileOperationsBloc
       return;
     }
 
-    emit(state.copyWith(isProcessing: true));
+    _processingOperationCount++;
+    emit(state.copyWith(isProcessing: true, error: null));
 
     final isCut = FileOperations().isCutOperation;
     final itemCount = FileOperations().clipboardItemCount;
@@ -194,12 +196,7 @@ class FileOperationsBloc
             : currentL10n.foCopiedItems(itemCount, event.destinationPath),
       );
 
-      emit(
-        state.copyWith(
-          isProcessing: false,
-          clipboardRevision: state.clipboardRevision + 1,
-        ),
-      );
+      emit(state.copyWith(clipboardRevision: state.clipboardRevision + 1));
 
       // Refresh the navigation bloc
       final navState = navigationBloc.state;
@@ -209,12 +206,10 @@ class FileOperationsBloc
         progressId,
         detail: currentL10n.errorWithDetail(e.toString()),
       );
-      emit(
-        state.copyWith(
-          isProcessing: false,
-          error: currentL10n.foErrorPasting(e.toString()),
-        ),
-      );
+      emit(state.copyWith(error: currentL10n.foErrorPasting(e.toString())));
+    } finally {
+      _processingOperationCount--;
+      emit(state.copyWith(isProcessing: _processingOperationCount > 0));
     }
   }
 
@@ -460,6 +455,7 @@ class FileOperationsBloc
     ).toSet();
     if (exactRetryPaths.isEmpty) return;
 
+    _processingOperationCount++;
     emit(
       state.copyWith(
         error: null,
@@ -480,9 +476,15 @@ class FileOperationsBloc
       sourcePath: paths.first,
     );
 
-    final succeeded = await TrashManager().retryPermanentDeleteAsAdministrator(
-      paths,
-    );
+    final Set<String> succeeded;
+    try {
+      succeeded = await TrashManager().retryPermanentDeleteAsAdministrator(
+        paths,
+      );
+    } finally {
+      _processingOperationCount--;
+      emit(state.copyWith(isProcessing: _processingOperationCount > 0));
+    }
     final failed = paths.where((path) => !succeeded.contains(path)).toList();
 
     _notifyPathsDeleted(succeeded);
@@ -495,7 +497,6 @@ class FileOperationsBloc
       emit(
         state.copyWith(
           error: null,
-          isProcessing: false,
           retryableElevatedDeletePaths: const <String>[],
         ),
       );
@@ -505,11 +506,7 @@ class FileOperationsBloc
           : currentL10n.foAdminFailedMany(failed.length);
       _progressController.fail(progressId, detail: message);
       emit(
-        state.copyWith(
-          error: message,
-          isProcessing: false,
-          retryableElevatedDeletePaths: failed,
-        ),
+        state.copyWith(error: message, retryableElevatedDeletePaths: failed),
       );
     }
 

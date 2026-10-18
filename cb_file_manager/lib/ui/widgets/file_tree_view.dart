@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'file_drag_drop_item.dart';
+import 'file_tags_tooltip.dart';
 import '../components/common/file_entry_presentation.dart';
 
 import 'package:flutter/foundation.dart';
@@ -204,7 +205,11 @@ class _FileTreeViewState extends State<FileTreeView> {
             selectedPaths: selected,
             onStartFileDrag: widget.onStartFileDrag,
             onMoveItemsToFolder: widget.onMoveItemsToFolder,
-            child: SizedBox.expand(child: row),
+            child: SizedBox.expand(
+              child: isDir
+                  ? row
+                  : FileTagsTooltip(path: entity.path, child: row),
+            ),
           );
         },
       ),

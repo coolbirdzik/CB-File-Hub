@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:cb_file_manager/helpers/core/filesystem_utils.dart';
@@ -6,10 +7,21 @@ import 'package:cb_file_manager/helpers/tags/tag_manager.dart';
 import 'package:cb_file_manager/models/database/database_manager.dart';
 import 'package:cb_file_manager/models/database/sqlite_database_provider.dart';
 import 'package:cb_file_manager/services/file_drag_drop/file_drag_drop_move_service.dart';
+import 'package:cb_file_manager/ui/controllers/operation_progress_controller.dart';
+import 'package:cb_file_manager/ui/screens/folder_list/bloc/file_navigation_bloc.dart';
+import 'package:cb_file_manager/ui/screens/folder_list/bloc/file_navigation_event.dart';
+import 'package:cb_file_manager/ui/screens/folder_list/bloc/file_operations_bloc.dart';
+import 'package:cb_file_manager/ui/screens/folder_list/bloc/file_operations_event.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
+
+class _RecordingNavigationBloc extends FileNavigationBloc {
+  // Transfers are real; suppress unrelated directory scans in this unit test.
+  @override
+  void add(FileNavigationEvent event) {}
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -50,6 +62,45 @@ void main() {
   }
 
   for (final move in [false, true]) {
+    test(
+      'Dart ${move ? 'move' : 'copy'} keeps its inputs when clipboard changes',
+      () async {
+        final source = await taggedFile(p.join(fixture.path, 'a.txt'), [
+          'work',
+        ]);
+        final other = await taggedFile(p.join(fixture.path, 'b.txt'), [
+          'other',
+        ]);
+        final destination = await Directory(
+          p.join(fixture.path, 'target'),
+        ).create();
+        final ops = FileOperations();
+        if (move) {
+          ops.cutToClipboard(source);
+        } else {
+          ops.copyToClipboard(source);
+        }
+        final result = await ops.pasteFromClipboard(
+          destination.path,
+          onProgress: (completed, _) {
+            if (completed != 0) return;
+            if (move) {
+              ops.copyToClipboard(other);
+            } else {
+              ops.cutToClipboard(other);
+            }
+          },
+        );
+
+        expect(await source.exists(), !move);
+        expect(await File(result.single.path).readAsString(), 'tagged content');
+        expect(await TagManager.getTags(result.single.path), ['work']);
+        expect(ops.clipboardItems.map((item) => item.path), [other.path]);
+        expect(ops.isCutOperation, !move);
+        expect(await other.exists(), isTrue);
+      },
+    );
+
     test(
       'Dart ${move ? 'move' : 'copy'} carries file tags to a unique name',
       () async {
@@ -185,6 +236,136 @@ void main() {
       },
     );
   }
+
+  test('a completed move preserves a newer cut clipboard', () async {
+    final source = await taggedFile(p.join(fixture.path, 'a.txt'), ['work']);
+    final next = await taggedFile(p.join(fixture.path, 'b.txt'), ['next']);
+    final destination = await Directory(
+      p.join(fixture.path, 'target'),
+    ).create();
+    final ops = FileOperations();
+    messenger.setMockMethodCallHandler(operations, (call) async {
+      ops.cutToClipboard(next);
+      final target = p.join(destination.path, p.basename(source.path));
+      await source.rename(target);
+      return {
+        'success': true,
+        'items': [
+          {'source': source.path, 'destination': target},
+        ],
+      };
+    });
+    ops.cutToClipboard(source);
+    await ops.pasteFromClipboard(destination.path);
+    expect(ops.clipboardItems.map((item) => item.path), [next.path]);
+    expect(ops.isCutOperation, isTrue);
+    expect(await source.exists(), isFalse);
+    expect(await next.exists(), isTrue);
+    expect(await TagManager.getTags(p.join(destination.path, 'a.txt')), [
+      'work',
+    ]);
+  }, skip: !Platform.isWindows);
+
+  test(
+    'paste tasks overlap and finish independently in the same bloc',
+    () async {
+      final first = await taggedFile(p.join(fixture.path, 'a.txt'), ['copy']);
+      final second = await taggedFile(p.join(fixture.path, 'b.txt'), ['move']);
+      final third = await taggedFile(p.join(fixture.path, 'c.txt'), ['next']);
+      final firstTarget = await Directory(p.join(fixture.path, 'one')).create();
+      final secondTarget = await Directory(
+        p.join(fixture.path, 'two'),
+      ).create();
+      final started = [Completer<void>(), Completer<void>()];
+      final release = [Completer<void>(), Completer<void>()];
+      var calls = 0;
+      messenger.setMockMethodCallHandler(operations, (call) async {
+        final index = calls++;
+        final args = call.arguments as Map;
+        final source = (args['sources'] as List).single as String;
+        final destination = p.join(
+          args['destination'] as String,
+          p.basename(source),
+        );
+        expect(call.method, index == 0 ? 'copyItems' : 'moveItems');
+        expect(source, index == 0 ? first.path : second.path);
+        started[index].complete();
+        await release[index].future;
+        if (call.method == 'moveItems') {
+          await File(source).rename(destination);
+        } else {
+          await File(source).copy(destination);
+        }
+        return {
+          'success': true,
+          'items': [
+            {'source': source, 'destination': destination},
+          ],
+        };
+      });
+      final navigation = _RecordingNavigationBloc();
+      final progress = OperationProgressController();
+      final bloc = FileOperationsBloc(
+        navigationBloc: navigation,
+        progressController: progress,
+      );
+      addTearDown(() async {
+        for (final gate in release) {
+          if (!gate.isCompleted) gate.complete();
+        }
+        await bloc.close();
+        await navigation.close();
+        progress.dispose();
+      });
+      final ops = FileOperations();
+      ops.copyToClipboard(first);
+      bloc.add(FileOperationsPaste(firstTarget.path));
+      await started[0].future.timeout(const Duration(seconds: 5));
+
+      ops.cutToClipboard(second);
+      bloc.add(FileOperationsPaste(secondTarget.path));
+      // Both calls must reach the backend before either is allowed to finish.
+      await started[1].future.timeout(const Duration(seconds: 5));
+      expect(progress.runningCount, 2);
+      expect(bloc.state.isProcessing, isTrue);
+
+      final firstFinished = bloc.stream.firstWhere(
+        (s) => s.clipboardRevision == 1,
+      );
+      release[0].complete();
+      await firstFinished.timeout(const Duration(seconds: 5));
+      expect(progress.runningCount, 1);
+      expect(bloc.state.isProcessing, isTrue);
+      expect(ops.clipboardItems.map((item) => item.path), [second.path]);
+      expect(ops.isCutOperation, isTrue);
+
+      ops.copyToClipboard(third);
+      final allFinished = bloc.stream.firstWhere((s) => !s.isProcessing);
+      release[1].complete();
+      await allFinished.timeout(const Duration(seconds: 5));
+      expect(progress.runningCount, 0);
+      expect(progress.finishedEntries, hasLength(2));
+      expect(ops.clipboardItems.map((item) => item.path), [third.path]);
+      expect(ops.isCutOperation, isFalse);
+      expect(await first.exists(), isTrue);
+      expect(await second.exists(), isFalse);
+      expect(await TagManager.getTags(p.join(firstTarget.path, 'a.txt')), [
+        'copy',
+      ]);
+      expect(await TagManager.getTags(p.join(secondTarget.path, 'b.txt')), [
+        'move',
+      ]);
+      expect(
+        await File(p.join(firstTarget.path, 'a.txt')).readAsString(),
+        'tagged content',
+      );
+      expect(
+        await File(p.join(secondTarget.path, 'b.txt')).readAsString(),
+        'tagged content',
+      );
+    },
+    skip: !Platform.isWindows,
+  );
 
   test(
     'native whole-folder move transfers descendants and honors nested renames',

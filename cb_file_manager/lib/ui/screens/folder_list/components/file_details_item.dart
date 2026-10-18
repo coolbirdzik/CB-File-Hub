@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:cb_file_manager/ui/widgets/file_tags_tooltip.dart';
 import 'package:flutter/material.dart';
 import 'package:cb_file_manager/ui/components/common/file_details_columns.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -196,6 +197,10 @@ class _FileDetailsItemState extends State<FileDetailsItem> {
 
   @override
   Widget build(BuildContext context) {
+    return FileTagsTooltip(path: widget.file.path, child: _buildItem(context));
+  }
+
+  Widget _buildItem(BuildContext context) {
     final ThemeData theme = Theme.of(context);
     final bool isBeingCut = ItemInteractionStyle.isBeingCut(widget.file.path);
 
