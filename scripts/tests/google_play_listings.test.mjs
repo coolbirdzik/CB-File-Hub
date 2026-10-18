@@ -33,31 +33,34 @@ function mockApi({ listings = [english], failLanguage, missingId = false } = {})
   return { calls, fetchImpl };
 }
 
-test('prepares both descriptions in one uncommitted edit, preserving titles/video', async () => {
+test('prepares every description in one uncommitted edit, preserving titles/video', async () => {
   const vietnamese = { language: 'vi', title: 'Tên hiện có', video: 'https://example.test/vi' };
-  const unrelated = { language: 'tr-TR', title: 'Keep Turkish' };
+  const unrelated = { language: 'ja-JP', title: 'Keep Japanese' };
   const current = [english, vietnamese, unrelated];
   const before = structuredClone(current);
   const content = loadGooglePlayListings();
   const mock = mockApi({ listings: current });
   assert.equal(await prepareGooglePlayListings({ ...options, ...mock, content }), 'edit 123');
-  assert.deepEqual(mock.calls.map((call) => call.method), ['POST', 'GET', 'PUT', 'PUT']);
-  for (const [index, language] of ['en-US', 'vi'].entries()) {
+  assert.deepEqual(mock.calls.map((call) => call.method), ['POST', 'GET', 'PUT', 'PUT', 'PUT', 'PUT']);
+  for (const [index, language] of ['en-US', 'tr-TR', 'vi', 'zh-CN'].entries()) {
     const call = mock.calls[index + 2];
     assert.ok(call.url.endsWith(`/edits/edit%20123/listings/${language}`));
-    assert.deepEqual(call.body, { ...current[index], ...content[language] });
+    const existing = current.find((entry) => entry.language === language);
+    assert.deepEqual(call.body, { ...existing, language, title: existing?.title ?? english.title, ...content[language] });
   }
   assert.deepEqual(current, before);
   assert.ok(mock.calls.every((call) => !call.url.includes(':commit') && !call.url.includes('images')));
 });
 
-test('new Vietnamese listing inherits only the existing product title', async () => {
+test('new language listings inherit only the existing product title', async () => {
   const mock = mockApi();
   await prepareGooglePlayListings({ ...options, ...mock, content: loadGooglePlayListings() });
-  const vi = mock.calls.at(-1).body;
-  assert.equal(vi.title, english.title);
-  assert.equal(vi.language, 'vi');
-  assert.equal(vi.video, undefined);
+  for (const language of ['tr-TR', 'vi', 'zh-CN']) {
+    const body = mock.calls.find((call) => call.url.endsWith(`/listings/${language}`)).body;
+    assert.equal(body.title, english.title);
+    assert.equal(body.language, language);
+    assert.equal(body.video, undefined);
+  }
 });
 
 test('failed listing update discards the whole edit instead of leaving partial changes', async () => {
@@ -102,7 +105,7 @@ test('prepare CLI validates copy before auth and produces an edit id with mocked
       if (String(url) === 'https://oauth2.googleapis.com/token') return Response.json({ access_token: 'fake-token' });
       if (options.method === 'POST' && String(url).endsWith('/edits')) return Response.json({ id: 'prepared' });
       if (options.method === 'GET' && String(url).endsWith('/listings')) return Response.json({ listings: [${JSON.stringify(english)}] });
-      if (options.method === 'PUT' && /\\/listings\\/(en-US|vi)$/.test(String(url))) return Response.json({});
+      if (options.method === 'PUT' && /\\/listings\\/(en-US|tr-TR|vi|zh-CN)$/.test(String(url))) return Response.json({});
       throw new Error('Unexpected mocked request: ' + url);
     };
   `);
@@ -120,7 +123,7 @@ test('prepare CLI validates copy before auth and produces an edit id with mocked
   assert.equal(prepared.status, 0, prepared.stderr);
   assert.equal(prepared.stdout.trim(), 'prepared');
   const calls = JSON.parse(fs.readFileSync(requestsPath, 'utf8'));
-  assert.deepEqual(calls.map((call) => call.method), ['POST', 'POST', 'GET', 'PUT', 'PUT']);
+  assert.deepEqual(calls.map((call) => call.method), ['POST', 'POST', 'GET', 'PUT', 'PUT', 'PUT', 'PUT']);
 
   fs.unlinkSync(requestsPath);
   fs.mkdirSync(path.join(directory, 'invalid'));

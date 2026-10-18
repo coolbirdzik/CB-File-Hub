@@ -1,5 +1,61 @@
 {
   "descriptionFile": "vi-vn.txt",
   "shortDescription": "Quản lý tập tin, ảnh, video, torrent và lưu trữ mạng trong một ứng dụng.",
-  "googlePlayLanguage": "vi"
+  "googlePlayLanguage": "vi",
+  "microsoftStoreImages": [
+    {
+      "file": "../../screenshots/promo/vi/desktop/01_duyet_tap_tin.png",
+      "imageType": "Screenshot",
+      "description": "Tập tin cục bộ, tab, tag và xem trước nhanh trong một không gian gọn gàng."
+    },
+    {
+      "file": "../../screenshots/promo/vi/desktop/02_thu_vien_anh.png",
+      "imageType": "Screenshot",
+      "description": "Quét album, thư mục media và bộ sưu tập hình ảnh mà không mất ngữ cảnh."
+    },
+    {
+      "file": "../../screenshots/promo/vi/desktop/11_thu_vien_torrent.png",
+      "imageType": "Screenshot",
+      "description": "Nhập bản sao lưu qBittorrent, gom file .torrent và magnet vào một thư viện có tìm kiếm."
+    },
+    {
+      "file": "../../screenshots/promo/vi/desktop/04_tim_kiem_ai.png",
+      "imageType": "Screenshot",
+      "description": "Tìm, xem lại và thao tác với tập tin bằng bảng trợ lý tích hợp."
+    },
+    {
+      "file": "../../screenshots/promo/vi/desktop/05_duyet_thao_tac_ai.png",
+      "imageType": "Screenshot",
+      "description": "Xem lại hành động của trợ lý trước khi bất kỳ thay đổi nào diễn ra."
+    },
+    {
+      "file": "../../screenshots/promo/vi/desktop/06_hoi_dap_ai.png",
+      "imageType": "Screenshot",
+      "description": "Trò chuyện với trợ lý hiểu ngữ cảnh ngay bên cạnh workspace."
+    },
+    {
+      "file": "../../screenshots/promo/vi/desktop/12_gan_tag.png",
+      "imageType": "Screenshot",
+      "description": "Chọn tag phổ biến, tag gần đây hoặc duyệt cây tag ngay bên cạnh tập tin."
+    },
+    {
+      "file": "../../screenshots/promo/vi/desktop/07_quan_ly_tag.png",
+      "imageType": "Screenshot",
+      "description": "Tạo hệ thống nhẹ cho dự án, tài liệu tham khảo và bộ sưu tập media."
+    },
+    {
+      "file": "../../screenshots/promo/vi/desktop/08_tap_tin_theo_tag.png",
+      "imageType": "Screenshot",
+      "description": "Tạo phân cấp tag cha con và mở đúng nhánh bạn đang cần."
+    },
+    {
+      "file": "../../screenshots/promo/vi/desktop/10_don_dep_o_dia.png",
+      "imageType": "Screenshot",
+      "description": "Quét thư mục nặng, xem lại tệp rác và hỏi CB Agent trước khi xóa."
+    },
+    {
+      "file": "../../screenshots/promo/store/hero_16x9.png",
+      "imageType": "PromotionalArt16x9"
+    }
+  ]
 }

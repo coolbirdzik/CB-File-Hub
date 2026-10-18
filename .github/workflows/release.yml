@@ -40,13 +40,13 @@ jobs:
       - uses: actions/setup-node@v7.0.0
         with:
           node-version: "22"
-      - name: Validate shared Microsoft Store and Google Play descriptions
+      - name: Validate shared Microsoft Store and Google Play listings and images
         run: |
           node --test scripts/tests/store_listings.test.mjs scripts/tests/google_play_listings.test.mjs
           node scripts/store_listings.mjs > store-listings-preview.json
       - uses: actions/upload-artifact@v7.0.1
         with:
-          name: store-listings-en-vi
+          name: store-listings
           path: store-listings-preview.json
 
   # Generate release notes from commits
@@ -455,7 +455,7 @@ jobs:
           name: windows-msix
           path: ${{ env.PROJECT_DIR }}/build/windows/msix/*.msix
 
-      - name: Create Partner Center submission archive
+      - name: Locate MSIX for Partner Center submission
         shell: pwsh
         run: |
           $version = "${{ needs.generate-release-notes.outputs.version_name }}"
@@ -465,20 +465,11 @@ jobs:
             throw "MSIX package not found in ${{ env.PROJECT_DIR }}/build/windows/msix"
           }
 
-          $stageDir = Join-Path $env:RUNNER_TEMP "msix-store-submit"
-          New-Item -ItemType Directory -Force -Path $stageDir | Out-Null
+          # partner_center_msix.mjs builds the submission ZIP (package + listing images).
+          "PARTNER_CENTER_PACKAGE_PATH=$($source.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "PARTNER_CENTER_PACKAGE_FILE_NAME=CBFileHub-$version-$msixVersion.msix" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
-          $packageFileName = "CBFileHub-$version-$msixVersion.msix"
-          $storePackagePath = Join-Path $stageDir $packageFileName
-          Copy-Item -LiteralPath $source.FullName -Destination $storePackagePath -Force
-
-          $archivePath = Join-Path $env:RUNNER_TEMP "CBFileHub-$version-$msixVersion-store.zip"
-          Compress-Archive -LiteralPath $storePackagePath -DestinationPath $archivePath -Force
-
-          "PARTNER_CENTER_PACKAGE_ARCHIVE=$archivePath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          "PARTNER_CENTER_PACKAGE_FILE_NAME=$packageFileName" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-
-      - name: Submit MSIX to Microsoft Store for automatic publishing
+      - name: Submit MSIX, listings and images to Microsoft Store for automatic publishing
         shell: bash
         env:
           PARTNER_CENTER_TENANT_ID: ${{ secrets.PARTNER_CENTER_TENANT_ID }}
@@ -490,6 +481,7 @@ jobs:
           PARTNER_CENTER_COMMIT_SUBMISSION: "true"
           PARTNER_CENTER_TARGET_PUBLISH_MODE: "Immediate"
         run: |
+          # Waits for Partner Center to finish processing the commit and fails on CommitFailed.
           SUBMISSION_ID="$(node scripts/partner_center_msix.mjs submit)"
           echo "Partner Center submission committed for automatic publishing after certification: $SUBMISSION_ID"
 

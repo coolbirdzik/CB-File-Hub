@@ -447,7 +447,7 @@ Generate promotional artwork from the captured screenshots:
 python scripts\make_promo_images.py
 ```
 
-The generated artwork is written to `screenshots/promo/desktop/`, `screenshots/promo/mobile/`, `screenshots/promo/tablet7/`, and the matching Vietnamese folders under `screenshots/promo/vi/`.
+The generated artwork is written to `screenshots/promo/desktop/`, `screenshots/promo/mobile/`, `screenshots/promo/tablet7/`, the matching Vietnamese folders under `screenshots/promo/vi/`, Turkish and Chinese desktop promos under `screenshots/promo/tr/` and `screenshots/promo/zh/`, and the text-free Microsoft Store hero art in `screenshots/promo/store/`. Use `--desktop-only --languages tr,zh` to regenerate only some languages.
 
 Render the English/Vietnamese Torrent dialog images with sample data from `cb_file_manager/`:
 
@@ -459,7 +459,7 @@ This opt-in widget capture writes `screenshots/features/torrents/en/` and `vi/`.
 
 ### Microsoft Store and Google Play descriptions
 
-Both stores use the same concise English/Vietnamese descriptions in [`store/listings/`](store/listings/). Edit each language's `.txt` once; its bullet points also generate Microsoft Store features. The sibling `.json` holds the short description and Google Play language code. CI checks character limits and uploads a `store-listings-en-vi` preview. MSIX submissions apply the text in Partner Center; AAB submissions include it in the same Google Play edit as the app bundle. See the [content guide](store/README.md).
+Both stores use the same concise descriptions in [`store/listings/`](store/listings/), one per app language (English, Vietnamese, Turkish, Simplified Chinese). Edit each language's `.txt` once; its bullet points also generate Microsoft Store features. The sibling `.json` holds the short description, Google Play language code and the Microsoft Store screenshots/hero art. CI checks text limits and image sizes and uploads a `store-listings` preview. MSIX submissions apply the text and images in Partner Center; AAB submissions include the text in the same Google Play edit as the app bundle. See the [content guide](store/README.md).
 
 ## Testing
 
