@@ -105,6 +105,22 @@ void main() {
       expect(pixels!.buffer.asUint8List().toSet().length, greaterThan(16));
       frame.image.dispose();
       codec.dispose();
+      // EOF pauses native playback. Seeking back must clear completed before
+      // resuming, or NativePlayer.play would restart this clip at zero.
+      await player.seek(
+        player.state.duration - const Duration(milliseconds: 300),
+      );
+      await player.play();
+      await waitFor(tester, () => player.state.completed);
+      await player.seek(const Duration(seconds: 5), exact: false);
+      await waitFor(
+        tester,
+        () =>
+            player.state.playing &&
+            player.state.position.inMilliseconds >= 4500 &&
+            player.state.position.inMilliseconds < 8000,
+        reason: 'Seeking back from EOF must resume at the requested position',
+      );
       // Reuse this player for another source without creating a second window.
       await player.open(PlaybackMedia(sample.path), play: true);
       await waitFor(
@@ -285,7 +301,7 @@ void main() {
       },
     );
 
-    testWidgets('rapid seek drags resume playback after pointer release', (
+    testWidgets('rapid seek drags keep playback through pointer release', (
       tester,
     ) async {
       await tester.pumpWidget(
@@ -326,11 +342,19 @@ void main() {
         );
         final first = await tester.startGesture(firstPoint);
         await first.moveBy(const Offset(25, 0));
-        await waitFor(tester, () => !controller.state.playing);
+        await waitFor(tester, () => controller.state.playing);
+        final heldAt = controller.state.position;
         await tester.pump(const Duration(seconds: 1));
+        await waitFor(
+          tester,
+          () =>
+              controller.state.position >
+              heldAt + const Duration(milliseconds: 300),
+          reason: 'Playback stopped while holding the seek thumb',
+        );
         await first.up();
-        // Re-grab before media_kit's next state poll acknowledges the resume. This
-        // must not mistake the first drag's temporary pause for a user pause.
+        // Re-grab while the first exact seek is still being acknowledged.
+        // Both gestures must preserve continuous playback.
         final second = await tester.startGesture(firstPoint);
         await second.moveBy(const Offset(60, 0));
         await tester.pump(const Duration(seconds: 2));
@@ -519,21 +543,30 @@ void main() {
                     3000,
               );
               await waitForPlayback(
-                'drag preview paused',
-                () => !controller.state.playing,
+                'drag preview playback mode (paused=$paused)',
+                () => controller.state.playing == !paused,
               );
-              // Allow the last throttled preview to land, then hold still.
-              // The picture must stay at this position until another move
-              // or release, even if playback was active before the drag.
+              // Live scrubbing keeps audio/video advancing; an explicitly
+              // paused video must remain at its preview frame instead.
               await tester.pump(const Duration(milliseconds: 300));
               final heldPosition = controller.state.position;
               await tester.pump(const Duration(seconds: 1));
-              expect(controller.state.playing, isFalse);
-              expect(
-                (controller.state.position - heldPosition).inMilliseconds.abs(),
-                lessThan(100),
-                reason: 'Video advanced while holding the seek thumb still',
-              );
+              expect(controller.state.playing, !paused);
+              if (paused) {
+                expect(
+                  (controller.state.position - heldPosition).inMilliseconds
+                      .abs(),
+                  lessThan(100),
+                  reason: 'Paused video advanced while holding the seek thumb',
+                );
+              } else {
+                await waitForPlayback(
+                  'live drag playback advances',
+                  () =>
+                      controller.state.position >
+                      heldPosition + const Duration(milliseconds: 300),
+                );
+              }
               await checkVisibleFrame('drag-$fraction-step-$step');
             }
           }
@@ -608,7 +641,7 @@ void main() {
             await waitForPlayback(
               'keyboard seek preview (${scenario.key.keyLabel}, paused=${scenario.paused})',
               () =>
-                  !controller.state.playing &&
+                  controller.state.playing == !scenario.paused &&
                   (scenario.key == LogicalKeyboardKey.arrowRight
                       ? controller.state.position >
                             before + const Duration(seconds: 8)

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:cb_file_manager/services/media/media_kit_playback.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -6,21 +7,86 @@ import 'package:media_kit/media_kit.dart' as mk;
 class DelayedPlayer extends mk.PlatformPlayer {
   DelayedPlayer() : super(configuration: const mk.PlayerConfiguration());
   final commands = <String>[];
+  Completer<void>? seekGate;
   void loadMetadata(Duration duration) {
     state = state.copyWith(duration: duration);
     durationController.add(duration);
   }
 
   @override
-  Future<void> play() async => commands.add('play');
+  Future<void> play() async {
+    // NativePlayer.play restarts at zero if seek did not clear completed.
+    if (state.completed) commands.add('restart:0');
+    commands.add('play');
+  }
+
   @override
   Future<void> pause() async => commands.add('pause');
   @override
-  Future<void> seek(Duration position) async =>
-      commands.add('seek:${position.inSeconds}');
+  Future<void> seek(Duration position) async {
+    commands.add('seek:${position.inSeconds}');
+    await seekGate?.future;
+    state = state.copyWith(completed: false);
+  }
 }
 
 void main() {
+  test('seeking back from EOF resumes requested playback', () async {
+    final native = DelayedPlayer();
+    final player = PlaybackPlayer(player: mk.Player(platformPlayer: native));
+    addTearDown(player.dispose);
+    native.loadMetadata(const Duration(seconds: 30));
+    await player.play();
+    native.state = native.state.copyWith(completed: true, playing: false);
+    await player.seek(const Duration(seconds: 22));
+    expect(native.commands, ['play', 'seek:22', 'play']);
+    expect(player.state.completed, isFalse);
+    expect(player.playRequested, isTrue);
+  });
+
+  test('seeking while explicitly paused does not start playback', () async {
+    final native = DelayedPlayer();
+    final player = PlaybackPlayer(player: mk.Player(platformPlayer: native));
+    addTearDown(player.dispose);
+    native.loadMetadata(const Duration(seconds: 30));
+    await player.play();
+    await player.pause();
+    await player.seek(const Duration(seconds: 5), exact: false);
+    expect(native.commands, ['play', 'pause', 'seek:5']);
+    expect(player.playRequested, isFalse);
+  });
+
+  test(
+    'an explicit pause while seeking takes precedence over resume',
+    () async {
+      final native = DelayedPlayer();
+      final player = PlaybackPlayer(player: mk.Player(platformPlayer: native));
+      addTearDown(player.dispose);
+      native.loadMetadata(const Duration(seconds: 30));
+      await player.play();
+      native.seekGate = Completer<void>();
+      final seeking = player.seek(const Duration(seconds: 5));
+      await player.pause();
+      native.seekGate!.complete();
+      await seeking;
+      expect(native.commands, ['play', 'seek:5', 'pause']);
+      expect(player.playRequested, isFalse);
+    },
+  );
+
+  test('seek completion after disposal cannot restart playback', () async {
+    final native = DelayedPlayer();
+    final player = PlaybackPlayer(player: mk.Player(platformPlayer: native));
+    native.loadMetadata(const Duration(seconds: 30));
+    await player.play();
+    native.seekGate = Completer<void>();
+    final seeking = player.seek(const Duration(seconds: 5));
+    await player.dispose();
+    native.seekGate!.complete();
+    await seeking;
+    expect(native.commands, ['play', 'seek:5']);
+  });
+
   test(
     'resume intent survives a second drag before native acknowledgement',
     () async {

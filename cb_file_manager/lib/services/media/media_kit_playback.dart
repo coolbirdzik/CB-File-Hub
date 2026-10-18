@@ -198,7 +198,9 @@ class PlaybackPlayer {
       _pendingSeek = position;
       return;
     }
-    if (!exact) {
+    // After EOF, use media_kit's seek to clear its completed flag before play.
+    // A raw keyframe command leaves that flag set, making play restart at zero.
+    if (!exact && !state.completed) {
       if (_player.platform case final mk.NativePlayer native) {
         await native.command([
           'seek',
@@ -209,6 +211,16 @@ class PlaybackPlayer {
       }
     }
     await _player.seek(position);
+    await _resumeAfterSeek();
+  }
+
+  Future<void> _resumeAfterSeek() async {
+    // Reaching EOF during a live seek stops native playback without changing
+    // the user's intent. Seeking back must resume it. Read the latest intent:
+    // a user pause or disposal while the seek was in flight takes precedence.
+    if (_disposal == null && _playRequested && !state.playing) {
+      await _player.play();
+    }
   }
 
   Future<void> setVolume(double volume) =>

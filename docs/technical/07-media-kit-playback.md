@@ -19,6 +19,11 @@ events drive position, duration, buffering, volume and dimensions. Screenshots
 use media_kit's PNG capture. Paused opening renders the preview without briefly
 playing audio. Looping maps to `PlaylistMode.single`.
 
+Slider drags, held arrow keys and wheel seeks keep active playback running so
+audio follows the seek. Explicitly paused playback stays paused. If playback
+reaches EOF while scrubbing, seeking back resumes the latest requested play
+state; a pause or disposal during an in-flight seek prevents that resume.
+
 Keep the video texture mounted while buffering, seeking and hiding controls.
 The overlay Stack must remain expanded. Default fit is `BoxFit.contain`, which
 preserves the full frame and aspect ratio, including when enlarging a video.
