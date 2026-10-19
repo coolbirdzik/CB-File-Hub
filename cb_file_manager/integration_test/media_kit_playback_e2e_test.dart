@@ -608,6 +608,7 @@ void main() {
           await waitForPlayback(
             'keyboard seek reset to 10 seconds (${scenario.key.keyLabel}, paused=${scenario.paused})',
             () =>
+                !controller.state.completed &&
                 controller.state.playing == !scenario.paused &&
                 (controller.state.position.inSeconds - 10).abs() <= 1,
           );
@@ -620,6 +621,13 @@ void main() {
           await tester.pump();
           expect(playerFocus.hasPrimaryFocus, isTrue);
           final before = controller.state.position;
+          bool hasKeyboardSeekPreview() =>
+              controller.state.playing == !scenario.paused &&
+              (scenario.key == LogicalKeyboardKey.arrowRight
+                  ? controller.state.position >
+                        before + const Duration(seconds: 8)
+                  : controller.state.position <
+                        before - const Duration(seconds: 8));
           await tester.sendKeyDownEvent(scenario.key);
           try {
             await tester.pump();
@@ -629,19 +637,21 @@ void main() {
                   .isFastSeeking,
               isTrue,
             );
-            for (var tick = 0; tick < scenario.ticks; tick++) {
+            // Observe the preview while repeating, rather than only after a
+            // fixed hold. Rewind reaches zero quickly, then live playback moves
+            // forward again. On a slow runner a two-second hold can miss the
+            // entire <2s observation window and wait until EOF for it to return.
+            for (
+              var tick = 0;
+              tick < scenario.ticks && !hasKeyboardSeekPreview();
+              tick++
+            ) {
               await tester.sendKeyRepeatEvent(scenario.key);
               await tester.pump(const Duration(milliseconds: 100));
             }
             await waitForPlayback(
               'keyboard seek preview (${scenario.key.keyLabel}, paused=${scenario.paused})',
-              () =>
-                  controller.state.playing == !scenario.paused &&
-                  (scenario.key == LogicalKeyboardKey.arrowRight
-                      ? controller.state.position >
-                            before + const Duration(seconds: 8)
-                      : controller.state.position <
-                            before - const Duration(seconds: 8)),
+              hasKeyboardSeekPreview,
             );
             await checkVisibleFrame('held-arrow-${scenario.key.keyLabel}');
           } finally {
