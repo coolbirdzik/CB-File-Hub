@@ -375,6 +375,7 @@ impl DiskScan {
                     config.whole_dir_category(&full_path)
                 };
                 let id = self.next_id.fetch_add(1, Ordering::Relaxed);
+                record.note_activity(info.last_write);
                 record.subdirs.push(SubdirEntry {
                     id,
                     last_write: info.last_write,
@@ -392,6 +393,7 @@ impl DiskScan {
                 continue;
             }
 
+            record.note_activity(info.last_write.max(info.last_access));
             let size = info.size;
             if size as i64 >= config.old_large_file_bytes {
                 record.old_large_files.push(FileEntry {
@@ -546,11 +548,19 @@ struct DirectoryRecord {
     folded_entries: u64,
     own_bytes: u64,
     own_files: u64,
+    /// Newest FILETIME among the direct entries: files' write or access, and
+    /// subfolders' own write. Dart folds it up the tree to tell when anything
+    /// inside a folder was last used.
+    newest_activity: u64,
     reparse_names: Vec<String>,
     old_large_files: Vec<FileEntry>,
 }
 
 impl DirectoryRecord {
+    fn note_activity(&mut self, filetime: u64) {
+        self.newest_activity = self.newest_activity.max(filetime);
+    }
+
     fn fold_entry(&mut self, size: u64, files: u64, junk: bool) {
         self.folded_bytes += size;
         self.folded_files += files;
@@ -600,6 +610,7 @@ impl DirectoryRecord {
         out.u64(self.folded_entries);
         out.u64(self.own_bytes);
         out.u64(self.own_files);
+        out.u64(self.newest_activity);
         out.u32(self.reparse_names.len() as u32);
         for name in &self.reparse_names {
             out.str(name);

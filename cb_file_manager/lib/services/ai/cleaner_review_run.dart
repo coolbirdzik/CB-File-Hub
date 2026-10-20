@@ -13,8 +13,17 @@ class CleanerReviewRun {
   final String? ownerTabId;
   final CleanerFullReview review;
   final String languageCode;
-  CleanerReviewRun(this.ownerTabId, {this.languageCode = 'en'})
-    : review = DiskCleanerService.instance.beginFullCleanerReview(ownerTabId);
+
+  /// Every group goes to the model instead of the unclear few.
+  final bool allGroups;
+  CleanerReviewRun(
+    this.ownerTabId, {
+    this.languageCode = 'en',
+    this.allGroups = false,
+  }) : review = DiskCleanerService.instance.beginFullCleanerReview(
+         ownerTabId,
+         aiAllGroups: allGroups,
+       );
 
   static const systemPrompt =
       'Give a quick metadata-only overview of disk-cleaner groups: what the data '
@@ -160,6 +169,14 @@ class CleanerReviewRun {
           ..sort((a, b) => b.fileBytes.compareTo(a.fileBytes));
     return candidates.take(maxAiGroups).toList();
   }
+
+  /// The full review: every group still without a model verdict, largest
+  /// first. Resuming after Stop picks up exactly where it left off.
+  List<CleanerReviewGroup> allAiGroups() =>
+      review.groups
+          .where((group) => group.analysis == null || group.usedFallback)
+          .toList()
+        ..sort((a, b) => b.fileBytes.compareTo(a.fileBytes));
 
   /// Picks the text for the active language; unknown codes fall back to English.
   String _t(String en, String vi, String tr, String zh) =>
@@ -538,13 +555,13 @@ class CleanerReviewRun {
   );
 
   String progressText(CleanerReviewGroup? group) => _t(
-    'Quick overview: ${review.reviewed} / ${review.total} entries'
+    '${allGroups ? 'AI review' : 'Quick overview'}: ${review.reviewed} / ${review.total} entries'
         '${group == null ? '…' : '\n${group.scope} — ${group.nodes.length} entries in this group'}',
-    'Đang nhận diện nhanh ${review.reviewed} / ${review.total} mục'
+    '${allGroups ? 'Đang review bằng AI' : 'Đang nhận diện nhanh'} ${review.reviewed} / ${review.total} mục'
         '${group == null ? '…' : '\n${group.scope} — ${group.nodes.length} mục cùng nhóm'}',
-    'Hızlı genel bakış: ${review.reviewed} / ${review.total} girdi'
+    '${allGroups ? 'Yapay zeka incelemesi' : 'Hızlı genel bakış'}: ${review.reviewed} / ${review.total} girdi'
         '${group == null ? '…' : '\n${group.scope} — bu grupta ${group.nodes.length} girdi'}',
-    '正在快速分析：${review.reviewed} / ${review.total} 个条目'
+    '${allGroups ? '正在 AI 审查' : '正在快速分析'}：${review.reviewed} / ${review.total} 个条目'
         '${group == null ? '…' : '\n${group.scope} — 该分组共 ${group.nodes.length} 个条目'}',
   );
 
@@ -563,13 +580,13 @@ class CleanerReviewRun {
         )
         .length;
     final base = _t(
-      '${review.isComplete ? 'Quick overview ready' : 'Quick overview incomplete'}: $scanGroups groups explained from scan metadata, $aiGroups with AI recommendations. '
+      '${allGroups ? (review.isComplete ? 'AI review ready' : 'AI review incomplete') : (review.isComplete ? 'Quick overview ready' : 'Quick overview incomplete')}: $scanGroups groups explained from scan metadata, $aiGroups with AI recommendations. '
           'See the data types and keep/remove advice beside the results; choose what to clean. File contents were not read.',
-      '${review.isComplete ? 'Đã nhận diện nhanh' : 'Nhận diện nhanh chưa hoàn tất'}: $scanGroups nhóm từ dữ liệu quét, $aiGroups nhóm có gợi ý AI. '
+      '${allGroups ? (review.isComplete ? 'Đã review toàn bộ bằng AI' : 'Review bằng AI chưa hoàn tất') : (review.isComplete ? 'Đã nhận diện nhanh' : 'Nhận diện nhanh chưa hoàn tất')}: $scanGroups nhóm từ dữ liệu quét, $aiGroups nhóm có gợi ý AI. '
           'Xem loại dữ liệu và gợi ý giữ/xóa bên cạnh; bạn tự chọn mục cần dọn. Không đọc nội dung file.',
-      '${review.isComplete ? 'Hızlı genel bakış hazır' : 'Hızlı genel bakış tamamlanmadı'}: $scanGroups grup tarama meta verileriyle açıklandı, $aiGroups grupta yapay zeka önerisi var. '
+      '${allGroups ? (review.isComplete ? 'Yapay zeka incelemesi hazır' : 'Yapay zeka incelemesi tamamlanmadı') : (review.isComplete ? 'Hızlı genel bakış hazır' : 'Hızlı genel bakış tamamlanmadı')}: $scanGroups grup tarama meta verileriyle açıklandı, $aiGroups grupta yapay zeka önerisi var. '
           'Veri türlerini ve sakla/kaldır önerilerini sonuçların yanında görün; neyin temizleneceğini siz seçin. Dosya içerikleri okunmadı.',
-      '${review.isComplete ? '快速分析已完成' : '快速分析未完成'}：根据扫描元数据说明了 $scanGroups 个分组，其中 $aiGroups 个分组有 AI 建议。'
+      '${allGroups ? (review.isComplete ? 'AI 全面审查已完成' : 'AI 全面审查未完成') : (review.isComplete ? '快速分析已完成' : '快速分析未完成')}：根据扫描元数据说明了 $scanGroups 个分组，其中 $aiGroups 个分组有 AI 建议。'
           '请在结果旁查看数据类型和保留/删除建议；由您自己选择要清理的内容。未读取文件内容。',
     );
     final fallback = fallbackItems == 0

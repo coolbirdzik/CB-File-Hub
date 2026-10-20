@@ -4,7 +4,7 @@ library;
 
 import 'dart:ffi';
 
-const int expectedAbiVersion = 3;
+const int expectedAbiVersion = 4;
 
 const int statusOk = 0;
 const int statusInvalidArgument = 1;

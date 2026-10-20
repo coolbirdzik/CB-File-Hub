@@ -596,7 +596,13 @@ class DiskCleanerService {
     );
   }
 
-  CleanerFullReview beginFullCleanerReview(String? ownerTabId) {
+  /// Resumes an unfinished review of the same results. A full AI review
+  /// ([aiAllGroups]) resumes only a full one: a stopped quick overview has
+  /// already settled most groups from scan metadata alone.
+  CleanerFullReview beginFullCleanerReview(
+    String? ownerTabId, {
+    bool aiAllGroups = false,
+  }) {
     final context = _cleanerScanContexts[ownerTabId];
     if (context == null ||
         context.isScanning ||
@@ -610,10 +616,12 @@ class DiskCleanerService {
     }
     if (existing != null &&
         !existing.isComplete &&
-        identical(existing.root, context.root)) {
+        identical(existing.root, context.root) &&
+        (!aiAllGroups || existing.aiAllGroups)) {
       return existing;
     }
-    final review = CleanerFullReview.deferred(context.root);
+    final review = CleanerFullReview.deferred(context.root)
+      ..aiAllGroups = aiAllGroups;
     _inspectedFullReviewGroups.remove(ownerTabId);
     _fullCleanerReviews[ownerTabId!] = review;
     return review;

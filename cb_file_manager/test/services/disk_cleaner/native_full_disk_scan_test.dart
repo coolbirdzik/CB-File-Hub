@@ -108,28 +108,74 @@ void main() {
     expect(dart.oldLargeItems.map((item) => item.name), contains('huge.iso'));
   }, skip: skip);
 
-  test('incremental refresh matches the Dart walker', () async {
-    final base = await scan(native: false);
-    final media = p.join(root.path, 'media');
-    final added = File(p.join(media, 'added.mov'));
-    await added.writeAsBytes(List.filled(1500, 1));
-    try {
-      final dart = await scan(
-        native: false,
-        baseRoot: base.root,
-        dirty: [media],
+  test(
+    'old folders are judged by their newest content, outermost only',
+    () async {
+      final tree = await Directory.systemTemp.createTemp('cb_old_activity_');
+      addTearDown(() => tree.delete(recursive: true));
+      Future<File> sparse(String relative, int size, DateTime time) async {
+        final target = File(p.join(tree.path, relative));
+        await target.parent.create(recursive: true);
+        await target.create();
+        // Sparse, so a 300 MB fixture takes no disk space.
+        await Process.run('fsutil', ['sparse', 'setflag', target.path]);
+        final handle = await target.open(mode: FileMode.append);
+        await handle.truncate(size);
+        await handle.close();
+        await target.setLastModified(time);
+        await target.setLastAccessed(time);
+        return target;
+      }
+
+      const mb = 1024 * 1024;
+      final old = DateTime(2019);
+      // AppData-like: the folders themselves look years old, but a file deep
+      // inside was used today.
+      await sparse('appdata/local/old.bin', 400 * mb, old);
+      await sparse('appdata/local/cache.bin', 300 * mb, DateTime.now());
+      // Untouched for years as a whole.
+      await sparse('archive/old1.bin', 300 * mb, old);
+      await sparse('archive/sub/old2.bin', 300 * mb, old);
+      // Directory times last: creating entries refreshed them.
+      for (final dir in [
+        'appdata/local',
+        'appdata',
+        'archive/sub',
+        'archive',
+      ]) {
+        final result = await Process.run('powershell', [
+          '-NoProfile',
+          '-Command',
+          "(Get-Item -LiteralPath '${p.join(tree.path, dir)}').LastWriteTime = "
+              "'2019-01-01'",
+        ]);
+        expect(result.exitCode, 0, reason: '${result.stderr}');
+      }
+
+      Future<FullDiskScanResult> scanTree(bool native) async {
+        final handle = await spawnFullDiskScan(
+          drivePath: tree.path,
+          useNativeScanner: native,
+        );
+        handle.progress.listen((_) {});
+        handle.treeSnapshots.listen((_) {});
+        return handle.future;
+      }
+
+      final dart = await scanTree(false);
+      final native = await scanTree(true);
+      expect(_insights(native), _insights(dart));
+      // Not the whole appdata folder: only what is really old inside it.
+      // archive's own files and subfolder are covered by archive itself.
+      expect(
+        dart.oldLargeItems.map(
+          (item) => p.relative(item.path, from: tree.path),
+        ),
+        ['archive', p.join('appdata', 'local', 'old.bin')],
       );
-      final native = await scan(
-        native: true,
-        baseRoot: base.root,
-        dirty: [media],
-      );
-      expect(dart.scanMode, FullDiskScanMode.incremental);
-      _expectSameResult(native, dart);
-    } finally {
-      await added.delete();
-    }
-  }, skip: skip);
+    },
+    skip: skip,
+  );
 }
 
 void _expectSameResult(FullDiskScanResult actual, FullDiskScanResult expected) {

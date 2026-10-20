@@ -1,3 +1,10 @@
+export 'cleaner_dashboard.dart'
+    show
+        OldLargeEvidenceFilter,
+        OldLargeEvidenceSections,
+        filterOldLargeEvidence,
+        splitOldLargeEvidence;
+
 import 'dart:async';
 import 'dart:collection';
 import 'dart:io';
@@ -46,6 +53,7 @@ import '../../../services/disk_cleaner/disk_tree_selection.dart';
 import '../../../services/disk_cleaner/cleaner_agent_review.dart';
 import 'cleaner_agent_analysis_panel.dart';
 import 'cleaner_review_overview.dart';
+import 'cleaner_dashboard.dart';
 import '../../../services/disk_cleaner/full_disk_scan_isolate.dart';
 import '../../tab_manager/core/tab_manager.dart';
 import '../../widgets/app_progress_indicator.dart';
@@ -65,52 +73,6 @@ typedef CleanerCachedResultLookup =
 
 typedef CleanerFullDiskScanStarter =
     Future<FullDiskScanHandle> Function(String drivePath);
-
-/// Separates informational old-large evidence into independently ranked
-/// folder and file sections for the Cleaner results panel.
-class OldLargeEvidenceSections {
-  final List<FullDiskScanInsight> folders;
-  final List<FullDiskScanInsight> files;
-
-  const OldLargeEvidenceSections({required this.folders, required this.files});
-
-  int get totalCount => folders.length + files.length;
-}
-
-enum OldLargeEvidenceFilter { all, folders, files }
-
-/// Builds deterministic, size-ranked sections without touching the drive.
-OldLargeEvidenceSections splitOldLargeEvidence(
-  Iterable<FullDiskScanInsight> items,
-) {
-  final folders = <FullDiskScanInsight>[];
-  final files = <FullDiskScanInsight>[];
-  for (final item in items) {
-    (item.isFile ? files : folders).add(item);
-  }
-  folders.sort(compareOldLargeDiskInsights);
-  files.sort(compareOldLargeDiskInsights);
-  return OldLargeEvidenceSections(folders: folders, files: files);
-}
-
-/// Returns the selected old-large evidence in stable presentation order.
-///
-/// The All view deliberately keeps folders before files so directory evidence
-/// cannot be hidden among file rows.
-List<FullDiskScanInsight> filterOldLargeEvidence(
-  Iterable<FullDiskScanInsight> items,
-  OldLargeEvidenceFilter filter,
-) {
-  final sections = splitOldLargeEvidence(items);
-  switch (filter) {
-    case OldLargeEvidenceFilter.all:
-      return <FullDiskScanInsight>[...sections.folders, ...sections.files];
-    case OldLargeEvidenceFilter.folders:
-      return sections.folders;
-    case OldLargeEvidenceFilter.files:
-      return sections.files;
-  }
-}
 
 /// Finds the deepest displayed node that contains [path].
 ///
@@ -145,18 +107,6 @@ DiskTreeNode? findNearestDisplayedTreeNodeForPath(
     stack.addAll(node.children);
   }
   return nearest;
-}
-
-class _OldLargeEvidenceSection {
-  final String keySuffix;
-  final String title;
-  final List<FullDiskScanInsight> items;
-
-  const _OldLargeEvidenceSection({
-    required this.keySuffix,
-    required this.title,
-    required this.items,
-  });
 }
 
 /// Coordinates the two user-visible scan intents: setup may display a
@@ -366,6 +316,13 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
   StreamSubscription<AiAgentState>? _agentReviewStateSub;
   String? _agentReviewStateTabId;
   bool _agentReviewLoading = false;
+
+  /// The running agent review assesses every group (see [_askAiFullReview]).
+  bool _agentFullReviewRunning = false;
+
+  /// Percent of scanned entries the running review has settled; drives the
+  /// toolbar label without rebuilding the whole screen per model batch.
+  final ValueNotifier<int> _agentReviewPercent = ValueNotifier<int>(0);
   bool _showCleanableOnly = false;
   _TreePreset _activePreset = _TreePreset.none;
 
@@ -397,8 +354,6 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
   };
   bool _showGrowthOnly = false;
   bool _reviewMode = false; // when true, tree shows only selected items
-  OldLargeEvidenceFilter _oldLargeEvidenceFilter = OldLargeEvidenceFilter.all;
-  bool _oldLargeEvidenceExpanded = true;
   bool _isRefreshingNode = false;
   bool _isShowingCachedDiskScan = false;
   late final CleanerAppInsightsCubit _appInsightsCubit;
@@ -455,12 +410,6 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
   /// can keep the focused row on screen; rows use a fixed 28px extent.
   final ScrollController _treeScrollController = ScrollController();
 
-  /// Scroll controller for the old-large evidence list.
-  ///
-  /// This list has its own scrollbar and must not fall back to the page's
-  /// primary controller, which may not have a position attached while the
-  /// results layout is being built.
-  final ScrollController _oldLargeItemsScrollController = ScrollController();
   static const double _treeRowExtent = 28;
 
   final FocusNode _resultsFocusNode = FocusNode(debugLabel: 'cbCleanerResults');
@@ -492,6 +441,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     _appInsightsGeneration++;
     _agentActivitySub?.cancel();
     _agentReviewStateSub?.cancel();
+    _agentReviewPercent.dispose();
     _appInsightsStateSub?.cancel();
     _appInsightsCubit.close();
     if (_publishedCleanerContextTabId != null) {
@@ -506,7 +456,6 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     _subFeatureListenable.dispose();
     _cleanProgress.dispose();
     _treeScrollController.dispose();
-    _oldLargeItemsScrollController.dispose();
     _resultsFocusNode.dispose();
     _appsFocusNode.dispose();
     super.dispose();
@@ -1604,6 +1553,32 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     );
   }
 
+  /// Every group goes to the model, largest first. Long on a local model, so
+  /// the toolbar shows progress and offers Stop; running it again resumes.
+  void _askAiFullReview() {
+    _agentFullReviewRunning = true;
+    _agentReviewPercent.value = 0;
+    _sendToAi(
+      AppLocalizations.of(context)!.diskCleanerFullAiReviewRequest,
+      reviewEntireCleanerScan: true,
+      reviewAllGroups: true,
+    );
+  }
+
+  void _stopAgentReview() {
+    final tabId = _agentReviewStateTabId;
+    final controller = AiPanelScope.maybeOf(context);
+    if (tabId == null || controller == null) return;
+    controller
+        .blocForTab(
+          tabId,
+          thinkingPhrases: const ['Analyzing...', 'Checking...'],
+          waitingApproval: 'Waiting for approval...',
+          runningToolTemplate: 'Running {}...',
+        )
+        .add(const StopGeneration());
+  }
+
   void _askAiAboutApps() {
     final report = _appStorageReport;
     if (report == null) {
@@ -1671,7 +1646,11 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     );
   }
 
-  void _sendToAi(String message, {bool reviewEntireCleanerScan = false}) {
+  void _sendToAi(
+    String message, {
+    bool reviewEntireCleanerScan = false,
+    bool reviewAllGroups = false,
+  }) {
     final controller = AiPanelScope.maybeOf(context);
     if (controller == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1704,6 +1683,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       SendMessage(
         message,
         reviewEntireCleanerScan: reviewEntireCleanerScan,
+        cleanerReviewAllGroups: reviewAllGroups,
         startNewConversation: reviewEntireCleanerScan,
         cleanerReviewLanguageCode: Localizations.localeOf(context).languageCode,
       ),
@@ -2626,10 +2606,17 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     );
     _agentReviewStateSub = bloc.stream.listen((state) {
       if (!mounted) return;
+      if (state.isLoading && _agentFullReviewRunning) {
+        final review = _service.fullCleanerReview(tabId);
+        if (review != null && review.total > 0) {
+          _agentReviewPercent.value = review.reviewed * 100 ~/ review.total;
+        }
+      }
       final clearInspection = !state.isLoading && _agentInspectingNode != null;
       if (_agentReviewLoading == state.isLoading && !clearInspection) return;
       setState(() {
         _agentReviewLoading = state.isLoading;
+        if (!state.isLoading) _agentFullReviewRunning = false;
         // Completion, failure and Stop all end the live inspecting indicator.
         if (clearInspection) _agentInspectingNode = null;
       });
@@ -2718,6 +2705,17 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       if (node.children.contains(target)) return node;
       stack.addAll(node.children.where((child) => !child.isFile));
     }
+    return null;
+  }
+
+  /// Why the agent review cannot start now, shown instead of a silently
+  /// disabled button. Null when it can (or the toolbar is not showing).
+  String? _agentReviewBlockedReason(AppLocalizations l) {
+    if (_isShowingCachedDiskScan) return l.diskCleanerAiNeedsFreshScan;
+    if (_isScanningFullDisk || _agentScanning || _isRefreshingNode) {
+      return l.diskCleanerAiWaitForScan;
+    }
+    if (_isCleaningJunk || _reviewMode) return l.diskCleanerAiWaitForCleanup;
     return null;
   }
 
@@ -3225,7 +3223,25 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
           // Top toolbar
           _buildResultsToolbar(theme, l, root),
           const Divider(height: 1),
-          _buildOldLargeItemsPanel(theme, l, root),
+          if (!_isScanningFullDisk && _lastDiskScanResult != null)
+            CleanerDashboard(
+              root: root,
+              oldLargeItems: _lastDiskScanResult!.oldLargeItems,
+              formatBytes: _fmt,
+              formatDate: _formatInsightDate,
+              onReveal: (path) {
+                final node = findNearestDisplayedTreeNodeForPath(root, path);
+                if (node != null) _revealNodeInTree(node);
+              },
+              onOpen: (path, isFile) => EntityOpenActions.openInNewTab(
+                context,
+                sourcePath: path,
+                preferredTabName: isFile
+                    ? p.basename(p.dirname(path))
+                    : p.basename(path),
+                openContainingFolder: isFile,
+              ),
+            ),
           const Divider(height: 1),
           Expanded(
             child: LayoutBuilder(
@@ -3323,6 +3339,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
         root.fileCount,
       );
       return Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
             PhosphorIconsLight.hardDrive,
@@ -3330,7 +3347,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
             color: theme.colorScheme.primary,
           ),
           const SizedBox(width: 8),
-          Expanded(
+          Flexible(
             child: Text(
               driveSummary,
               style: theme.textTheme.titleSmall?.copyWith(
@@ -3452,27 +3469,26 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       );
     }
 
-    final actions = <Widget>[
-      // Junk summary badge
-      boundedAction(
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(
-            color: Colors.orange.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: Text(
-            l.diskCleanerJunkSummary(_fmt(junkBytes)),
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: Colors.orange.shade700,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
+    final junkBadge = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.orange.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(6),
       ),
+      child: Text(
+        l.diskCleanerJunkSummary(_fmt(junkBytes)),
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: Colors.orange.shade700,
+        ),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+    );
+
+    // What the tree shows: presets and filters, grouped on the left.
+    final filters = <Widget>[
       // Preset views — "how do I get space back" shortcuts that don't
       // require walking the hierarchy.
       boundedAction(
@@ -3502,7 +3518,6 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
           ),
         ),
       ),
-      // Filter cleanable-only
       boundedAction(
         CbTooltip(
           message: l.diskCleanerShowCleanableOnly,
@@ -3538,65 +3553,12 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
             ),
           ),
         ),
-      // Quick check actions
-      boundedAction(
-        TextButton(
-          style: TextButton.styleFrom(shape: _cleanerButtonShape),
-          onPressed: () => _setAllCleanableChecked(_rootNode, true),
-          child: Text(
-            l.diskCleanerCheckAllCleanable,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-      ),
-      boundedAction(
-        TextButton(
-          style: TextButton.styleFrom(shape: _cleanerButtonShape),
-          onPressed: () => _setAllCleanableChecked(_rootNode, false),
-          child: Text(
-            l.diskCleanerUncheckAll,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-      ),
-      if (_aiAvailable)
-        boundedAction(
-          FilledButton.tonalIcon(
-            style: FilledButton.styleFrom(shape: _cleanerButtonShape),
-            key: const ValueKey<String>('cleaner-agent-select-recommendations'),
-            onPressed: _canSelectAgentTargets && !_agentReviewLoading
-                ? _askAiToSelectRecommendations
-                : null,
-            icon: _agentReviewLoading
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(PhosphorIconsLight.sparkle, size: 16),
-            label: Text(
-              l.diskCleanerSuggestAndSelect,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ),
-      if (!_isScanningFullDisk)
-        boundedAction(
-          OutlinedButton.icon(
-            style: OutlinedButton.styleFrom(shape: _cleanerButtonShape),
-            key: const ValueKey<String>('cleaner-select-drives'),
-            onPressed: _returnToDriveSetup,
-            icon: const Icon(PhosphorIconsLight.hardDrives, size: 16),
-            label: Text(
-              l.diskCleanerSelectDrives,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ),
+    ];
+
+    // What to do with it: one menu per concern, the scan last.
+    final actions = <Widget>[
+      _buildCheckMenu(l),
+      if (_aiAvailable) _buildAgentReviewButton(theme, l),
       boundedAction(
         OutlinedButton.icon(
           style: OutlinedButton.styleFrom(shape: _cleanerButtonShape),
@@ -3625,64 +3587,308 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
           ),
         ),
       ),
+      if (!_isScanningFullDisk)
+        CbTooltip(
+          message: l.diskCleanerSelectDrives,
+          child: IconButton.outlined(
+            key: const ValueKey<String>('cleaner-select-drives'),
+            style: IconButton.styleFrom(shape: _cleanerButtonShape),
+            onPressed: _returnToDriveSetup,
+            icon: const Icon(PhosphorIconsLight.hardDrives, size: 18),
+          ),
+        ),
     ];
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+
+    Widget status() => ValueListenableBuilder<FullDiskScanProgress?>(
+      valueListenable: _diskProgressListenable,
+      builder: (context, _, _) => buildStatus(),
+    );
+
+    Widget actionRow() => Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (final (index, action) in actions.indexed) ...[
+          if (index > 0) const SizedBox(width: 8),
+          action,
+        ],
+      ],
+    );
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final compact = constraints.maxWidth < 1120;
-          if (compact) {
+          // Row 1: the drive and its junk on the left, actions on the right.
+          // Row 2: tree filters on the left, scan status on the right.
+          if (constraints.maxWidth >= 860) {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                ValueListenableBuilder<FullDiskScanProgress?>(
-                  valueListenable: _diskProgressListenable,
-                  builder: (context, _, _) => Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      buildDriveInfo(),
-                      if (hasStatus) ...[
-                        const SizedBox(height: 6),
-                        buildStatus(),
-                      ],
-                    ],
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Flexible(child: buildDriveInfo()),
+                          const SizedBox(width: 10),
+                          Flexible(child: junkBadge),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    actionRow(),
+                  ],
                 ),
                 const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  alignment: WrapAlignment.end,
-                  children: actions,
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 3,
+                      child: Wrap(spacing: 8, runSpacing: 6, children: filters),
+                    ),
+                    if (hasStatus) ...[
+                      const SizedBox(width: 16),
+                      Expanded(
+                        flex: 2,
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: status(),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ],
             );
           }
-
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              ValueListenableBuilder<FullDiskScanProgress?>(
-                valueListenable: _diskProgressListenable,
-                builder: (context, _, _) => Row(
-                  children: [
-                    Expanded(flex: 3, child: buildDriveInfo()),
-                    const SizedBox(width: 16),
-                    Expanded(flex: 2, child: buildStatus()),
-                  ],
-                ),
+              Row(
+                children: [
+                  Flexible(child: buildDriveInfo()),
+                  const SizedBox(width: 10),
+                  Flexible(child: junkBadge),
+                ],
               ),
+              if (hasStatus) ...[const SizedBox(height: 6), status()],
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
-                alignment: WrapAlignment.end,
-                children: actions,
+                children: [...filters, ...actions],
               ),
             ],
           );
         },
       ),
+    );
+  }
+
+  /// Check / uncheck every cleanable row: one menu instead of two buttons.
+  Widget _buildCheckMenu(AppLocalizations l) => MenuAnchor(
+    menuChildren: [
+      MenuItemButton(
+        key: const ValueKey<String>('cleaner-check-all'),
+        leadingIcon: const Icon(PhosphorIconsLight.checkSquare, size: 16),
+        onPressed: () => _setAllCleanableChecked(_rootNode, true),
+        child: Text(l.diskCleanerCheckAllCleanable),
+      ),
+      MenuItemButton(
+        key: const ValueKey<String>('cleaner-uncheck-all'),
+        leadingIcon: const Icon(PhosphorIconsLight.square, size: 16),
+        onPressed: () => _setAllCleanableChecked(_rootNode, false),
+        child: Text(l.diskCleanerUncheckAll),
+      ),
+    ],
+    builder: (context, controller, _) => OutlinedButton.icon(
+      key: const ValueKey<String>('cleaner-check-menu'),
+      style: OutlinedButton.styleFrom(shape: _cleanerButtonShape),
+      onPressed: () =>
+          controller.isOpen ? controller.close() : controller.open(),
+      icon: const Icon(PhosphorIconsLight.checkSquare, size: 16),
+      label: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(l.diskCleanerSelectionMenu),
+          const SizedBox(width: 4),
+          const Icon(PhosphorIconsLight.caretDown, size: 12),
+        ],
+      ),
+    ),
+  );
+
+  /// A split button: the main half starts the quick overview, the caret
+  /// offers the full AI review, and Stop while either runs.
+  Widget _buildAgentReviewButton(ThemeData theme, AppLocalizations l) {
+    final busy = _agentReviewLoading;
+    final canStart = _canSelectAgentTargets && !busy;
+    final blockedReason = busy ? null : _agentReviewBlockedReason(l);
+    const radius = Radius.circular(CbRadii.button);
+    const gap = Radius.circular(3);
+    // Two-line rows: the app's compact menu theme sizes items for one line.
+    final twoLineItem = MenuItemButton.styleFrom(
+      minimumSize: const Size(0, 72),
+      maximumSize: const Size(double.infinity, 96),
+      visualDensity: VisualDensity.standard,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    );
+    Widget menuEntry(String title, String hint) => ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 320),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
+          Text(
+            hint,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        CbTooltip(
+          message:
+              blockedReason ??
+              (_agentFullReviewRunning
+                  ? l.diskCleanerFullAiReviewHint
+                  : l.diskCleanerQuickReviewHint),
+          child: FilledButton.tonalIcon(
+            key: const ValueKey<String>('cleaner-agent-select-recommendations'),
+            style: FilledButton.styleFrom(
+              shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.horizontal(left: radius, right: gap),
+              ),
+            ),
+            onPressed: canStart ? _askAiToSelectRecommendations : null,
+            icon: busy
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(PhosphorIconsLight.sparkle, size: 16),
+            label: busy && _agentFullReviewRunning
+                ? ValueListenableBuilder<int>(
+                    valueListenable: _agentReviewPercent,
+                    builder: (context, percent, _) =>
+                        Text(l.diskCleanerAiReviewProgress(percent)),
+                  )
+                : Text(
+                    l.diskCleanerSuggestAndSelect,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+          ),
+        ),
+        const SizedBox(width: 2),
+        MenuAnchor(
+          alignmentOffset: const Offset(0, 4),
+          menuChildren: busy
+              ? [
+                  MenuItemButton(
+                    key: const ValueKey<String>('cleaner-agent-stop-review'),
+                    leadingIcon: const Icon(Icons.stop_rounded, size: 18),
+                    onPressed: _stopAgentReview,
+                    child: Text(l.diskCleanerStopAiReview),
+                  ),
+                ]
+              : [
+                  if (blockedReason != null) ...[
+                    // Say why the entries below are unavailable.
+                    Padding(
+                      key: const ValueKey<String>('cleaner-agent-blocked'),
+                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 320),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(
+                              PhosphorIconsLight.info,
+                              size: 16,
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: Text(
+                                blockedReason,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    if (_isShowingCachedDiskScan)
+                      MenuItemButton(
+                        key: const ValueKey<String>('cleaner-agent-rescan'),
+                        leadingIcon: const Icon(
+                          PhosphorIconsLight.arrowCounterClockwise,
+                          size: 18,
+                        ),
+                        onPressed: () =>
+                            unawaited(_startScan(forceRefresh: true)),
+                        child: Text(l.diskCleanerScanAgain),
+                      ),
+                    const Divider(height: 1),
+                  ],
+                  MenuItemButton(
+                    style: twoLineItem,
+                    leadingIcon: const Icon(
+                      PhosphorIconsLight.sparkle,
+                      size: 18,
+                    ),
+                    onPressed: canStart ? _askAiToSelectRecommendations : null,
+                    child: menuEntry(
+                      l.diskCleanerSuggestAndSelect,
+                      l.diskCleanerQuickReviewHint,
+                    ),
+                  ),
+                  MenuItemButton(
+                    key: const ValueKey<String>('cleaner-agent-full-review'),
+                    style: twoLineItem,
+                    leadingIcon: const Icon(
+                      PhosphorIconsLight.listChecks,
+                      size: 18,
+                    ),
+                    onPressed: canStart ? _askAiFullReview : null,
+                    child: menuEntry(
+                      l.diskCleanerFullAiReview,
+                      l.diskCleanerFullAiReviewHint,
+                    ),
+                  ),
+                ],
+          builder: (context, controller, _) => CbTooltip(
+            message: l.diskCleanerAiReviewOptions,
+            child: FilledButton.tonal(
+              key: const ValueKey<String>('cleaner-agent-review-menu'),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(36, 40),
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                shape: const RoundedRectangleBorder(
+                  borderRadius: BorderRadius.horizontal(
+                    left: gap,
+                    right: radius,
+                  ),
+                ),
+              ),
+              onPressed: () =>
+                  controller.isOpen ? controller.close() : controller.open(),
+              child: const Icon(PhosphorIconsLight.caretDown, size: 14),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -4183,423 +4389,6 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
               }).toList(),
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildOldLargeItemsPanel(
-    ThemeData theme,
-    AppLocalizations l,
-    DiskTreeNode root,
-  ) {
-    if (_isScanningFullDisk || _lastDiskScanResult == null) {
-      return const SizedBox.shrink();
-    }
-
-    final evidence = splitOldLargeEvidence(_lastDiskScanResult!.oldLargeItems);
-    final items = filterOldLargeEvidence(
-      _lastDiskScanResult!.oldLargeItems,
-      _oldLargeEvidenceFilter,
-    );
-    final panelHeight = _oldLargeEvidenceExpanded
-        ? (items.isEmpty ? 142.0 : 288.0)
-        : 64.0;
-    final foldersSection = _OldLargeEvidenceSection(
-      keySuffix: 'folders',
-      title: l.diskCleanerOldLargeFolders,
-      items: evidence.folders,
-    );
-    final filesSection = _OldLargeEvidenceSection(
-      keySuffix: 'files',
-      title: l.diskCleanerOldLargeFiles,
-      items: evidence.files,
-    );
-
-    String filterLabel(OldLargeEvidenceFilter filter) {
-      switch (filter) {
-        case OldLargeEvidenceFilter.all:
-          return l.diskCleanerOldLargeAll;
-        case OldLargeEvidenceFilter.folders:
-          return l.diskCleanerOldLargeFolders;
-        case OldLargeEvidenceFilter.files:
-          return l.diskCleanerOldLargeFiles;
-      }
-    }
-
-    int filterCount(OldLargeEvidenceFilter filter) {
-      switch (filter) {
-        case OldLargeEvidenceFilter.all:
-          return evidence.totalCount;
-        case OldLargeEvidenceFilter.folders:
-          return evidence.folders.length;
-        case OldLargeEvidenceFilter.files:
-          return evidence.files.length;
-      }
-    }
-
-    void selectFilter(OldLargeEvidenceFilter? filter) {
-      if (filter == null || filter == _oldLargeEvidenceFilter) return;
-      setState(() {
-        _oldLargeEvidenceFilter = filter;
-        if (_oldLargeItemsScrollController.hasClients) {
-          _oldLargeItemsScrollController.jumpTo(0);
-        }
-      });
-    }
-
-    Widget buildEvidenceRow(FullDiskScanInsight item) {
-      final activity = item.lastActivity;
-      return InkWell(
-        key: ValueKey<String>('cleaner-old-large-entry-${item.path}'),
-        borderRadius: BorderRadius.circular(8),
-        onTap: () {
-          final node = findNearestDisplayedTreeNodeForPath(root, item.path);
-          if (node != null) _revealNodeInTree(node);
-        },
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-          child: Row(
-            children: [
-              Container(
-                width: 28,
-                height: 28,
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primaryContainer.withValues(
-                    alpha: 0.55,
-                  ),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  item.isFile
-                      ? PhosphorIconsLight.file
-                      : PhosphorIconsLight.folder,
-                  size: 16,
-                  color: theme.colorScheme.primary,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item.name,
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    Text(
-                      item.path,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    _fmt(item.sizeBytes),
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  if (activity != null)
-                    Text(
-                      l.diskCleanerOldLargeLastActivity(
-                        _formatInsightDate(activity),
-                      ),
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(width: 2),
-              IconButton(
-                key: ValueKey<String>('cleaner-old-large-open-${item.path}'),
-                constraints: const BoxConstraints.tightFor(
-                  width: 32,
-                  height: 32,
-                ),
-                padding: EdgeInsets.zero,
-                tooltip: item.isFile ? l.openContainingFolder : l.openInNewTab,
-                icon: const Icon(PhosphorIconsLight.folderOpen, size: 17),
-                onPressed: () {
-                  EntityOpenActions.openInNewTab(
-                    context,
-                    sourcePath: item.path,
-                    preferredTabName: item.isFile
-                        ? p.basename(p.dirname(item.path))
-                        : p.basename(item.path),
-                    openContainingFolder: item.isFile,
-                  );
-                },
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    Widget buildSectionHeader(_OldLargeEvidenceSection section) {
-      final isFolder = section.keySuffix == 'folders';
-      return Padding(
-        key: ValueKey<String>('cleaner-old-large-section-${section.keySuffix}'),
-        padding: const EdgeInsets.fromLTRB(10, 7, 8, 5),
-        child: Row(
-          children: [
-            Icon(
-              isFolder ? PhosphorIconsLight.folder : PhosphorIconsLight.file,
-              size: 16,
-              color: theme.colorScheme.primary,
-            ),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Text(
-                section.title,
-                style: theme.textTheme.labelMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: theme.colorScheme.onSurface,
-                ),
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                '${section.items.length}',
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    Widget buildSectionCard(_OldLargeEvidenceSection section) {
-      return DecoratedBox(
-        decoration: CbDecorations.card(context, radius: 10),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            buildSectionHeader(section),
-            Divider(
-              height: 1,
-              color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
-            ),
-            Expanded(
-              child: section.items.isEmpty
-                  ? Center(
-                      child: Text(
-                        l.diskCleanerOldLargeEmpty,
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    )
-                  : Scrollbar(
-                      child: ListView.separated(
-                        primary: false,
-                        padding: const EdgeInsets.symmetric(vertical: 2),
-                        itemCount: section.items.length,
-                        separatorBuilder: (context, index) => Divider(
-                          height: 1,
-                          indent: 44,
-                          endIndent: 8,
-                          color: theme.colorScheme.outlineVariant.withValues(
-                            alpha: 0.3,
-                          ),
-                        ),
-                        itemBuilder: (context, index) =>
-                            buildEvidenceRow(section.items[index]),
-                      ),
-                    ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    Widget buildStackedSections() {
-      final sections = <_OldLargeEvidenceSection>[
-        if (evidence.folders.isNotEmpty) foldersSection,
-        if (evidence.files.isNotEmpty) filesSection,
-      ];
-      final children = <Widget>[];
-      for (final section in sections) {
-        children
-          ..add(buildSectionHeader(section))
-          ..addAll(section.items.map(buildEvidenceRow));
-      }
-      return Scrollbar(
-        controller: _oldLargeItemsScrollController,
-        thumbVisibility: items.length > 4,
-        child: ListView(
-          controller: _oldLargeItemsScrollController,
-          primary: false,
-          padding: const EdgeInsets.symmetric(vertical: 2),
-          children: children,
-        ),
-      );
-    }
-
-    return Container(
-      height: panelHeight,
-      margin: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-      padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
-      decoration: CbDecorations.card(context, radius: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SizedBox(
-            height: 36,
-            child: Row(
-              children: [
-                Container(
-                  width: 30,
-                  height: 30,
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primaryContainer.withValues(
-                      alpha: 0.6,
-                    ),
-                    borderRadius: BorderRadius.circular(9),
-                  ),
-                  child: Icon(
-                    PhosphorIconsLight.clockCounterClockwise,
-                    size: 17,
-                    color: theme.colorScheme.primary,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Row(
-                    children: [
-                      Flexible(
-                        child: Text(
-                          l.diskCleanerOldLargeTitle,
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(width: 7),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 7,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.primaryContainer,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          '${evidence.totalCount}',
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: theme.colorScheme.onPrimaryContainer,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (_oldLargeEvidenceExpanded && evidence.totalCount > 0)
-                  CbSelect<OldLargeEvidenceFilter>(
-                    size: CbSelectSize.sm,
-                    value: _oldLargeEvidenceFilter,
-                    onChanged: selectFilter,
-                    items: [
-                      for (final filter in OldLargeEvidenceFilter.values)
-                        CbSelectItem<OldLargeEvidenceFilter>(
-                          value: filter,
-                          label:
-                              '${filterLabel(filter)} (${filterCount(filter)})',
-                        ),
-                    ],
-                  ),
-                const SizedBox(width: 4),
-                IconButton(
-                  constraints: const BoxConstraints.tightFor(
-                    width: 30,
-                    height: 30,
-                  ),
-                  padding: EdgeInsets.zero,
-                  tooltip: _oldLargeEvidenceExpanded ? l.close : l.open,
-                  onPressed: () => setState(() {
-                    _oldLargeEvidenceExpanded = !_oldLargeEvidenceExpanded;
-                  }),
-                  icon: Icon(
-                    _oldLargeEvidenceExpanded
-                        ? PhosphorIconsLight.caretUp
-                        : PhosphorIconsLight.caretDown,
-                    size: 17,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (_oldLargeEvidenceExpanded) ...[
-            const SizedBox(height: 8),
-            Expanded(
-              child: items.isEmpty
-                  ? Align(
-                      alignment: Alignment.centerLeft,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 6),
-                        child: Text(
-                          l.diskCleanerOldLargeEmpty,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
-                    )
-                  : LayoutBuilder(
-                      builder: (context, constraints) {
-                        final showColumns =
-                            _oldLargeEvidenceFilter ==
-                                OldLargeEvidenceFilter.all &&
-                            constraints.maxWidth >= 720;
-                        if (showColumns) {
-                          return Row(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Expanded(child: buildSectionCard(foldersSection)),
-                              const SizedBox(width: 8),
-                              Expanded(child: buildSectionCard(filesSection)),
-                            ],
-                          );
-                        }
-                        if (_oldLargeEvidenceFilter ==
-                            OldLargeEvidenceFilter.folders) {
-                          return buildSectionCard(foldersSection);
-                        }
-                        if (_oldLargeEvidenceFilter ==
-                            OldLargeEvidenceFilter.files) {
-                          return buildSectionCard(filesSection);
-                        }
-                        return buildStackedSections();
-                      },
-                    ),
-            ),
-          ],
         ],
       ),
     );

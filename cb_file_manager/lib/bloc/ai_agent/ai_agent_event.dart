@@ -21,6 +21,10 @@ class SendMessage extends AiAgentEvent {
   final bool reviewEntireCleanerScan;
   final String cleanerReviewLanguageCode;
 
+  /// With [reviewEntireCleanerScan]: let the model assess every group,
+  /// largest first, instead of the few unclear ones. Stoppable and resumable.
+  final bool cleanerReviewAllGroups;
+
   /// Start a separate conversation atomically before sending this message.
   /// Retry and edit events leave this false so they stay in their conversation.
   final bool startNewConversation;
@@ -30,6 +34,7 @@ class SendMessage extends AiAgentEvent {
     this.referencedFiles = const [],
     this.reviewEntireCleanerScan = false,
     this.cleanerReviewLanguageCode = 'en',
+    this.cleanerReviewAllGroups = false,
     this.startNewConversation = false,
   });
 
@@ -39,6 +44,7 @@ class SendMessage extends AiAgentEvent {
     referencedFiles,
     reviewEntireCleanerScan,
     cleanerReviewLanguageCode,
+    cleanerReviewAllGroups,
     startNewConversation,
   ];
 }

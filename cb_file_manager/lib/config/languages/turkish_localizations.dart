@@ -3899,6 +3899,82 @@ class TurkishLocalizations implements AppLocalizations {
   @override
   String get diskCleanerSuggestAndSelect => 'Hızlı inceleme';
   @override
+  String get diskCleanerQuickReviewHint =>
+      'Her grubu tarama meta verileriyle açıklar; yapay zeka yalnızca belirsiz birkaçına bakar.';
+  @override
+  String get diskCleanerFullAiReview => 'Tam yapay zeka incelemesi';
+  @override
+  String get diskCleanerFullAiReviewHint =>
+      'Yapay zeka her grubu, en büyükten başlayarak değerlendirir. Yerel modelde yavaştır; istediğiniz an durdurup sürdürebilirsiniz.';
+  @override
+  String get diskCleanerFullAiReviewRequest =>
+      'Tarama sonuçlarındaki her grubu en büyükten başlayarak yapay zekayla incele: veri nedir, '
+      'saklanmalı mı yoksa kaldırılabilir mi. Dosya içeriklerini okuma, dosya seçme veya '
+      'hiçbir şeyi silme. Türkçe yanıt ver.';
+  @override
+  String get diskCleanerStopAiReview => 'Yapay zeka incelemesini durdur';
+  @override
+  String get diskCleanerAiReviewOptions => 'Yapay zeka inceleme seçenekleri';
+  @override
+  String get diskCleanerSelectionMenu => 'Seç';
+  @override
+  String get diskCleanerAiNeedsFreshScan =>
+      'Kayıtlı sonuçlar gösteriliyor. Yapay zekanın güncel diski incelemesi için yeniden tarayın.';
+  @override
+  String get diskCleanerAiWaitForScan =>
+      'Yapay zeka incelemesi için taramanın bitmesini bekleyin.';
+  @override
+  String get diskCleanerAiWaitForCleanup =>
+      'Yapay zekaya sormadan önce mevcut temizlik incelemesini bitirin.';
+  @override
+  String diskCleanerAiReviewProgress(int percent) => 'AI %$percent';
+  @override
+  String get diskCleanerDashboardTitle => 'Genel bakış';
+  @override
+  String get diskCleanerDashboardHint =>
+      'Ayrıntıları görmek ve filtrelemek için bir kart seçin.';
+  @override
+  String get diskCleanerDashboardHeavyFolders => 'Büyük klasörler';
+  @override
+  String get diskCleanerDashboardLargeFiles => 'Büyük dosyalar';
+  @override
+  String get diskCleanerDashboardOldUnused => 'Eski ve kullanılmayan';
+  @override
+  String get diskCleanerDashboardKnownCauses => 'Bilinen alan tüketiciler';
+  @override
+  String get diskCleanerDashboardFileTypes => 'Dosya türüne göre';
+  @override
+  String get diskCleanerDashboardAllTypes => 'Tüm türler';
+  @override
+  String get diskCleanerDashboardNoMatches => 'Bu koşullara uyan öğe yok.';
+  @override
+  String diskCleanerDashboardCount(int count) => '$count öğe';
+  @override
+  String diskCleanerDashboardAtLeast(String size) => 'En az $size';
+  @override
+  String diskCleanerDashboardUnusedFor(String age) => '$age+ kullanılmadı';
+  @override
+  String diskCleanerDashboardMonths(int months) => '$months ay';
+  @override
+  String diskCleanerDashboardYears(int years) => '$years yıl';
+  @override
+  String diskCleanerDashboardOfDisk(String percent) => 'diskin $percent';
+  @override
+  String diskCleanerFileTypeLabel(String group) => switch (group) {
+    'video' => 'Videolar',
+    'disk_image' => 'Disk görüntüleri (ISO, VHD…)',
+    'archive' => 'Arşivler',
+    'installer' => 'Yükleyiciler',
+    'ai_model' => 'Yapay zeka modelleri',
+    'database_mail' => 'Veritabanı ve posta',
+    'audio' => 'Ses',
+    'image_raw' => 'RAW ve tasarım görselleri',
+    'dump_log' => 'Döküm ve günlükler',
+    'game_data' => 'Oyun verileri',
+    'other' => 'Diğer dosyalar',
+    _ => group,
+  };
+  @override
   String get diskCleanerAdviceFromScan => 'Tarama meta verilerine dayalı';
   @override
   String get diskCleanerAdviceFromAi => 'Yapay zeka önerisi';

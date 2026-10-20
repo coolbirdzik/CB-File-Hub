@@ -3679,6 +3679,76 @@ class ChineseLocalizations implements AppLocalizations {
   @override
   String get diskCleanerSuggestAndSelect => '快速分析';
   @override
+  String get diskCleanerQuickReviewHint => '根据扫描元数据说明每个分组；AI 只查看少数不明确的分组。';
+  @override
+  String get diskCleanerFullAiReview => 'AI 全面审查';
+  @override
+  String get diskCleanerFullAiReviewHint =>
+      'AI 从最大的分组开始评估每个分组。本地模型较慢，可随时停止并继续。';
+  @override
+  String get diskCleanerFullAiReviewRequest =>
+      '用 AI 从最大的分组开始审查扫描结果中的每个分组：这是什么数据，应保留还是可以考虑删除。'
+      '不要读取文件内容、不要选择文件，也不要删除任何内容。请用中文回答。';
+  @override
+  String get diskCleanerStopAiReview => '停止 AI 审查';
+  @override
+  String get diskCleanerAiReviewOptions => 'AI 审查选项';
+  @override
+  String get diskCleanerSelectionMenu => '选择';
+  @override
+  String get diskCleanerAiNeedsFreshScan => '正在显示已保存的结果。请重新扫描，让 AI 审查当前磁盘。';
+  @override
+  String get diskCleanerAiWaitForScan => '请等待扫描完成后再进行 AI 审查。';
+  @override
+  String get diskCleanerAiWaitForCleanup => '请先完成当前的清理审查，再询问 AI。';
+  @override
+  String diskCleanerAiReviewProgress(int percent) => 'AI $percent%';
+  @override
+  String get diskCleanerDashboardTitle => '概览';
+  @override
+  String get diskCleanerDashboardHint => '选择一张卡片查看详情并筛选。';
+  @override
+  String get diskCleanerDashboardHeavyFolders => '大文件夹';
+  @override
+  String get diskCleanerDashboardLargeFiles => '大文件';
+  @override
+  String get diskCleanerDashboardOldUnused => '旧的、长期未用';
+  @override
+  String get diskCleanerDashboardKnownCauses => '已知占用来源';
+  @override
+  String get diskCleanerDashboardFileTypes => '按文件类型';
+  @override
+  String get diskCleanerDashboardAllTypes => '所有类型';
+  @override
+  String get diskCleanerDashboardNoMatches => '没有符合条件的项目。';
+  @override
+  String diskCleanerDashboardCount(int count) => '$count 项';
+  @override
+  String diskCleanerDashboardAtLeast(String size) => '至少 $size';
+  @override
+  String diskCleanerDashboardUnusedFor(String age) => '至少 $age 未使用';
+  @override
+  String diskCleanerDashboardMonths(int months) => '$months 个月';
+  @override
+  String diskCleanerDashboardYears(int years) => '$years 年';
+  @override
+  String diskCleanerDashboardOfDisk(String percent) => '占磁盘 $percent';
+  @override
+  String diskCleanerFileTypeLabel(String group) => switch (group) {
+    'video' => '视频',
+    'disk_image' => '磁盘镜像（ISO、VHD…）',
+    'archive' => '压缩包',
+    'installer' => '安装程序',
+    'ai_model' => 'AI 模型',
+    'database_mail' => '数据库和邮件',
+    'audio' => '音频',
+    'image_raw' => 'RAW 和设计图片',
+    'dump_log' => '转储和日志',
+    'game_data' => '游戏数据',
+    'other' => '其他文件',
+    _ => group,
+  };
+  @override
   String get diskCleanerAdviceFromScan => '基于扫描元数据';
   @override
   String get diskCleanerAdviceFromAi => 'AI 建议';

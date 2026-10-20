@@ -3860,6 +3860,81 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get diskCleanerSuggestAndSelect => 'Xem nhanh';
   @override
+  String get diskCleanerQuickReviewHint =>
+      'Giải thích mọi nhóm từ dữ liệu quét; AI chỉ xem vài nhóm chưa rõ.';
+  @override
+  String get diskCleanerFullAiReview => 'Review toàn bộ bằng AI';
+  @override
+  String get diskCleanerFullAiReviewHint =>
+      'AI đánh giá mọi nhóm, nhóm lớn trước. Chậm với model local; có thể dừng và chạy tiếp.';
+  @override
+  String get diskCleanerFullAiReviewRequest =>
+      'Dùng AI review toàn bộ các nhóm trong kết quả quét, nhóm lớn trước: đây là dữ liệu gì, '
+      'nên giữ hay có thể cân nhắc xóa. Không đọc nội dung file, không tích chọn và không xóa. '
+      'Trả lời bằng tiếng Việt.';
+  @override
+  String get diskCleanerStopAiReview => 'Dừng review AI';
+  @override
+  String get diskCleanerAiReviewOptions => 'Tuỳ chọn review AI';
+  @override
+  String get diskCleanerSelectionMenu => 'Chọn';
+  @override
+  String get diskCleanerAiNeedsFreshScan =>
+      'Đang xem kết quả lưu đệm. Quét lại để AI review đúng ổ đĩa hiện tại.';
+  @override
+  String get diskCleanerAiWaitForScan => 'Chờ quét xong để review bằng AI.';
+  @override
+  String get diskCleanerAiWaitForCleanup =>
+      'Hoàn tất bước dọn/xem lại hiện tại trước khi hỏi AI.';
+  @override
+  String diskCleanerAiReviewProgress(int percent) => 'AI $percent%';
+  @override
+  String get diskCleanerDashboardTitle => 'Tổng quan';
+  @override
+  String get diskCleanerDashboardHint => 'Bấm một thẻ để xem chi tiết và lọc.';
+  @override
+  String get diskCleanerDashboardHeavyFolders => 'Thư mục nặng';
+  @override
+  String get diskCleanerDashboardLargeFiles => 'File lớn';
+  @override
+  String get diskCleanerDashboardOldUnused => 'Cũ, lâu không dùng';
+  @override
+  String get diskCleanerDashboardKnownCauses => 'Nguyên nhân đã biết';
+  @override
+  String get diskCleanerDashboardFileTypes => 'Theo loại file';
+  @override
+  String get diskCleanerDashboardAllTypes => 'Mọi loại';
+  @override
+  String get diskCleanerDashboardNoMatches =>
+      'Không có mục nào khớp điều kiện.';
+  @override
+  String diskCleanerDashboardCount(int count) => '$count mục';
+  @override
+  String diskCleanerDashboardAtLeast(String size) => 'Từ $size';
+  @override
+  String diskCleanerDashboardUnusedFor(String age) => 'Không dùng ≥ $age';
+  @override
+  String diskCleanerDashboardMonths(int months) => '$months tháng';
+  @override
+  String diskCleanerDashboardYears(int years) => '$years năm';
+  @override
+  String diskCleanerDashboardOfDisk(String percent) => '$percent ổ đĩa';
+  @override
+  String diskCleanerFileTypeLabel(String group) => switch (group) {
+    'video' => 'Video',
+    'disk_image' => 'Ảnh đĩa (ISO, VHD…)',
+    'archive' => 'File nén',
+    'installer' => 'Bộ cài',
+    'ai_model' => 'Model AI',
+    'database_mail' => 'CSDL & thư',
+    'audio' => 'Âm thanh',
+    'image_raw' => 'Ảnh RAW & thiết kế',
+    'dump_log' => 'Dump & log',
+    'game_data' => 'Dữ liệu game',
+    'other' => 'File khác',
+    _ => group,
+  };
+  @override
   String get diskCleanerAdviceFromScan => 'Theo dữ liệu quét';
   @override
   String get diskCleanerAdviceFromAi => 'Gợi ý từ AI';

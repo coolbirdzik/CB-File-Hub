@@ -3867,6 +3867,85 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get diskCleanerSuggestAndSelect => 'Quick review';
   @override
+  String get diskCleanerQuickReviewHint =>
+      'Explains every group from scan metadata; AI checks only the few unclear ones.';
+  @override
+  String get diskCleanerFullAiReview => 'Full AI review';
+  @override
+  String get diskCleanerFullAiReviewHint =>
+      'AI assesses every group, largest first. Slow on a local model; stop and resume any time.';
+  @override
+  String get diskCleanerFullAiReviewRequest =>
+      'Review every group of the scan results with AI, largest first: what the data is and '
+      'whether to keep it or consider removing it. Do not read file contents, select files '
+      'or delete anything. Answer in English.';
+  @override
+  String get diskCleanerStopAiReview => 'Stop AI review';
+  @override
+  String get diskCleanerAiReviewOptions => 'AI review options';
+  @override
+  String get diskCleanerSelectionMenu => 'Select';
+  @override
+  String get diskCleanerAiNeedsFreshScan =>
+      'Showing saved results. Scan again so AI reviews the current disk.';
+  @override
+  String get diskCleanerAiWaitForScan =>
+      'Wait for the scan to finish to review with AI.';
+  @override
+  String get diskCleanerAiWaitForCleanup =>
+      'Finish the current cleanup review before asking AI.';
+  @override
+  String diskCleanerAiReviewProgress(int percent) => 'AI $percent%';
+  @override
+  String get diskCleanerDashboardTitle => 'Overview';
+  @override
+  String get diskCleanerDashboardHint =>
+      'Pick a card to see details and filter them.';
+  @override
+  String get diskCleanerDashboardHeavyFolders => 'Heavy folders';
+  @override
+  String get diskCleanerDashboardLargeFiles => 'Large files';
+  @override
+  String get diskCleanerDashboardOldUnused => 'Old & unused';
+  @override
+  String get diskCleanerDashboardKnownCauses => 'Known space hogs';
+  @override
+  String get diskCleanerDashboardFileTypes => 'By file type';
+  @override
+  String get diskCleanerDashboardAllTypes => 'All types';
+  @override
+  String get diskCleanerDashboardNoMatches =>
+      'Nothing matches these conditions.';
+  @override
+  String diskCleanerDashboardCount(int count) =>
+      count == 1 ? '1 item' : '$count items';
+  @override
+  String diskCleanerDashboardAtLeast(String size) => 'At least $size';
+  @override
+  String diskCleanerDashboardUnusedFor(String age) => 'Unused $age+';
+  @override
+  String diskCleanerDashboardMonths(int months) => '$months months';
+  @override
+  String diskCleanerDashboardYears(int years) =>
+      years == 1 ? '1 year' : '$years years';
+  @override
+  String diskCleanerDashboardOfDisk(String percent) => '$percent of disk';
+  @override
+  String diskCleanerFileTypeLabel(String group) => switch (group) {
+    'video' => 'Videos',
+    'disk_image' => 'Disk images (ISO, VHD…)',
+    'archive' => 'Archives',
+    'installer' => 'Installers',
+    'ai_model' => 'AI models',
+    'database_mail' => 'Databases & mail',
+    'audio' => 'Audio',
+    'image_raw' => 'RAW & design images',
+    'dump_log' => 'Dumps & logs',
+    'game_data' => 'Game data',
+    'other' => 'Other files',
+    _ => group,
+  };
+  @override
   String get diskCleanerAdviceFromScan => 'Based on scan metadata';
   @override
   String get diskCleanerAdviceFromAi => 'AI recommendation';

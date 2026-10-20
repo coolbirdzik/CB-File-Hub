@@ -76,6 +76,7 @@ class AiMessage extends Equatable {
   /// Preserve the explicit full-scan action when retrying an unchanged request.
   final bool reviewEntireCleanerScan;
   final String cleanerReviewLanguageCode;
+  final bool cleanerReviewAllGroups;
 
   const AiMessage({
     required this.id,
@@ -90,6 +91,7 @@ class AiMessage extends Equatable {
     this.referencedFiles,
     this.reviewEntireCleanerScan = false,
     this.cleanerReviewLanguageCode = 'en',
+    this.cleanerReviewAllGroups = false,
   });
 
   AiMessage copyWith({
@@ -115,6 +117,7 @@ class AiMessage extends Equatable {
       referencedFiles: referencedFiles ?? this.referencedFiles,
       reviewEntireCleanerScan: reviewEntireCleanerScan,
       cleanerReviewLanguageCode: cleanerReviewLanguageCode,
+      cleanerReviewAllGroups: cleanerReviewAllGroups,
     );
   }
 
@@ -132,6 +135,7 @@ class AiMessage extends Equatable {
     referencedFiles,
     reviewEntireCleanerScan,
     cleanerReviewLanguageCode,
+    cleanerReviewAllGroups,
   ];
 
   Map<String, dynamic> toJson() => {
@@ -146,6 +150,8 @@ class AiMessage extends Equatable {
     if (reviewEntireCleanerScan) 'reviewEntireCleanerScan': true,
     if (reviewEntireCleanerScan)
       'cleanerReviewLanguageCode': cleanerReviewLanguageCode,
+    if (reviewEntireCleanerScan && cleanerReviewAllGroups)
+      'cleanerReviewAllGroups': true,
   };
 
   factory AiMessage.fromJson(Map<String, dynamic> json) {
@@ -165,6 +171,7 @@ class AiMessage extends Equatable {
       reviewEntireCleanerScan: json['reviewEntireCleanerScan'] == true,
       cleanerReviewLanguageCode:
           json['cleanerReviewLanguageCode'] as String? ?? 'en',
+      cleanerReviewAllGroups: json['cleanerReviewAllGroups'] == true,
       timestamp:
           DateTime.tryParse(json['timestamp'] as String? ?? '') ??
           DateTime.now(),

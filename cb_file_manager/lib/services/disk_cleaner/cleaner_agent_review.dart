@@ -179,6 +179,9 @@ class CleanerFullReview {
   bool _indexReady = true;
   int aggregatedItems = 0;
   final List<CleanerReviewGroup> groups = [];
+
+  /// Started as a full AI review; only such a run resumes it as one.
+  bool aiAllGroups = false;
   Map<String, CleanerReviewGroup> _groupsByPath = {};
   Map<DiskTreeNode, DiskTreeNode> _directoryParents = {};
 

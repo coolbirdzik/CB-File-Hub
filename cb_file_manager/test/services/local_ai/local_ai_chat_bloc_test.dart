@@ -199,6 +199,99 @@ void main() {
     });
   }
 
+  test('full AI review assesses every group, largest first, and resumes '
+      'after Stop', () async {
+    const owner = 'full-cleaner-bloc-test';
+    final cleaner = DiskCleanerService.instance;
+    final files = List.generate(
+      60,
+      (i) => DiskTreeNode(
+        name: 'data.bin',
+        fullPath: 'C:\\Data\\app$i\\data.bin',
+        isFile: true,
+        sizeBytes: i + 1,
+      ),
+    );
+    final root = DiskTreeNode(name: 'C:', fullPath: r'C:\', children: files);
+    cleaner.publishCleanerScanContext(
+      ownerTabId: owner,
+      root: root,
+      reviewItem: (_, _) => true,
+      reviewGroup: (_, _) => true,
+    );
+    addTearDown(() => cleaner.clearCleanerScanContext(owner));
+
+    List<String> idsOf(List<Map<String, String>> request) {
+      final prompt = request.single['content']!;
+      final evidence = jsonDecode(prompt.split('Evidence: ').last) as List;
+      return [for (final e in evidence) e['group_id'] as String];
+    }
+
+    AiAgentBloc? bloc;
+    var stopOnRequest = 2;
+    final runtime = _ConversationRuntime(
+      [],
+      respond: (messages) {
+        final runtimeRequests = idsOf(messages);
+        if (stopOnRequest > 0 && --stopOnRequest == 0) {
+          bloc!.add(const StopGeneration());
+        }
+        return [
+          jsonEncode({
+            'assessments': [
+              for (final id in runtimeRequests)
+                {'group_id': id, 'decision': 'KEEP', 'reason': 'App data.'},
+            ],
+          }),
+        ];
+      },
+    );
+    final tools = _RecordingTools(ownerTabId: owner);
+    bloc = await createBloc(runtime, tools);
+    const request = SendMessage(
+      'Full review',
+      reviewEntireCleanerScan: true,
+      cleanerReviewAllGroups: true,
+    );
+
+    bloc.add(request);
+    await _waitUntil(() => runtime.requests.length >= 2);
+    await _waitUntil(() => !bloc!.state.isLoading);
+    final review = cleaner.fullCleanerReview(owner)!;
+    expect(review.isComplete, isFalse, reason: 'Stopped mid-way');
+    final firstRun = runtime.requests.map(idsOf).toList();
+    expect(firstRun.first.first, 'group_59', reason: 'Largest group first');
+
+    bloc.add(request);
+    await _waitUntil(
+      () => bloc!.state.messages.last.content.contains('AI review ready'),
+    );
+    expect(identical(cleaner.fullCleanerReview(owner), review), isTrue);
+    expect(review.isComplete, isTrue);
+    final resumed = runtime.requests.skip(firstRun.length).map(idsOf);
+    expect(
+      resumed.expand((ids) => ids).toSet().intersection(firstRun.first.toSet()),
+      isEmpty,
+      reason: 'Groups assessed before Stop are not sent again',
+    );
+    expect(
+      runtime.requests.length,
+      greaterThan(CleanerReviewRun.maxAiBatches),
+      reason: 'No quick-review batch cap',
+    );
+    expect(
+      review.groups.every(
+        (g) =>
+            !g.analysis!.fromScan &&
+            g.analysis!.decision == CleanerItemDecision.keep &&
+            !g.analysis!.selectForCleanup,
+      ),
+      isTrue,
+    );
+    expect(files.every((file) => !file.isSelectedForDeletion), isTrue);
+    expect(tools.calls, isEmpty);
+  });
+
   test('recognized Cleaner data needs no model calls', () async {
     const owner = 'quick-known-cleaner-test';
     final cleaner = DiskCleanerService.instance;
@@ -416,9 +509,12 @@ class _ConversationRuntime extends LocalAiChatRuntime
     implements LocalAiConversationRuntime {
   final List<List<String>> responses;
   final String? liveUrl;
+
+  /// Answers a request from its messages instead of [responses].
+  final List<String> Function(List<Map<String, String>> messages)? respond;
   final requests = <List<Map<String, String>>>[];
   final http = _RealHttpOverrides().createHttpClient(null);
-  _ConversationRuntime(this.responses, {this.liveUrl});
+  _ConversationRuntime(this.responses, {this.liveUrl, this.respond});
   @override
   Stream<String> sendConversationStream({
     required InstalledLocalModel model,
@@ -437,6 +533,7 @@ class _ConversationRuntime extends LocalAiChatRuntime
         maxResponseTokens: 2048,
       );
     }
+    if (respond != null) return Stream.fromIterable(respond!(messages));
     return Stream.fromIterable(responses[requests.length - 1]);
   }
 

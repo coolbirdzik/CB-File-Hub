@@ -39,7 +39,7 @@ use job::Job;
 use search::{Matcher, Search};
 
 /// Bumped whenever an exported signature changes; Dart refuses a mismatch.
-const ABI_VERSION: u32 = 3;
+const ABI_VERSION: u32 = 4;
 
 pub const STATUS_OK: i32 = 0;
 pub const STATUS_INVALID_ARGUMENT: i32 = 1;

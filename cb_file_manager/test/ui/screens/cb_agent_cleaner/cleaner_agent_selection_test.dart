@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:cb_file_manager/config/languages/app_localizations_delegate.dart';
+import 'package:cb_file_manager/design_system/cb_theme_builder.dart';
 import 'package:cb_file_manager/bloc/ai_agent/ai_agent_bloc.dart';
 import 'package:cb_file_manager/bloc/ai_agent/ai_agent_event.dart';
 import 'package:cb_file_manager/bloc/ai_agent/ai_agent_state.dart';
@@ -34,6 +35,12 @@ class _Cleaner extends DiskCleanerService {
     DriveSpace(path: r'C:\', label: 'Test', totalBytes: 10000, freeBytes: 5000),
   ];
 
+  /// Like the real service, a completed scan is what setup shows next time.
+  FullDiskScanResult? _completed;
+
+  @override
+  FullDiskScanResult? cachedFullScanResult(String drivePath) => _completed;
+
   @override
   Future<FullDiskScanHandle> scanFullDisk({
     required String drivePath,
@@ -42,7 +49,10 @@ class _Cleaner extends DiskCleanerService {
     int maxChildrenPerDirectory = defaultMaxChildrenPerDirectory,
   }) async => FullDiskScanHandle.completed(
     drivePath: drivePath,
-    result: FullDiskScanResult(root: root, duration: Duration.zero),
+    result: _completed = FullDiskScanResult(
+      root: root,
+      duration: Duration.zero,
+    ),
   );
 }
 
@@ -99,6 +109,7 @@ class _Panel extends AiPanelController {
 }
 
 void main() {
+  _toolbarTests();
   testWidgets(
     'agent selection checks and reveals exact scan rows and keeps deletion behind review',
     (tester) async {
@@ -463,4 +474,141 @@ void main() {
       expect(cleaner.getCleanerScanContext(ownerTabId: tabId), isNull);
     },
   );
+}
+
+void _toolbarTests() {
+  // 1400: one action row beside the drive; 1000: the narrow wrapped layout.
+  for (final width in [1400.0, 1000.0]) {
+    testWidgets('toolbar groups selection and AI review into menus ($width)', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({});
+      GetIt.instance.pushNewScope();
+      GetIt.instance.registerSingleton<AiProviderService>(_AvailableProvider());
+      addTearDown(GetIt.instance.popScope);
+      tester.view.physicalSize = Size(width, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final junk = DiskTreeNode(
+        name: 'a.tmp',
+        fullPath: r'C:\Cache\a.tmp',
+        isFile: true,
+        sizeBytes: 100,
+        fileCount: 1,
+        junkCategoryId: 'windows_temp',
+      );
+      final root = DiskTreeNode(
+        name: r'C:\',
+        fullPath: r'C:\',
+        sizeBytes: 100,
+        fileCount: 1,
+        isExpanded: true,
+        children: [
+          DiskTreeNode(
+            name: 'Cache',
+            fullPath: r'C:\Cache',
+            sizeBytes: 100,
+            fileCount: 1,
+            children: [junk],
+          ),
+        ],
+      );
+      final reviewBloc = _ReviewBloc();
+      final panel = _Panel(reviewBloc);
+      addTearDown(reviewBloc.close);
+      addTearDown(panel.dispose);
+      final tabs = TabManagerBloc()..add(AddTab(path: '#cb-agent-cleaner'));
+      await tester.pump();
+      addTearDown(tabs.close);
+
+      await tester.pumpWidget(
+        AiPanelScope(
+          controller: panel,
+          child: BlocProvider.value(
+            value: tabs,
+            child: MaterialApp(
+              // The app theme: compact menu rows, as on Windows.
+              theme: CbThemeBuilder.build(
+                brightness: Brightness.light,
+                accent: Colors.indigo,
+              ).copyWith(visualDensity: VisualDensity.compact),
+              locale: const Locale('en'),
+              supportedLocales: const [Locale('en')],
+              localizationsDelegates: const [
+                AppLocalizationsDelegate(),
+                GlobalMaterialLocalizations.delegate,
+                GlobalWidgetsLocalizations.delegate,
+                GlobalCupertinoLocalizations.delegate,
+              ],
+              home: Scaffold(
+                body: CbAgentCleanerScreen(
+                  tabId: tabs.state.activeTabId!,
+                  cleanerService: _Cleaner(root),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('cleaner-scan-cta')));
+      await tester.pumpAndSettle();
+
+      // Check-all lives in the selection menu now.
+      await tester.tap(find.byKey(const ValueKey('cleaner-check-menu')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('cleaner-check-all')));
+      await tester.pumpAndSettle();
+      expect(junk.isSelectedForDeletion, isTrue);
+
+      // Saved (cached) results cannot be reviewed: the menu says why and
+      // offers a fresh scan instead of silently disabled entries.
+      await tester.tap(find.byKey(const ValueKey('cleaner-select-drives')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('cleaner-scan-cta')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('cleaner-agent-review-menu')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('cleaner-agent-blocked')),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .widget<MenuItemButton>(
+              find.byKey(const ValueKey('cleaner-agent-full-review')),
+            )
+            .onPressed,
+        isNull,
+      );
+      await tester.tap(find.byKey(const ValueKey('cleaner-agent-rescan')));
+      await tester.pumpAndSettle();
+      expect(junk.isSelectedForDeletion, isFalse, reason: 'Fresh scan');
+
+      // The caret starts the full AI review.
+      await tester.tap(find.byKey(const ValueKey('cleaner-agent-review-menu')));
+      await tester.pumpAndSettle();
+      expect(find.text('Full AI review'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('cleaner-agent-full-review')));
+      await tester.pumpAndSettle();
+      expect(reviewBloc.reviewRequests, hasLength(1));
+      final request = reviewBloc.reviewRequests.single;
+      expect(request.reviewEntireCleanerScan, isTrue);
+      expect(request.cleanerReviewAllGroups, isTrue);
+
+      // While it runs, the main half shows progress and the menu offers Stop.
+      reviewBloc.beginReview();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.text('AI 0%'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('cleaner-agent-review-menu')));
+      // The spinner never settles; pump past the menu's open animation.
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(
+        find.byKey(const ValueKey('cleaner-agent-stop-review')),
+        findsOneWidget,
+      );
+    });
+  }
 }

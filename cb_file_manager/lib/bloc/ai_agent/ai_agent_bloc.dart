@@ -701,7 +701,9 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
       timestamp: DateTime.now(),
       reviewEntireCleanerScan: true,
       cleanerReviewLanguageCode: event.cleanerReviewLanguageCode,
+      cleanerReviewAllGroups: event.cleanerReviewAllGroups,
     );
+    final allGroups = event.cleanerReviewAllGroups;
     final messages = [...state.messages, userMessage];
     final assistantId = _uuid.v4();
     final local = _isLocalAiSelected();
@@ -736,15 +738,21 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
 
     CleanerReviewRun? run;
     try {
-      showProgress(switch (event.cleanerReviewLanguageCode) {
-        'vi' => 'Đang nhận diện nhanh dữ liệu từ kết quả quét…',
-        'tr' => 'Tarama meta verilerinden hızlı bir genel bakış hazırlanıyor…',
-        'zh' => '正在根据扫描元数据准备快速概览…',
+      showProgress(switch ((event.cleanerReviewLanguageCode, allGroups)) {
+        ('vi', true) => 'Đang chuẩn bị review toàn bộ bằng AI…',
+        ('vi', false) => 'Đang nhận diện nhanh dữ liệu từ kết quả quét…',
+        ('tr', true) => 'Tüm gruplar için yapay zeka incelemesi hazırlanıyor…',
+        ('tr', false) =>
+          'Tarama meta verilerinden hızlı bir genel bakış hazırlanıyor…',
+        ('zh', true) => '正在准备 AI 全面审查…',
+        ('zh', false) => '正在根据扫描元数据准备快速概览…',
+        (_, true) => 'Preparing an AI review of every group…',
         _ => 'Preparing a quick overview from scan metadata…',
       });
       run = CleanerReviewRun(
         _toolExecutor.ownerTabId,
         languageCode: event.cleanerReviewLanguageCode,
+        allGroups: allGroups,
       );
       final review = run.review;
       await review.prepareGroups(
@@ -760,7 +768,11 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
             )
           : 6000;
       final activeRun = run;
-      final aiGroups = activeRun.quickAiGroups();
+      // A full review sends every pending group to the model, largest first,
+      // so stopping early still covers the space that matters most.
+      final aiGroups = allGroups
+          ? activeRun.allAiGroups()
+          : activeRun.quickAiGroups();
       final aiGroupSet = aiGroups.toSet();
       final scanGroups = review.groups
           .where(
@@ -915,7 +927,7 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
       for (final batch
           in activeRun
               .batches(maxEvidenceChars: evidenceBudget, groups: aiGroups)
-              .take(CleanerReviewRun.maxAiBatches)) {
+              .take(allGroups ? 1 << 30 : CleanerReviewRun.maxAiBatches)) {
         _ensureGenerationActive(generationId);
         activeRun.requireActiveContext();
         showProgress(activeRun.batchProgressText(batch));
@@ -2069,6 +2081,7 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
             original.reviewEntireCleanerScan &&
             trimmed == original.content.trim(),
         cleanerReviewLanguageCode: original.cleanerReviewLanguageCode,
+        cleanerReviewAllGroups: original.cleanerReviewAllGroups,
       ),
     );
   }

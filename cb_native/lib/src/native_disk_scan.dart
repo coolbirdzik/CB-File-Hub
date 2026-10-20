@@ -93,6 +93,7 @@ class NativeDirRecord {
     required this.foldedEntries,
     required this.ownBytes,
     required this.ownFiles,
+    required this.newestActivityFileTime,
     required this.reparseNames,
   });
 
@@ -114,6 +115,10 @@ class NativeDirRecord {
   /// Direct files only; subdirectories report their own.
   final int ownBytes;
   final int ownFiles;
+
+  /// Newest FILETIME among the direct entries (files' write or access,
+  /// subfolders' own write); 0 when there are none.
+  final int newestActivityFileTime;
 
   /// Direct entries skipped because they are reparse points.
   final List<String> reparseNames;
@@ -369,6 +374,7 @@ class _RecordReader {
       foldedEntries: _u64(),
       ownBytes: _u64(),
       ownFiles: _u64(),
+      newestActivityFileTime: _u64(),
       reparseNames: List.generate(_u32(), (_) => _str()),
     );
   }

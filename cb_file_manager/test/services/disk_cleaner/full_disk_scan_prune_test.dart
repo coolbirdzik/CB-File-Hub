@@ -403,13 +403,14 @@ void main() {
     });
 
     test(
-      'retains independent 50-item folder and file caps within 100 total',
+      'retains independent per-type folder and file caps within 100 total',
       () {
         final folders = <FullDiskScanInsight>[];
         final files = <FullDiskScanInsight>[];
         final oldActivity = DateTime(2025, 1, 1);
 
-        for (var index = 0; index < 60; index++) {
+        const count = defaultOldLargeItemsPerType + 10;
+        for (var index = 0; index < count; index++) {
           retainOldLargeDiskInsight(
             folders,
             FullDiskScanInsight(
@@ -442,8 +443,8 @@ void main() {
         );
         expect(combined, hasLength(100));
         expect(combined.length, lessThanOrEqualTo(defaultMaxOldLargeItems));
-        expect(folders.first.name, 'folder-59');
-        expect(files.first.name, 'file-59');
+        expect(folders.first.name, 'folder-${count - 1}');
+        expect(files.first.name, 'file-${count - 1}');
       },
     );
 

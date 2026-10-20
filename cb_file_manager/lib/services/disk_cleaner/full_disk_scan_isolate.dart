@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:ffi';
 import 'dart:io' show Platform, sleep;
 import 'dart:isolate';
+import 'dart:math' as math;
 
 import 'package:cb_native/cb_native.dart';
 import 'package:ffi/ffi.dart';
@@ -35,7 +37,7 @@ const int defaultOldLargeFileBytes = 100 * 1024 * 1024;
 const int defaultOldLargeDirectoryBytes = 512 * 1024 * 1024;
 
 /// Keep the evidence payload small and useful on a busy system drive.
-const int defaultOldLargeItemsPerType = 50;
+const int defaultOldLargeItemsPerType = 200;
 
 /// Keep the final old-large evidence payload explicitly bounded even if the
 /// per-type retention policy changes independently in the future.
@@ -152,12 +154,47 @@ List<FullDiskScanInsight> buildBoundedOldLargeDiskEvidence({
   int maxItems = defaultMaxOldLargeItems,
 }) {
   if (maxItems <= 0) return <FullDiskScanInsight>[];
-  final items = <FullDiskScanInsight>[...folders, ...files]
-    ..sort(compareOldLargeDiskInsights);
+  final items = outermostOldLargeDiskInsights(<FullDiskScanInsight>[
+    ...folders,
+    ...files,
+  ])..sort(compareOldLargeDiskInsights);
   if (items.length > maxItems) {
     items.removeRange(maxItems, items.length);
   }
   return items;
+}
+
+/// Drops evidence inside an old folder that is itself listed: once a folder
+/// counts as unused as a whole, its subfolders and files repeat the same bytes.
+List<FullDiskScanInsight> outermostOldLargeDiskInsights(
+  Iterable<FullDiskScanInsight> items,
+) {
+  String key(String path) {
+    var normalized = path.replaceAll('/', r'\').toUpperCase();
+    while (normalized.endsWith(r'\')) {
+      normalized = normalized.substring(0, normalized.length - 1);
+    }
+    return normalized;
+  }
+
+  final folders = items.where((item) => !item.isFile).toList()
+    ..sort((a, b) => a.path.length.compareTo(b.path.length));
+  final kept = <String>[];
+  bool inside(String path) {
+    final target = key(path);
+    return kept.any((folder) => target.startsWith('$folder\\'));
+  }
+
+  final result = <FullDiskScanInsight>[];
+  for (final folder in folders) {
+    if (inside(folder.path)) continue;
+    kept.add(key(folder.path));
+    result.add(folder);
+  }
+  for (final file in items.where((item) => item.isFile)) {
+    if (!inside(file.path)) result.add(file);
+  }
+  return result;
 }
 
 /// Serializable junk rule consumed by the full-disk scan isolate.
@@ -407,6 +444,12 @@ DateTime? _fileTimeToDateTime(win32.FILETIME fileTime) {
   );
 }
 
+int _fileTimeTicks(int low, int high) =>
+    ((high & 0xffffffff) << 32) | (low & 0xffffffff);
+
+DateTime? _fileTimeFromTicks(int ticks) =>
+    _fileTimePartsToDateTime(ticks & 0xffffffff, ticks >> 32);
+
 DateTime? _fileTimePartsToDateTime(int low, int high) {
   final ticks = (high << 32) | (low & 0xffffffff);
   const windowsToUnixEpochTicks = 116444736000000000;
@@ -520,6 +563,10 @@ void _fullDiskScanWorker(_FullScanArgs args) {
   final coverageIssues = <FullDiskScanCoverageIssue>[];
   final oldLargeFiles = <FullDiskScanInsight>[];
   final oldLargeDirectories = <FullDiskScanInsight>[];
+  // Newest activity (FILETIME ticks) anywhere inside each scanned folder. A
+  // folder's own last-write only changes when its direct entries change, so
+  // C:\Users\me\AppData looks years old while its contents change daily.
+  final subtreeActivity = HashMap<DiskTreeNode, int>.identity();
   final scanStartedAt = DateTime.now();
   final wholeDirRules = args.junkRules
       .where((rule) => rule.includeGlobs.isEmpty)
@@ -733,6 +780,7 @@ void _fullDiskScanWorker(_FullScanArgs args) {
     // capped, so the completed tree contains every folder without retaining a
     // node for every small file in a large directory.
     final retainedFiles = <DiskTreeNode>[];
+    var newestActivity = 0;
     var foldedFileBytes = 0;
     var foldedFileCount = 0;
     var foldedJunkBytes = 0;
@@ -827,8 +875,7 @@ void _fullDiskScanWorker(_FullScanArgs args) {
             // the old-large threshold.
             final lastWriteLow = findData.ref.ftLastWriteTime.dwLowDateTime;
             final lastWriteHigh = findData.ref.ftLastWriteTime.dwHighDateTime;
-            final lastAccessLow = findData.ref.ftLastAccessTime.dwLowDateTime;
-            final lastAccessHigh = findData.ref.ftLastAccessTime.dwHighDateTime;
+            final childWrite = _fileTimeTicks(lastWriteLow, lastWriteHigh);
             final childJunkCategory =
                 inheritedJunkCategory ?? wholeDirCategory(fullPath);
             final child = DiskTreeNode(
@@ -844,6 +891,11 @@ void _fullDiskScanWorker(_FullScanArgs args) {
             scanInto(child, depth + 1, childJunkCategory);
             node.sizeBytes += child.sizeBytes;
             node.fileCount += child.fileCount;
+            final childActivity = math.max(
+              childWrite,
+              subtreeActivity.remove(child) ?? 0,
+            );
+            newestActivity = math.max(newestActivity, childActivity);
             if (child.sizeBytes >= defaultOldLargeDirectoryBytes) {
               retainOldLargeDiskInsight(
                 oldLargeDirectories,
@@ -852,14 +904,7 @@ void _fullDiskScanWorker(_FullScanArgs args) {
                   path: fullPath,
                   isFile: false,
                   sizeBytes: child.sizeBytes,
-                  lastModified: _fileTimePartsToDateTime(
-                    lastWriteLow,
-                    lastWriteHigh,
-                  ),
-                  lastAccessed: _fileTimePartsToDateTime(
-                    lastAccessLow,
-                    lastAccessHigh,
-                  ),
+                  lastModified: _fileTimeFromTicks(childActivity),
                 ),
                 now: scanStartedAt,
               );
@@ -869,6 +914,19 @@ void _fullDiskScanWorker(_FullScanArgs args) {
             final sizeHigh = findData.ref.nFileSizeHigh;
             final sizeLow = findData.ref.nFileSizeLow;
             final fileSize = (sizeHigh << 32) | sizeLow;
+            newestActivity = math.max(
+              newestActivity,
+              math.max(
+                _fileTimeTicks(
+                  findData.ref.ftLastWriteTime.dwLowDateTime,
+                  findData.ref.ftLastWriteTime.dwHighDateTime,
+                ),
+                _fileTimeTicks(
+                  findData.ref.ftLastAccessTime.dwLowDateTime,
+                  findData.ref.ftLastAccessTime.dwHighDateTime,
+                ),
+              ),
+            );
             if (fileSize >= defaultOldLargeFileBytes) {
               final lastModified = _fileTimeToDateTime(
                 findData.ref.ftLastWriteTime,
@@ -941,6 +999,7 @@ void _fullDiskScanWorker(_FullScanArgs args) {
     } finally {
       calloc.free(findData);
       calloc.free(lpFileName);
+      subtreeActivity[node] = newestActivity;
       for (final file in retainedFiles) {
         node.addChild(file);
       }
@@ -1014,8 +1073,11 @@ void _fullDiskScanWorker(_FullScanArgs args) {
     DateTime? fileTime(int ticks) =>
         _fileTimePartsToDateTime(ticks & 0xffffffff, ticks >> 32);
 
+    final ownActivity = <int, int>{};
+
     void apply(NativeDirRecord record) {
       final dir = nodes[record.id]!;
+      ownActivity[record.id] = record.newestActivityFileTime;
       final dirPath = dir.fullPath;
       final separator = dirPath.endsWith('\\') ? '' : '\\';
       switch (record.status) {
@@ -1145,31 +1207,42 @@ void _fullDiskScanWorker(_FullScanArgs args) {
       scan.dispose();
     }
 
-    void finishDirectory(DiskTreeNode directory) {
+    final idOf = HashMap<DiskTreeNode, int>.identity();
+    nodes.forEach((id, directory) => idOf[directory] = id);
+
+    // Bottom-up: sizes are final, and each folder's newest activity becomes
+    // its own entries', its own write time and its subfolders' newest.
+    int finishDirectory(DiskTreeNode directory) {
+      final id = idOf[directory]!;
+      var newest = math.max(
+        ownActivity[id] ?? 0,
+        subdirs[id]?.lastWriteFileTime ?? 0,
+      );
       for (final child in directory.children) {
-        if (!child.isFile) finishDirectory(child);
+        if (!child.isFile && idOf.containsKey(child)) {
+          newest = math.max(newest, finishDirectory(child));
+        }
       }
       directory.sortBySize(recursive: false);
       cacheDirectJunkMetadata(directory);
+      if (subdirs[id] case final subdir?
+          when directory.sizeBytes >= defaultOldLargeDirectoryBytes) {
+        retainOldLargeDiskInsight(
+          oldLargeDirectories,
+          FullDiskScanInsight(
+            name: subdir.name,
+            path: directory.fullPath,
+            isFile: false,
+            sizeBytes: directory.sizeBytes,
+            lastModified: fileTime(newest),
+          ),
+          now: scanStartedAt,
+        );
+      }
+      return newest;
     }
 
-    finishDirectory(node);
-    subdirs.forEach((id, subdir) {
-      final directory = nodes[id]!;
-      if (directory.sizeBytes < defaultOldLargeDirectoryBytes) return;
-      retainOldLargeDiskInsight(
-        oldLargeDirectories,
-        FullDiskScanInsight(
-          name: subdir.name,
-          path: directory.fullPath,
-          isFile: false,
-          sizeBytes: directory.sizeBytes,
-          lastModified: fileTime(subdir.lastWriteFileTime),
-          lastAccessed: fileTime(subdir.lastAccessFileTime),
-        ),
-        now: scanStartedAt,
-      );
-    });
+    subtreeActivity[node] = finishDirectory(node);
     return true;
   }
 
