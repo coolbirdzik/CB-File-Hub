@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:isolate';
 
+import 'package:cb_native/cb_native.dart';
+
 import 'cleaner_models.dart';
 
 const Duration _defaultRootOpenTimeout = Duration(milliseconds: 800);
@@ -211,6 +213,97 @@ void _scanWorker(_SpawnArgs args) async {
     if (check == _DirectoryCheck.timedOut) {
       _addTimeoutWarnings(warnings, group.rules);
       continue;
+    }
+
+    // Rust walks the group when package:cb_native is built: no async stat
+    // per file and no RegExp per name, with the same rules and results.
+    // Duration.zero is the test seam for the Dart first-entry timeout below.
+    if (args.rootOpenTimeout != Duration.zero) {
+      final baseItems = totalItems;
+      final baseBytes = totalBytes;
+      final elapsed = Stopwatch()..start();
+      var nativeTimedOut = false;
+      final native = await NativeFs.junkScan(
+        scanPath: group.scanPath,
+        recursive: group.recursive,
+        lowerCaseKeys: Platform.isWindows,
+        rules: [
+          for (final (index, rule) in group.rules.indexed)
+            NativeJunkRule(
+              index: index,
+              baseKey: rule.baseKey,
+              recursive: rule.source.recursive,
+              includeGlobs: rule.source.includeGlobs,
+              excludeGlobs: rule.source.excludeGlobs,
+              // isAfter(cutoff) at millisecond precision.
+              cutoffMs: rule.minAgeCutoff == null
+                  ? null
+                  : rule.minAgeCutoff!.microsecondsSinceEpoch ~/ 1000,
+            ),
+        ],
+        tick: const Duration(milliseconds: 50),
+        shouldContinue: () => !nativeTimedOut,
+        onProgress: (progress) {
+          final counters = progress.counters;
+          // Like the Dart first-entry timeout: the root never opened.
+          if (counters[2] == 0 && elapsed.elapsed > args.rootOpenTimeout) {
+            nativeTimedOut = true;
+            return;
+          }
+          totalItems = baseItems + counters[0];
+          totalBytes = baseBytes + counters[1];
+          if (counters[3] > 0) {
+            currentCategory = group.rules[counters[3] - 1].source.categoryId;
+          }
+          maybeFlush(
+            progress.currentPath.isEmpty
+                ? group.scanPath
+                : progress.currentPath,
+          );
+        },
+      );
+      if (nativeTimedOut) {
+        _addTimeoutWarnings(warnings, group.rules);
+        continue;
+      }
+      if (native != null) {
+        totalItems = baseItems;
+        totalBytes = baseBytes;
+        for (final hit in native.hits) {
+          final entityPath = _pathKey(hit.path);
+          final modified = DateTime.fromMillisecondsSinceEpoch(hit.modifiedMs);
+          for (final index in hit.ruleIndices) {
+            final categoryId = group.rules[index].source.categoryId;
+            final seen = seenByCategory.putIfAbsent(
+              categoryId,
+              () => <String>{},
+            );
+            if (!seen.add(entityPath)) continue;
+            currentCategory = categoryId;
+            results
+                .putIfAbsent(categoryId, () => <JunkItem>[])
+                .add(
+                  JunkItem(
+                    path: hit.path,
+                    sizeBytes: hit.size,
+                    lastModified: modified,
+                    categoryId: categoryId,
+                  ),
+                );
+            totalItems++;
+            totalBytes += hit.size;
+          }
+        }
+        final error = native.error;
+        if (error != null) {
+          for (final rule in group.rules) {
+            warnings.add(
+              '${rule.source.categoryId}: $error (${rule.source.basePath})',
+            );
+          }
+        }
+        continue;
+      }
     }
 
     Object? streamError;

@@ -605,6 +605,7 @@ class CleanerSpaceInsights {
     int limit = 20,
   }) {
     final needle = query?.trim().toUpperCase() ?? '';
+    final scopeLength = scope.fullPath.length;
     final groupExtensions = typeGroup == null
         ? null
         : fileTypeGroups[typeGroup];
@@ -615,7 +616,15 @@ class CleanerSpaceInsights {
       if (node.fullPath.isEmpty || node.isAggregate) return false;
       if (kind == 'file' && !node.isFile) return false;
       if (kind == 'folder' && node.isFile) return false;
-      if (needle.isNotEmpty && !node.name.toUpperCase().contains(needle)) {
+      // The name or any folder below the scope: "PikPak" plus extension
+      // "pptd" finds the cache files inside a PikPak folder.
+      if (needle.isNotEmpty &&
+          !node.name.toUpperCase().contains(needle) &&
+          !(node.fullPath.length > scopeLength &&
+              node.fullPath
+                  .substring(scopeLength)
+                  .toUpperCase()
+                  .contains(needle))) {
         return false;
       }
       if (extensions.isEmpty && groupExtensions == null) return true;

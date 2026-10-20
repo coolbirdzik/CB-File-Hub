@@ -1,0 +1,38 @@
+[package]
+name = "cb_native"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+# Loaded by Dart FFI as a bundled dynamic library (see ../hook/build.dart).
+crate-type = ["cdylib"]
+
+# Every dependency is pure Rust so Android and iOS cross builds need no C
+# toolchain beyond the linker the build hook already configures.
+[dependencies]
+regex = "1"
+sha2 = "0.10"
+image = { version = "0.25", default-features = false, features = ["bmp", "gif", "ico", "jpeg", "png", "tga", "tiff", "webp"] }
+jpeg-decoder = { version = "0.3", default-features = false }
+fast_image_resize = "6"
+zip = { version = "9", default-features = false, features = ["bzip2", "deflate-flate2-zlib-rs", "deflate64", "lzma", "xz"] }
+tar = { version = "0.4", default-features = false }
+flate2 = { version = "1", default-features = false, features = ["zlib-rs"] }
+bzip2 = "0.6"
+lzma-rust2 = { version = "0.22", default-features = false, features = ["std", "xz"] }
+sevenz-rust2 = { version = "0.20", default-features = false, features = ["bzip2", "deflate"] }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = [
+  "Win32_Foundation",
+  "Win32_Security",
+  "Win32_Storage_FileSystem",
+  "Win32_System_IO",
+] }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = "symbols"

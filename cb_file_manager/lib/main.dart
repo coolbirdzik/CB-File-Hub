@@ -197,6 +197,7 @@ void main(List<String> args) {
 
 /// Shared entry for production [main] and for `integration_test` (with `--dart-define=CB_E2E=true`).
 Future<void> runCbFileApp() async {
+  final startupStopwatch = Stopwatch()..start();
   WidgetsFlutterBinding.ensureInitialized();
 
   // Bundled Inter / JetBrains Mono are OFL-licensed; the licence has to ship
@@ -631,10 +632,15 @@ Future<void> runCbFileApp() async {
     }
   } else {
     await initializeDataAndTags();
-    if (!kCbE2EFast) {
-      await initializeHeavyBackgroundServices();
-    }
+    debugPrint(
+      'Startup: data and tags ready after ${startupStopwatch.elapsedMilliseconds}ms',
+    );
   }
+  // Nothing on the first frame depends on these: the thumbnail cache loads on
+  // first use, and album monitoring probes every album folder, which stalls on
+  // an offline share or a spun-down disk while the window is already visible.
+  final deferHeavyServicesToFirstFrame =
+      !kCbE2EFast && !(isSecondaryWindow && !isProgressWindow);
 
   if (env['CB_PIP_MODE'] == '1' &&
       (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
@@ -705,6 +711,14 @@ Future<void> runCbFileApp() async {
       ),
     ),
   );
+
+  debugPrint('Startup: runApp after ${startupStopwatch.elapsedMilliseconds}ms');
+
+  if (deferHeavyServicesToFirstFrame) {
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      unawaited(initializeHeavyBackgroundServices());
+    });
+  }
 
   if (isSecondaryWindow &&
       startDraggingWindow &&

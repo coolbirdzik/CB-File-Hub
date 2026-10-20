@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -11,6 +10,7 @@ import 'package:path/path.dart' as p;
 import 'package:window_manager/window_manager.dart';
 
 import 'package:cb_file_manager/e2e/cb_e2e_config.dart';
+import 'package:cb_file_manager/helpers/core/file_hash.dart';
 
 import 'app_update_models.dart';
 import 'desktop_update_installer.dart';
@@ -400,7 +400,7 @@ class AppUpdateService extends ChangeNotifier {
     if (size != null && size > 0 && await file.length() != size) return false;
     final expected = update.sha256;
     if (expected == null || expected.isEmpty) return true;
-    final digest = await sha256.bind(file.openRead()).first;
+    final digest = await sha256OfFile(file.path);
     return digest.toString() == expected;
   }
 

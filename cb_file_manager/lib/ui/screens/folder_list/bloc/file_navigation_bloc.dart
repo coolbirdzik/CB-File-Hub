@@ -1,10 +1,11 @@
+import 'package:cb_native/cb_native.dart';
 import 'package:cb_file_manager/helpers/core/search_request_guard.dart';
 import 'package:cb_file_manager/helpers/core/search_query.dart';
 import 'dart:async';
 import 'package:cb_file_manager/config/languages/current_localizations.dart';
 import 'dart:io';
 import 'dart:math' as math;
-import 'package:flutter/foundation.dart' show compute;
+import 'package:flutter/foundation.dart' show compute, visibleForTesting;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:path/path.dart' as pathlib;
 import 'package:cb_file_manager/helpers/files/folder_sort_manager.dart';
@@ -327,14 +328,9 @@ class FileNavigationBloc
       }
       AppLogger.perf('Dir listing CACHE MISS "${event.path}" — scanning disk');
 
-      // ── Offload scan + stat + sort to background isolate ────────────────────
+      // ── Offload scan + stat + sort off the UI isolate ───────────────────────
       // With 5000+ files, stat + sort on the main isolate causes UI jank.
-      // compute() runs the work in a separate Dart isolate (background thread)
-      // so the Flutter UI thread stays completely free.
-      final scanResult = await compute(
-        _scanDirectoryInIsolate,
-        _ScanArgs(event.path, sortOption.name),
-      );
+      final scanResult = await _scanDirectory(event.path, sortOption);
 
       // Reconstruct typed objects from the isolate's plain path lists.
       final folders = scanResult.folderPaths.map(Directory.new).toList();
@@ -342,39 +338,13 @@ class FileNavigationBloc
       final sortedFolders = folders; // already sorted in isolate
       final sortedFiles = files; // already sorted in isolate
 
-      // Rebuild FileStat cache from raw stat rows for downstream consumers
-      // (e.g. sort-on-demand, file details panel). We build it on the main
-      // isolate from the already-fetched raw rows — no extra I/O needed.
-      final statsCache = <String, FileStat>{};
-      // FileStat cannot be constructed directly; fetch only for small folders
-      // to populate the cache (large folders skip to avoid blocking).
-      if (scanResult.statRows.length <= 500) {
-        final allPaths = [...scanResult.folderPaths, ...scanResult.filePaths];
-        await Future.wait(
-          allPaths.map((p) async {
-            try {
-              statsCache[p] = await FileStat.stat(p);
-            } catch (_) {}
-          }),
-        );
-      }
-
       emit(
         state.copyWith(
           isLoading: false,
           folders: sortedFolders,
           files: sortedFiles,
-          fileStatsCache: Map.from(statsCache),
           sortOption: sortOption,
         ),
-      );
-
-      // Store in directory listing cache so navigating back is instant.
-      DirectoryListingCacheService.instance.storeListing(
-        path: event.path,
-        files: files,
-        folders: folders,
-        stats: statsCache,
       );
 
       // Update thumbnail loader priority map so loading respects display (sort) order,
@@ -390,6 +360,35 @@ class FileNavigationBloc
       ThumbnailLoader.setListingReady(true);
 
       AppLogger.perf('UI ready total=${totalSw.elapsedMilliseconds}ms');
+
+      // FileStat cannot be built from the isolate's raw rows, so small folders
+      // stat again here for the details columns and sort-on-demand. This runs
+      // after the listing is on screen; items stat themselves lazily until
+      // the cache arrives. Large folders skip it to avoid flooding the disk.
+      final statsCache = <String, FileStat>{};
+      final entryCount =
+          scanResult.folderPaths.length + scanResult.filePaths.length;
+      if (entryCount <= 500) {
+        final allPaths = [...scanResult.folderPaths, ...scanResult.filePaths];
+        await Future.wait(
+          allPaths.map((p) async {
+            try {
+              statsCache[p] = await FileStat.stat(p);
+            } catch (_) {}
+          }),
+        );
+        if (!isClosed && state.currentPath.path == event.path) {
+          emit(state.copyWith(fileStatsCache: Map.from(statsCache)));
+        }
+      }
+
+      // Store in directory listing cache so navigating back is instant.
+      DirectoryListingCacheService.instance.storeListing(
+        path: event.path,
+        files: files,
+        folders: folders,
+        stats: statsCache,
+      );
 
       // Proactive thumbnail generation
       _prefetchThumbnails(sortedFiles, event.path);
@@ -459,11 +458,8 @@ class FileNavigationBloc
       );
       final sortOption = folderSortOption ?? state.sortOption;
 
-      // Offload scan + stat + sort to background isolate (same as _onLoad).
-      final scanResult = await compute(
-        _scanDirectoryInIsolate,
-        _ScanArgs(event.path, sortOption.name),
-      );
+      // Offload scan + stat + sort off the UI isolate (same as _onLoad).
+      final scanResult = await _scanDirectory(event.path, sortOption);
 
       final sortedFolders = scanResult.folderPaths.map(Directory.new).toList();
       final sortedFiles = scanResult.filePaths.map(File.new).toList();
@@ -711,12 +707,18 @@ class FileNavigationBloc
       final List<FileSystemEntity> results = [];
 
       if (event.recursive) {
-        await _recursiveSearch(
-          Directory(state.currentPath.path),
+        final root = state.currentPath.path;
+        final nativeResults = await _nativeRecursiveSearch(
+          root,
           query,
-          results,
-          regex,
+          event.useRegex ? event.query : null,
+          request,
         );
+        if (nativeResults != null) {
+          results.addAll(nativeResults);
+        } else {
+          await _recursiveSearch(Directory(root), query, results, regex);
+        }
       } else {
         for (final file in state.files) {
           if (_matchesQuery(pathlib.basename(file.path), query, regex)) {
@@ -950,6 +952,47 @@ class FileNavigationBloc
     }
   }
 
+  /// Walks [root] on Rust worker threads (package:cb_native). Returns null
+  /// when the native library is missing or cannot compile [regexPattern], so
+  /// the caller runs the Dart walker instead.
+  Future<List<FileSystemEntity>?> _nativeRecursiveSearch(
+    String root,
+    String query,
+    String? regexPattern,
+    int request,
+  ) async {
+    final search = NativeSearch.start(
+      root: root,
+      words: regexPattern == null ? TextUtils.searchWords(query) : const [],
+      regex: regexPattern,
+    );
+    if (search == null) return null;
+
+    final sw = Stopwatch()..start();
+    final hits = await NativeSearch.collect(
+      search,
+      shouldContinue: () => !isClosed && _searchRequests.isCurrent(request),
+    );
+    // A superseded search returns nothing; the caller drops it anyway.
+    if (hits == null) return const [];
+    AppLogger.perf(
+      'Native recursive search "$root" hits=${hits.length} '
+      'took=${sw.elapsedMilliseconds}ms',
+    );
+
+    // Workers finish directories in any order; sort for a stable listing
+    // close to the depth-first order of the Dart walker.
+    hits.sort((a, b) => a.path.toLowerCase().compareTo(b.path.toLowerCase()));
+    return [
+      for (final hit in hits)
+        switch (hit.kind) {
+          NativeEntryKind.directory => Directory(hit.path),
+          NativeEntryKind.link => Link(hit.path),
+          NativeEntryKind.file => File(hit.path),
+        },
+    ];
+  }
+
   Future<void> _recursiveSearch(
     Directory dir,
     String query,
@@ -1070,6 +1113,41 @@ class _ScanArgs {
   const _ScanArgs(this.path, this.sortOption);
 }
 
+/// Lists, stats and sorts [path] on a Rust thread (package:cb_native), or in
+/// a [compute] isolate with [_scanDirectoryInIsolate] when the library is not
+/// built or the directory cannot be listed (the Dart path then raises the
+/// precise [FileSystemException]). Natively there is no isolate to spawn per
+/// navigation, and on Windows the sizes and dates a date or size sort needs
+/// come with the directory entries instead of one `stat` per file.
+Future<_ScanResult> _scanDirectory(String path, SortOption sortOption) async {
+  final native = await NativeFs.listDirectory(
+    path,
+    sort:
+        NativeListSort.values.asNameMap()[sortOption.name] ??
+        NativeListSort.nameAsc,
+    skipSuffixes: const ['.tags'],
+    skipNames: const ['.cbfile_config.json'],
+  );
+  if (native != null) {
+    return _ScanResult(
+      folderPaths: [for (final entry in native.folders) entry.path],
+      filePaths: [for (final entry in native.files) entry.path],
+      statRows: const {},
+    );
+  }
+  return compute(_scanDirectoryInIsolate, _ScanArgs(path, sortOption.name));
+}
+
+/// The Dart listing [_scanDirectory] falls back to, for parity tests.
+@visibleForTesting
+Future<({List<String> folders, List<String> files})>
+dartScanDirectoryForTesting(String path, SortOption sortOption) async {
+  final result = await _scanDirectoryInIsolate(
+    _ScanArgs(path, sortOption.name),
+  );
+  return (folders: result.folderPaths, files: result.filePaths);
+}
+
 /// Top-level function — runs in a separate isolate.
 /// Scans [args.path], stats all entities in parallel chunks, sorts them
 /// by [args.sortOption] name, and returns already-sorted path lists + raw stats.
@@ -1096,8 +1174,13 @@ Future<_ScanResult> _scanDirectoryInIsolate(_ScanArgs args) async {
 
   final allPaths = [...folderPaths, ...filePaths];
   final statRows = <String, _StatRow>{};
+  // Only the date and size comparators below read stats. Statting every entry
+  // for a name sort is one extra syscall per file (a network round trip on a
+  // share) before the listing can be shown.
+  final sortNeedsStats =
+      args.sortOption.startsWith('date') || args.sortOption.startsWith('size');
 
-  for (var i = 0; i < allPaths.length; i += statChunkSize) {
+  for (var i = 0; sortNeedsStats && i < allPaths.length; i += statChunkSize) {
     final chunk = allPaths.skip(i).take(statChunkSize).toList();
     final results = await Future.wait(
       chunk.map((p) async {

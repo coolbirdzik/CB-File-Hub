@@ -56,6 +56,6 @@ export const Head: HeadFC = () => (
   <Seo
     title="Interactive demo - CB File Hub"
     description="Try CB File Hub in your browser with sample files: tabs, previews, tags, network places and CB Agent."
-    path="/demo"
+    path="/demo/"
   />
 );

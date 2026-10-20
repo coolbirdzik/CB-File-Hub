@@ -62,9 +62,8 @@
     <!-- Android 13+ notifications runtime permission -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- PiP and Foreground Service permissions -->
+    <!-- Background task and wake lock permissions -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <!-- Android 13+ granular media permissions -->

@@ -3,6 +3,7 @@ import 'file_drag_drop_item.dart';
 import 'file_tags_tooltip.dart';
 import '../components/common/file_entry_presentation.dart';
 
+import 'package:cb_native/cb_native.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -222,7 +223,27 @@ class _FileTreeViewState extends State<FileTreeView> {
 /// within each group). Hidden config files are skipped to match the
 /// existing browser behaviour.
 Future<List<TreeNode<FileSystemEntity>>> _scanDirectory(String path) async {
-  return compute(_scanDirectoryRaw, path);
+  // A Rust thread when package:cb_native is built, else an isolate.
+  final native = await NativeFs.listDirectory(
+    path,
+    skipSuffixes: const ['.tags'],
+    skipNames: const ['.cbfile_config.json'],
+  );
+  if (native == null) return compute(_scanDirectoryRaw, path);
+  return [
+    for (final entry in native.folders)
+      TreeNode<FileSystemEntity>(
+        id: entry.path,
+        data: Directory(entry.path),
+        isLeaf: false,
+      ),
+    for (final entry in native.files)
+      TreeNode<FileSystemEntity>(
+        id: entry.path,
+        data: File(entry.path),
+        isLeaf: true,
+      ),
+  ];
 }
 
 List<TreeNode<FileSystemEntity>> _scanDirectoryRaw(String path) {

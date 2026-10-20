@@ -584,6 +584,47 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
   }
 
   @override
+  Future<Map<String, List<String>>> getTagsForFiles(
+    List<String> filePaths,
+  ) async {
+    final result = <String, List<String>>{
+      for (final path in filePaths) path: <String>[],
+    };
+    if (result.isEmpty) return result;
+
+    try {
+      final database = await getDatabase();
+      final uniquePaths = result.keys.toList(growable: false);
+      // Stay well under SQLite's bound-variable limit.
+      const chunkSize = 500;
+      for (var i = 0; i < uniquePaths.length; i += chunkSize) {
+        final chunk = uniquePaths.sublist(
+          i,
+          i + chunkSize > uniquePaths.length
+              ? uniquePaths.length
+              : i + chunkSize,
+        );
+        final placeholders = List.filled(chunk.length, '?').join(', ');
+        final rows = await database.query(
+          'file_tags',
+          columns: <String>['file_path', 'tag'],
+          where: 'file_path IN ($placeholders)',
+          whereArgs: chunk,
+          orderBy: 'created_at ASC, id ASC',
+        );
+        for (final row in rows) {
+          final path = row['file_path'];
+          final tag = row['tag'];
+          if (path is String && tag is String) result[path]?.add(tag);
+        }
+      }
+    } catch (error) {
+      // Same contract as getTagsForFile: a failed read reports no tags.
+    }
+    return result;
+  }
+
+  @override
   Future<bool> setTagsForFile(String filePath, List<String> tags) async {
     final uniqueTags = <String, String>{};
     for (final tag in tags) {

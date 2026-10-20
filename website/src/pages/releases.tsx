@@ -376,6 +376,6 @@ export const Head: HeadFC = () => (
   <Seo
     title="Release notes - CB File Hub"
     description="What changed in each CB File Hub release for Windows and Android: new features, fixes, improvements and downloads."
-    path="/releases"
+    path="/releases/"
   />
 );

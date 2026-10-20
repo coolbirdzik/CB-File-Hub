@@ -22,5 +22,7 @@ _bmad
 .env.local
 !.env.example
 
-# Firebase Hosting deploy cache
+# Local hosting caches (including the previous Firebase deployment).
 website/.firebase/
+website/firebase-debug.log
+website/.wrangler/

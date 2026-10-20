@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
 import 'package:archive/archive_io.dart' as archive_io;
+import 'package:cb_native/cb_native.dart';
 import 'package:path/path.dart' as p;
 
 import 'archive_entry_info.dart';
@@ -19,7 +21,17 @@ class ArchiveDirectoryListing {
 typedef ArchiveProgressCallback = void Function(int completed, int total);
 
 /// Lists and extracts common archive formats (zip, tar, 7z, rar, …).
+///
+/// Everything but RAR is read on a Rust thread when package:cb_native is
+/// built: streamed to disk with real progress, and `.7z` without 7-Zip
+/// installed. The `package:archive` decoders (synchronous, so they block the
+/// isolate they run on) and the 7-Zip executable remain the fallback.
 class ArchiveService {
+  /// [useNative] false forces the Dart / 7-Zip paths (tests compare both).
+  ArchiveService({this.useNative = true});
+
+  final bool useNative;
+
   static const _sevenZipCandidates = [
     r'C:\Program Files\7-Zip\7z.exe',
     r'C:\Program Files (x86)\7-Zip\7z.exe',
@@ -39,6 +51,9 @@ class ArchiveService {
       throw UnsupportedError('Unsupported archive: $archivePath');
     }
 
+    final native = await _listNatively(archivePath, format);
+    if (native != null) return native;
+
     if (isDartArchiveFormat(format)) {
       return _listWithDart(archivePath, format);
     }
@@ -55,6 +70,15 @@ class ArchiveService {
     final format = detectArchiveFormat(archivePath);
     if (format == ArchiveFormat.unknown) {
       throw UnsupportedError('Unsupported archive: $archivePath');
+    }
+
+    if (await _extractNatively(
+      archivePath: archivePath,
+      format: format,
+      destinationDir: destinationDir,
+      onProgress: onProgress,
+    )) {
+      return;
     }
 
     if (isDartArchiveFormat(format)) {
@@ -84,6 +108,15 @@ class ArchiveService {
       throw UnsupportedError('Unsupported archive: $archivePath');
     }
 
+    if (await _extractNatively(
+      archivePath: archivePath,
+      format: format,
+      destinationDir: destinationDir,
+      entryName: _normalizeEntryName(entryName),
+    )) {
+      return;
+    }
+
     if (isDartArchiveFormat(format)) {
       await _extractSingleWithDart(
         archivePath: archivePath,
@@ -110,12 +143,83 @@ class ArchiveService {
     return null;
   }
 
+  static NativeArchiveFormat? _nativeFormat(ArchiveFormat format) =>
+      switch (format) {
+        ArchiveFormat.zip => NativeArchiveFormat.zip,
+        ArchiveFormat.tar => NativeArchiveFormat.tar,
+        ArchiveFormat.tarGz => NativeArchiveFormat.tarGz,
+        ArchiveFormat.tarBz2 => NativeArchiveFormat.tarBz2,
+        ArchiveFormat.tarXz => NativeArchiveFormat.tarXz,
+        ArchiveFormat.gzip => NativeArchiveFormat.gzip,
+        ArchiveFormat.bzip2 => NativeArchiveFormat.bzip2,
+        ArchiveFormat.sevenZip => NativeArchiveFormat.sevenZip,
+        ArchiveFormat.rar || ArchiveFormat.unknown => null,
+      };
+
+  /// A `.7z` that Rust cannot read (an unsupported method or encryption)
+  /// still opens through 7-Zip when it is installed; the Dart formats fall
+  /// back to `package:archive`, which raises its own error if the archive is
+  /// really broken.
+  bool _canFallBackFrom(ArchiveFormat format) =>
+      format != ArchiveFormat.sevenZip || findSevenZipExecutable() != null;
+
+  /// Null when Rust is unavailable or failed with a fallback left to try.
+  Future<List<ArchiveEntryInfo>?> _listNatively(
+    String archivePath,
+    ArchiveFormat format,
+  ) async {
+    final nativeFormat = useNative ? _nativeFormat(format) : null;
+    if (nativeFormat == null) return null;
+    final List<NativeArchiveEntry>? entries;
+    try {
+      entries = await NativeArchive.list(archivePath, nativeFormat);
+    } on NativeJobException catch (e) {
+      if (_canFallBackFrom(format)) return null;
+      throw StateError('Failed to list archive: ${e.message}');
+    }
+    return entries
+        ?.map(
+          (entry) => ArchiveEntryInfo(
+            name: entry.name,
+            size: entry.size,
+            compressedSize: entry.compressedSize,
+            isDirectory: entry.isDirectory,
+            modified: entry.modified,
+          ),
+        )
+        .toList();
+  }
+
+  /// Whether Rust extracted the archive (or the single [entryName], written
+  /// flat into [destinationDir]).
+  Future<bool> _extractNatively({
+    required String archivePath,
+    required ArchiveFormat format,
+    required String destinationDir,
+    String? entryName,
+    ArchiveProgressCallback? onProgress,
+  }) async {
+    final nativeFormat = useNative ? _nativeFormat(format) : null;
+    if (nativeFormat == null) return false;
+    try {
+      return await NativeArchive.extract(
+        path: archivePath,
+        format: nativeFormat,
+        destination: destinationDir,
+        entry: entryName,
+        onProgress: onProgress,
+      );
+    } on NativeJobException catch (e) {
+      if (_canFallBackFrom(format)) return false;
+      throw StateError('Failed to extract archive: ${e.message}');
+    }
+  }
+
   Future<List<ArchiveEntryInfo>> _listWithDart(
     String archivePath,
     ArchiveFormat format,
   ) async {
-    final archive = await _decodeDartArchive(archivePath, format);
-    try {
+    return _withDartArchive(archivePath, format, (archive) {
       return archive.files
           .where((file) => file.name.isNotEmpty)
           .map(
@@ -131,9 +235,7 @@ class ArchiveService {
             ),
           )
           .toList();
-    } finally {
-      await archive.clear();
-    }
+    });
   }
 
   Future<void> _extractWithDart({
@@ -164,8 +266,18 @@ class ArchiveService {
     required String destinationDir,
     required ArchiveFormat format,
   }) async {
-    final archive = await _decodeDartArchive(archivePath, format);
-    try {
+    // A lone .gz / .bz2 holds just the one member.
+    if (format == ArchiveFormat.gzip || format == ArchiveFormat.bzip2) {
+      await _extractSingleCompressedMember(
+        archivePath: archivePath,
+        destinationDir: destinationDir,
+        format: format,
+      );
+      return;
+    }
+    await _withDartArchive(archivePath, format, storeData: true, (
+      archive,
+    ) async {
       final normalizedTarget = _normalizeEntryName(entryName);
       ArchiveFile? match;
       for (final file in archive.files) {
@@ -191,9 +303,7 @@ class ArchiveService {
       } finally {
         await output.close();
       }
-    } finally {
-      await archive.clear();
-    }
+    });
   }
 
   Future<void> _extractSingleCompressedMember({
@@ -222,10 +332,16 @@ class ArchiveService {
     }
   }
 
-  Future<Archive> _decodeDartArchive(
+  /// Decodes [archivePath] and runs [use] on it. Entry data is read lazily
+  /// from the input stream (and, for compressed tars, from a temporary
+  /// `.tar`), so it is only readable inside [use]: both are released after.
+  /// Tar entries carry no data at all unless [storeData] is set.
+  Future<T> _withDartArchive<T>(
     String archivePath,
     ArchiveFormat format,
-  ) async {
+    FutureOr<T> Function(Archive archive) use, {
+    bool storeData = false,
+  }) async {
     Directory? tempDir;
     var workingPath = archivePath;
     var workingFormat = format;
@@ -263,24 +379,28 @@ class ArchiveService {
       if (workingFormat == ArchiveFormat.gzip ||
           workingFormat == ArchiveFormat.bzip2) {
         final baseName = p.basenameWithoutExtension(archivePath);
-        return Archive()..add(
-          ArchiveFile(
-            baseName.isEmpty ? p.basename(archivePath) : baseName,
-            File(archivePath).lengthSync(),
-            Uint8List(0),
+        return await use(
+          Archive()..add(
+            ArchiveFile(
+              baseName.isEmpty ? p.basename(archivePath) : baseName,
+              File(archivePath).lengthSync(),
+              Uint8List(0),
+            ),
           ),
         );
       }
 
       final input = archive_io.InputFileStream(workingPath);
+      Archive? archive;
       try {
         if (workingFormat == ArchiveFormat.tar) {
-          return TarDecoder().decodeStream(input, storeData: false);
+          archive = TarDecoder().decodeStream(input, storeData: storeData);
+        } else if (workingFormat == ArchiveFormat.zip) {
+          archive = ZipDecoder().decodeStream(input);
         }
-        if (workingFormat == ArchiveFormat.zip) {
-          return ZipDecoder().decodeStream(input);
-        }
+        if (archive != null) return await use(archive);
       } finally {
+        await archive?.clear();
         await input.close();
       }
     } finally {

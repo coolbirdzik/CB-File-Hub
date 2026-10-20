@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:ffi';
 
 // packages
+import 'package:cb_native/cb_native.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:path/path.dart' as pathlib;
@@ -21,6 +22,7 @@ import 'package:cb_file_manager/helpers/tags/file_operation_tags.dart';
 import 'io_extensions.dart';
 import 'text_utils.dart';
 import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
+import 'package:cb_file_manager/helpers/files/file_type_registry.dart';
 
 String storageRootPath = "/storage/emulated/0/";
 
@@ -544,22 +546,32 @@ Future<List<Directory>> getAllStorageLocations() async {
     }
   }
 
+  // Windows letters come from the GetLogicalDrives bitmask and are already
+  // unique. Resolving them would open every volume root, and an offline mapped
+  // share or a spun-down disk holds that call for seconds.
+  if (Platform.isWindows) return storageLocations;
+
   // Remove duplicates using canonicalized paths to avoid aliases (/sdcard vs /storage/emulated/0)
+  final canonicalPaths = await Future.wait(
+    storageLocations.map((dir) async {
+      try {
+        return await dir.resolveSymbolicLinks();
+      } catch (_) {
+        return dir.path;
+      }
+    }),
+  );
   final uniquePaths = <String>{};
-  storageLocations = storageLocations.where((dir) {
-    String canonical = dir.path;
-    try {
-      canonical = Directory(canonical).resolveSymbolicLinksSync();
-    } catch (_) {
-      // ignore resolve errors
-    }
+  final uniqueLocations = <Directory>[];
+  for (var i = 0; i < storageLocations.length; i++) {
+    var canonical = canonicalPaths[i];
     if (canonical.endsWith(Platform.pathSeparator) && canonical.length > 1) {
       canonical = canonical.substring(0, canonical.length - 1);
     }
-    return uniquePaths.add(canonical);
-  }).toList();
+    if (uniquePaths.add(canonical)) uniqueLocations.add(storageLocations[i]);
+  }
 
-  return storageLocations;
+  return uniqueLocations;
 }
 
 /// Recursively get all videos in a directory and its subdirectories
@@ -591,6 +603,9 @@ Future<List<File>> getAllVideos(String path, {bool recursive = true}) async {
   }
 
   // Normal path - scan the specified directory
+  final native = await _nativeMediaFiles(path, recursive, FileCategory.video);
+  if (native != null) return native;
+
   List<FileSystemEntity> allFiles = await getFoldersAndFiles(
     path,
     recursive: recursive,
@@ -601,6 +616,28 @@ Future<List<File>> getAllVideos(String path, {bool recursive = true}) async {
   }).toList();
 
   return videoFiles;
+}
+
+/// The files [getAllImages] / [getAllVideos] return, found on Rust threads
+/// (package:cb_native) with the extension filter applied there, so a large
+/// library is not first listed into Dart objects in full. Same rules as
+/// [getFoldersAndFiles]: links are followed and dot names are left out (but
+/// still searched). Null when the library is unavailable.
+Future<List<File>?> _nativeMediaFiles(
+  String path,
+  bool recursive,
+  FileCategory category,
+) async {
+  final entries = await NativeFs.walk(
+    roots: [path],
+    recursive: recursive,
+    skipDotNames: true,
+    followLinks: true,
+    extensionMode: NativeExtensionMode.lastDot,
+    extensions: FileTypeRegistry.getExtensionsForCategory(category),
+  );
+  if (entries == null) return null;
+  return [for (final entry in entries) File(entry.path)];
 }
 
 /// Recursively get all images in a directory and its subdirectories
@@ -632,6 +669,9 @@ Future<List<File>> getAllImages(String path, {bool recursive = true}) async {
   }
 
   // Normal path - scan the specified directory
+  final native = await _nativeMediaFiles(path, recursive, FileCategory.image);
+  if (native != null) return native;
+
   List<FileSystemEntity> allFiles = await getFoldersAndFiles(
     path,
     recursive: recursive,

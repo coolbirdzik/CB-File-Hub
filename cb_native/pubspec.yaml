@@ -1,0 +1,20 @@
+name: cb_native
+description: Rust-backed native helpers for CB File Hub (file search, walks, images, archives).
+publish_to: none
+version: 0.1.0
+
+environment:
+  sdk: ">=3.12.0 <4.0.0"
+
+dependencies:
+  code_assets: ^1.2.1
+  ffi: ^2.1.0
+  hooks: ^2.2.0
+
+dev_dependencies:
+  # Builds the zip fixture in test/native_job_test.dart.
+  archive: ^4.0.7
+  # Only for tool/gen_fold_table.dart, which derives the Rust fold table from
+  # the exact package the app's Dart search uses.
+  diacritic: ^0.1.6
+  test: ^1.25.0

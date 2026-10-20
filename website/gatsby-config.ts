@@ -3,10 +3,10 @@ import type { GatsbyConfig } from "gatsby";
 const config: GatsbyConfig = {
   siteMetadata: {
     title: "CB File Hub",
-    siteUrl: "https://cbfilehub.web.app",
+    siteUrl: "https://coolbird.net",
   },
-  // Firebase Hosting serves with `trailingSlash: false`, keep Gatsby links in sync.
-  trailingSlash: "never",
+  // Pages serves Gatsby's directory index pages with a trailing slash.
+  trailingSlash: "always",
   graphqlTypegen: false,
   plugins: ["gatsby-plugin-postcss"],
 };

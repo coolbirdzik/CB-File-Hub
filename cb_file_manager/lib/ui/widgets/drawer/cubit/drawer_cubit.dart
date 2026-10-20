@@ -89,7 +89,13 @@ class DrawerCubit extends Cubit<DrawerState> {
     try {
       final prefs = UserPreferences.instance;
       await prefs.init();
-      final latest = await prefs.getSidebarPinnedPaths();
+      // This runs every 2s only to pick up pins changed by another window, so
+      // it must not probe every pinned folder: an offline share or sleeping
+      // disk would stall each tick, and a briefly unreachable pin would be
+      // pruned for good. loadStorageLocations still validates.
+      final latest = await prefs.getSidebarPinnedPaths(
+        validateDirectories: false,
+      );
       final old = state.pinnedPaths;
       if (latest.length != old.length ||
           latest.any((item) => !old.contains(item))) {

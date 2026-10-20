@@ -23,6 +23,10 @@ abstract class IDatabaseProvider {
   /// Get all tags for a file
   Future<List<String>> getTagsForFile(String filePath);
 
+  /// Get tags for many files in one query. Every requested path is present in
+  /// the result, with an empty list when it has no tags.
+  Future<Map<String, List<String>>> getTagsForFiles(List<String> filePaths);
+
   /// Set tags for a file (replacing any existing tags)
   Future<bool> setTagsForFile(String filePath, List<String> tags);
 

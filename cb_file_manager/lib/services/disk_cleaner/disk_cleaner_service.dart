@@ -3,6 +3,7 @@ import 'dart:ffi';
 import 'dart:io';
 import 'dart:isolate';
 
+import 'package:cb_native/cb_native.dart';
 import 'package:ffi/ffi.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -20,6 +21,7 @@ import 'cleaner_safety.dart';
 import 'disk_cleaner_isolate.dart';
 import 'disk_tree_node.dart';
 import 'full_disk_scan_isolate.dart';
+import 'scan_target_resolver.dart';
 import 'windows_known_folders.dart';
 
 enum DiskCleanerAgentActivityType {
@@ -95,7 +97,14 @@ class CleanerSelectionResult {
   final List<DiskTreeNode> selected;
   final String? error;
 
-  const CleanerSelectionResult({this.selected = const [], this.error});
+  /// Requested path -> real scanned path, for near misses that were fixed.
+  final Map<String, String> corrections;
+
+  const CleanerSelectionResult({
+    this.selected = const [],
+    this.error,
+    this.corrections = const {},
+  });
 }
 
 class _TrackedScanChanges {
@@ -421,10 +430,18 @@ class DiskCleanerService {
       }
       stack.addAll(candidate.children);
     }
+    String? correctedFrom;
     if (node == null) {
-      return const CleanerItemInteractionResult(
-        error: 'Path is not an exact selectable scan target.',
-      );
+      // Models often copy long names slightly wrong; fix a unique near miss
+      // instead of leaving the agent stuck.
+      final match = resolveScanTarget(context.root, path);
+      node = match.node;
+      correctedFrom = match.correctedFrom;
+      if (node == null) {
+        return CleanerItemInteractionResult(
+          error: _notATargetError(null, match.suggestions),
+        );
+      }
     }
     if (analysis != null) {
       if (!identical(_inspectedCleanerItems[ownerTabId], node)) {
@@ -465,7 +482,25 @@ class DiskCleanerService {
     return CleanerItemInteractionResult(
       node: node,
       scanId: _cleanerScanContexts[ownerTabId]?.scanId,
+      correctedFrom: correctedFrom,
     );
+  }
+
+  /// [paths] null keeps the single-item wording of the inspect tools.
+  static String _notATargetError(List<String>? paths, List<String> closest) {
+    final buffer = StringBuffer(
+      paths == null
+          ? 'Path is not an exact selectable scan target.'
+          : 'Not an exact selectable scan target: ${paths.join(', ')}.',
+    );
+    if (closest.isNotEmpty) {
+      buffer.write(
+        ' Closest scanned paths: ${closest.join('; ')}. Copy one exactly.',
+      );
+    } else {
+      buffer.write(' Read the scan again (search_cleaner_scan finds rows).');
+    }
+    return buffer.toString();
   }
 
   /// Changes only the visible selection. Deletion still needs UI review.
@@ -518,17 +553,28 @@ class DiskCleanerService {
       }
       stack.addAll(node.children);
     }
-    final missing = paths
-        .where((path) => !found.containsKey(normalize(path)))
-        .toList();
-    if (missing.isNotEmpty) {
+    final corrections = <String, String>{};
+    final unresolved = <String>[];
+    final suggestions = <String>[];
+    for (final path in paths) {
+      if (found.containsKey(normalize(path))) continue;
+      final match = resolveScanTarget(context.root, path);
+      final node = match.node;
+      if (node == null) {
+        unresolved.add(path);
+        suggestions.addAll(match.suggestions);
+        continue;
+      }
+      found[normalize(path)] = node;
+      corrections[path] = node.fullPath;
+    }
+    if (unresolved.isNotEmpty) {
       return CleanerSelectionResult(
-        error:
-            'Not an exact selectable scan target: ${missing.join(', ')}. Read the scan again.',
+        error: _notATargetError(unresolved, suggestions.take(5).toList()),
       );
     }
     final selected = context.selectTargets!(
-      wanted.map((path) => found[path]!).toList(),
+      {for (final path in wanted) found[path]!}.toList(),
       replace,
     );
     if (selected == null) {
@@ -537,7 +583,7 @@ class DiskCleanerService {
             'Cleaner results are no longer ready for selection. Read the scan again.',
       );
     }
-    return CleanerSelectionResult(selected: selected);
+    return CleanerSelectionResult(selected: selected, corrections: corrections);
   }
 
   CleanerScanContext? getCleanerScanContext({String? ownerTabId}) {
@@ -1453,50 +1499,68 @@ class DiskCleanerService {
       AppLogger.info('[DiskCleaner] Expanding directory target: ${item.path}');
       onPreparing?.call(item.path);
       var childCount = 0;
-      try {
-        await for (final entity in Directory(
-          item.path,
-        ).list(recursive: true, followLinks: false)) {
-          final childType = FileSystemEntity.typeSync(
-            entity.path,
-            followLinks: false,
-          );
-          if (childType != FileSystemEntityType.file) {
-            continue;
-          }
-
-          int size = 0;
-          DateTime? modified;
-          try {
-            final stat = entity.statSync();
-            size = stat.size;
-            modified = stat.modified;
-          } catch (_) {}
-
+      // Rust walks and stats the tree when package:cb_native is built.
+      final native = await NativeFs.walk(roots: [item.path], stats: true);
+      if (native != null) {
+        for (final entry in native) {
           expanded.add(
             JunkItem(
-              path: entity.path,
-              sizeBytes: size,
-              lastModified: modified,
+              path: entry.path,
+              sizeBytes: entry.size,
+              lastModified: DateTime.fromMillisecondsSinceEpoch(
+                entry.modifiedMs,
+              ),
               categoryId: item.categoryId,
             ),
           );
-          childCount++;
-
-          // Yield periodically so the UI can repaint and the user sees the
-          // "Preparing files…" status update instead of a frozen screen
-          // while we walk huge junk directories (e.g. %TEMP%).
-          if (childCount % 500 == 0) {
-            onPreparing?.call(entity.path);
-            await Future<void>.delayed(Duration.zero);
-          }
         }
-      } catch (e, st) {
-        AppLogger.warning(
-          '[DiskCleaner] Failed to fully expand directory target: ${item.path}',
-          error: e,
-          stackTrace: st,
-        );
+        childCount = native.length;
+      } else {
+        try {
+          await for (final entity in Directory(
+            item.path,
+          ).list(recursive: true, followLinks: false)) {
+            final childType = FileSystemEntity.typeSync(
+              entity.path,
+              followLinks: false,
+            );
+            if (childType != FileSystemEntityType.file) {
+              continue;
+            }
+
+            int size = 0;
+            DateTime? modified;
+            try {
+              final stat = entity.statSync();
+              size = stat.size;
+              modified = stat.modified;
+            } catch (_) {}
+
+            expanded.add(
+              JunkItem(
+                path: entity.path,
+                sizeBytes: size,
+                lastModified: modified,
+                categoryId: item.categoryId,
+              ),
+            );
+            childCount++;
+
+            // Yield periodically so the UI can repaint and the user sees the
+            // "Preparing files…" status update instead of a frozen screen
+            // while we walk huge junk directories (e.g. %TEMP%).
+            if (childCount % 500 == 0) {
+              onPreparing?.call(entity.path);
+              await Future<void>.delayed(Duration.zero);
+            }
+          }
+        } catch (e, st) {
+          AppLogger.warning(
+            '[DiskCleaner] Failed to fully expand directory target: ${item.path}',
+            error: e,
+            stackTrace: st,
+          );
+        }
       }
 
       AppLogger.info(

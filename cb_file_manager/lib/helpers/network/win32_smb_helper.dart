@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ffi';
 import 'dart:io';
 
+import 'package:cb_native/cb_native.dart';
 import 'package:ffi/ffi.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
@@ -542,11 +543,23 @@ class Win32SmbHelper {
       tempFile = File(localPath);
       final imageBytes = await tempFile.readAsBytes();
 
-      // Use compute to avoid blocking the UI thread
-      final thumbnailData = await compute(_createHighQualityImageThumbnail, {
-        'imageBytes': imageBytes,
-        'size': normalizedSize,
-      });
+      // Rust (package:cb_native) when built; package:image in an isolate
+      // otherwise, or when Rust cannot decode the format.
+      final native = await NativeImage.thumbnail(
+        bytes: imageBytes,
+        width: normalizedSize,
+        height: normalizedSize,
+        fit: NativeThumbnailFit.fit,
+        filter: NativeResizeFilter.cubic,
+        enhance: true,
+        format: NativeImageFormat.png,
+      );
+      final thumbnailData =
+          native?.bytes ??
+          await compute(_createHighQualityImageThumbnail, {
+            'imageBytes': imageBytes,
+            'size': normalizedSize,
+          });
 
       if (thumbnailData != null) {
         _thumbnailCache[cacheKey] = thumbnailData;
@@ -602,6 +615,19 @@ class Win32SmbHelper {
         // Already decent quality
         return data;
       }
+
+      // Same adjustments without resizing, off the UI isolate when Rust is
+      // built.
+      final native = await NativeImage.thumbnail(
+        bytes: data,
+        width: 0xFFFF,
+        height: 0xFFFF,
+        fit: NativeThumbnailFit.shrinkOnly,
+        enhance: true,
+        format: NativeImageFormat.jpeg,
+        quality: 90,
+      );
+      if (native != null) return native.bytes;
 
       // Process directly without isolates to avoid issues
       try {

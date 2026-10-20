@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:ui';
+import 'package:cb_native/cb_native.dart';
 
 import 'package:flutter/material.dart';
 import 'package:cb_file_manager/design_system/cb_design_system.dart';
@@ -278,6 +279,14 @@ class _CacheManagementScreenState extends State<CacheManagementScreen> {
     try {
       if (!await dir.exists()) {
         return const _DirectoryStats(fileCount: 0, totalBytes: 0);
+      }
+
+      final native = await NativeFs.directorySize(directories: [dir.path]);
+      if (native != null) {
+        return _DirectoryStats(
+          fileCount: native.files,
+          totalBytes: native.bytes,
+        );
       }
       int totalBytes = 0;
       int fileCount = 0;

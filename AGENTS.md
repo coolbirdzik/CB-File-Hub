@@ -2,11 +2,12 @@
 
 ## Project layout
 
-This is **not** a standard single-package Flutter app. The repo root is a workspace with two packages and a build system:
+This is **not** a standard single-package Flutter app. The repo root is a workspace with three packages and a build system:
 
 ```
 cb_file_manager/   ← main Flutter app (all flutter/dart commands run here)
 mobile_smb_native/ ← local FFI plugin (SMB/CIFS via libsmb2, path dependency)
+cb_native/         ← Rust helpers via a Dart build hook (path dependency, optional)
 justfile           ← primary build orchestrator (uses `just` command runner, requires Git Bash on Windows)
 scripts/           ← build, version, and CI helper scripts (bash)
 installer/         ← Windows installer configs (Inno Setup, WiX)
@@ -150,6 +151,56 @@ CB Agent can run local GGUF models on-device via a bundled llama.cpp runtime.
   `KILL_ON_JOB_CLOSE` (`lib/services/local_ai/windows_process_reaper.dart`), so
   the OS reaps it if the app dies for any reason. `dispose()` handles the
   graceful path (model/context change).
+
+## Rust native helpers (cb_native)
+
+`cb_native/` holds a Rust crate (`rust/`) that `hook/build.dart` compiles with
+`cargo build --release --locked` and bundles as a code asset on every
+`flutter build`/`run`/`test`. Everything runs on Rust threads, never on the
+calling isolate:
+
+- the recursive file-name search (`FileNavigationBloc._nativeRecursiveSearch`);
+- the Disk Cleaner's full-disk scan (`nativeScanInto` in
+  `lib/services/disk_cleaner/full_disk_scan_isolate.dart`). Rust does the
+  per-directory work of the Dart `scanInto` (sizes, junk rules, file folding,
+  old-large files) and streams one record per directory; the scan isolate only
+  builds `DiskTreeNode`s, so progress, previews, incremental refresh and final
+  batching are unchanged. `useNativeScanner: false` forces the Dart walker;
+  `test/services/disk_cleaner/native_full_disk_scan_test.dart` checks both
+  produce the same result. Rust also reads paths longer than 260 characters,
+  which the Dart walker reports as inaccessible, and returns each folder's
+  NTFS file ID with the listing (`win_dir.rs`), so even cold scans can be
+  refreshed from the USN Journal. A scan nobody polls for 15 s stops itself,
+  because the Cleaner cancels by killing the isolate;
+- **jobs** (`job.rs`, Dart `NativeJob`): everything else. A job posts its end
+  state to a Dart port (dart_api_dl) so callers wake at once, and stops when
+  that port's isolate is gone. Callers: folder sizes (`LazyPathSizeCalculator`,
+  cache stats, Windows.old), the folder listing and tree view
+  (`_scanDirectory`; `test/ui/screens/folder_list/native_directory_listing_test.dart`
+  checks every sort against the Dart listing), filtered walks
+  (`getAllImages`/`getAllVideos`, album scans, Downloads leftovers, Cleaner
+  directory expansion), the junk-rule scan (`disk_cleaner_isolate.dart`),
+  image thumbnails (photo, SMB/network; JPEGs decode at a reduced DCT scale),
+  the editor's encode and inpaint (an exact port of `inpaint.dart`), SHA-256
+  (`helpers/core/file_hash.dart`), and archives (`ArchiveService`: zip, tar,
+  tar.gz/bz2/xz, gz, bz2 and 7z without 7-Zip; RAR still needs 7-Zip).
+  Every caller keeps its Dart code as the fallback.
+
+- **Optional by design:** if cargo, the rustup target or the build is missing,
+  the hook prints `cb_native: ...` and bundles nothing; `CbNative.isAvailable`
+  is then false and the Dart code runs. All crates are pure Rust, so cross
+  builds need no C toolchain. Add a target with
+  `rustup target add <triple>` (Android: `aarch64-linux-android`,
+  `armv7-linux-androideabi`, `x86_64-linux-android`; CI Android jobs run
+  `scripts/ci/setup_rust_android.sh` for this).
+- **Matching must equal Dart:** the Rust port of `TextUtils.searchKey` uses
+  tables generated from `package:diacritic` and Dart's `toLowerCase`
+  (`cd cb_native && dart run tool/gen_fold_table.dart`, which also emits the
+  upper-case table the junk rules use). Rerun it after a Dart
+  SDK upgrade; `test/helpers/core/native_search_parity_test.dart` fails on drift.
+- **Checks:** `cargo test --release` and `cargo clippy --release --all-targets`
+  in `cb_native/rust/`, `dart test` in `cb_native/`. Compare speed with
+  `dart run tool/bench_search.dart <root> <query>`.
 
 ## Windows build gotchas
 

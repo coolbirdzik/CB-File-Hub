@@ -27,7 +27,7 @@ export function Layout({ children, current }: { children: React.ReactNode; curre
 }
 
 export function Seo({ title, description, path = "/" }: { title: string; description: string; path?: string }) {
-  const url = `https://cbfilehub.web.app${path}`;
+  const url = `https://coolbird.net${path}`;
   return (
     <>
       <title>{title}</title>
@@ -38,7 +38,7 @@ export function Seo({ title, description, path = "/" }: { title: string; descrip
       <meta property="og:title" content="CB File Hub" />
       <meta property="og:description" content="One place for your files, media and ideas." />
       <meta property="og:url" content={url} />
-      <meta property="og:image" content="https://cbfilehub.web.app/media/hero-browser.webp" />
+      <meta property="og:image" content="https://coolbird.net/media/hero-browser.webp" />
       <meta name="twitter:card" content="summary_large_image" />
       <link rel="canonical" href={url} />
       <link rel="icon" type="image/png" href="/logo-badge.png?v=2" />

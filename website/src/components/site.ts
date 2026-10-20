@@ -16,7 +16,7 @@ export const links = {
   macos: latestDmg?.url ?? `${github}/releases/latest`,
   privacy: "/privacy",
   terms: "/terms",
-  releases: "/releases",
+  releases: "/releases/",
   github,
 };
 
@@ -26,7 +26,7 @@ export const nav = [
   { href: "/#experience", en: "Experience", vi: "Trải nghiệm" },
   { href: "/#features", en: "Features", vi: "Tính năng" },
   { href: "/#platforms", en: "Platforms", vi: "Nền tảng" },
-  { href: "/releases", en: "Release notes", vi: "Bản phát hành" },
+  { href: "/releases/", en: "Release notes", vi: "Bản phát hành" },
 ];
 
 export const download = { en: "Download", vi: "Tải ứng dụng" };

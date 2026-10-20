@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:cb_native/cb_native.dart';
 import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
 
@@ -125,6 +126,32 @@ class AgentFileTools {
           throw ArgumentError('file_checksum requires a regular file.');
         }
         final deadline = DateTime.now().add(const Duration(seconds: 60));
+        // Rust hashes with the CPU's SHA instructions when package:cb_native
+        // is built; cancellation and the deadline apply the same way.
+        Object? stopped;
+        Digest? nativeHash;
+        try {
+          final bytes = await NativeHash.sha256File(
+            path,
+            shouldContinue: () {
+              try {
+                check();
+              } catch (e) {
+                stopped = e;
+                return false;
+              }
+              if (DateTime.now().isAfter(deadline)) {
+                stopped = TimeoutException('Checksum timed out.');
+                return false;
+              }
+              return true;
+            },
+          );
+          if (bytes != null) nativeHash = Digest(bytes);
+        } on NativeJobException {
+          // The Dart stream below reports the read error.
+        }
+        if (stopped != null) throw stopped!;
         final stream = File(path)
             .openRead()
             .map((chunk) {
@@ -135,7 +162,7 @@ class AgentFileTools {
               return chunk;
             })
             .timeout(const Duration(seconds: 15));
-        final hash = await sha256.bind(stream).first;
+        final hash = nativeHash ?? await sha256.bind(stream).first;
         final after = await FileStat.stat(path);
         if (before.size != after.size || before.modified != after.modified) {
           throw StateError('File changed while hashing. Retry.');

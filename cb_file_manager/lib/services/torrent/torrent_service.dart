@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cb_file_manager/helpers/core/file_hash.dart';
 
 import '../../models/database/sqlite_database_provider.dart';
 import '../drive/drive_info.dart';
@@ -147,7 +148,7 @@ class TorrentService extends ChangeNotifier {
         if (p.extension(file.path).toLowerCase() != '.fastresume') continue;
         final archive = File(item.resumeArchivePath(file.path, destination));
         if (!await archive.exists() ||
-            await sha256.bind(archive.openRead()).first != digests[file.path]) {
+            await sha256OfFile(archive.path) != digests[file.path]) {
           throw StateError('qBittorrent resume copy differs from source');
         }
       }
@@ -263,8 +264,7 @@ class TorrentService extends ChangeNotifier {
         }
         final digest = sha256.convert(bytes).toString();
         await _writeQbittorrentBackup(archive, bytes);
-        if ((await sha256.bind(File(archive).openRead()).first).toString() !=
-            digest) {
+        if ((await sha256OfFile(archive)).toString() != digest) {
           throw StateError('qBittorrent resume archive verification failed');
         }
         return (resume, digest);
@@ -321,7 +321,7 @@ class TorrentService extends ChangeNotifier {
           'Recovered qBittorrent entry is not durably stored: $hash',
         );
       }
-      final digest = await sha256.bind(File(archive).openRead()).first;
+      final digest = await sha256OfFile(archive);
       if (digest.toString() != proof['qbittorrent_resume_digest']) {
         throw StateError(
           'Recovered qBittorrent resume verification failed: $hash',

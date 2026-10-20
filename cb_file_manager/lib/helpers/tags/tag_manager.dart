@@ -465,9 +465,11 @@ class TagManager {
 
     try {
       if (_useDatabase && _databaseManager != null) {
-        // Use Database - still need to query one by one, but database is fast
+        // One IN query instead of a round trip per file: each round trip
+        // queues behind every other startup query on the shared connection.
+        final rows = await _databaseManager!.getTagsForFiles(uncachedPaths);
         for (final path in uncachedPaths) {
-          final tags = await _databaseManager!.getTagsForFile(path);
+          final tags = rows[path] ?? <String>[];
           _tagsCache[path] = tags;
           if (tags.isNotEmpty) {
             result[path] = tags;

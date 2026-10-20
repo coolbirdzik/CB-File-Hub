@@ -39,7 +39,15 @@ class CleanerItemInteractionResult {
   final String? scanId;
   final String? error;
 
-  const CleanerItemInteractionResult({this.node, this.scanId, this.error});
+  /// The requested path when [node] was found by correcting a near miss.
+  final String? correctedFrom;
+
+  const CleanerItemInteractionResult({
+    this.node,
+    this.scanId,
+    this.error,
+    this.correctedFrom,
+  });
 }
 
 typedef _ReviewEntry = ({

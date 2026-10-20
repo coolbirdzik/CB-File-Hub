@@ -2,6 +2,7 @@ import 'dart:ffi';
 import 'dart:io';
 import 'dart:async';
 
+import 'package:cb_native/cb_native.dart';
 import 'package:ffi/ffi.dart';
 import 'package:flutter/foundation.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -831,6 +832,17 @@ class SMBService implements ISmbService {
 
       // Decode and resize
       final imageBytes = Uint8List.fromList(chunks);
+
+      // Off the UI isolate on a Rust thread when package:cb_native is built.
+      final native = await NativeImage.thumbnail(
+        bytes: imageBytes,
+        width: size,
+        height: size,
+        fit: NativeThumbnailFit.stretch,
+        filter: NativeResizeFilter.cubic,
+        format: NativeImageFormat.png,
+      );
+      if (native != null) return native.bytes;
 
       final image = img.decodeImage(imageBytes);
       if (image == null) {

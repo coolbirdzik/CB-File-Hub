@@ -255,6 +255,9 @@ jobs:
           cd ${{ env.PROJECT_DIR }}
           flutter pub get
 
+      - name: Setup Rust Android targets (cb_native)
+        run: bash scripts/ci/setup_rust_android.sh
+
       - name: Build APK
         run: |
           cd ${{ env.PROJECT_DIR }}

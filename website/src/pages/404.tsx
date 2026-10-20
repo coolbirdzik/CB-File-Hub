@@ -34,5 +34,5 @@ export default function NotFoundPage() {
 }
 
 export const Head: HeadFC = () => (
-  <Seo title="Page not found - CB File Hub" description="This page does not exist." path="/404" />
+  <Seo title="Page not found - CB File Hub" description="This page does not exist." path="/404/" />
 );

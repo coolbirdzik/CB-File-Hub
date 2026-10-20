@@ -16,6 +16,7 @@ import 'package:cb_file_manager/services/media/media_kit_playback.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:path/path.dart' as pathlib;
 import 'package:image/image.dart' as img;
+import 'package:cb_native/cb_native.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:open_filex/open_filex.dart';
@@ -2708,9 +2709,22 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
             'Captured bytes not directly decodable; attempting PNG re-encode...',
           );
           try {
-            final decoded = img.decodeImage(screenshotBytes);
-            if (decoded != null) {
-              screenshotBytes = Uint8List.fromList(img.encodePng(decoded));
+            // Re-encode on a Rust thread when package:cb_native is built.
+            var reencoded = (await NativeImage.thumbnail(
+              bytes: screenshotBytes,
+              width: 0xFFFF,
+              height: 0xFFFF,
+              fit: NativeThumbnailFit.shrinkOnly,
+              format: NativeImageFormat.png,
+            ))?.bytes;
+            if (reencoded == null) {
+              final decoded = img.decodeImage(screenshotBytes);
+              if (decoded != null) {
+                reencoded = Uint8List.fromList(img.encodePng(decoded));
+              }
+            }
+            if (reencoded != null) {
+              screenshotBytes = reencoded;
               // Test again
               try {
                 await ui.instantiateImageCodec(screenshotBytes);

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:isolate';
 import 'package:cb_file_manager/helpers/files/file_type_registry.dart';
+import 'package:cb_native/cb_native.dart';
 import 'package:path/path.dart' as path;
 import '../models/objectbox/album.dart';
 import '../models/objectbox/album_config.dart';
@@ -45,6 +46,24 @@ class AlbumFileScanner {
         .whereType<RegExp>()
         .toList(growable: false);
 
+    final imageExtensions = FileTypeRegistry.getExtensionsForCategory(
+      FileCategory.image,
+    );
+    final native = await NativeFs.countFiles(
+      roots: config.directoriesList,
+      recursive: config.includeSubdirectories,
+      extensionMode: NativeExtensionMode.path,
+      extensions: extensions.isEmpty
+          ? imageExtensions
+          : imageExtensions.where(extensions.contains),
+      excludeNameRegexes: _validPatterns(config.excludePatternsList),
+    );
+    if (native != null) {
+      _cachedImageCounts[album.id] = native;
+      _lastScanTime[album.id] = DateTime.now();
+      return native;
+    }
+
     var count = 0;
     for (final dirPath in config.directoriesList) {
       final directory = Directory(dirPath);
@@ -87,6 +106,13 @@ class AlbumFileScanner {
       return _cachedFiles[album.id]!;
     }
 
+    final native = await _scanNatively(config);
+    if (native != null) {
+      _cachedFiles[album.id] = native;
+      _lastScanTime[album.id] = DateTime.now();
+      return native;
+    }
+
     // Scan in background if many directories
     final directories = config.directoriesList;
     if (directories.length > 3) {
@@ -94,6 +120,55 @@ class AlbumFileScanner {
     } else {
       return await _scanDirectly(album, config);
     }
+  }
+
+  /// Patterns Dart's RegExp accepts; the Dart scanner skips the others.
+  static List<String> _validPatterns(List<String> patterns) => [
+    for (final pattern in patterns)
+      if (pattern.isNotEmpty && _compiles(pattern)) pattern,
+  ];
+
+  static bool _compiles(String pattern) {
+    try {
+      RegExp(pattern, caseSensitive: false);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// The Dart scan's result from Rust threads (package:cb_native), which
+  /// filter and stat the files without an isolate. Null when the library is
+  /// unavailable or an exclude pattern is not valid Rust regex syntax.
+  Future<List<FileInfo>?> _scanNatively(AlbumConfig config) async {
+    // The Dart loop adds a file before checking the limit.
+    final limit = config.maxFileCount > 0 ? config.maxFileCount : 1;
+    final extensions = config.fileExtensionsList;
+    final entries = await NativeFs.walk(
+      roots: config.directoriesList,
+      recursive: config.includeSubdirectories,
+      stats: true,
+      extensionMode: extensions.isEmpty
+          ? NativeExtensionMode.none
+          : NativeExtensionMode.path,
+      extensions: extensions,
+      excludeNameRegexes: _validPatterns(config.excludePatternsList),
+      maxResults: limit,
+    );
+    if (entries == null) return null;
+    final files = <FileInfo>[
+      for (final entry in entries.take(limit))
+        FileInfo(
+          path: entry.path,
+          name: path.basename(entry.path),
+          size: entry.size,
+          modifiedTime: DateTime.fromMillisecondsSinceEpoch(entry.modifiedMs),
+          isImage: _isImageFile(path.extension(entry.path).toLowerCase()),
+          isVideo: _isVideoFile(path.extension(entry.path).toLowerCase()),
+        ),
+    ];
+    _sortFiles(files, config.sortBy, config.sortAscending);
+    return files;
   }
 
   /// Scan files directly in main thread (for small albums)

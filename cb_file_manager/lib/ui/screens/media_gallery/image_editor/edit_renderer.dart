@@ -4,6 +4,7 @@ import 'dart:math';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:cb_native/cb_native.dart';
 import 'package:flutter/painting.dart';
 import 'package:image/image.dart' as img;
 import 'package:vector_math/vector_math_64.dart' show Matrix4, Vector3;
@@ -328,13 +329,22 @@ Future<Uint8List> encodeImage(ui.Image image, String extension) async {
 }
 
 // Kept apart from the callers so the isolate closure captures only bytes
-// and numbers, never a ui.Image.
+// and numbers, never a ui.Image. Rust (package:cb_native) encodes when it is
+// built; `package:image` in an isolate otherwise.
 Future<Uint8List> _encodeInIsolate(
   Uint8List rgba,
   int width,
   int height,
   String ext,
-) {
+) async {
+  final native = await NativeImage.encode(rgba, width, height, switch (ext) {
+    '.jpg' || '.jpeg' => NativeImageFormat.jpeg,
+    '.bmp' => NativeImageFormat.bmp,
+    '.gif' => NativeImageFormat.gif,
+    '.tif' || '.tiff' => NativeImageFormat.tiff,
+    _ => NativeImageFormat.png,
+  }, quality: 95);
+  if (native != null) return native;
   return Isolate.run(() {
     final decoded = img.Image.fromBytes(
       width: width,
@@ -353,12 +363,15 @@ Future<Uint8List> _encodeInIsolate(
   });
 }
 
+/// The same result either way: the Rust port of [inpaintRgba] is exact.
 Future<Uint8List> _inpaintInIsolate(
   Uint8List pixels,
   Uint8List mask,
   int width,
   int height,
-) => Isolate.run(() => inpaintRgba(pixels, mask, width, height));
+) async =>
+    await NativeImage.inpaint(pixels, mask, width, height) ??
+    await Isolate.run(() => inpaintRgba(pixels, mask, width, height));
 
 String encodedExtension(String extension) {
   final ext = extension.toLowerCase();

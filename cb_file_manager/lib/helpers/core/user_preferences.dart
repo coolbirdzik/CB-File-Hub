@@ -350,7 +350,7 @@ class UserPreferences {
       try {
         final directory = Directory(folderPath);
         // Only return the path if the directory exists and is accessible
-        if (directory.existsSync()) {
+        if (await directory.exists()) {
           return folderPath;
         } else {
           // If directory doesn't exist, clear the preference
@@ -502,7 +502,7 @@ class UserPreferences {
       bool changed = false;
       for (final p in rawPaths) {
         try {
-          if (Directory(p).existsSync()) {
+          if (await Directory(p).exists()) {
             validPaths.add(p);
           } else {
             changed = true;
@@ -594,7 +594,7 @@ class UserPreferences {
     }
 
     try {
-      if (Directory(normalized).existsSync()) {
+      if (await Directory(normalized).exists()) {
         return normalized;
       }
     } catch (_) {}

@@ -32,6 +32,7 @@ import '../../../ui/utils/entity_open_actions.dart';
 import '../../../ui/utils/file_type_utils.dart';
 import '../../../ui/utils/route.dart';
 import '../../../services/ai/ai_provider_service.dart';
+import '../../../services/local_ai/local_ai_advisor_service.dart';
 import '../../../services/app_insights/app_insights_models.dart';
 import '../../../services/app_insights/app_storage_analyzer.dart';
 import '../../../services/app_insights/windows_app_inventory_service.dart';
@@ -609,15 +610,28 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     _selectedDrive = _mostPressuredDrivePath(_drives);
     _appInsightsDrive = _defaultDrivePath(_drives);
     await _loadLastScanSummaries();
-    try {
-      final providers = await GetIt.instance<AiProviderService>()
-          .getEnabledProviders();
-      _aiAvailable = providers.isNotEmpty;
-    } catch (_) {}
+    _aiAvailable = await _hasUsableAi();
     if (mounted) setState(() {});
     if (_activeSubFeature == _CleanerSubFeature.appInsights &&
         _appInsightsCubit.state.status == CleanerAppInsightsStatus.idle) {
       unawaited(_startAppInsightsScan());
+    }
+  }
+
+  /// CB Agent runs on an enabled cloud provider or an installed local model
+  /// (AiAgentBloc merges both), so either one enables the agent actions here.
+  static Future<bool> _hasUsableAi() async {
+    final getIt = GetIt.instance;
+    try {
+      if (getIt.isRegistered<LocalAiAdvisorService>() &&
+          getIt<LocalAiAdvisorService>().getInstalledModels().isNotEmpty) {
+        return true;
+      }
+    } catch (_) {}
+    try {
+      return await getIt<AiProviderService>().hasConfiguredProvider;
+    } catch (_) {
+      return false;
     }
   }
 

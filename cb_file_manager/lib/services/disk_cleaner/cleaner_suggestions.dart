@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:isolate';
 
+import 'package:cb_native/cb_native.dart';
 import 'package:path/path.dart' as p;
 
 import 'cleaner_categories.dart';
@@ -358,9 +359,7 @@ class CleanerSuggestionScanner {
       final cutoff = now().subtract(downloadsMinAge);
       CleanerSuggestion? found;
       try {
-        final files = await Isolate.run(
-          () => _listDownloadsLeftovers(downloads, cutoff),
-        );
+        final files = await _downloadsLeftoversInBackground(downloads, cutoff);
         found = downloadsSuggestion(downloads, files);
         if (found != null) suggestions.add(found);
       } catch (error) {
@@ -598,7 +597,7 @@ class CleanerSuggestionScanner {
   Future<CleanerSuggestion?> _previousWindowsSuggestion(String drive) async {
     final path = '$drive\\Windows.old';
     if (!await Directory(path).exists()) return null;
-    final (bytes, partial) = await Isolate.run(() => _directorySize(path));
+    final (bytes, partial) = await _directorySizeInBackground(path);
     if (bytes <= 0) return null;
     return CleanerSuggestion(
       id: 'previous_windows',
@@ -633,6 +632,44 @@ class CleanerSuggestionScanner {
   /// that have not been modified since [cutoff].
   static List<JunkItem> listDownloadsLeftovers(String path, DateTime cutoff) =>
       _listDownloadsLeftovers(path, cutoff);
+
+  /// [listDownloadsLeftovers] on Rust threads, or in an isolate without them.
+  static Future<List<JunkItem>> _downloadsLeftoversInBackground(
+    String path,
+    DateTime cutoff,
+  ) async {
+    if (!await Directory(path).exists()) return const [];
+    final native = await NativeFs.walk(
+      roots: [path],
+      maxDepth: 1,
+      extensionMode: NativeExtensionMode.path,
+      extensions: [
+        for (final ext in downloadsExtensions) '.${ext.toLowerCase()}',
+      ],
+      minSize: downloadsMinBytes,
+      // isAfter(cutoff) in milliseconds: the file is newer when its
+      // millisecond is past the cutoff's floor.
+      maxModifiedMs: cutoff.microsecondsSinceEpoch ~/ 1000,
+    );
+    if (native == null) {
+      return Isolate.run(() => _listDownloadsLeftovers(path, cutoff));
+    }
+    return [
+      for (final entry in native)
+        _userSelected(
+          entry.path,
+          entry.size,
+          DateTime.fromMillisecondsSinceEpoch(entry.modifiedMs),
+        ),
+    ];
+  }
+
+  /// [_directorySize] on Rust threads, or in an isolate without them.
+  static Future<(int, bool)> _directorySizeInBackground(String path) async {
+    final native = await NativeFs.directorySize(directories: [path]);
+    if (native != null) return (native.bytes, native.unreadable > 0);
+    return Isolate.run(() => _directorySize(path));
+  }
 
   static List<JunkItem> _listDownloadsLeftovers(String path, DateTime cutoff) {
     final root = Directory(path);

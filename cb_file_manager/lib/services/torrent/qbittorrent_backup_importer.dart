@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
+import 'package:cb_file_manager/helpers/core/file_hash.dart';
 import 'package:path/path.dart' as p;
 
 import 'windows_qbittorrent_process.dart';
@@ -192,7 +193,7 @@ class QbittorrentBackupImporter {
       await verify(item.hash, destination);
       await verifyResumeCopies?.call(item, destination, sourceDigests);
       for (final pair in staged.entries) {
-        final digest = await sha256.bind(File(pair.value).openRead()).first;
+        final digest = await sha256OfFile(pair.value);
         if (digest != sourceDigests[pair.key]) {
           throw const QbittorrentImportException(
             QbittorrentImportProblem.changed,
@@ -288,9 +289,7 @@ class QbittorrentBackupImporter {
           final digests = <String, Digest>{};
           if (removeSources) {
             for (final file in item.files) {
-              digests[file.path] = await sha256
-                  .bind(File(file.path).openRead())
-                  .first;
+              digests[file.path] = await sha256OfFile(file.path);
             }
           }
           await save(item, target);

@@ -1,0 +1,4 @@
+.dart_tool/
+# Per-package pub lock; the app resolves cb_native through its own lockfile.
+pubspec.lock
+rust/target/

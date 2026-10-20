@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:path/path.dart' as p;
+
 import '../../helpers/files/trash_manager.dart';
 import '../../utils/app_logger.dart';
 import '../album_service.dart';
@@ -11,6 +13,7 @@ import '../disk_cleaner/cleaner_models.dart';
 import '../disk_cleaner/cleaner_space_insights.dart';
 import '../disk_cleaner/disk_cleaner_service.dart';
 import '../disk_cleaner/disk_tree_node.dart';
+import '../disk_cleaner/scan_target_resolver.dart' show editDistance;
 import 'cleaner_scan_registry.dart';
 import 'assistant_response_text.dart';
 import 'agent_tool_catalog.dart';
@@ -581,7 +584,12 @@ class ToolExecutor {
     for (final p in paths) {
       final type = FileSystemEntity.typeSync(p);
       if (type == FileSystemEntityType.notFound) {
-        failed[p] = 'Not found';
+        // Never guess for a deletion: name the real sibling so the agent can
+        // call again with it (and the user approves that exact path).
+        final near = await _nearestSibling(p);
+        failed[p] = near == null
+            ? 'Not found'
+            : 'Not found. Did you mean $near ? Retry with that exact path.';
       } else {
         existingPaths.add(p);
       }
@@ -621,6 +629,31 @@ class ToolExecutor {
       output: buffer.toString().trim(),
       success: failed.isEmpty,
     );
+  }
+
+  /// The one entry next to [path] whose name is within two edits of it, for
+  /// paths a model copied slightly wrong.
+  static Future<String?> _nearestSibling(String path) async {
+    final name = p.basename(path).toUpperCase();
+    if (name.length < 6) return null;
+    final matches = <String>[];
+    try {
+      var seen = 0;
+      await for (final entity in Directory(
+        p.dirname(path),
+      ).list(followLinks: false)) {
+        if (++seen > 5000) break;
+        final candidate = p.basename(entity.path).toUpperCase();
+        if ((candidate.length - name.length).abs() <= 2 &&
+            editDistance(candidate, name) <= 2) {
+          matches.add(entity.path);
+          if (matches.length > 1) return null;
+        }
+      }
+    } catch (_) {
+      return null;
+    }
+    return matches.length == 1 ? matches.single : null;
   }
 
   // ---------------------------------------------------------------------------
@@ -1358,6 +1391,10 @@ class ToolExecutor {
         if (node != null) ...{
           'scan_id': result.scanId,
           'path': node.fullPath,
+          if (result.correctedFrom case final requested?)
+            'note':
+                'Requested path "$requested" is not in the scan; used the '
+                'closest scanned row. Use this exact path from now on.',
           'size_bytes': node.sizeBytes,
           'type': node.isFile ? 'file' : 'folder',
           'evidence': _formatSpaceConsumer(node),
@@ -1400,6 +1437,8 @@ class ToolExecutor {
           'selected_paths': result.selected
               .map((node) => node.fullPath)
               .toList(),
+          if (result.corrections.isNotEmpty)
+            'corrected_paths': result.corrections,
           'selected_bytes': result.selected.fold<int>(
             0,
             (sum, node) => sum + node.sizeBytes,

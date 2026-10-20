@@ -1,6 +1,5 @@
 node_modules/
 .cache/
-# Gatsby build output (Firebase Hosting deploys this folder). Sources live in src/ and static/.
+# Gatsby build output (Cloudflare Pages deploys this folder).
 public/
-firebase-debug.log
-.firebase/
+.wrangler/

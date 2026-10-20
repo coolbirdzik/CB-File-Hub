@@ -48,22 +48,21 @@ class TextUtils {
   /// - "test_file" matches "test file" (special chars)
   static bool matchesSearch(String text, String query) {
     final cleanText = searchKey(text);
-    final cleanQuery = searchKey(query);
+    final queryWords = searchWords(query);
 
-    // Split query into words for flexible matching
-    final queryWords = cleanQuery
-        .split(RegExp(r'\s+'))
-        .where((word) => word.isNotEmpty)
-        .toList();
-
-    // If no words, do simple contains check
-    if (queryWords.isEmpty) {
-      return cleanText.contains(cleanQuery);
-    }
+    // No words means the cleaned query is empty, which every text contains.
+    if (queryWords.isEmpty) return true;
 
     // Check if all query words exist in text (order independent)
     return queryWords.every((word) => cleanText.contains(word));
   }
+
+  /// The words [matchesSearch] requires, each already a [searchKey]. A text
+  /// matches when its [searchKey] contains all of them; the native search
+  /// (package:cb_native) receives exactly this list.
+  static List<String> searchWords(String query) => searchKey(
+    query,
+  ).split(RegExp(r'\s+')).where((word) => word.isNotEmpty).toList();
 
   /// Backwards-compatible name for older file-search callers.
   static bool matchesVietnamese(String text, String query) =>

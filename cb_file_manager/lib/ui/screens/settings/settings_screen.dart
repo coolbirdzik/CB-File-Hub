@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:cb_native/cb_native.dart';
 import 'package:flutter/material.dart';
 import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
@@ -413,6 +414,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       if (!await dir.exists()) {
         return const _DirectoryStats(fileCount: 0, totalBytes: 0);
+      }
+
+      final native = await NativeFs.directorySize(directories: [dir.path]);
+      if (native != null) {
+        return _DirectoryStats(
+          fileCount: native.files,
+          totalBytes: native.bytes,
+        );
       }
 
       int totalBytes = 0;

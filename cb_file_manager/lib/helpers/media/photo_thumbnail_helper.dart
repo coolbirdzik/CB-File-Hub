@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
+import 'package:cb_native/cb_native.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as path;
@@ -304,12 +305,14 @@ class PhotoThumbnailHelper {
       final cacheDir = await AppPathHelper.getPhotoCacheDir();
       final destPath = path.join(cacheDir.path, _cacheFilename(imagePath));
 
-      final result = await compute(_generatePhotoThumbnailIsolate, {
-        'sourcePath': imagePath,
-        'destPath': destPath,
-        'maxSize': maxSize,
-        'quality': thumbnailQuality,
-      });
+      final result =
+          await _generateNatively(imagePath, destPath, maxSize) ??
+          await compute(_generatePhotoThumbnailIsolate, {
+            'sourcePath': imagePath,
+            'destPath': destPath,
+            'maxSize': maxSize,
+            'quality': thumbnailQuality,
+          });
 
       if (result != null) {
         _addToFileCache(key, result);
@@ -325,6 +328,33 @@ class PhotoThumbnailHelper {
     }
 
     return null;
+  }
+
+  /// Same thumbnail as [_generatePhotoThumbnailIsolate], made on a Rust
+  /// thread (package:cb_native) with JPEGs decoded at a reduced DCT scale.
+  /// Null when the library is missing or cannot decode the file, so the
+  /// `package:image` isolate can try instead.
+  static Future<String?> _generateNatively(
+    String sourcePath,
+    String destPath,
+    int maxSize,
+  ) async {
+    final thumbnail = await NativeImage.thumbnail(
+      path: sourcePath,
+      width: maxSize,
+      height: maxSize,
+      fit: NativeThumbnailFit.shrinkOnly,
+      filter: NativeResizeFilter.linear,
+      format: NativeImageFormat.jpeg,
+      quality: thumbnailQuality,
+    );
+    if (thumbnail == null) return null;
+    try {
+      await File(destPath).writeAsBytes(thumbnail.bytes, flush: false);
+      return destPath;
+    } catch (_) {
+      return null;
+    }
   }
 
   /// Wipe in-memory caches without deleting disk files.

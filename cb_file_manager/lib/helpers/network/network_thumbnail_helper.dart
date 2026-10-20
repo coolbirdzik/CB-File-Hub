@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:async';
 import 'dart:isolate';
 import 'dart:typed_data';
+import 'package:cb_native/cb_native.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:path/path.dart' as p;
@@ -869,6 +870,18 @@ class NetworkThumbnailHelper {
     final data = bytes.takeBytes();
     if (data.isEmpty) return null;
 
+    // Rust (package:cb_native) when built; package:image in an isolate
+    // otherwise, or when Rust cannot decode the format.
+    final native = await NativeImage.thumbnail(
+      bytes: data,
+      width: size,
+      height: size,
+      fit: NativeThumbnailFit.fit,
+      filter: NativeResizeFilter.average,
+      enhance: true,
+      format: NativeImageFormat.png,
+    );
+    if (native != null) return native.bytes;
     return compute(_generateImageThumbnailBytes, {'bytes': data, 'size': size});
   }
 

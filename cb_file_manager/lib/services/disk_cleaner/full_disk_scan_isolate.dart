@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:ffi';
+import 'dart:io' show Platform, sleep;
 import 'dart:isolate';
 
+import 'package:cb_native/cb_native.dart';
 import 'package:ffi/ffi.dart';
 import 'package:win32/win32.dart' as win32;
 
@@ -180,6 +182,9 @@ class FullDiskJunkRule {
 /// Uses Win32 FindFirstFileW/FindNextFileW for maximum speed — each directory
 /// entry returns name + size + attributes in a single syscall, eliminating the
 /// need for separate stat() calls. ~5-10x faster than Dart's listSync+statSync.
+/// When package:cb_native is built, the same per-directory work runs on Rust
+/// worker threads instead (see `nativeScanInto`), and this isolate only turns
+/// the finished directories into [DiskTreeNode]s.
 ///
 /// The worker compacts only the file tail before the result crosses the isolate
 /// boundary. A raw system drive may hold millions of file entries, while the
@@ -198,6 +203,7 @@ Future<FullDiskScanHandle> spawnFullDiskScan({
   List<FullDiskScanInsight> baseOldLargeItems = const <FullDiskScanInsight>[],
   List<String> trackedDirtyDirectories = const <String>[],
   bool hasTrackedChanges = false,
+  bool useNativeScanner = true,
   void Function(FullDiskScanResult result)? onCompleted,
 }) async {
   final receivePort = ReceivePort();
@@ -214,6 +220,7 @@ Future<FullDiskScanHandle> spawnFullDiskScan({
     baseOldLargeItems: baseOldLargeItems,
     trackedDirtyDirectories: trackedDirtyDirectories,
     hasTrackedChanges: hasTrackedChanges,
+    useNativeScanner: useNativeScanner,
   );
 
   final isolate = await Isolate.spawn(_fullDiskScanWorker, args);
@@ -534,6 +541,35 @@ void _fullDiskScanWorker(_FullScanArgs args) {
         ),
       )
       .toList(growable: false);
+  // The Rust scanner refers to junk categories by index into this list.
+  final nativeCategories = <String>[];
+  int nativeCategory(String? categoryId) {
+    if (categoryId == null) return -1;
+    final index = nativeCategories.indexOf(categoryId);
+    if (index >= 0) return index;
+    nativeCategories.add(categoryId);
+    return nativeCategories.length - 1;
+  }
+
+  final useNativeScanner =
+      args.useNativeScanner && Platform.isWindows && CbNative.isAvailable;
+  final nativeWholeDirRules = [
+    for (final rule in wholeDirRules)
+      NativeWholeDirRule(
+        upperPath: rule.path,
+        upperPrefix: rule.prefix,
+        category: nativeCategory(rule.categoryId),
+      ),
+  ];
+  final nativeGlobRules = [
+    for (final rule in args.junkRules.where((r) => r.includeGlobs.isNotEmpty))
+      NativeGlobRule(
+        upperBasePath: rule.basePath.toUpperCase(),
+        category: nativeCategory(rule.categoryId),
+        // The Dart globs match case-insensitively against upper-cased names.
+        upperGlobs: [for (final glob in rule.includeGlobs) glob.toUpperCase()],
+      ),
+  ];
   int totalDirs = 0;
   int totalFiles = 0;
   int totalBytes = 0;
@@ -930,6 +966,226 @@ void _fullDiskScanWorker(_FullScanArgs args) {
     }
   }
 
+  /// [scanInto] on Rust worker threads. Returns false when package:cb_native
+  /// is unavailable, so the caller runs [scanInto] instead.
+  ///
+  /// Rust reports each finished directory's own entries, parent records first.
+  /// Nodes are attached as records arrive so progress previews keep working;
+  /// the bottom-up steps [scanInto] runs as each directory completes (sorting,
+  /// junk caches, old large folders) run once the whole subtree is in.
+  bool nativeScanInto(
+    DiskTreeNode node,
+    int depth, [
+    String? inheritedJunkCategory,
+    bool replaceExisting = false,
+  ]) {
+    final scan = NativeDiskScan.start(
+      root: node.fullPath,
+      startDepth: depth,
+      maxDepth: args.maxDepth,
+      maxChildrenPerDirectory: args.maxChildrenPerDirectory,
+      minDisplayEntryBytes: args.minDisplayEntryBytes,
+      oldLargeFileBytes: defaultOldLargeFileBytes,
+      inheritedCategory: nativeCategory(inheritedJunkCategory),
+      wholeDirRules: nativeWholeDirRules,
+      globRules: nativeGlobRules,
+      // Free natively (they come with the directory listing), so even a cold
+      // scan records them and the next refresh can use the USN Journal.
+      collectFileIds: canReadJournalChanges,
+    );
+    if (scan == null) return false;
+
+    if (replaceExisting) {
+      node.replaceChildren(const <DiskTreeNode>[]);
+      node.sizeBytes = 0;
+      node.fileCount = 0;
+    }
+    if (inheritedJunkCategory != null) {
+      node.junkCategoryId = inheritedJunkCategory;
+    }
+
+    final nodes = <int, DiskTreeNode>{0: node};
+    final parents = <int, int>{};
+    final subdirs = <int, NativeSubdir>{};
+    final baseDirs = totalDirs;
+    final baseFiles = totalFiles;
+    final baseBytes = totalBytes;
+    String? category(int index) => index < 0 ? null : nativeCategories[index];
+    DateTime? fileTime(int ticks) =>
+        _fileTimePartsToDateTime(ticks & 0xffffffff, ticks >> 32);
+
+    void apply(NativeDirRecord record) {
+      final dir = nodes[record.id]!;
+      final dirPath = dir.fullPath;
+      final separator = dirPath.endsWith('\\') ? '' : '\\';
+      switch (record.status) {
+        case NativeDirStatus.inaccessible:
+          inaccessible.add(dirPath);
+          coverageIssues.add(
+            FullDiskScanCoverageIssue(
+              path: dirPath,
+              reason: FullDiskScanCoverageIssueReason.inaccessible,
+            ),
+          );
+        case NativeDirStatus.maxDepthReached:
+          coverageIssues.add(
+            FullDiskScanCoverageIssue(
+              path: dirPath,
+              reason: FullDiskScanCoverageIssueReason.maxDepthReached,
+              detail: 'Maximum scan depth ${args.maxDepth} reached.',
+            ),
+          );
+        case NativeDirStatus.scanned:
+          break;
+      }
+
+      for (final subdir in record.subdirs) {
+        final fullPath = '$dirPath$separator${subdir.name}';
+        final child = DiskTreeNode(
+          name: subdir.name,
+          fullPath: fullPath,
+          fileReferenceNumber: canReadJournalChanges
+              ? subdir.fileId ??
+                    (collectDirectoryFileIds
+                        ? DiskUsnJournalReader.readFileReferenceNumber(fullPath)
+                        : null)
+              : null,
+          junkCategoryId: category(subdir.category),
+        );
+        dir.addChild(child);
+        nodes[subdir.id] = child;
+        parents[subdir.id] = record.id;
+        subdirs[subdir.id] = subdir;
+      }
+      for (final name in record.reparseNames) {
+        coverageIssues.add(
+          FullDiskScanCoverageIssue(
+            path: '$dirPath$separator$name',
+            reason: FullDiskScanCoverageIssueReason.reparsePoint,
+          ),
+        );
+      }
+      for (final file in record.oldLargeFiles) {
+        retainOldLargeDiskInsight(
+          oldLargeFiles,
+          FullDiskScanInsight(
+            name: file.name,
+            path: '$dirPath$separator${file.name}',
+            isFile: true,
+            sizeBytes: file.size,
+            lastModified: fileTime(file.lastWriteFileTime),
+            lastAccessed: fileTime(file.lastAccessFileTime),
+          ),
+          now: scanStartedAt,
+        );
+      }
+      for (final file in record.retainedFiles) {
+        final junkCategory = category(file.category);
+        dir.addChild(
+          DiskTreeNode(
+            name: file.name,
+            fullPath: '$dirPath$separator${file.name}',
+            isFile: true,
+            sizeBytes: file.size,
+            fileCount: 1,
+            junkCategoryId: junkCategory,
+          )..cacheJunkMetadata(
+            junkBytes: junkCategory == null ? 0 : file.size,
+            hasJunkChildren: false,
+          ),
+        );
+      }
+      if (record.foldedEntries > 0) {
+        dir.addChild(
+          DiskTreeNode(
+            name: '',
+            fullPath: '',
+            isFile: true,
+            sizeBytes: record.foldedBytes,
+            fileCount: record.foldedFiles,
+            aggregatedItemCount: record.foldedEntries,
+          )..cacheJunkMetadata(
+            junkBytes: record.foldedJunkBytes,
+            hasJunkChildren: record.foldedJunkBytes > 0,
+          ),
+        );
+      }
+      if (record.ownBytes == 0 && record.ownFiles == 0) return;
+      // Directory totals include descendants, so credit every ancestor up to
+      // the scan root, which is what scanInto's recursion adds up.
+      int? id = record.id;
+      while (id != null) {
+        final ancestor = nodes[id]!;
+        ancestor.sizeBytes += record.ownBytes;
+        ancestor.fileCount += record.ownFiles;
+        id = parents[id];
+      }
+    }
+
+    try {
+      while (true) {
+        final batch = scan.poll();
+        for (var index = 0; index < batch.records.length; index++) {
+          // Reading file IDs can make a large batch slow; keep Rust from
+          // treating this isolate as gone.
+          if (index % 512 == 511) scan.keepAlive();
+          apply(batch.records[index]);
+        }
+        final progress = scan.progress();
+        totalDirs = baseDirs + progress.directories;
+        totalFiles = baseFiles + progress.files;
+        totalBytes = baseBytes + progress.bytes;
+        maybeFlush(
+          progress.currentPath.isEmpty ? node.fullPath : progress.currentPath,
+        );
+        if (batch.finished) break;
+        sleep(const Duration(milliseconds: 8));
+      }
+    } finally {
+      scan.dispose();
+    }
+
+    void finishDirectory(DiskTreeNode directory) {
+      for (final child in directory.children) {
+        if (!child.isFile) finishDirectory(child);
+      }
+      directory.sortBySize(recursive: false);
+      cacheDirectJunkMetadata(directory);
+    }
+
+    finishDirectory(node);
+    subdirs.forEach((id, subdir) {
+      final directory = nodes[id]!;
+      if (directory.sizeBytes < defaultOldLargeDirectoryBytes) return;
+      retainOldLargeDiskInsight(
+        oldLargeDirectories,
+        FullDiskScanInsight(
+          name: subdir.name,
+          path: directory.fullPath,
+          isFile: false,
+          sizeBytes: directory.sizeBytes,
+          lastModified: fileTime(subdir.lastWriteFileTime),
+          lastAccessed: fileTime(subdir.lastAccessFileTime),
+        ),
+        now: scanStartedAt,
+      );
+    });
+    return true;
+  }
+
+  void scanSubtree(
+    DiskTreeNode node,
+    int depth, [
+    String? inheritedJunkCategory,
+    bool replaceExisting = false,
+  ]) {
+    if (useNativeScanner &&
+        nativeScanInto(node, depth, inheritedJunkCategory, replaceExisting)) {
+      return;
+    }
+    scanInto(node, depth, inheritedJunkCategory, replaceExisting);
+  }
+
   final driveName = args.drivePath.endsWith('\\')
       ? args.drivePath
       : '${args.drivePath}\\';
@@ -1071,7 +1327,7 @@ void _fullDiskScanWorker(_FullScanArgs args) {
               parentByPath[_normalizeComparableWindowsPath(current.fullPath)];
         }
         final depth = chain.length - 1;
-        scanInto(target, depth, target.junkCategoryId, true);
+        scanSubtree(target, depth, target.junkCategoryId, true);
         for (var index = 1; index < chain.length; index++) {
           recalculateDirectory(chain[index]);
         }
@@ -1085,12 +1341,20 @@ void _fullDiskScanWorker(_FullScanArgs args) {
     inaccessible.clear();
     coverageIssues.clear();
     changedDirectoryCount = 0;
-    root = DiskTreeNode(name: driveName, fullPath: driveName);
+    root = DiskTreeNode(
+      name: driveName,
+      fullPath: driveName,
+      // The native walk gives every folder below the root its ID; with the
+      // root's own, changes directly in it resolve too.
+      fileReferenceNumber: useNativeScanner && canReadJournalChanges
+          ? DiskUsnJournalReader.readFileReferenceNumber(driveName)
+          : null,
+    );
     rootSnapshot = root;
     // Every directory is sorted and its file tail is folded by `scanInto` as
     // it completes. All directory nodes remain in the final tree, while the
     // large file tail never has to cross the isolate boundary.
-    scanInto(root, 0);
+    scanSubtree(root, 0);
     nextJournalCursor = canReadJournalChanges
         ? DiskUsnJournalReader.readCursor(args.drivePath)
         : null;
@@ -1324,6 +1588,10 @@ class _FullScanArgs {
   final List<FullDiskScanInsight> baseOldLargeItems;
   final List<String> trackedDirtyDirectories;
   final bool hasTrackedChanges;
+
+  /// Walk with package:cb_native when it is built. Tests turn it off to
+  /// compare against the Dart walker.
+  final bool useNativeScanner;
   const _FullScanArgs({
     required this.sendPort,
     required this.drivePath,
@@ -1337,6 +1605,7 @@ class _FullScanArgs {
     this.baseOldLargeItems = const <FullDiskScanInsight>[],
     this.trackedDirtyDirectories = const <String>[],
     this.hasTrackedChanges = false,
+    this.useNativeScanner = true,
   });
 }
 
