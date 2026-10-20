@@ -4,7 +4,8 @@ import 'package:cb_file_manager/bloc/selection/selection.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tabbed_folder/tabbed_folder_keyboard_controller.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:cb_file_manager/helpers/core/desktop_shortcuts.dart';
+import 'file_keyboard_shortcuts.dart';
 
 class BrowserLikeKeyboardShortcuts {
   static KeyEventResult handleSearch({
@@ -12,30 +13,14 @@ class BrowserLikeKeyboardShortcuts {
     required KeyEvent? event,
     VoidCallback? onSearch,
   }) {
-    final commandPressed =
-        HardwareKeyboard.instance.isControlPressed ||
-        (Platform.isMacOS && HardwareKeyboard.instance.isMetaPressed);
-    if (isDesktop &&
-        onSearch != null &&
-        (event is KeyDownEvent || event is KeyRepeatEvent) &&
-        commandPressed &&
-        !HardwareKeyboard.instance.isAltPressed &&
-        !HardwareKeyboard.instance.isShiftPressed &&
-        event!.logicalKey == LogicalKeyboardKey.keyF) {
-      onSearch();
-      return KeyEventResult.handled;
-    }
-    return KeyEventResult.ignored;
+    return FileKeyboardShortcuts.handleSearch(
+      isDesktop: isDesktop,
+      event: event,
+      onSearch: onSearch,
+    );
   }
 
-  static bool isTextInputFocused() {
-    final focusedContext = FocusManager.instance.primaryFocus?.context;
-    if (focusedContext == null) {
-      return false;
-    }
-    return focusedContext.widget is EditableText ||
-        focusedContext.findAncestorWidgetOfExactType<EditableText>() != null;
-  }
+  static bool isTextInputFocused() => DesktopShortcuts.isTextInputFocused;
 
   static KeyEventResult handleBasic({
     required bool isDesktop,
@@ -49,74 +34,23 @@ class BrowserLikeKeyboardShortcuts {
     VoidCallback? onPaste,
     VoidCallback? onRename,
     VoidCallback? onSearch,
-  }) {
-    final searchResult = handleSearch(
-      isDesktop: isDesktop,
-      event: event,
-      onSearch: onSearch,
-    );
-    if (searchResult != KeyEventResult.ignored) return searchResult;
-    if (!isDesktop || event == null || isTextInputFocused()) {
-      return KeyEventResult.ignored;
-    }
-
-    final bool isKeyPress = event is KeyDownEvent || event is KeyRepeatEvent;
-    if (!isKeyPress) {
-      return KeyEventResult.ignored;
-    }
-
-    final key = event.logicalKey;
-    // The command modifier is Cmd on macOS and Ctrl everywhere else. Checking
-    // only Ctrl left every Cmd shortcut dead on a Mac.
-    final isCtrl =
-        HardwareKeyboard.instance.isControlPressed ||
-        (Platform.isMacOS && HardwareKeyboard.instance.isMetaPressed);
-    final isShift = HardwareKeyboard.instance.isShiftPressed;
-
-    if (key == LogicalKeyboardKey.escape && onEscape != null) {
-      onEscape();
-      return KeyEventResult.handled;
-    }
-
-    if ((key == LogicalKeyboardKey.f5 ||
-            (isCtrl && key == LogicalKeyboardKey.keyR)) &&
-        onRefresh != null) {
-      onRefresh();
-      return KeyEventResult.handled;
-    }
-
-    if (isCtrl && key == LogicalKeyboardKey.keyA && onSelectAll != null) {
-      onSelectAll();
-      return KeyEventResult.handled;
-    }
-
-    if (key == LogicalKeyboardKey.delete && onDelete != null) {
-      onDelete(isShift);
-      return KeyEventResult.handled;
-    }
-
-    if (isCtrl && key == LogicalKeyboardKey.keyC && onCopy != null) {
-      onCopy();
-      return KeyEventResult.handled;
-    }
-
-    if (isCtrl && key == LogicalKeyboardKey.keyX && onCut != null) {
-      onCut();
-      return KeyEventResult.handled;
-    }
-
-    if (isCtrl && key == LogicalKeyboardKey.keyV && onPaste != null) {
-      onPaste();
-      return KeyEventResult.handled;
-    }
-
-    if (key == LogicalKeyboardKey.f2 && onRename != null) {
-      onRename();
-      return KeyEventResult.handled;
-    }
-
-    return KeyEventResult.ignored;
-  }
+    VoidCallback? onBack,
+    VoidCallback? onForward,
+  }) => FileKeyboardShortcuts.handle(
+    isDesktop: isDesktop,
+    event: event,
+    onEscape: onEscape,
+    onRefresh: onRefresh,
+    onSelectAll: onSelectAll,
+    onDelete: onDelete,
+    onCopy: onCopy,
+    onCut: onCut,
+    onPaste: onPaste,
+    onRename: onRename,
+    onSearch: onSearch,
+    onBack: onBack,
+    onForward: onForward,
+  );
 
   static KeyEventResult handle({
     required bool isDesktop,
@@ -126,6 +60,9 @@ class BrowserLikeKeyboardShortcuts {
     required String? currentFilter,
     int? gridCrossAxisCount,
     required VoidCallback onBackInTabHistory,
+    VoidCallback? onForwardInTabHistory,
+    VoidCallback? onNavigateToParent,
+    VoidCallback? onCreateFolder,
     required void Function(String folderPath) focusFolderPath,
     required void Function(String filePath) focusFilePath,
     required void Function({
@@ -166,6 +103,9 @@ class BrowserLikeKeyboardShortcuts {
       currentFilter: currentFilter,
       gridCrossAxisCount: gridCrossAxisCount,
       onBackInTabHistory: onBackInTabHistory,
+      onForwardInTabHistory: onForwardInTabHistory,
+      onNavigateToParent: onNavigateToParent,
+      onCreateFolder: onCreateFolder,
       focusFolderPath: focusFolderPath,
       focusFilePath: focusFilePath,
       selectRange: selectRange,

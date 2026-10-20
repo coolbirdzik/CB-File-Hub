@@ -444,6 +444,12 @@ abstract class AppLocalizations {
   String get noSystemWallpaperDetected;
   String get customBackdropImage;
   String get backdropImageNotFound;
+  String get backdropModeGlass;
+  String get backdropModeGlassDescription;
+  String get desktopGlassStrength;
+  String desktopGlassStrengthDescription(int percentage);
+  String get desktopGlassBlur;
+  String desktopGlassBlurDescription(int percentage);
   String get desktopAcrylicStrength;
   String desktopAcrylicStrengthDescription(int percentage);
   String get vietnameseLanguage;
@@ -1026,6 +1032,12 @@ abstract class AppLocalizations {
   String get pinMenu;
   String get unpinMenu;
   String get pinnedSection;
+  String get favoritesSection;
+  String get sidebarApplications;
+  String get sidebarDesktop;
+  String get sidebarPictures;
+  String get sidebarMusic;
+  String get sidebarMovies;
   String get pinToSidebar;
   String get unpinFromSidebar;
   String get pinnedToSidebar;

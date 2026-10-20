@@ -190,6 +190,7 @@ class _BrowserLikeFileSurfaceState extends State<BrowserLikeFileSurface> {
         currentFilter: widget.currentFilter,
         gridCrossAxisCount: widget.gridCrossAxisCount,
         onBackInTabHistory: widget.onBackInTabHistory!,
+        onForwardInTabHistory: widget.onMouseForward,
         focusFolderPath: widget.focusFolderPath!,
         focusFilePath: widget.focusFilePath!,
         selectRange: widget.selectRange!,
@@ -240,6 +241,8 @@ class _BrowserLikeFileSurfaceState extends State<BrowserLikeFileSurface> {
         onPaste: widget.onPaste,
         onRename: widget.onRename,
         onSearch: widget.onSearch,
+        onBack: widget.onMouseBack,
+        onForward: widget.onMouseForward,
       );
       if (result != KeyEventResult.ignored) return result;
     }

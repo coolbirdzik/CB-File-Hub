@@ -1013,6 +1013,21 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get backdropImageNotFound => 'Không tìm thấy ảnh';
   @override
+  String get backdropModeGlass => 'Glass';
+  @override
+  String get backdropModeGlassDescription =>
+      'Nhìn xuyên qua lớp kính để thấy màn hình nền và cửa sổ phía sau ứng dụng.';
+  @override
+  String get desktopGlassStrength => 'Độ trong Glass';
+  @override
+  String desktopGlassStrengthDescription(int percentage) =>
+      'Hiện nền phía sau nhưng luôn giữ lớp màu bảo vệ chữ ($percentage%).';
+  @override
+  String get desktopGlassBlur => 'Độ mờ nền Glass';
+  @override
+  String desktopGlassBlurDescription(int percentage) =>
+      'Làm mờ ảnh nền và nội dung phía sau bề mặt kính ($percentage%).';
+  @override
   String get desktopAcrylicStrength => 'Độ mạnh acrylic máy tính';
   @override
   String desktopAcrylicStrengthDescription(int percentage) =>
@@ -2711,6 +2726,18 @@ class VietnameseLocalizations implements AppLocalizations {
 
   @override
   String get pinnedSection => 'Đã ghim';
+  @override
+  String get favoritesSection => 'Yêu thích';
+  @override
+  String get sidebarApplications => 'Ứng dụng';
+  @override
+  String get sidebarDesktop => 'Màn hình nền';
+  @override
+  String get sidebarPictures => 'Hình ảnh';
+  @override
+  String get sidebarMusic => 'Nhạc';
+  @override
+  String get sidebarMovies => 'Phim';
 
   @override
   String get pinToSidebar => 'Ghim vào thanh bên';

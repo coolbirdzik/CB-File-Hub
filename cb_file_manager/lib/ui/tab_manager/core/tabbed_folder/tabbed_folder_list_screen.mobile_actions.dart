@@ -33,7 +33,7 @@ extension _TabbedFolderListMobileActions on _TabbedFolderListScreenState {
       );
     };
     // Register create folder callback - delegates to FolderContextMenu's create folder dialog
-    controller.onCreateFolder = () => _showMobileCreateFolderDialog();
+    controller.onCreateFolder = () => _showCreateFolderDialog();
     controller.onAllowFileExtensionRenameChanged = _setAllowFileExtensionRename;
     controller.folderListBloc = _folderListBloc;
     controller.allowFileExtensionRename = _allowFileExtensionRename;
@@ -92,8 +92,8 @@ extension _TabbedFolderListMobileActions on _TabbedFolderListScreenState {
     }
   }
 
-  /// Show create folder dialog for mobile
-  void _showMobileCreateFolderDialog() async {
+  /// Show the shared create-folder dialog.
+  void _showCreateFolderDialog() async {
     await RouteUtils.showAcrylicDialog(
       context: context,
       builder: (dialogContext) => _MobileCreateFolderDialog(

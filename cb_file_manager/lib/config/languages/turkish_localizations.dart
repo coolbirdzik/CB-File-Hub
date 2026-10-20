@@ -1026,6 +1026,21 @@ class TurkishLocalizations implements AppLocalizations {
   @override
   String get backdropImageNotFound => 'Görsel bulunamadı';
   @override
+  String get backdropModeGlass => 'Cam';
+  @override
+  String get backdropModeGlassDescription =>
+      'macOS camı üzerinden uygulamanın arkasındaki masaüstünü ve pencereleri görün.';
+  @override
+  String get desktopGlassStrength => 'Cam saydamlığı';
+  @override
+  String desktopGlassStrengthDescription(int percentage) =>
+      'Metnin arkasındaki koruyucu tonu koruyarak arka planı gösterin (%$percentage).';
+  @override
+  String get desktopGlassBlur => 'Cam arka plan bulanıklığı';
+  @override
+  String desktopGlassBlurDescription(int percentage) =>
+      'Cam yüzeylerin arkasındaki duvar kağıdını ve içeriği yumuşatın (%$percentage).';
+  @override
   String get desktopAcrylicStrength => 'Masaüstü akrilik yoğunluğu';
   @override
   String desktopAcrylicStrengthDescription(int percentage) =>
@@ -2744,6 +2759,18 @@ class TurkishLocalizations implements AppLocalizations {
 
   @override
   String get pinnedSection => 'Sabitlenenler';
+  @override
+  String get favoritesSection => 'Favoriler';
+  @override
+  String get sidebarApplications => 'Uygulamalar';
+  @override
+  String get sidebarDesktop => 'Masaüstü';
+  @override
+  String get sidebarPictures => 'Resimler';
+  @override
+  String get sidebarMusic => 'Müzik';
+  @override
+  String get sidebarMovies => 'Filmler';
 
   @override
   String get pinToSidebar => 'Kenar çubuğuna sabitle';

@@ -1020,6 +1020,21 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get backdropImageNotFound => 'Image not found';
   @override
+  String get backdropModeGlass => 'Glass';
+  @override
+  String get backdropModeGlassDescription =>
+      'See the desktop and windows behind the app through macOS glass.';
+  @override
+  String get desktopGlassStrength => 'Glass transparency';
+  @override
+  String desktopGlassStrengthDescription(int percentage) =>
+      'Reveal more background while keeping a protective tint behind text ($percentage%).';
+  @override
+  String get desktopGlassBlur => 'Glass background blur';
+  @override
+  String desktopGlassBlurDescription(int percentage) =>
+      'Soften wallpaper and content behind glass surfaces ($percentage%).';
+  @override
   String get desktopAcrylicStrength => 'Desktop acrylic strength';
   @override
   String desktopAcrylicStrengthDescription(int percentage) =>
@@ -2717,6 +2732,18 @@ class EnglishLocalizations implements AppLocalizations {
 
   @override
   String get pinnedSection => 'Pinned';
+  @override
+  String get favoritesSection => 'Favorites';
+  @override
+  String get sidebarApplications => 'Applications';
+  @override
+  String get sidebarDesktop => 'Desktop';
+  @override
+  String get sidebarPictures => 'Pictures';
+  @override
+  String get sidebarMusic => 'Music';
+  @override
+  String get sidebarMovies => 'Movies';
 
   @override
   String get pinToSidebar => 'Pin to Sidebar';

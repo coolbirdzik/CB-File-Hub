@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:cb_file_manager/helpers/core/desktop_shortcuts.dart';
+import 'package:cb_file_manager/ui/components/common/file_keyboard_shortcuts.dart';
 import 'package:cb_file_manager/ui/components/common/file_entry_presentation.dart';
 
 import 'package:cb_file_manager/bloc/selection/selection.dart';
@@ -275,6 +277,9 @@ class TabbedFolderKeyboardController {
     required String? currentFilter,
     int? gridCrossAxisCount,
     required VoidCallback onBackInTabHistory,
+    VoidCallback? onForwardInTabHistory,
+    VoidCallback? onNavigateToParent,
+    VoidCallback? onCreateFolder,
     required void Function(String folderPath) focusFolderPath,
     required void Function(String filePath) focusFilePath,
     required void Function({
@@ -304,7 +309,9 @@ class TabbedFolderKeyboardController {
     onScrollToIndex,
     KeyEvent? event,
   }) {
-    if (!isDesktop || event == null) return KeyEventResult.ignored;
+    if (!isDesktop || event == null || DesktopShortcuts.isTextInputFocused) {
+      return KeyEventResult.ignored;
+    }
     _navigationItemExtent = folderListState.viewMode == ViewMode.list
         ? itemMainAxisExtent
         : 48.0;
@@ -313,81 +320,83 @@ class TabbedFolderKeyboardController {
     if (!isKeyPress) return KeyEventResult.ignored;
 
     final LogicalKeyboardKey key = event.logicalKey;
-    final bool isCtrlPressed = HardwareKeyboard.instance.isControlPressed;
-    final bool isShiftPressed =
-        HardwareKeyboard.instance.isShiftPressed ||
-        HardwareKeyboard.instance.logicalKeysPressed.contains(
-          LogicalKeyboardKey.shiftLeft,
-        ) ||
-        HardwareKeyboard.instance.logicalKeysPressed.contains(
-          LogicalKeyboardKey.shiftRight,
-        );
+    final bool isCtrlPressed = DesktopShortcuts.isPrimaryPressed;
+    final bool isShiftPressed = HardwareKeyboard.instance.isShiftPressed;
+    if (DesktopShortcuts.isMacOS &&
+        onRename != null &&
+        event is KeyRepeatEvent &&
+        (key == LogicalKeyboardKey.enter ||
+            key == LogicalKeyboardKey.numpadEnter)) {
+      return KeyEventResult.ignored;
+    }
+    final commonResult = FileKeyboardShortcuts.handle(
+      isDesktop: isDesktop,
+      event: event,
+      onRefresh: onRefresh,
+      onSelectAll: onSelectAll,
+      onDelete: onDelete,
+      onCopy: onCopy,
+      onCut: onCut,
+      onPaste: onPaste,
+      onRename: onRename,
+      onBack: onBackInTabHistory,
+      onForward: onForwardInTabHistory,
+    );
+    if (commonResult != KeyEventResult.ignored) return commonResult;
 
-    // Delete key - move to trash or permanent delete
-    if (key == LogicalKeyboardKey.delete) {
-      debugPrint('Delete key pressed - Shift: $isShiftPressed');
-
-      onDelete(isShiftPressed);
+    if (DesktopShortcuts.isMacOS &&
+        onCreateFolder != null &&
+        DesktopShortcuts.matches(
+          event,
+          LogicalKeyboardKey.keyN,
+          meta: true,
+          shift: true,
+        )) {
+      onCreateFolder();
       return KeyEventResult.handled;
     }
-
-    // Ctrl+A - Select all
-    if (isCtrlPressed &&
-        key == LogicalKeyboardKey.keyA &&
-        onSelectAll != null) {
-      debugPrint('Ctrl+A pressed - Select all');
-      onSelectAll();
+    if (onNavigateToParent != null &&
+        ((DesktopShortcuts.isMacOS &&
+                DesktopShortcuts.matches(
+                  event,
+                  LogicalKeyboardKey.arrowUp,
+                  meta: true,
+                )) ||
+            DesktopShortcuts.matches(
+              event,
+              LogicalKeyboardKey.arrowUp,
+              alt: true,
+            ))) {
+      onNavigateToParent();
       return KeyEventResult.handled;
     }
-
-    // Ctrl+C - Copy
-    if (isCtrlPressed && key == LogicalKeyboardKey.keyC && onCopy != null) {
-      debugPrint('Ctrl+C pressed - Copy');
-      onCopy();
-      return KeyEventResult.handled;
-    }
-
-    // Ctrl+X - Cut
-    if (isCtrlPressed && key == LogicalKeyboardKey.keyX && onCut != null) {
-      debugPrint('Ctrl+X pressed - Cut');
-      onCut();
-      return KeyEventResult.handled;
-    }
-
-    // Ctrl+V - Paste
-    if (isCtrlPressed && key == LogicalKeyboardKey.keyV && onPaste != null) {
-      debugPrint('Ctrl+V pressed - Paste');
-      onPaste();
-      return KeyEventResult.handled;
-    }
-
-    // F2 - Rename
-    if (key == LogicalKeyboardKey.f2 && onRename != null) {
-      debugPrint('F2 pressed - Rename');
-      onRename();
-      return KeyEventResult.handled;
-    }
-
-    // F5 or Ctrl+R - Refresh
-    if ((key == LogicalKeyboardKey.f5 ||
-            (isCtrlPressed && key == LogicalKeyboardKey.keyR)) &&
-        onRefresh != null) {
-      debugPrint(
-        '${key == LogicalKeyboardKey.f5 ? "F5" : "Ctrl+R"} pressed - Refresh',
-      );
-      onRefresh();
-      return KeyEventResult.handled;
-    }
-
-    // Backspace - Navigate back
-    if (key == LogicalKeyboardKey.backspace) {
-      final focusedWidget = FocusManager.instance.primaryFocus?.context?.widget;
-      if (focusedWidget is EditableText) {
-        return KeyEventResult.ignored;
-      }
-
+    if (DesktopShortcuts.matches(
+      event,
+      LogicalKeyboardKey.backspace,
+      includeRepeats: true,
+    )) {
       onBackInTabHistory();
       return KeyEventResult.handled;
+    }
+
+    final macOpen =
+        DesktopShortcuts.isMacOS &&
+        (DesktopShortcuts.matches(
+              event,
+              LogicalKeyboardKey.arrowDown,
+              meta: true,
+            ) ||
+            DesktopShortcuts.matches(
+              event,
+              LogicalKeyboardKey.keyO,
+              meta: true,
+            ));
+    // Modified arrows belong to platform navigation, never plain item movement.
+    if (!macOpen &&
+        (HardwareKeyboard.instance.isAltPressed ||
+            (HardwareKeyboard.instance.isMetaPressed &&
+                (!DesktopShortcuts.isMacOS || !isShiftPressed)))) {
+      return KeyEventResult.ignored;
     }
 
     final List<FileSystemEntity> items = _getNavigableItems(
@@ -430,7 +439,10 @@ class TabbedFolderKeyboardController {
     final isColumnList = folderListState.viewMode == ViewMode.list;
     final verticalStep = isColumnList ? 1 : crossAxisCount;
     final horizontalStep = isColumnList ? crossAxisCount : 1;
-    if (key == LogicalKeyboardKey.arrowDown) {
+    if (macOpen) {
+      activateEntity(items[currentIndex]);
+      return KeyEventResult.handled;
+    } else if (key == LogicalKeyboardKey.arrowDown) {
       targetIndex = currentIndex + verticalStep;
     } else if (key == LogicalKeyboardKey.arrowUp) {
       targetIndex = currentIndex - verticalStep;

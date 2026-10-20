@@ -2,6 +2,8 @@ import 'dart:io';
 import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
+import 'package:flutter/foundation.dart';
+import 'package:cb_file_manager/services/filesystem/macos_user_folders_service.dart';
 import 'package:cb_file_manager/helpers/core/filesystem_utils.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 
@@ -9,6 +11,7 @@ import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 class DrawerState extends Equatable {
   final List<Directory> storageLocations;
   final List<String> pinnedPaths;
+  final List<MacosUserFolder> macosUserFolders;
   final String activeTabId;
   final bool isStorageExpanded;
   final bool isPinnedExpanded;
@@ -18,6 +21,7 @@ class DrawerState extends Equatable {
   const DrawerState({
     this.storageLocations = const [],
     this.pinnedPaths = const [],
+    this.macosUserFolders = const [],
     this.activeTabId = '',
     this.isStorageExpanded = false,
     this.isPinnedExpanded = false,
@@ -28,6 +32,7 @@ class DrawerState extends Equatable {
   DrawerState copyWith({
     List<Directory>? storageLocations,
     List<String>? pinnedPaths,
+    List<MacosUserFolder>? macosUserFolders,
     String? activeTabId,
     bool? isStorageExpanded,
     bool? isPinnedExpanded,
@@ -37,6 +42,7 @@ class DrawerState extends Equatable {
     return DrawerState(
       storageLocations: storageLocations ?? this.storageLocations,
       pinnedPaths: pinnedPaths ?? this.pinnedPaths,
+      macosUserFolders: macosUserFolders ?? this.macosUserFolders,
       activeTabId: activeTabId ?? this.activeTabId,
       isStorageExpanded: isStorageExpanded ?? this.isStorageExpanded,
       isPinnedExpanded: isPinnedExpanded ?? this.isPinnedExpanded,
@@ -49,6 +55,7 @@ class DrawerState extends Equatable {
   List<Object?> get props => [
     storageLocations,
     pinnedPaths,
+    macosUserFolders,
     activeTabId,
     isStorageExpanded,
     isPinnedExpanded,
@@ -64,8 +71,13 @@ class DrawerCubit extends Cubit<DrawerState> {
   static const String _defaultTabId = '__global__';
 
   Timer? _syncTimer;
+  final MacosUserFoldersService _userFolders;
+  bool get _isMacOS => _userFolders.platform == TargetPlatform.macOS;
+  bool get _defaultPinnedExpanded => _isMacOS;
 
-  DrawerCubit() : super(const DrawerState()) {
+  DrawerCubit({MacosUserFoldersService? userFolders})
+    : _userFolders = userFolders ?? MacosUserFoldersService(),
+      super(const DrawerState()) {
     _startSyncTimer();
   }
 
@@ -91,8 +103,7 @@ class DrawerCubit extends Cubit<DrawerState> {
       await prefs.init();
       // This runs every 2s only to pick up pins changed by another window, so
       // it must not probe every pinned folder: an offline share or sleeping
-      // disk would stall each tick, and a briefly unreachable pin would be
-      // pruned for good. loadStorageLocations still validates.
+      // disk would stall each tick. Validation never deletes stored pins.
       final latest = await prefs.getSidebarPinnedPaths(
         validateDirectories: false,
       );
@@ -124,16 +135,43 @@ class DrawerCubit extends Cubit<DrawerState> {
     // Drives must still show when preferences are unavailable (for example a
     // database that fails to open), so only the pinned/expanded state is lost.
     var pinned = state.pinnedPaths;
+    var macosUserFolders = state.macosUserFolders;
     var storageExpanded = state.isStorageExpanded;
     var pinnedExpanded = state.isPinnedExpanded;
     String? error;
     try {
       final prefs = UserPreferences.instance;
       await prefs.init();
-      pinned = await prefs.getSidebarPinnedPaths();
+      var seededMacosDefaults = false;
+      if (_isMacOS) {
+        try {
+          macosUserFolders = await _userFolders.load();
+          seededMacosDefaults = await prefs.seedMacosSidebarDefaults(
+            macosUserFolders.map((folder) => folder.path).toList(),
+          );
+        } catch (e) {
+          debugPrint('Could not load macOS sidebar folders: $e');
+        }
+      }
+      pinned = await prefs.getSidebarPinnedPaths(
+        validateDirectories: !_isMacOS,
+      );
       final rememberWorkspace = await prefs.getRememberTabWorkspaceEnabled();
+      // Reveal newly introduced defaults once, including existing accounts
+      // whose previous empty pinned section was stored as collapsed.
+      if (seededMacosDefaults && rememberWorkspace) {
+        await prefs.setDrawerSectionExpanded(
+          tabId: normalizedTabId,
+          sectionKey: _pinnedSectionKey,
+          isExpanded: true,
+        );
+        await prefs.setLastDrawerSectionExpanded(
+          sectionKey: _pinnedSectionKey,
+          isExpanded: true,
+        );
+      }
       storageExpanded = false;
-      pinnedExpanded = false;
+      pinnedExpanded = _defaultPinnedExpanded;
 
       if (rememberWorkspace) {
         // First try to get the state for this specific tab
@@ -171,7 +209,7 @@ class DrawerCubit extends Cubit<DrawerState> {
               await prefs.getLastDrawerSectionExpanded(
                 sectionKey: _pinnedSectionKey,
               ) ??
-              false;
+              _defaultPinnedExpanded;
           // Also save this state for the current tab so it's "claimed"
           await prefs.setDrawerSectionExpanded(
             tabId: normalizedTabId,
@@ -187,6 +225,7 @@ class DrawerCubit extends Cubit<DrawerState> {
       state.copyWith(
         storageLocations: locations,
         pinnedPaths: pinned,
+        macosUserFolders: macosUserFolders,
         activeTabId: normalizedTabId,
         isStorageExpanded: storageExpanded,
         isPinnedExpanded: pinnedExpanded,
@@ -226,14 +265,14 @@ class DrawerCubit extends Cubit<DrawerState> {
         state.copyWith(
           activeTabId: normalizedTabId,
           isStorageExpanded: false,
-          isPinnedExpanded: false,
+          isPinnedExpanded: _defaultPinnedExpanded,
         ),
       );
       return;
     }
 
     var storageExpanded = false;
-    var pinnedExpanded = false;
+    var pinnedExpanded = _defaultPinnedExpanded;
 
     // First try to get the state for this specific tab
     final storageExpandedTab = await prefs.getDrawerSectionExpanded(
@@ -270,7 +309,7 @@ class DrawerCubit extends Cubit<DrawerState> {
           await prefs.getLastDrawerSectionExpanded(
             sectionKey: _pinnedSectionKey,
           ) ??
-          false;
+          _defaultPinnedExpanded;
       // Also save this state for the current tab so it's "claimed"
       await prefs.setDrawerSectionExpanded(
         tabId: normalizedTabId,

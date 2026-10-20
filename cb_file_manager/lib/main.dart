@@ -484,6 +484,9 @@ Future<void> runCbFileApp() async {
           isDesktopPlatform: isDesktopPlatform,
           isPipWindow: isPip,
           isDarkMode: isDarkMode,
+          strength: Platform.isMacOS
+              ? await ThemeProvider.readInitialMacosGlassStrength()
+              : 1,
         );
       } catch (_) {}
     }
@@ -825,13 +828,14 @@ class _CBFileAppState extends State<CBFileApp>
   int _windowMutationAcrylicGeneration = 0;
   bool? _lastAppliedNativeBackdropDarkMode;
   AcrylicBackdropMode? _lastBackdropMode;
+  double? _lastNativeGlassStrength;
   ValueNotifier<Locale>? _localeNotifier;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    if (Platform.isWindows) {
+    if (Platform.isWindows || Platform.isMacOS) {
       windowManager.addListener(this);
     }
 
@@ -875,7 +879,7 @@ class _CBFileAppState extends State<CBFileApp>
 
   @override
   void dispose() {
-    if (Platform.isWindows) {
+    if (Platform.isWindows || Platform.isMacOS) {
       windowManager.removeListener(this);
     }
     WidgetsBinding.instance.removeObserver(this);
@@ -952,7 +956,10 @@ class _CBFileAppState extends State<CBFileApp>
   }
 
   void _scheduleAcrylicReapplyAfterWindowMutation() {
-    if (!Platform.isWindows || !_useDesktopAcrylicVisuals) return;
+    if (!(Platform.isWindows || Platform.isMacOS) ||
+        !_useDesktopAcrylicVisuals) {
+      return;
+    }
     final themeProvider = context.read<ThemeProvider>();
     if (themeProvider.isWallpaperMode) {
       _disableNativeBackdrop();
@@ -1020,7 +1027,8 @@ class _CBFileAppState extends State<CBFileApp>
             accentColor: provider.currentAccentColor,
             fontColor: provider.currentFontColor,
             uiFont: provider.currentUiFont,
-            acrylicStrength: provider.desktopAcrylicStrength,
+            acrylicStrength: provider.desktopBackdropStrength,
+            glassBlurStrength: provider.desktopGlassBlurStrength,
             preferTransparentBackdrop:
                 provider.backdropMode == AcrylicBackdropMode.dynamic,
           )
@@ -1036,7 +1044,8 @@ class _CBFileAppState extends State<CBFileApp>
             accentColor: provider.currentAccentColor,
             fontColor: provider.currentFontColor,
             uiFont: provider.currentUiFont,
-            acrylicStrength: provider.desktopAcrylicStrength,
+            acrylicStrength: provider.desktopBackdropStrength,
+            glassBlurStrength: provider.desktopGlassBlurStrength,
             preferTransparentBackdrop:
                 provider.backdropMode == AcrylicBackdropMode.dynamic,
           );
@@ -1057,7 +1066,10 @@ class _CBFileAppState extends State<CBFileApp>
     bool includeImmediate = false,
     bool? forcedIsDarkMode,
   }) {
-    if (!Platform.isWindows || !_useDesktopAcrylicVisuals) return;
+    if (!(Platform.isWindows || Platform.isMacOS) ||
+        !_useDesktopAcrylicVisuals) {
+      return;
+    }
     final themeProvider = context.read<ThemeProvider>();
     if (themeProvider.isWallpaperMode) {
       _disableNativeBackdrop();
@@ -1092,6 +1104,7 @@ class _CBFileAppState extends State<CBFileApp>
               isDesktopPlatform: true,
               isPipWindow: false,
               isDarkMode: isDarkMode,
+              strength: themeProvider.desktopBackdropStrength,
             );
           } catch (_) {}
         }),
@@ -1100,6 +1113,18 @@ class _CBFileAppState extends State<CBFileApp>
   }
 
   void _disableNativeBackdrop() {
+    // Cancel deferred reapplications before switching to the user's wallpaper.
+    _acrylicSyncGeneration++;
+    if (Platform.isMacOS) {
+      unawaited(
+        WindowAcrylicService.disableMacosBackground(
+          isDarkMode: _resolveNativeBackdropDarkMode(
+            context.read<ThemeProvider>(),
+          ),
+        ),
+      );
+      return;
+    }
     if (!Platform.isWindows) return;
     unawaited(
       WindowsNativeTabDragDropService.setWindowsSystemBackdrop(enabled: false),
@@ -1109,12 +1134,13 @@ class _CBFileAppState extends State<CBFileApp>
   Widget _buildMaterialHostApp(ThemeProvider themeProvider) {
     final lightTheme = _resolveMaterialLightTheme(themeProvider);
     final darkTheme = _resolveMaterialDarkTheme(themeProvider);
-    final acrylicStrength = themeProvider.desktopAcrylicStrength;
+    final acrylicStrength = themeProvider.desktopBackdropStrength;
     final resolvedLightTheme = _useDesktopAcrylicVisuals
         ? createDesktopAcrylicMaterialBridgeTheme(
             baseTheme: lightTheme,
             brightness: Brightness.light,
             strength: acrylicStrength,
+            glassBlurStrength: themeProvider.desktopGlassBlurStrength,
             preferTransparentBackdrop:
                 themeProvider.backdropMode == AcrylicBackdropMode.dynamic,
           )
@@ -1124,6 +1150,7 @@ class _CBFileAppState extends State<CBFileApp>
             baseTheme: darkTheme,
             brightness: Brightness.dark,
             strength: acrylicStrength,
+            glassBlurStrength: themeProvider.desktopGlassBlurStrength,
             preferTransparentBackdrop:
                 themeProvider.backdropMode == AcrylicBackdropMode.dynamic,
           )
@@ -1204,7 +1231,8 @@ class _CBFileAppState extends State<CBFileApp>
             ? createDesktopAcrylicMaterialBridgeTheme(
                 baseTheme: resolvedTheme,
                 brightness: brightness,
-                strength: themeProvider.desktopAcrylicStrength,
+                strength: themeProvider.desktopBackdropStrength,
+                glassBlurStrength: themeProvider.desktopGlassBlurStrength,
                 preferTransparentBackdrop:
                     themeProvider.backdropMode == AcrylicBackdropMode.dynamic,
               )
@@ -1230,12 +1258,16 @@ class _CBFileAppState extends State<CBFileApp>
     final bool isDarkMode = _resolveNativeBackdropDarkMode(themeProvider);
     final backdropMode = themeProvider.backdropMode;
 
-    if (_useDesktopAcrylicVisuals && Platform.isWindows) {
+    if (_useDesktopAcrylicVisuals && (Platform.isWindows || Platform.isMacOS)) {
       final modeChanged =
           _lastBackdropMode != null && _lastBackdropMode != backdropMode;
       final darkModeChanged = _lastAppliedNativeBackdropDarkMode != isDarkMode;
 
-      if (modeChanged || darkModeChanged) {
+      final glassStrengthChanged =
+          Platform.isMacOS &&
+          _lastNativeGlassStrength != themeProvider.desktopGlassStrength;
+      if (modeChanged || darkModeChanged || glassStrengthChanged) {
+        _lastNativeGlassStrength = themeProvider.desktopGlassStrength;
         _lastAppliedNativeBackdropDarkMode = isDarkMode;
         _lastBackdropMode = backdropMode;
         WidgetsBinding.instance.addPostFrameCallback((_) {

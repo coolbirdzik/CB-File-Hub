@@ -1,13 +1,15 @@
 import 'dart:ui';
 
-import 'package:flutter/widgets.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'macos_glass_theme.dart';
 
-/// A Fluent desktop material surface with app-owned tint compositing.
+/// Shared desktop chrome, composited with the Flutter controls above it.
 ///
-/// The blur is deliberately one [BackdropFilter] per surface. A zero blur
-/// remains a translucent tint surface for environments where backdrop
-/// filtering is unavailable. There is deliberately no border: chrome is
-/// separated from the canvas by its tint alone (flat design).
+/// macOS supplies a native behind-window material, while these surfaces blur
+/// Flutter content. Decorative AppKit platform views must not be embedded here:
+/// their engine-owned containers participate in native hit testing even when
+/// the material's own hitTest returns nil.
 class FluentChromeSurface extends StatelessWidget {
   final Color tint;
   final double tintAlpha;
@@ -26,15 +28,38 @@ class FluentChromeSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isMacOS = !kIsWeb && defaultTargetPlatform == TargetPlatform.macOS;
+    final reduceTransparency = MediaQuery.highContrastOf(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final glass = isMacOS
+        ? Theme.of(context).extension<MacosGlassTheme>() ??
+              MacosGlassTheme(
+                strength: 1,
+                brightness: Theme.of(context).brightness,
+              )
+        : null;
+    final effectiveBlur = glass?.blurSigma ?? blurSigma;
+    final surfaceAlpha = reduceTransparency
+        ? 1.0
+        : glass?.chromeOpacity ?? tintAlpha.clamp(0.0, 1.0);
+    final colorScheme = Theme.of(context).colorScheme;
+    final surfaceTint =
+        glass?.readableSurface(
+          tint,
+          opacity: surfaceAlpha,
+          foregrounds: [colorScheme.onSurface, colorScheme.onSurfaceVariant],
+        ) ??
+        tint.withValues(alpha: surfaceAlpha);
     final tintOverlay = DecoratedBox(
-      decoration: BoxDecoration(
-        color: tint.withValues(alpha: tintAlpha.clamp(0.0, 1.0)),
-      ),
+      decoration: BoxDecoration(color: surfaceTint),
     );
-    final backdrop = blurSigma > 0
+    final backdrop = effectiveBlur > 0 && !reduceTransparency
         ? Positioned.fill(
             child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
+              filter: ImageFilter.blur(
+                sigmaX: effectiveBlur,
+                sigmaY: effectiveBlur,
+              ),
               child: const SizedBox.expand(),
             ),
           )
@@ -47,6 +72,22 @@ class FluentChromeSurface extends StatelessWidget {
         children: [
           backdrop,
           Positioned.fill(child: tintOverlay),
+          if (isMacOS)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: borderRadius,
+                    border: Border.all(
+                      color: Colors.white.withValues(
+                        alpha: isDark ? 0.08 : 0.4,
+                      ),
+                      width: 0.5,
+                    ),
+                  ),
+                ),
+              ),
+            ),
           child,
         ],
       ),

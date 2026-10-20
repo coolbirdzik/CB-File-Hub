@@ -9,6 +9,8 @@ import 'package:cb_file_manager/ui/controllers/operation_progress_controller.dar
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/services.dart';
+import 'package:cb_file_manager/design_system/primitives/cb_panel_reveal.dart';
 
 const _update = AppUpdateInfo(
   version: '1.2.0',
@@ -54,6 +56,32 @@ void main() {
       child: StatusCenterToolbarButton(),
     ),
   );
+
+  testWidgets('bell reveals and dismisses the status panel with motion', (
+    tester,
+  ) async {
+    await tester.pumpWidget(toolbarHost());
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(IconButton));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 60));
+    final fade = tester.widget<FadeTransition>(
+      find
+          .descendant(
+            of: find.byType(CbPanelReveal),
+            matching: find.byType(FadeTransition),
+          )
+          .first,
+    );
+    expect(fade.opacity.value, greaterThan(0));
+    expect(fade.opacity.value, lessThan(1));
+    await tester.pumpAndSettle();
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pump();
+    expect(find.byType(StatusCenterPanel), findsOneWidget);
+    await tester.pumpAndSettle();
+    expect(find.byType(StatusCenterPanel), findsNothing);
+  });
 
   testWidgets('startup opens the bell when a newer release is found', (
     tester,

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'widgets/drawer/sidebar_pinned_entry.dart';
 import 'dart:ui';
 
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
@@ -39,10 +40,7 @@ import 'components/common/macos_traffic_light_inset.dart';
 class _FluentDrawerTokens {
   const _FluentDrawerTokens._();
 
-  static const double width = 288;
   static const double outerRadius = 12;
-  static const double itemRadius = 6;
-  static const double itemHeight = 42;
   static const double itemVerticalMargin = 2;
   static const double sectionLeadingInset = 8;
   static const double sectionIndent = 30;
@@ -132,28 +130,33 @@ class _FluentDrawerSectionState extends State<FluentDrawerSection> {
     final accent = theme.accentColor.defaultBrushFor(theme.brightness);
     final icon = widget.icon;
     final selected = widget.selected;
+    final isMacOS = FluentSurfaceTokens.isMacOS;
 
     return fluent.Expander(
       key: _expanderKey,
-      leading: Padding(
-        // Fluent Expander starts its leading widget 8px earlier than the
-        // navigation-row icon slot. Compensate here so Pinned and Drives share
-        // the same icon centerline as every other top-level drawer item.
-        padding: const EdgeInsetsDirectional.only(
-          start: _FluentDrawerTokens.sectionLeadingInset,
-        ),
-        child: Icon(
-          icon,
-          size: 18,
-          color: selected ? accent : resources.textFillColorSecondary,
-        ),
-      ),
+      leading: isMacOS
+          ? null
+          : Padding(
+              // Fluent Expander starts its leading widget 8px earlier than the
+              // navigation-row icon slot. Compensate here so Pinned and Drives share
+              // the same icon centerline as every other top-level drawer item.
+              padding: const EdgeInsetsDirectional.only(
+                start: _FluentDrawerTokens.sectionLeadingInset,
+              ),
+              child: Icon(
+                icon,
+                size: 18,
+                color: selected ? accent : resources.textFillColorSecondary,
+              ),
+            ),
       header: Text(
         widget.title,
         style: TextStyle(
-          color: resources.textFillColorPrimary,
-          fontSize: 13.5,
-          fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+          color: isMacOS
+              ? resources.textFillColorSecondary
+              : resources.textFillColorPrimary,
+          fontSize: isMacOS ? 12 : 13.5,
+          fontWeight: isMacOS || selected ? FontWeight.w600 : FontWeight.w500,
         ),
       ),
       content: widget.content,
@@ -164,11 +167,13 @@ class _FluentDrawerSectionState extends State<FluentDrawerSection> {
         (states) => _fluentDrawerStateFill(theme, states, selected: selected),
       ),
       headerShape: (_) => RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(_FluentDrawerTokens.itemRadius),
+        borderRadius: BorderRadius.circular(
+          FluentSurfaceTokens.drawerItemRadius,
+        ),
       ),
       contentBackgroundColor: Colors.transparent,
-      contentPadding: const EdgeInsetsDirectional.only(
-        start: _FluentDrawerTokens.sectionIndent,
+      contentPadding: EdgeInsetsDirectional.only(
+        start: isMacOS ? 0 : _FluentDrawerTokens.sectionIndent,
         end: 2,
         bottom: 4,
       ),
@@ -184,6 +189,18 @@ Color _fluentDrawerStateFill(
 }) {
   final resources = theme.resources;
   final accent = theme.accentColor.defaultBrushFor(theme.brightness);
+  if (FluentSurfaceTokens.isMacOS) {
+    if (states.contains(WidgetState.pressed)) {
+      return resources.textFillColorPrimary.withValues(alpha: 0.12);
+    }
+    if (selected) {
+      return resources.textFillColorPrimary.withValues(alpha: 0.08);
+    }
+    if (states.contains(WidgetState.hovered)) {
+      return resources.textFillColorPrimary.withValues(alpha: 0.04);
+    }
+    return Colors.transparent;
+  }
   if (states.contains(WidgetState.pressed)) {
     return selected
         ? Color.alphaBlend(
@@ -360,7 +377,9 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
                 // The overlay drawer covers the tab bar row the traffic lights
                 // sit in (the pinned one sits below it).
                 if (Platform.isMacOS && !widget.isPinned)
-                  const MacosTrafficLightTopInset(height: 48),
+                  MacosTrafficLightTopInset(
+                    height: FluentSurfaceTokens.tabBarHeight,
+                  ),
                 // Modern drawer header
                 DrawerHeaderWidget(
                   isPinned: widget.isPinned,
@@ -551,7 +570,10 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
     final theme = fluent.FluentTheme.of(context);
     final resources = theme.resources;
     final surfaces = FluentSurfaceTokens.of(context);
-    final drawerRadius = widget.isPinned
+    final isMacOS = FluentSurfaceTokens.isMacOS;
+    final drawerRadius = isMacOS
+        ? BorderRadius.circular(widget.isPinned ? 16 : 20)
+        : widget.isPinned
         ? BorderRadius.zero
         : const BorderRadius.only(
             topRight: Radius.circular(_FluentDrawerTokens.outerRadius),
@@ -565,20 +587,22 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
       // The legacy standalone drawer can be rendered without a tab provider.
     }
 
-    return FluentChromeSurface(
+    final drawer = FluentChromeSurface(
       key: const ValueKey<String>('fluent-drawer-acrylic'),
       tint: surfaces.chromeTint,
       tintAlpha: surfaces.drawerTintAlpha,
       blurSigma: surfaces.chromeBlur,
       borderRadius: drawerRadius,
       child: SizedBox(
-        width: _FluentDrawerTokens.width,
+        width: FluentSurfaceTokens.drawerWidth,
         child: SafeArea(
           bottom: false,
           child: Column(
             children: [
               if (Platform.isMacOS && !widget.isPinned)
-                const MacosTrafficLightTopInset(height: 48),
+                MacosTrafficLightTopInset(
+                  height: FluentSurfaceTokens.tabBarHeight - 8,
+                ),
               _buildFluentDrawerHeader(context, resources: resources),
               Expanded(
                 child: BlocBuilder<DrawerCubit, DrawerState>(
@@ -592,7 +616,9 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
                     );
 
                     return ListView(
-                      padding: const EdgeInsets.fromLTRB(12, 10, 12, 16),
+                      padding: isMacOS
+                          ? const EdgeInsets.fromLTRB(10, 4, 10, 12)
+                          : const EdgeInsets.fromLTRB(12, 10, 12, 16),
                       children: [
                         _fluentNavigationItem(
                           context,
@@ -609,7 +635,9 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
                             context,
                             key: const ValueKey<String>('fluent-pinned'),
                             icon: PhosphorIconsLight.pushPin,
-                            title: context.tr.pinnedSection,
+                            title: isMacOS
+                                ? context.tr.favoritesSection
+                                : context.tr.pinnedSection,
                             selected: hasSelectedPinnedPath,
                             expanded: state.isPinnedExpanded,
                             onStateChanged: context
@@ -617,12 +645,17 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
                                 .setPinnedExpanded,
                             content: Column(
                               children: state.pinnedPaths
-                                  .map(
-                                    (path) => _fluentNavigationItem(
+                                  .map((path) {
+                                    final entry = SidebarPinnedEntry.fromPath(
+                                      path,
+                                      l10n: context.tr,
+                                      userFolders: state.macosUserFolders,
+                                    );
+                                    return _fluentNavigationItem(
                                       context,
-                                      icon: _fluentPinnedIcon(path),
-                                      title: _fluentPinnedName(path),
-                                      semanticLabel: _fluentPinnedName(path),
+                                      icon: entry.icon,
+                                      title: entry.title,
+                                      semanticLabel: entry.title,
                                       selected: _isFluentPathSelected(
                                         activePath,
                                         path,
@@ -630,7 +663,7 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
                                       onPressed: () => _navigateTo(
                                         context,
                                         path,
-                                        _fluentPinnedName(path),
+                                        entry.title,
                                         isStorage: true,
                                       ),
                                       trailing: CbFluentTooltip(
@@ -653,8 +686,8 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
                                           ),
                                         ),
                                       ),
-                                    ),
-                                  )
+                                    );
+                                  })
                                   .toList(growable: false),
                             ),
                           ),
@@ -818,6 +851,15 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
         ),
       ),
     );
+    return SizedBox(
+      width: FluentSurfaceTokens.drawerWidth,
+      child: Padding(
+        padding: isMacOS
+            ? EdgeInsets.fromLTRB(8, 8, widget.isPinned ? 0 : 8, 8)
+            : EdgeInsets.zero,
+        child: drawer,
+      ),
+    );
   }
 
   Widget _buildFluentDrawerHeader(
@@ -829,7 +871,9 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
         : context.tr.pinMenu;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 12, 4),
+      padding: FluentSurfaceTokens.isMacOS
+          ? const EdgeInsets.fromLTRB(12, 6, 10, 2)
+          : const EdgeInsets.fromLTRB(16, 8, 12, 4),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
@@ -891,6 +935,7 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
     final theme = fluent.FluentTheme.of(context);
     final resources = theme.resources;
     final accent = theme.accentColor.defaultBrushFor(theme.brightness);
+    final isMacOS = FluentSurfaceTokens.isMacOS;
 
     return fluent.HoverButton(
       semanticLabel: semanticLabel ?? title,
@@ -912,7 +957,7 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
             child: AnimatedContainer(
               duration: _FluentDrawerTokens.stateTransition,
               curve: Curves.easeOutCubic,
-              height: _FluentDrawerTokens.itemHeight,
+              height: FluentSurfaceTokens.drawerItemHeight,
               decoration: ShapeDecoration(
                 color: _fluentDrawerStateFill(
                   theme,
@@ -921,31 +966,32 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
                 ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(
-                    _FluentDrawerTokens.itemRadius,
+                    FluentSurfaceTokens.drawerItemRadius,
                   ),
                 ),
               ),
               padding: const EdgeInsetsDirectional.only(start: 10, end: 8),
               child: Row(
                 children: [
-                  SizedBox(
-                    width: 4,
-                    child: Center(
-                      child: AnimatedContainer(
-                        duration: _FluentDrawerTokens.stateTransition,
-                        curve: Curves.easeOutCubic,
-                        width: selected ? 3 : 0,
-                        height: 20,
-                        decoration: BoxDecoration(
-                          color: accent,
-                          borderRadius: BorderRadius.circular(2),
+                  if (!isMacOS)
+                    SizedBox(
+                      width: 4,
+                      child: Center(
+                        child: AnimatedContainer(
+                          duration: _FluentDrawerTokens.stateTransition,
+                          curve: Curves.easeOutCubic,
+                          width: selected ? 3 : 0,
+                          height: 20,
+                          decoration: BoxDecoration(
+                            color: accent,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  Icon(icon, size: 18, color: iconColor),
-                  const SizedBox(width: 12),
+                  if (!isMacOS) const SizedBox(width: 10),
+                  Icon(icon, size: isMacOS ? 17 : 18, color: iconColor),
+                  SizedBox(width: isMacOS ? 10 : 12),
                   Expanded(
                     child: Text(
                       title,
@@ -953,9 +999,11 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: resources.textFillColorPrimary,
-                        fontSize: 13.5,
+                        fontSize: isMacOS ? 13 : 13.5,
                         fontWeight: selected
                             ? FontWeight.w600
+                            : isMacOS
+                            ? FontWeight.w400
                             : FontWeight.w500,
                       ),
                     ),
@@ -1135,28 +1183,6 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
       return '$drive (${drive.startsWith('C:') ? 'System' : 'Drive'})';
     }
     return path;
-  }
-
-  String _fluentPinnedName(String path) {
-    var normalized = path;
-    if (normalized.endsWith(Platform.pathSeparator) && normalized.length > 1) {
-      normalized = normalized.substring(0, normalized.length - 1);
-    }
-    final parts = normalized.split(Platform.pathSeparator);
-    return parts.where((part) => part.isNotEmpty).isNotEmpty
-        ? parts.where((part) => part.isNotEmpty).last
-        : normalized;
-  }
-
-  IconData _fluentPinnedIcon(String path) {
-    try {
-      return FileSystemEntity.typeSync(path, followLinks: false) ==
-              FileSystemEntityType.file
-          ? PhosphorIconsLight.file
-          : PhosphorIconsLight.folder;
-    } catch (_) {
-      return PhosphorIconsLight.pushPin;
-    }
   }
 
   void _navigateTo(

@@ -162,6 +162,8 @@ class _FileViewShellState extends State<FileViewShell> {
       onPaste: widget.onPaste,
       onRename: widget.onRename,
       onSearch: widget.onSearch,
+      onBack: widget.onMouseBack,
+      onForward: widget.onMouseForward,
     );
   }
 

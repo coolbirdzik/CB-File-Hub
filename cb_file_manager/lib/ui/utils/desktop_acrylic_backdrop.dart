@@ -4,10 +4,11 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/theme_provider.dart';
+import '../../design_system/macos_glass_theme.dart';
 
-/// Host wrapper for desktop acrylic windows.
+/// Host wrapper for desktop window materials.
 ///
-/// In **dynamic** mode the native acrylic/mica backdrop is used
+/// In **dynamic** mode the native Windows Acrylic or macOS Glass is used
 /// (applied via `WindowAcrylicService`). This widget then paints nothing.
 ///
 /// In **wallpaper** mode the widget draws a user-selected image behind the
@@ -39,6 +40,22 @@ class DesktopAcrylicBackdrop extends StatelessWidget {
     if (imagePath == null || imagePath.isEmpty) return child;
 
     final imageFile = File(imagePath);
+    final strength = themeProvider.desktopBackdropStrength;
+    final glass = themeProvider.usesMacosGlass
+        ? MacosGlassTheme(
+            strength: strength,
+            blurStrength: themeProvider.desktopGlassBlurStrength,
+            brightness: brightness,
+          )
+        : null;
+    final highContrast = MediaQuery.highContrastOf(context);
+    final blur = highContrast ? 0.0 : glass?.blurSigma ?? 60 * strength;
+    final tintOpacity = highContrast
+        ? 1.0
+        : glass?.wallpaperTintOpacity ??
+              (brightness == Brightness.light
+                  ? (0.82 + 0.14 * (1.0 - strength)).clamp(0.0, 1.0)
+                  : (0.78 + 0.16 * (1.0 - strength)).clamp(0.0, 1.0));
 
     return Stack(
       fit: StackFit.expand,
@@ -54,28 +71,11 @@ class DesktopAcrylicBackdrop extends StatelessWidget {
         // Frosted glass blur overlay
         ClipRect(
           child: BackdropFilter(
-            filter: ImageFilter.blur(
-              sigmaX: 60 * themeProvider.desktopAcrylicStrength,
-              sigmaY: 60 * themeProvider.desktopAcrylicStrength,
-            ),
-            child: Container(
-              color: brightness == Brightness.light
-                  ? Colors.white.withValues(
-                      alpha:
-                          (0.82 +
-                                  0.14 *
-                                      (1.0 -
-                                          themeProvider.desktopAcrylicStrength))
-                              .clamp(0.0, 1.0),
-                    )
-                  : Colors.black.withValues(
-                      alpha:
-                          (0.78 +
-                                  0.16 *
-                                      (1.0 -
-                                          themeProvider.desktopAcrylicStrength))
-                              .clamp(0.0, 1.0),
-                    ),
+            filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
+            child: ColoredBox(
+              color:
+                  (brightness == Brightness.light ? Colors.white : Colors.black)
+                      .withValues(alpha: tintOpacity),
             ),
           ),
         ),

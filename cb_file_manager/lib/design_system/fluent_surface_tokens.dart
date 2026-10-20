@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'cb_tokens.dart';
+import 'macos_glass_theme.dart';
 import 'tokens/cb_geometry_tokens.dart';
 
 /// Semantic surfaces used by the desktop Fluent browser shell.
@@ -61,15 +63,21 @@ class FluentSurfaceTokens {
     final chromeTint = isDark
         ? Color.alphaBlend(colors.scrim.withValues(alpha: 0.16), colors.canvas)
         : colors.surfaceSunken;
-    final toolbarTintAlpha = isDark ? 0.52 : 0.64;
-    final drawerTintAlpha = isDark ? 0.60 : 0.72;
+    final glass = theme.extension<MacosGlassTheme>();
+    final readableChrome = glass?.readableSurface(
+      chromeTint,
+      opacity: glass.chromeOpacity,
+      foregrounds: [colors.textPrimary, colors.textSecondary],
+    );
+    final toolbarTintAlpha = readableChrome?.a ?? (isDark ? 0.52 : 0.64);
+    final drawerTintAlpha = readableChrome?.a ?? (isDark ? 0.60 : 0.72);
     return FluentSurfaceTokens(
       canvas: theme.scaffoldBackgroundColor,
       chromeTint: chromeTint,
       toolbar: chromeTint.withValues(alpha: toolbarTintAlpha),
       toolbarTintAlpha: toolbarTintAlpha,
       drawerTintAlpha: drawerTintAlpha,
-      chromeBlur: 18,
+      chromeBlur: glass?.blurSigma ?? 18,
       // A translucent fill, not the sunken neutral: with no outline around
       // it, the control has to read as a tone on the tinted toolbar, and the
       // sunken neutral matches the dark canvas exactly.
@@ -88,6 +96,14 @@ class FluentSurfaceTokens {
 
   factory FluentSurfaceTokens.of(BuildContext context) =>
       FluentSurfaceTokens.fromTheme(Theme.of(context));
+
+  /// One geometry contract for the title row, traffic lights and navigation.
+  static bool get isMacOS => defaultTargetPlatform == TargetPlatform.macOS;
+  static double get tabBarHeight => isMacOS ? 60 : 48;
+  static double get tabWidth => isMacOS ? 240 : 210;
+  static double get drawerWidth => isMacOS ? 260 : 288;
+  static double get drawerItemHeight => isMacOS ? 36 : 42;
+  static double get drawerItemRadius => isMacOS ? 8 : 6;
 
   static const double toolbarHeight = 52;
   static const double controlHeight = 34;

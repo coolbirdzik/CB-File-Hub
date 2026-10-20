@@ -106,7 +106,7 @@ class _ScrollableTabBarState extends State<ScrollableTabBar> {
           ? 50
           : null, // Provide a specific height for the custom title bar on Windows
       decoration: BoxDecoration(color: tabBackgroundColor, boxShadow: const []),
-      margin: Platform.isWindows
+      margin: Platform.isWindows || Platform.isMacOS
           ? EdgeInsets.zero
           : const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       padding: EdgeInsets.zero,
@@ -201,7 +201,7 @@ class _ScrollableTabBarState extends State<ScrollableTabBar> {
             const DragToMoveArea(
               child: SizedBox(width: 24, height: double.infinity),
             ),
-          if (Platform.isWindows && widget.leadingCaptionActions.isNotEmpty)
+          if (widget.leadingCaptionActions.isNotEmpty)
             Row(
               mainAxisSize: MainAxisSize.min,
               children: widget.leadingCaptionActions,
@@ -438,13 +438,14 @@ class _ModernTabBarState extends State<_ModernTabBar> {
     }
   }
 
-  void _endDrag() {
+  void _endDrag({bool rebuild = true}) {
+    if (_activeDragTabId == null) return;
     _activeDragTabId = null;
     _previewTargetIndex = null;
     _lastReorderFromIndex = null;
     _lastReorderToIndex = null;
     widget.onTabDragEnded?.call();
-    if (mounted) {
+    if (mounted && rebuild) {
       setState(() {});
     }
   }
@@ -578,11 +579,15 @@ class _ModernTabBarState extends State<_ModernTabBar> {
       oldWidget.controller.removeListener(_onTabControllerChange);
       widget.controller.addListener(_onTabControllerChange);
     }
+    if (_activeDragTabId != null && _activeDragIndex() < 0) {
+      _endDrag();
+    }
   }
 
   @override
   void dispose() {
     widget.controller.removeListener(_onTabControllerChange);
+    _endDrag(rebuild: false);
     super.dispose();
   }
 
@@ -598,7 +603,9 @@ class _ModernTabBarState extends State<_ModernTabBar> {
         Platform.isWindows || Platform.isLinux || Platform.isMacOS;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(0, 4, 4, 0),
+      padding: Platform.isMacOS
+          ? EdgeInsets.zero
+          : const EdgeInsets.fromLTRB(0, 4, 4, 0),
       child: Listener(
         key: _tabStripKey,
         onPointerDown: (e) {
@@ -689,7 +696,7 @@ class _ModernTabBarState extends State<_ModernTabBar> {
                     isActive: isActive,
                     isSelected: isSelected,
                     showRightDivider: showRightDivider,
-                    onPrimaryDown: (event) {
+                    onPrimaryPressed: () {
                       final keys = HardwareKeyboard.instance.logicalKeysPressed;
                       final shiftPressed =
                           HardwareKeyboard.instance.isShiftPressed ||
@@ -762,6 +769,8 @@ class _ModernTabBarState extends State<_ModernTabBar> {
                         targetIndex: index,
                         child: Draggable<DesktopTabDragData>(
                           data: dragData,
+                          allowedButtonsFilter: (buttons) =>
+                              buttons == kPrimaryMouseButton,
                           onDragStarted: () => _beginDrag(dragData),
                           onDragUpdate: (details) =>
                               _handleDragUpdate(dragData, details),
@@ -870,12 +879,14 @@ class _CaptionStyleAddTabButtonState extends State<_CaptionStyleAddTabButton> {
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _isHovered = true),
       onExit: (_) => setState(() => _isHovered = false),
-      child: _OptimizedButtonInteraction(
-        onTap: () {
+      child: CbPressable(
+        cursor: SystemMouseCursors.click,
+        canRequestFocus: false,
+        onPressed: () {
           widget.onPressed?.call();
           HapticFeedback.lightImpact();
         },
-        child: Container(
+        builder: (context, state) => Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
           decoration: BoxDecoration(
             color: _isHovered ? hoverBg : idleBg,
@@ -893,7 +904,7 @@ class _ModernTab extends StatefulWidget {
   final bool isActive;
   final bool isSelected;
   final bool showRightDivider;
-  final ValueChanged<PointerDownEvent> onPrimaryDown;
+  final VoidCallback onPrimaryPressed;
   final ValueChanged<Offset>? onSecondaryClick;
   final Color activeTabColor;
   final Color hoverColor;
@@ -908,7 +919,7 @@ class _ModernTab extends StatefulWidget {
     required this.isActive,
     required this.isSelected,
     required this.showRightDivider,
-    required this.onPrimaryDown,
+    required this.onPrimaryPressed,
     this.onSecondaryClick,
     required this.activeTabColor,
     required this.hoverColor,
@@ -965,7 +976,8 @@ class _ModernTabState extends State<_ModernTab>
 
   @override
   Widget build(BuildContext context) {
-    const tabWidth = 210.0;
+    final tabWidth = FluentSurfaceTokens.tabWidth;
+    final isMacOS = FluentSurfaceTokens.isMacOS;
     const tabHeight = 40.0;
     final isDarkMode = widget.theme.brightness == Brightness.dark;
     final cs = widget.theme.colorScheme;
@@ -976,7 +988,9 @@ class _ModernTabState extends State<_ModernTab>
     final selectedFillColor = primaryColor.withValues(
       alpha: isDarkMode ? 0.22 : 0.12,
     );
-    final activeFillColor = widget.activeTabColor;
+    final activeFillColor = isMacOS
+        ? cs.onSurface.withValues(alpha: isDarkMode ? 0.10 : 0.07)
+        : widget.activeTabColor;
     const inactiveFillColor = Colors.transparent;
 
     return MouseRegion(
@@ -995,7 +1009,7 @@ class _ModernTabState extends State<_ModernTab>
                       ));
 
           return _OptimizedTabInteraction(
-            onPrimaryDown: widget.onPrimaryDown,
+            onPrimaryPressed: widget.onPrimaryPressed,
             onMiddleClick: widget.onClose,
             onSecondaryClick: widget.onSecondaryClick,
             child: Stack(
@@ -1006,7 +1020,9 @@ class _ModernTabState extends State<_ModernTab>
                   curve: Curves.easeOutCubic,
                   width: tabWidth,
                   height: tabHeight,
-                  margin: const EdgeInsets.only(left: 2, right: 2, top: 6),
+                  margin: isMacOS
+                      ? const EdgeInsets.symmetric(horizontal: 3, vertical: 6)
+                      : const EdgeInsets.only(left: 2, right: 2, top: 6),
                   clipBehavior: Clip.hardEdge,
                   decoration: BoxDecoration(
                     color: widget.isSelected
@@ -1016,10 +1032,12 @@ class _ModernTabState extends State<_ModernTab>
                               : (_isHovered && !_isCloseButtonHovered
                                     ? hoverColor
                                     : inactiveFillColor)),
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(10),
-                      topRight: Radius.circular(10),
-                    ),
+                    borderRadius: isMacOS
+                        ? BorderRadius.circular(10)
+                        : const BorderRadius.only(
+                            topLeft: Radius.circular(10),
+                            topRight: Radius.circular(10),
+                          ),
                   ),
                   child: Stack(
                     children: [
@@ -1056,7 +1074,7 @@ class _ModernTabState extends State<_ModernTab>
                           ),
                         ),
                       ),
-                      if (widget.isActive)
+                      if (widget.isActive && !isMacOS)
                         Positioned(
                           left: 8,
                           right: 8,
@@ -1088,12 +1106,14 @@ class _ModernTabState extends State<_ModernTab>
                               setState(() => _isCloseButtonHovered = true),
                           onExit: (_) =>
                               setState(() => _isCloseButtonHovered = false),
-                          child: _OptimizedButtonInteraction(
-                            onTap: () {
+                          child: CbPressable(
+                            cursor: SystemMouseCursors.click,
+                            semanticLabel: context.tr.closeTab,
+                            onPressed: () {
                               widget.onClose?.call();
                               HapticFeedback.lightImpact();
                             },
-                            child: Container(
+                            builder: (context, state) => Container(
                               width: 22,
                               height: 22,
                               decoration: BoxDecoration(
@@ -1130,15 +1150,15 @@ class _ModernTabState extends State<_ModernTab>
   }
 }
 
-/// Optimized tab interaction handler that eliminates delay on tab clicks
+/// Gesture-owned primary clicks keep nested close buttons independent.
 class _OptimizedTabInteraction extends StatefulWidget {
-  final ValueChanged<PointerDownEvent> onPrimaryDown;
+  final VoidCallback onPrimaryPressed;
   final VoidCallback? onMiddleClick;
   final ValueChanged<Offset>? onSecondaryClick;
   final Widget child;
 
   const _OptimizedTabInteraction({
-    required this.onPrimaryDown,
+    required this.onPrimaryPressed,
     this.onMiddleClick,
     this.onSecondaryClick,
     required this.child,
@@ -1152,55 +1172,30 @@ class _OptimizedTabInteraction extends StatefulWidget {
 class _OptimizedTabInteractionState extends State<_OptimizedTabInteraction> {
   @override
   Widget build(BuildContext context) {
-    return Listener(
-      onPointerDown: (PointerDownEvent event) {
-        // Primary mouse button (left click)
-        if (event.buttons == kPrimaryMouseButton) {
-          widget.onPrimaryDown(event);
-          HapticFeedback.lightImpact();
-        }
-        // Middle mouse button (wheel click)
-        else if (event.buttons == kMiddleMouseButton &&
-            widget.onMiddleClick != null) {
-          widget.onMiddleClick!();
-          HapticFeedback.lightImpact();
-        }
-        // Secondary mouse button (right click)
-        else if (event.buttons == kSecondaryMouseButton &&
-            widget.onSecondaryClick != null) {
-          widget.onSecondaryClick!(event.position);
-        }
+    // A tap recognizer must compete with the enclosing Draggable. A raw
+    // Listener alone lets the drag win on pointer-down without any movement.
+    return GestureDetector(
+      onTap: () {
+        widget.onPrimaryPressed();
+        HapticFeedback.lightImpact();
       },
-      behavior: HitTestBehavior.opaque,
-      child: widget.child,
-    );
-  }
-}
-
-/// Optimized button interaction handler for the close and add tab buttons
-class _OptimizedButtonInteraction extends StatefulWidget {
-  final VoidCallback onTap;
-  final Widget child;
-
-  const _OptimizedButtonInteraction({required this.onTap, required this.child});
-
-  @override
-  _OptimizedButtonInteractionState createState() =>
-      _OptimizedButtonInteractionState();
-}
-
-class _OptimizedButtonInteractionState
-    extends State<_OptimizedButtonInteraction> {
-  @override
-  Widget build(BuildContext context) {
-    return Listener(
-      onPointerDown: (PointerDownEvent event) {
-        if (event.buttons == kPrimaryMouseButton) {
-          widget.onTap();
-        }
-      },
-      behavior: HitTestBehavior.opaque,
-      child: widget.child,
+      child: Listener(
+        onPointerDown: (PointerDownEvent event) {
+          // Auxiliary mouse buttons are not handled by the tap recognizer.
+          if (event.buttons == kMiddleMouseButton &&
+              widget.onMiddleClick != null) {
+            widget.onMiddleClick!();
+            HapticFeedback.lightImpact();
+          }
+          // Secondary mouse button (right click)
+          else if (event.buttons == kSecondaryMouseButton &&
+              widget.onSecondaryClick != null) {
+            widget.onSecondaryClick!(event.position);
+          }
+        },
+        behavior: HitTestBehavior.opaque,
+        child: widget.child,
+      ),
     );
   }
 }

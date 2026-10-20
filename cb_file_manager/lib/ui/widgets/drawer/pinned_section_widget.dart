@@ -1,4 +1,5 @@
-import 'dart:io';
+import 'sidebar_pinned_entry.dart';
+import 'package:flutter/foundation.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -66,7 +67,9 @@ class _PinnedSectionWidgetState extends State<PinnedSectionWidget> {
             color: theme.colorScheme.primary,
           ),
           title: Text(
-            l10n.pinnedSection,
+            defaultTargetPlatform == TargetPlatform.macOS
+                ? l10n.favoritesSection
+                : l10n.pinnedSection,
             style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w600,
@@ -81,13 +84,15 @@ class _PinnedSectionWidgetState extends State<PinnedSectionWidget> {
           },
           children: state.pinnedPaths
               .map((pinnedPath) {
+                final entry = SidebarPinnedEntry.fromPath(
+                  pinnedPath,
+                  l10n: l10n,
+                  userFolders: state.macosUserFolders,
+                );
                 return _buildPinnedItem(
                   context,
-                  pinnedPath: pinnedPath,
-                  onTap: () => widget.onNavigate(
-                    pinnedPath,
-                    _getPinnedDisplayName(pinnedPath),
-                  ),
+                  entry: entry,
+                  onTap: () => widget.onNavigate(pinnedPath, entry.title),
                   onUnpin: () {
                     context.read<DrawerCubit>().togglePinnedPath(pinnedPath);
                   },
@@ -101,7 +106,7 @@ class _PinnedSectionWidgetState extends State<PinnedSectionWidget> {
 
   Widget _buildPinnedItem(
     BuildContext context, {
-    required String pinnedPath,
+    required SidebarPinnedEntry entry,
     required VoidCallback onTap,
     required VoidCallback onUnpin,
   }) {
@@ -111,12 +116,12 @@ class _PinnedSectionWidgetState extends State<PinnedSectionWidget> {
       contentPadding: const EdgeInsets.only(left: 52, right: 14),
       dense: true,
       leading: Icon(
-        _iconForPinnedPath(pinnedPath),
+        entry.icon,
         size: 20,
         color: theme.colorScheme.primary.withValues(alpha: 0.8),
       ),
       title: Text(
-        _getPinnedDisplayName(pinnedPath),
+        entry.title,
         style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
       ),
       trailing: IconButton(
@@ -130,33 +135,5 @@ class _PinnedSectionWidgetState extends State<PinnedSectionWidget> {
       ),
       onTap: onTap,
     );
-  }
-
-  IconData _iconForPinnedPath(String path) {
-    try {
-      final entityType = FileSystemEntity.typeSync(path, followLinks: false);
-      if (entityType == FileSystemEntityType.file) {
-        return PhosphorIconsLight.file;
-      }
-      if (entityType == FileSystemEntityType.directory) {
-        return PhosphorIconsLight.folder;
-      }
-    } catch (_) {}
-    return PhosphorIconsLight.pushPin;
-  }
-
-  String _getPinnedDisplayName(String path) {
-    var normalized = path;
-    if (normalized.endsWith(Platform.pathSeparator) && normalized.length > 1) {
-      normalized = normalized.substring(0, normalized.length - 1);
-    }
-    if (Platform.isWindows && RegExp(r'^[a-zA-Z]:$').hasMatch(normalized)) {
-      return normalized;
-    }
-    if (normalized == '/') return '/';
-    final parts = normalized.split(Platform.pathSeparator);
-    return parts.where((part) => part.isNotEmpty).isNotEmpty
-        ? parts.where((part) => part.isNotEmpty).last
-        : normalized;
   }
 }

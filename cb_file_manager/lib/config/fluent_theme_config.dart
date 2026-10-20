@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+import '../design_system/macos_glass_theme.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import 'package:flutter/material.dart';
 
@@ -15,7 +17,9 @@ class FluentThemeConfig {
     AppFontColor fontColor = ThemeConfig.defaultFontColor,
     AppUiFont uiFont = ThemeConfig.defaultUiFont,
     double acrylicStrength = 1.00,
+    double glassBlurStrength = 1,
     bool preferTransparentBackdrop = false,
+    TargetPlatform? platform,
   }) {
     final materialTheme = ThemeConfig.getTheme(
       themeType,
@@ -25,6 +29,13 @@ class FluentThemeConfig {
     );
     final fluentAccentColor = _resolveAccentColor(accentColor);
     final isDark = materialTheme.brightness == Brightness.dark;
+    final glass = (platform ?? defaultTargetPlatform) == TargetPlatform.macOS
+        ? MacosGlassTheme(
+            strength: acrylicStrength,
+            blurStrength: glassBlurStrength,
+            brightness: materialTheme.brightness,
+          )
+        : null;
     final double normalizedStrength = acrylicStrength
         .clamp(0.0, 2.0)
         .toDouble();
@@ -43,65 +54,86 @@ class FluentThemeConfig {
     final cardBase = colors.surfaceRaised;
     final menuBase = colors.surfaceOverlay;
 
-    final scaffoldColor = scaffoldBase.withValues(
-      alpha: isDark
-          ? opacityByStrength(
-              solidAtMin: 0.96,
-              glassAtMax: preferTransparentBackdrop ? 0.76 : 0.88,
-            )
-          : opacityByStrength(
-              solidAtMin: 0.995,
-              glassAtMax: preferTransparentBackdrop ? 0.84 : 0.96,
-            ),
+    Color surface(Color tint, {required double alpha}) =>
+        glass?.readableSurface(
+          tint,
+          opacity: alpha,
+          foregrounds: [colors.textPrimary, colors.textSecondary],
+        ) ??
+        tint.withValues(alpha: alpha);
+    final scaffoldColor = surface(
+      scaffoldBase,
+      alpha:
+          glass?.canvasOpacity ??
+          (isDark
+              ? opacityByStrength(
+                  solidAtMin: 0.96,
+                  glassAtMax: preferTransparentBackdrop ? 0.76 : 0.88,
+                )
+              : opacityByStrength(
+                  solidAtMin: 0.995,
+                  glassAtMax: preferTransparentBackdrop ? 0.84 : 0.96,
+                )),
     );
-    final cardColor = cardBase.withValues(
-      alpha: isDark
-          ? opacityByStrength(
-              solidAtMin: 0.98,
-              glassAtMax: preferTransparentBackdrop ? 0.84 : 0.94,
-            )
-          : opacityByStrength(
-              solidAtMin: 0.99,
-              glassAtMax: preferTransparentBackdrop ? 0.88 : 0.97,
-            ),
+    final cardColor = surface(
+      cardBase,
+      alpha:
+          glass?.containerOpacity ??
+          (isDark
+              ? opacityByStrength(
+                  solidAtMin: 0.98,
+                  glassAtMax: preferTransparentBackdrop ? 0.84 : 0.94,
+                )
+              : opacityByStrength(
+                  solidAtMin: 0.99,
+                  glassAtMax: preferTransparentBackdrop ? 0.88 : 0.97,
+                )),
     );
     final menuColor = menuBase.withValues(
-      alpha: isDark
-          ? opacityByStrength(
-              solidAtMin: 0.995,
-              glassAtMax: preferTransparentBackdrop ? 0.90 : 0.98,
-            )
-          : opacityByStrength(
-              solidAtMin: 0.995,
-              glassAtMax: preferTransparentBackdrop ? 0.90 : 0.98,
-            ),
+      alpha: (glass != null
+          ? 1.0
+          : (isDark
+                ? opacityByStrength(
+                    solidAtMin: 0.995,
+                    glassAtMax: preferTransparentBackdrop ? 0.90 : 0.98,
+                  )
+                : opacityByStrength(
+                    solidAtMin: 0.995,
+                    glassAtMax: preferTransparentBackdrop ? 0.90 : 0.98,
+                  ))),
     );
 
     return fluent.FluentThemeData(
       brightness: materialTheme.brightness,
       accentColor: fluentAccentColor,
       scaffoldBackgroundColor: scaffoldColor,
-      acrylicBackgroundColor: scaffoldBase.withValues(
-        alpha: isDark
-            ? opacityByStrength(
-                solidAtMin: 0.98,
-                glassAtMax: preferTransparentBackdrop ? 0.82 : 0.92,
-              )
-            : opacityByStrength(
-                solidAtMin: 0.99,
-                glassAtMax: preferTransparentBackdrop ? 0.88 : 0.97,
-              ),
+      acrylicBackgroundColor: surface(
+        scaffoldBase,
+        alpha:
+            glass?.chromeOpacity ??
+            (isDark
+                ? opacityByStrength(
+                    solidAtMin: 0.98,
+                    glassAtMax: preferTransparentBackdrop ? 0.82 : 0.92,
+                  )
+                : opacityByStrength(
+                    solidAtMin: 0.99,
+                    glassAtMax: preferTransparentBackdrop ? 0.88 : 0.97,
+                  )),
       ),
-      micaBackgroundColor: scaffoldBase.withValues(
-        alpha: isDark
-            ? opacityByStrength(
-                solidAtMin: 0.96,
-                glassAtMax: preferTransparentBackdrop ? 0.70 : 0.82,
-              )
-            : opacityByStrength(
-                solidAtMin: 0.99,
-                glassAtMax: preferTransparentBackdrop ? 0.84 : 0.96,
-              ),
+      micaBackgroundColor: surface(
+        scaffoldBase,
+        alpha:
+            glass?.chromeOpacity ??
+            (isDark
+                ? opacityByStrength(
+                    solidAtMin: 0.96,
+                    glassAtMax: preferTransparentBackdrop ? 0.70 : 0.82,
+                  )
+                : opacityByStrength(
+                    solidAtMin: 0.99,
+                    glassAtMax: preferTransparentBackdrop ? 0.84 : 0.96,
+                  )),
       ),
       menuColor: menuColor,
       cardColor: cardColor,

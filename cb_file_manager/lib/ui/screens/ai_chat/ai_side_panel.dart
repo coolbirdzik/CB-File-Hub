@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:cb_file_manager/design_system/cb_design_system.dart';
+import 'package:cb_file_manager/design_system/fluent_chrome_surface.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter/services.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -142,141 +143,149 @@ class _AiSidePanelState extends State<AiSidePanel> {
       value: _bloc,
       child: Container(
         width: widget.width,
-        // Flat: one tonal step off the surface separates the docked panel
-        // from the page, not a rule down its edge.
-        decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerLow),
-        child: Stack(
-          children: [
-            Row(
-              children: [
-                // Conversation list panel (animated slide-in from left, resizable)
-                ClipRect(
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    curve: Curves.easeInOut,
-                    width: _showConversations ? _convPanelWidth : 0,
-                    child: OverflowBox(
-                      maxWidth: _convPanelMaxWidth,
-                      minWidth: 0,
-                      alignment: Alignment.centerLeft,
-                      child: SizedBox(
-                        width: _convPanelWidth,
-                        child: _showConversations
-                            ? Stack(
-                                children: [
-                                  ConversationListPanel(
-                                    onClose: () => setState(
-                                      () => _showConversations = false,
-                                    ),
-                                  ),
-                                  // Drag handle on the right edge
-                                  Positioned(
-                                    right: 0,
-                                    top: 0,
-                                    bottom: 0,
-                                    child: MouseRegion(
-                                      cursor: SystemMouseCursors.resizeColumn,
-                                      child: GestureDetector(
-                                        behavior: HitTestBehavior.opaque,
-                                        onHorizontalDragUpdate: (details) {
-                                          setState(() {
-                                            _convPanelWidth =
-                                                (_convPanelWidth +
-                                                        details.delta.dx)
-                                                    .clamp(
-                                                      _convPanelMinWidth,
-                                                      _convPanelMaxWidth,
-                                                    );
-                                          });
-                                        },
-                                        child: const SizedBox(width: 4),
+        padding: Platform.isMacOS ? const EdgeInsets.all(8) : EdgeInsets.zero,
+        child: FluentChromeSurface(
+          tint: theme.colorScheme.surfaceContainerLow,
+          tintAlpha: Platform.isMacOS
+              ? 0.70
+              : theme.colorScheme.surfaceContainerLow.a,
+          blurSigma: Platform.isMacOS ? 24 : 0,
+          borderRadius: Platform.isMacOS
+              ? BorderRadius.circular(20)
+              : BorderRadius.zero,
+          child: Stack(
+            children: [
+              Row(
+                children: [
+                  // Conversation list panel (animated slide-in from left, resizable)
+                  ClipRect(
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      curve: Curves.easeInOut,
+                      width: _showConversations ? _convPanelWidth : 0,
+                      child: OverflowBox(
+                        maxWidth: _convPanelMaxWidth,
+                        minWidth: 0,
+                        alignment: Alignment.centerLeft,
+                        child: SizedBox(
+                          width: _convPanelWidth,
+                          child: _showConversations
+                              ? Stack(
+                                  children: [
+                                    ConversationListPanel(
+                                      onClose: () => setState(
+                                        () => _showConversations = false,
                                       ),
                                     ),
-                                  ),
-                                ],
-                              )
-                            : const SizedBox.shrink(),
+                                    // Drag handle on the right edge
+                                    Positioned(
+                                      right: 0,
+                                      top: 0,
+                                      bottom: 0,
+                                      child: MouseRegion(
+                                        cursor: SystemMouseCursors.resizeColumn,
+                                        child: GestureDetector(
+                                          behavior: HitTestBehavior.opaque,
+                                          onHorizontalDragUpdate: (details) {
+                                            setState(() {
+                                              _convPanelWidth =
+                                                  (_convPanelWidth +
+                                                          details.delta.dx)
+                                                      .clamp(
+                                                        _convPanelMinWidth,
+                                                        _convPanelMaxWidth,
+                                                      );
+                                            });
+                                          },
+                                          child: const SizedBox(width: 4),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              : const SizedBox.shrink(),
+                        ),
                       ),
                     ),
                   ),
-                ),
 
-                // Main panel content
-                Expanded(
-                  child: BlocConsumer<AiAgentBloc, AiAgentState>(
-                    listenWhen: (prev, curr) {
-                      if (prev.conversationId != curr.conversationId) {
-                        return true;
-                      }
-                      if (prev.messages.length != curr.messages.length) {
-                        return true;
-                      }
-                      if (prev.pendingApproval != curr.pendingApproval) {
-                        return true;
-                      }
-                      // Auto-scroll while streaming tokens — track last message
-                      // content changes so user follows the generated answer.
-                      if (!curr.isLoading) return false;
-                      final prevLast = prev.messages.isNotEmpty
-                          ? prev.messages.last.content
-                          : '';
-                      final currLast = curr.messages.isNotEmpty
-                          ? curr.messages.last.content
-                          : '';
-                      return prevLast != currLast;
-                    },
-                    listener: (context, state) {
-                      final animate =
-                          _lastConversationId == state.conversationId;
-                      _lastConversationId = state.conversationId;
-                      _scrollToBottom(animated: animate);
-                    },
-                    builder: (context, state) {
-                      return Column(
-                        children: [
-                          // Header
-                          _buildHeader(context, l, theme, state),
-                          const Divider(height: 1),
+                  // Main panel content
+                  Expanded(
+                    child: BlocConsumer<AiAgentBloc, AiAgentState>(
+                      listenWhen: (prev, curr) {
+                        if (prev.conversationId != curr.conversationId) {
+                          return true;
+                        }
+                        if (prev.messages.length != curr.messages.length) {
+                          return true;
+                        }
+                        if (prev.pendingApproval != curr.pendingApproval) {
+                          return true;
+                        }
+                        // Auto-scroll while streaming tokens — track last message
+                        // content changes so user follows the generated answer.
+                        if (!curr.isLoading) return false;
+                        final prevLast = prev.messages.isNotEmpty
+                            ? prev.messages.last.content
+                            : '';
+                        final currLast = curr.messages.isNotEmpty
+                            ? curr.messages.last.content
+                            : '';
+                        return prevLast != currLast;
+                      },
+                      listener: (context, state) {
+                        final animate =
+                            _lastConversationId == state.conversationId;
+                        _lastConversationId = state.conversationId;
+                        _scrollToBottom(animated: animate);
+                      },
+                      builder: (context, state) {
+                        return Column(
+                          children: [
+                            // Header
+                            _buildHeader(context, l, theme, state),
+                            const Divider(height: 1),
 
-                          // Error banner (provider failures)
-                          if (state.error != null)
-                            _buildErrorBanner(context, theme, state),
+                            // Error banner (provider failures)
+                            if (state.error != null)
+                              _buildErrorBanner(context, theme, state),
 
-                          // Messages
-                          Expanded(
-                            child:
-                                state.messages.isEmpty &&
-                                    state.pendingApproval == null
-                                ? _buildEmptyState(context, l, theme, state)
-                                : _buildMessages(context, state),
-                          ),
-
-                          // Workspace indicator + Input
-                          ChatInputBar(
-                            onStop: () => _bloc.add(const StopGeneration()),
-                            onSend: (text, files) => _bloc.add(
-                              SendMessage(text, referencedFiles: files),
+                            // Messages
+                            Expanded(
+                              child:
+                                  state.messages.isEmpty &&
+                                      state.pendingApproval == null
+                                  ? _buildEmptyState(context, l, theme, state)
+                                  : _buildMessages(context, state),
                             ),
-                            isLoading: state.isLoading,
-                            workspaceIndicator: _buildWorkspaceIndicator(
-                              context,
-                              theme,
-                              state,
+
+                            // Workspace indicator + Input
+                            ChatInputBar(
+                              onStop: () => _bloc.add(const StopGeneration()),
+                              onSend: (text, files) => _bloc.add(
+                                SendMessage(text, referencedFiles: files),
+                              ),
+                              isLoading: state.isLoading,
+                              workspaceIndicator: _buildWorkspaceIndicator(
+                                context,
+                                theme,
+                                state,
+                              ),
                             ),
-                          ),
-                        ],
-                      );
-                    },
+                          ],
+                        );
+                      },
+                    ),
                   ),
-                ),
-              ],
-            ),
-            _AiPanelResizeHandle(
-              onDragStart: (_) => _startPanelResize(),
-              onDragUpdate: _updatePanelResize,
-              onDragEnd: (_) => _endPanelResize(),
-            ),
-          ],
+                ],
+              ),
+              _AiPanelResizeHandle(
+                onDragStart: (_) => _startPanelResize(),
+                onDragUpdate: _updatePanelResize,
+                onDragEnd: (_) => _endPanelResize(),
+              ),
+            ],
+          ),
         ),
       ),
     );

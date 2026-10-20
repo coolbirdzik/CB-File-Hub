@@ -13,6 +13,7 @@ import 'tab_data.dart';
 import 'tab_paths.dart';
 import 'tab_content_overlay.dart';
 import 'tab_focus_gate.dart';
+import 'tab_keyboard_shortcuts.dart';
 import 'tab_pane_state.dart';
 import '../../drawer.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
@@ -20,6 +21,7 @@ import 'tabbed_folder/tabbed_folder_list_screen.dart';
 import 'package:flutter/gestures.dart'; // Import for mouse scrolling
 import '../desktop/scrollable_tab_bar.dart'; // Import our custom ScrollableTabBar
 import '../desktop/desktop_tab_drag_data.dart';
+import '../desktop/tab_drag_overlay_controller.dart';
 import '../mobile/mobile_tab_view.dart'; // Import giao diện mobile kiểu Chrome
 import 'package:cb_file_manager/config/languages/app_localizations.dart'; // Import AppLocalizations
 import 'package:cb_file_manager/config/translation_helper.dart'; // Import translation helper
@@ -47,6 +49,7 @@ import '../components/tab_inactive_indicator.dart';
 import '../components/tab_always_active_indicator.dart';
 import 'package:cb_file_manager/services/tab_activity/tab_activity_manager.dart';
 import 'package:cb_file_manager/design_system/primitives/cb_tooltip.dart';
+import 'package:cb_file_manager/design_system/primitives/cb_panel_reveal.dart';
 
 // Create a custom scroll behavior that supports mouse wheel scrolling
 class TabBarMouseScrollBehavior extends MaterialScrollBehavior {
@@ -65,32 +68,6 @@ class TabScreen extends StatefulWidget {
 
   @override
   State<TabScreen> createState() => _TabScreenState();
-}
-
-// Create a new tab action for keyboard shortcuts
-class CreateNewTabIntent extends Intent {
-  const CreateNewTabIntent();
-}
-
-// Create a close tab action for keyboard shortcuts
-class CloseTabIntent extends Intent {
-  const CloseTabIntent();
-}
-
-// Create a new window action for keyboard shortcuts
-class CreateNewWindowIntent extends Intent {
-  const CreateNewWindowIntent();
-}
-
-// Create actions for switching to specific tabs
-class SwitchToTabIntent extends Intent {
-  final int tabIndex;
-  const SwitchToTabIntent(this.tabIndex);
-}
-
-/// Intent to toggle split-pane view for the active tab.
-class ToggleSplitViewIntent extends Intent {
-  const ToggleSplitViewIntent();
 }
 
 class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
@@ -117,7 +94,8 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
       _isDesktop &&
       Platform.environment[WindowStartupPayload.envSecondaryWindowKey] == '1';
 
-  OverlayEntry? _windowDropOverlayEntry;
+  final TabDragOverlayController _windowDropOverlay =
+      TabDragOverlayController();
   final Map<String, _CachedTabContent> _tabContentCache =
       <String, _CachedTabContent>{};
 
@@ -160,7 +138,7 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
 
   @override
   void dispose() {
-    _removeWindowDropOverlay();
+    _windowDropOverlay.dispose();
     _tabContentCache.clear();
     for (final node in _tabFocusScopes.values) {
       node.dispose();
@@ -718,94 +696,7 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                 }
               }
 
-              // Define keyboard shortcuts and actions
-              final Map<ShortcutActivator, Intent> shortcuts = {
-                // Create new tab with Ctrl+T
-                const SingleActivator(LogicalKeyboardKey.keyT, control: true):
-                    const CreateNewTabIntent(),
-                // Create new tab with Ctrl+N
-                const SingleActivator(LogicalKeyboardKey.keyN, control: true):
-                    const CreateNewTabIntent(),
-                // Create new window with Ctrl+Shift+N
-                const SingleActivator(
-                  LogicalKeyboardKey.keyN,
-                  control: true,
-                  shift: true,
-                ): const CreateNewWindowIntent(),
-                // macOS equivalents
-                const SingleActivator(LogicalKeyboardKey.keyN, meta: true):
-                    const CreateNewTabIntent(),
-                const SingleActivator(
-                  LogicalKeyboardKey.keyN,
-                  meta: true,
-                  shift: true,
-                ): const CreateNewWindowIntent(),
-                // Close current tab with Ctrl+W
-                LogicalKeySet(
-                  LogicalKeyboardKey.control,
-                  LogicalKeyboardKey.keyW,
-                ): const CloseTabIntent(),
-                // Toggle split-pane view with Ctrl+\
-                const SingleActivator(
-                  LogicalKeyboardKey.backslash,
-                  control: true,
-                ): const ToggleSplitViewIntent(),
-                // Switch to tabs 1-9 with Ctrl+1, Ctrl+2, etc.
-                LogicalKeySet(
-                  LogicalKeyboardKey.control,
-                  LogicalKeyboardKey.digit1,
-                ): const SwitchToTabIntent(
-                  0,
-                ),
-                LogicalKeySet(
-                  LogicalKeyboardKey.control,
-                  LogicalKeyboardKey.digit2,
-                ): const SwitchToTabIntent(
-                  1,
-                ),
-                LogicalKeySet(
-                  LogicalKeyboardKey.control,
-                  LogicalKeyboardKey.digit3,
-                ): const SwitchToTabIntent(
-                  2,
-                ),
-                LogicalKeySet(
-                  LogicalKeyboardKey.control,
-                  LogicalKeyboardKey.digit4,
-                ): const SwitchToTabIntent(
-                  3,
-                ),
-                LogicalKeySet(
-                  LogicalKeyboardKey.control,
-                  LogicalKeyboardKey.digit5,
-                ): const SwitchToTabIntent(
-                  4,
-                ),
-                LogicalKeySet(
-                  LogicalKeyboardKey.control,
-                  LogicalKeyboardKey.digit6,
-                ): const SwitchToTabIntent(
-                  5,
-                ),
-                LogicalKeySet(
-                  LogicalKeyboardKey.control,
-                  LogicalKeyboardKey.digit7,
-                ): const SwitchToTabIntent(
-                  6,
-                ),
-                LogicalKeySet(
-                  LogicalKeyboardKey.control,
-                  LogicalKeyboardKey.digit8,
-                ): const SwitchToTabIntent(
-                  7,
-                ),
-                LogicalKeySet(
-                  LogicalKeyboardKey.control,
-                  LogicalKeyboardKey.digit9,
-                ): const SwitchToTabIntent(
-                  8,
-                ),
-              };
+              final shortcuts = tabKeyboardShortcuts();
 
               final Map<Type, Action<Intent>> actions = {
                 CreateNewTabIntent: CallbackAction<CreateNewTabIntent>(
@@ -837,6 +728,21 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                 SwitchToTabIntent: CallbackAction<SwitchToTabIntent>(
                   onInvoke: (SwitchToTabIntent intent) =>
                       _handleSwitchToTab(intent.tabIndex),
+                ),
+                CycleTabIntent: CallbackAction<CycleTabIntent>(
+                  onInvoke: (intent) {
+                    final state = context.read<TabManagerBloc>().state;
+                    if (state.tabs.isEmpty) return null;
+                    final index = state.tabs.indexWhere(
+                      (tab) => tab.id == state.activeTabId,
+                    );
+                    _handleSwitchToTab(
+                      index < 0
+                          ? (intent.delta < 0 ? state.tabs.length - 1 : 0)
+                          : (index + intent.delta) % state.tabs.length,
+                    );
+                    return null;
+                  },
                 ),
                 ToggleSplitViewIntent: CallbackAction<ToggleSplitViewIntent>(
                   onInvoke: (ToggleSplitViewIntent intent) {
@@ -926,7 +832,9 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                               // controls for the legacy desktop host.
                               appBar: isTablet
                                   ? PreferredSize(
-                                      preferredSize: const Size.fromHeight(48),
+                                      preferredSize: Size.fromHeight(
+                                        FluentSurfaceTokens.tabBarHeight,
+                                      ),
                                       child: Builder(
                                         builder: (context) {
                                           final FluentSurfaceTokens? chrome =
@@ -934,7 +842,8 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                                               ? FluentSurfaceTokens.of(context)
                                               : null;
                                           final tabBar = Container(
-                                            height: 48,
+                                            height: FluentSurfaceTokens
+                                                .tabBarHeight,
                                             padding: const EdgeInsets.symmetric(
                                               horizontal: 8,
                                             ),
@@ -944,8 +853,10 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                                             child: Row(
                                               children: [
                                                 if (Platform.isMacOS)
-                                                  const MacosTrafficLightInset(
-                                                    barHeight: 48,
+                                                  MacosTrafficLightInset(
+                                                    barHeight:
+                                                        FluentSurfaceTokens
+                                                            .tabBarHeight,
                                                   ),
                                                 if (!_isDrawerPinned)
                                                   Padding(
@@ -1315,7 +1226,11 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                                   // Pinned drawer (if enabled)
                                   if (_isDrawerPinned)
                                     SizedBox(
-                                      width: 280,
+                                      width:
+                                          _useFluentDesktopShell &&
+                                              FluentSurfaceTokens.isMacOS
+                                          ? FluentSurfaceTokens.drawerWidth
+                                          : 280,
                                       child: CBDrawer(
                                         context,
                                         activeTabId: state.activeTabId,
@@ -1524,48 +1439,58 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
     return ListenableBuilder(
       listenable: _aiPanelController,
       builder: (context, _) {
-        if (!_aiPanelController.isOpen) return tabContent;
-        if (activeTab != null && isAiChatPath(activeTab.path)) {
-          return tabContent;
-        }
-
         final ownerTabId = _aiPanelController.ownerTabId;
-        if (ownerTabId == null) return tabContent;
+        final showPanel =
+            _aiPanelController.isOpen &&
+            ownerTabId != null &&
+            !(activeTab != null && isAiChatPath(activeTab.path));
         final availableWidth = MediaQuery.of(context).size.width;
         final panelWidth = _aiPanelController.clampedPanelWidthFor(
           availableWidth,
         );
 
-        final bloc = _aiPanelController.blocForTab(
-          ownerTabId,
-          initialPath: _aiPanelController.currentPath,
-          thinkingPhrases: [
-            AppLocalizations.of(context)!.aiThinking0,
-            AppLocalizations.of(context)!.aiThinking1,
-            AppLocalizations.of(context)!.aiThinking2,
-            AppLocalizations.of(context)!.aiThinking3,
-          ],
-          waitingApproval: AppLocalizations.of(context)!.aiWaitingApproval,
-          runningToolTemplate: AppLocalizations.of(
-            context,
-          )!.aiRunningTool('{}'),
-        );
+        final bloc = showPanel
+            ? _aiPanelController.blocForTab(
+                ownerTabId,
+                initialPath: _aiPanelController.currentPath,
+                thinkingPhrases: [
+                  AppLocalizations.of(context)!.aiThinking0,
+                  AppLocalizations.of(context)!.aiThinking1,
+                  AppLocalizations.of(context)!.aiThinking2,
+                  AppLocalizations.of(context)!.aiThinking3,
+                ],
+                waitingApproval: AppLocalizations.of(
+                  context,
+                )!.aiWaitingApproval,
+                runningToolTemplate: AppLocalizations.of(
+                  context,
+                )!.aiRunningTool('{}'),
+              )
+            : null;
 
         return Row(
           children: [
             Expanded(child: tabContent),
-            AiSidePanel(
-              key: ValueKey(ownerTabId),
-              bloc: bloc,
-              width: panelWidth,
-              onWidthChanged: (width) => _aiPanelController.updatePanelWidth(
-                width,
-                availableWidth: availableWidth,
-              ),
-              onWidthChangeEnd: () => _aiPanelController.commitPanelWidth(
-                availableWidth: availableWidth,
-              ),
-              onClose: () => _aiPanelController.close(),
+            CbPanelReveal(
+              visible: showPanel,
+              reserveWidth: true,
+              hiddenOffset: const Offset(0.08, 0),
+              alignment: Alignment.centerRight,
+              child: bloc == null
+                  ? null
+                  : AiSidePanel(
+                      key: ValueKey(ownerTabId),
+                      bloc: bloc,
+                      width: panelWidth,
+                      onWidthChanged: (width) =>
+                          _aiPanelController.updatePanelWidth(
+                            width,
+                            availableWidth: availableWidth,
+                          ),
+                      onWidthChangeEnd: () => _aiPanelController
+                          .commitPanelWidth(availableWidth: availableWidth),
+                      onClose: () => _aiPanelController.close(),
+                    ),
             ),
           ],
         );
@@ -1631,8 +1556,7 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
   }
 
   void _removeWindowDropOverlay() {
-    _windowDropOverlayEntry?.remove();
-    _windowDropOverlayEntry = null;
+    _windowDropOverlay.remove();
   }
 
   Future<void> _showWindowDropOverlay(
@@ -1641,20 +1565,16 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
   ) async {
     if (!_isDesktop) return;
 
-    _removeWindowDropOverlay();
-
-    final svc = locator<DesktopWindowingService>();
-    final others = await svc.listOtherWindows();
-    if (!mounted) return;
-    final moveSelection = _resolveTabMoveSelection(dragged.tabId);
-    final moveCount = moveSelection.tabIds.length;
-
-    // ignore: use_build_context_synchronously
     final overlay = Overlay.maybeOf(context, rootOverlay: true);
     if (overlay == null) return;
+    final moveSelection = _resolveTabMoveSelection(dragged.tabId);
+    final moveCount = moveSelection.tabIds.length;
+    final svc = locator<DesktopWindowingService>();
 
-    _windowDropOverlayEntry = OverlayEntry(
-      builder: (ctx) {
+    await _windowDropOverlay.show(
+      overlay: overlay,
+      load: svc.listOtherWindows,
+      builder: (ctx, others) {
         final theme = Theme.of(ctx);
         final isDarkMode = theme.brightness == Brightness.dark;
         final bg = isDarkMode
@@ -1829,8 +1749,6 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
         );
       },
     );
-
-    overlay.insert(_windowDropOverlayEntry!);
   }
 
   Future<void> _handleNativeTabDrag(

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'desktop_backdrop_strength_control.dart';
 
 import 'package:cb_native/cb_native.dart';
 import 'package:flutter/material.dart';
@@ -1806,7 +1807,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _buildUiFontControl(themeProvider),
             if (showDesktopAcrylicControl) ...[
               _buildBackdropModeControl(themeProvider),
-              _buildDesktopAcrylicStrengthControl(themeProvider),
+              const DesktopBackdropStrengthControl(),
             ],
           ],
         );
@@ -2027,6 +2028,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Text(
             mode == AcrylicBackdropMode.wallpaper
                 ? l10n.backdropModeWallpaperDescription
+                : themeProvider.usesMacosGlass
+                ? l10n.backdropModeGlassDescription
                 : l10n.backdropModeDynamicDescription,
             style: TextStyle(
               fontSize: 12,
@@ -2037,7 +2040,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Row(
             children: [
               _buildModeChip(
-                label: l10n.backdropModeDynamic,
+                label: themeProvider.usesMacosGlass
+                    ? l10n.backdropModeGlass
+                    : l10n.backdropModeDynamic,
                 icon: PhosphorIconsLight.monitor,
                 isSelected: mode == AcrylicBackdropMode.dynamic,
                 onTap: () =>
@@ -2174,55 +2179,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
               color: isSelected
                   ? theme.colorScheme.primary
                   : theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDesktopAcrylicStrengthControl(ThemeProvider themeProvider) {
-    final value = themeProvider.desktopAcrylicStrength;
-    final percentage = (value * 100).round();
-    final l10n = AppLocalizations.of(context)!;
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            l10n.desktopAcrylicStrength,
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            l10n.desktopAcrylicStrengthDescription(percentage),
-            style: TextStyle(
-              fontSize: 12,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          ),
-          Semantics(
-            container: true,
-            child: Slider(
-              min: 0,
-              max: 2,
-              divisions: 20,
-              value: value,
-              label: '$percentage%',
-              onChanged: (nextValue) {
-                context.read<ThemeProvider>().setDesktopAcrylicStrength(
-                  nextValue,
-                  persist: false,
-                );
-              },
-              onChangeEnd: (nextValue) {
-                context.read<ThemeProvider>().setDesktopAcrylicStrength(
-                  nextValue,
-                  persist: true,
-                );
-              },
             ),
           ),
         ],

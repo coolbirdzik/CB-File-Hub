@@ -1463,6 +1463,19 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
                 tabManagerBloc.backNavigationToPath(widget.tabId);
               }
             },
+            onForwardInTabHistory: _handleMouseForwardButton,
+            onNavigateToParent: () =>
+                _navigationController.navigateToParentFolder(
+                  context,
+                  _currentPath,
+                  _pathController,
+                  (_) => _keyboardController.clearFocus(),
+                ),
+            onCreateFolder:
+                path.isAbsolute(_currentPath) &&
+                    !ArchivePathUtils.isArchiveBrowsePath(_currentPath)
+                ? _showCreateFolderDialog
+                : null,
             focusFolderPath: (path) => _toggleFolderSelection(
               path,
               shiftSelect: false,

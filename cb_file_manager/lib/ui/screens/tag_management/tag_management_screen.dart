@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/helpers/core/desktop_shortcuts.dart';
 import 'package:cb_file_manager/ui/components/common/search_text_field.dart';
 import 'dart:async';
 import 'dart:io';
@@ -247,7 +248,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
   bool _onKeyEvent(KeyEvent event) {
     // Modifier state drives ctrl/shift-click selection, so it has to track
     // every event, handled or not, and before any early return.
-    final bool ctrl = HardwareKeyboard.instance.isControlPressed;
+    final bool ctrl = DesktopShortcuts.isPrimaryPressed;
     final bool shift = HardwareKeyboard.instance.isShiftPressed;
     if (ctrl != _isCtrlPressed || shift != _isShiftPressed) {
       setState(() {
@@ -1100,7 +1101,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
 
     // Get keyboard state for Ctrl/Shift
     final keyboard = HardwareKeyboard.instance;
-    final bool isCtrlPressed = keyboard.isControlPressed;
+    final bool isCtrlPressed = DesktopShortcuts.isPrimaryPressed;
     final bool isShiftPressed = keyboard.isShiftPressed;
 
     final Set<String> nextSelection;

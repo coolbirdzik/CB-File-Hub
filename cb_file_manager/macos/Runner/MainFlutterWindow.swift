@@ -7,6 +7,7 @@ class MainFlutterWindow: NSWindow {
   // height keeps AppKit's native layout (e.g. windows without a tab bar).
   private var trafficLightBarHeight: CGFloat = 0
   private var trafficLightLeading: CGFloat = 0
+  private var glassBackground: NSVisualEffectView?
 
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
@@ -25,6 +26,16 @@ class MainFlutterWindow: NSWindow {
         return
       }
       switch call.method {
+      case "getSidebarUserFolders":
+        result(self.sidebarUserFolders())
+      case "setGlassBackground":
+        let args = call.arguments as? [String: Any]
+        self.setGlassBackground(
+          enabled: args?["enabled"] as? Bool ?? false,
+          dark: args?["dark"] as? Bool ?? false,
+          strength: args?["strength"] as? Double ?? 1,
+          controller: flutterViewController)
+        result(nil)
       case "setTrafficLightLayout":
         let args = call.arguments as? [String: Any]
         self.trafficLightBarHeight = CGFloat(
@@ -48,6 +59,7 @@ class MainFlutterWindow: NSWindow {
     for name in [
       NSWindow.didResizeNotification,
       NSWindow.didEndLiveResizeNotification,
+      NSWindow.didEnterFullScreenNotification,
       NSWindow.didExitFullScreenNotification,
       NSWindow.didBecomeKeyNotification,
       NSWindow.didResignKeyNotification,
@@ -59,8 +71,70 @@ class MainFlutterWindow: NSWindow {
     super.awakeFromNib()
   }
 
+  private func sidebarUserFolders() -> [[String: String]] {
+    let manager = FileManager.default
+    var folders: [[String: String]] = []
+    func add(_ kind: String, _ url: URL?) {
+      guard let url = url else { return }
+      var directory: ObjCBool = false
+      guard manager.fileExists(atPath: url.path, isDirectory: &directory),
+        directory.boolValue else { return }
+      folders.append(["kind": kind, "path": url.standardizedFileURL.path])
+    }
+    add("applications", manager.urls(for: .applicationDirectory, in: .localDomainMask).first)
+    add("desktop", manager.urls(for: .desktopDirectory, in: .userDomainMask).first)
+    add("documents", manager.urls(for: .documentDirectory, in: .userDomainMask).first)
+    add("downloads", manager.urls(for: .downloadsDirectory, in: .userDomainMask).first)
+    add("home", manager.homeDirectoryForCurrentUser)
+    add("pictures", manager.urls(for: .picturesDirectory, in: .userDomainMask).first)
+    add("music", manager.urls(for: .musicDirectory, in: .userDomainMask).first)
+    add("movies", manager.urls(for: .moviesDirectory, in: .userDomainMask).first)
+    return folders
+  }
+
+  private func setGlassBackground(
+    enabled: Bool, dark: Bool, strength: Double, controller: FlutterViewController
+  ) {
+    appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
+    if !enabled {
+      glassBackground?.removeFromSuperview()
+      glassBackground = nil
+      isOpaque = true
+      backgroundColor = .windowBackgroundColor
+      controller.backgroundColor = .windowBackgroundColor
+      return
+    }
+    guard let content = contentView,
+      let frameView = content.superview else { return }
+    let background = glassBackground ?? WindowGlassBackdrop(frame: content.frame)
+    background.autoresizingMask = [.width, .height]
+    background.material = .underWindowBackground
+    background.blendingMode = .behindWindow
+    background.state = .followsWindowActiveState
+    // AppKit owns the blur kernel. Vary the material's contribution together
+    // with Flutter's tint and content blur; never use private blur APIs.
+    background.alphaValue = CGFloat(min(max(strength.isFinite ? strength / 2 : 0.5, 0), 1))
+    // Keep the Flutter view controller as the window's content controller:
+    // plugins depend on it, and the backdrop must sit below Flutter's layer.
+    if background.superview !== frameView {
+      frameView.addSubview(background, positioned: .below, relativeTo: content)
+    }
+    background.frame = content.frame
+    glassBackground = background
+    isOpaque = false
+    backgroundColor = .clear
+    controller.backgroundColor = .clear
+  }
+
   @objc private func windowLayoutChanged(_ notification: Notification) {
     layoutTrafficLights()
+    if let background = glassBackground, let content = contentView,
+      let frameView = content.superview {
+      if background.superview !== frameView {
+        frameView.addSubview(background, positioned: .below, relativeTo: content)
+      }
+      background.frame = content.frame
+    }
   }
 
   /// Returns the zoom button's right edge in window points, or nil when the
@@ -90,6 +164,12 @@ class MainFlutterWindow: NSWindow {
     }
     return Double(zoom.convert(zoom.bounds, to: nil).maxX)
   }
+}
+
+/// Decorative window material stays outside Flutter's platform-view hierarchy
+/// and can never become the mouse target, including during window relayout.
+private final class WindowGlassBackdrop: NSVisualEffectView {
+  override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }
 
 /// Floating card shown beside System Settings while the user grants Full Disk

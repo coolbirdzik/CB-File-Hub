@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'sidebar_pins_repository.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -84,7 +85,6 @@ class UserPreferences {
       'preferred_video_player_app';
   static const String _openVideoInNewWindowKey = 'open_video_in_new_window';
   static const String _recentPathsKey = 'recent_paths';
-  static const String _sidebarPinnedPathsKey = 'sidebar_pinned_paths';
   static const String _rememberTabWorkspaceKey = 'remember_tab_workspace';
   static const String _lastOpenedTabPathKey = 'last_opened_tab_path';
   static const String _lastOpenedTabsListKey = 'last_opened_tabs_list';
@@ -474,90 +474,29 @@ class UserPreferences {
     return await _deletePreference(_recentPathsKey);
   }
 
-  /// Get pinned sidebar paths.
-  ///
-  /// When [validateDirectories] is true, stored paths are validated against
-  /// existing filesystem entities (file or directory).
+  Future<SidebarPinsRepository> _sidebarPins() async {
+    await init();
+    return SidebarPinsRepository(await _databaseManager!.getDatabase());
+  }
+
+  /// Reads pinned destinations without deleting temporarily unavailable paths.
   Future<List<String>> getSidebarPinnedPaths({
     bool validateDirectories = true,
-  }) async {
-    final jsonString = await _getPreference<String>(_sidebarPinnedPathsKey);
-    if (jsonString == null || jsonString.trim().isEmpty) return <String>[];
+  }) async =>
+      (await _sidebarPins()).read(validateDirectories: validateDirectories);
 
-    try {
-      final decoded = json.decode(jsonString);
-      if (decoded is! List) return <String>[];
+  Future<bool> isPathPinnedToSidebar(String path) async =>
+      (await _sidebarPins()).contains(path);
 
-      final rawPaths = decoded
-          .whereType<String>()
-          .map((p) => p.trim())
-          .where((p) => p.isNotEmpty && !_isVirtualPath(p))
-          .toList(growable: false);
+  Future<bool> addSidebarPinnedPath(String path) async =>
+      (await _sidebarPins()).setPinned(path, pinned: true);
 
-      if (!validateDirectories) {
-        return rawPaths;
-      }
+  Future<bool> removeSidebarPinnedPath(String path) async =>
+      (await _sidebarPins()).setPinned(path, pinned: false);
 
-      final List<String> validPaths = <String>[];
-      bool changed = false;
-      for (final p in rawPaths) {
-        try {
-          if (await Directory(p).exists()) {
-            validPaths.add(p);
-          } else {
-            changed = true;
-          }
-        } catch (_) {
-          changed = true;
-        }
-      }
-
-      if (changed) {
-        await _savePreference<String>(
-          _sidebarPinnedPathsKey,
-          json.encode(validPaths),
-        );
-      }
-
-      return validPaths;
-    } catch (_) {
-      return <String>[];
-    }
-  }
-
-  Future<bool> isPathPinnedToSidebar(String path) async {
-    final target = path.trim();
-    if (target.isEmpty || _isVirtualPath(target)) return false;
-    final existing = await getSidebarPinnedPaths(validateDirectories: false);
-    return existing.any((p) => _pathsEqual(p, target));
-  }
-
-  Future<bool> addSidebarPinnedPath(String path) async {
-    final target = path.trim();
-    if (target.isEmpty || _isVirtualPath(target)) return false;
-
-    final existing = await getSidebarPinnedPaths(validateDirectories: false);
-    if (existing.any((p) => _pathsEqual(p, target))) return true;
-
-    final updated = <String>[target, ...existing];
-    return await _savePreference<String>(
-      _sidebarPinnedPathsKey,
-      json.encode(updated),
-    );
-  }
-
-  Future<bool> removeSidebarPinnedPath(String path) async {
-    final target = path.trim();
-    if (target.isEmpty) return false;
-
-    final existing = await getSidebarPinnedPaths(validateDirectories: false);
-    final updated = existing.where((p) => !_pathsEqual(p, target)).toList();
-
-    return await _savePreference<String>(
-      _sidebarPinnedPathsKey,
-      json.encode(updated),
-    );
-  }
+  /// Seeds Finder-style defaults once, preserving manual pins and removals.
+  Future<bool> seedMacosSidebarDefaults(List<String> defaults) async =>
+      (await _sidebarPins()).seedMacosDefaults(defaults);
 
   /// Whether tab workspace persistence is enabled.
   ///

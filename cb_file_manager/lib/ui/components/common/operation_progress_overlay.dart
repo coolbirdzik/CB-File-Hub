@@ -6,6 +6,9 @@ import 'package:cb_file_manager/services/app_update/app_update_service.dart';
 import 'package:cb_file_manager/ui/components/app_update/app_update_dialog.dart';
 import 'package:cb_file_manager/ui/controllers/operation_progress_controller.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:cb_file_manager/design_system/fluent_chrome_surface.dart';
+import 'package:cb_file_manager/design_system/primitives/cb_panel_reveal.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/config/translation_helper.dart';
 
@@ -106,6 +109,7 @@ class _StatusCenterToolbarButtonState extends State<StatusCenterToolbarButton>
     _glowController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 700),
+      value: 1,
     );
     _glowAnimation = CurvedAnimation(
       parent: _glowController,
@@ -126,6 +130,7 @@ class _StatusCenterToolbarButtonState extends State<StatusCenterToolbarButton>
     // is being unmounted so rebuilding is both unnecessary and illegal
     // (_lifecycleState == defunct assertion in framework.dart:5340).
     _panelOverlay?.remove();
+    _panelOverlay?.dispose();
     _panelOverlay = null;
     _controller.removeListener(_onChanged);
     _updates.removeListener(_onChanged);
@@ -150,6 +155,7 @@ class _StatusCenterToolbarButtonState extends State<StatusCenterToolbarButton>
   }
 
   OverlayEntry? _panelOverlay;
+  bool _panelOpen = false;
 
   void _scheduleStartupNotification() {
     if (!_updates.shouldExpandStartupNotification || _startupOpenScheduled) {
@@ -172,7 +178,7 @@ class _StatusCenterToolbarButtonState extends State<StatusCenterToolbarButton>
   }
 
   void _openStatusCenter() {
-    if (_panelOverlay != null) {
+    if (_panelOpen) {
       _closePanelOverlay();
       return;
     }
@@ -182,7 +188,12 @@ class _StatusCenterToolbarButtonState extends State<StatusCenterToolbarButton>
   void _showStatusCenter() {
     _controller.markAllSeen();
     _updates.markUpdateSeen();
-    if (_panelOverlay != null) return;
+    _panelOpen = true;
+    if (_panelOverlay != null) {
+      _panelOverlay!.markNeedsBuild();
+      setState(() {});
+      return;
+    }
 
     final overlay = Overlay.of(context);
     final overlayBox = overlay.context.findRenderObject() as RenderBox;
@@ -211,6 +222,9 @@ class _StatusCenterToolbarButtonState extends State<StatusCenterToolbarButton>
         onDismiss: _closePanelOverlay,
         bgColor: bgColor,
         shadowColor: shadowColor,
+        theme: theme,
+        visible: _panelOpen,
+        onDismissed: _removePanelOverlay,
       ),
     );
     _panelOverlay = entry;
@@ -219,8 +233,17 @@ class _StatusCenterToolbarButtonState extends State<StatusCenterToolbarButton>
   }
 
   void _closePanelOverlay() {
+    if (!_panelOpen) return;
+    _panelOpen = false;
+    _panelOverlay?.markNeedsBuild();
+    if (mounted) setState(() {});
+  }
+
+  void _removePanelOverlay() {
     _panelOverlay?.remove();
+    _panelOverlay?.dispose();
     _panelOverlay = null;
+    _panelOpen = false;
     if (mounted) setState(() {});
   }
 
@@ -288,7 +311,7 @@ class _StatusCenterToolbarButtonState extends State<StatusCenterToolbarButton>
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16.0),
                 ),
-                backgroundColor: hasUnread || runningCount > 0
+                backgroundColor: _panelOpen || hasUnread || runningCount > 0
                     ? theme.colorScheme.primary.withValues(alpha: 0.10)
                     : Colors.transparent,
               ),
@@ -715,9 +738,7 @@ class _StatusCenterTaskTile extends StatelessWidget {
   }
 }
 
-/// Full-screen overlay that renders the Status Center panel as a solid opaque
-/// widget positioned below the toolbar bell button. A transparent barrier
-/// behind it dismisses the panel on tap-outside.
+/// Anchored status popover with a dismiss barrier and a retained exit.
 class _StatusCenterOverlayPanel extends StatelessWidget {
   final double panelRight;
   final double panelTop;
@@ -725,6 +746,9 @@ class _StatusCenterOverlayPanel extends StatelessWidget {
   final VoidCallback onDismiss;
   final Color bgColor;
   final Color shadowColor;
+  final ThemeData theme;
+  final bool visible;
+  final VoidCallback onDismissed;
 
   const _StatusCenterOverlayPanel({
     required this.panelRight,
@@ -733,13 +757,13 @@ class _StatusCenterOverlayPanel extends StatelessWidget {
     required this.onDismiss,
     required this.bgColor,
     required this.shadowColor,
+    required this.theme,
+    required this.visible,
+    required this.onDismissed,
   });
 
   @override
   Widget build(BuildContext context) {
-    // OverlayEntry context has no app Theme — use the pre-captured colors
-    // and inject a Theme so child widgets resolve colors correctly.
-    final appTheme = Theme.of(context);
     return Stack(
       children: [
         // Barrier — dismiss on tap outside
@@ -750,24 +774,39 @@ class _StatusCenterOverlayPanel extends StatelessWidget {
             child: const SizedBox.expand(),
           ),
         ),
-        // Panel — solid opaque surface with explicit background
         Positioned(
           right: panelRight,
           top: panelTop,
           child: Theme(
-            data: appTheme,
-            child: Material(
-              elevation: 12,
-              color: bgColor,
-              shadowColor: shadowColor,
-              borderRadius: BorderRadius.circular(18),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(18),
-                child: ColoredBox(
-                  color: bgColor,
-                  child: StatusCenterPanel(
-                    controller: controller,
-                    solidBackground: bgColor,
+            data: theme,
+            child: CbPanelReveal(
+              visible: visible,
+              onDismissed: onDismissed,
+              child: CallbackShortcuts(
+                bindings: {
+                  const SingleActivator(LogicalKeyboardKey.escape): onDismiss,
+                },
+                child: FocusScope(
+                  child: Focus(
+                    autofocus: true,
+                    child: Material(
+                      elevation: Platform.isMacOS ? 0 : 12,
+                      color: Colors.transparent,
+                      shadowColor: shadowColor,
+                      borderRadius: BorderRadius.circular(18),
+                      child: FluentChromeSurface(
+                        borderRadius: BorderRadius.circular(18),
+                        tint: bgColor,
+                        tintAlpha: Platform.isMacOS ? 0.72 : 1,
+                        blurSigma: Platform.isMacOS ? 24 : 0,
+                        child: StatusCenterPanel(
+                          controller: controller,
+                          solidBackground: Platform.isMacOS
+                              ? Colors.transparent
+                              : bgColor,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),

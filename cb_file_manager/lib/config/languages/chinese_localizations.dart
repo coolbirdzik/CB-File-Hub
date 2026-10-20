@@ -968,6 +968,20 @@ class ChineseLocalizations implements AppLocalizations {
   @override
   String get backdropImageNotFound => '未找到图片';
   @override
+  String get backdropModeGlass => '玻璃';
+  @override
+  String get backdropModeGlassDescription => '透过 macOS 玻璃效果查看应用后方的桌面和窗口。';
+  @override
+  String get desktopGlassStrength => '玻璃透明度';
+  @override
+  String desktopGlassStrengthDescription(int percentage) =>
+      '显示更多背景，同时保留文字后方的保护底色（$percentage%）。';
+  @override
+  String get desktopGlassBlur => '玻璃背景模糊';
+  @override
+  String desktopGlassBlurDescription(int percentage) =>
+      '柔化玻璃表面后方的壁纸和内容（$percentage%）。';
+  @override
   String get desktopAcrylicStrength => '桌面亚克力强度';
   @override
   String desktopAcrylicStrengthDescription(int percentage) =>
@@ -2572,6 +2586,18 @@ class ChineseLocalizations implements AppLocalizations {
 
   @override
   String get pinnedSection => '已固定';
+  @override
+  String get favoritesSection => '个人收藏';
+  @override
+  String get sidebarApplications => '应用程序';
+  @override
+  String get sidebarDesktop => '桌面';
+  @override
+  String get sidebarPictures => '图片';
+  @override
+  String get sidebarMusic => '音乐';
+  @override
+  String get sidebarMovies => '影片';
 
   @override
   String get pinToSidebar => '固定到侧边栏';
