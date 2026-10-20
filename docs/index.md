@@ -6,9 +6,11 @@
   - `guides/01-ai-technical-guide.md`
   - `guides/02-microsoft-store-submission-guide.md`
   - `guides/03-privacy-policy.md`
+  - [Installation](guides/04-installation.md) — Windows, macOS, Linux, and Android
   - `contributing/01-contribution-guide.md`
   - `contributing/02-coding-standards.md`
   - `contributing/03-release-guide.md`
+  - [Development setup](contributing/04-development-setup.md) — Toolchains, builds, tests, and screenshot automation
   - `quality/01-testing-strategy.md`
   - `quality/02-e2e-desktop-integration.md` — Desktop E2E (`integration_test`, Makefile, logs, CI)
 - **Technical**

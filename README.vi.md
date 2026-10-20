@@ -1,5 +1,7 @@
 # CB File Hub
 
+**Your ALL-IN-ONE file manager for Windows, macOS, Linux, and Android.**
+
 [English](README.md) | [Tiếng Việt](README.vi.md)
 
 <p align="center"><img src="cb_file_manager/assets/images/logo_circle.png" alt="Logo CB File Hub" width="160" /></p>
@@ -19,7 +21,7 @@ CB File Hub là ứng dụng quản lý tập tin đa nền tảng dành cho th�
 - **Tag và album:** tag cha/con, tìm theo nhiều tag, album thủ công và album thông minh theo quy tắc.
 - **Tập tin mạng và SSH:** SMB, FTP, SFTP, WebDAV, hồ sơ SSH, khóa và terminal.
 - **CB Agent:** tìm tập tin bằng ngôn ngữ tự nhiên, đề xuất tổ chức và hỗ trợ đánh giá trước khi dọn dẹp.
-- **Dọn ổ đĩa Windows:** xem thư mục lớn, file tạm, bộ nhớ đệm và chọn chính xác mục cần xử lý.
+- **Disk Cleaner (Windows, macOS, Android):** xem thư mục lớn, file tạm, bộ nhớ đệm và chọn chính xác mục cần xử lý.
 - **Sao lưu và cá nhân hóa:** sao lưu cài đặt/tag, các tích hợp đám mây khả dụng, giao diện sáng/tối và màu nhấn.
 
 ## Hình ảnh
@@ -31,7 +33,7 @@ CB File Hub là ứng dụng quản lý tập tin đa nền tảng dành cho th�
   </tr>
   <tr>
     <td width="50%"><img src="screenshots/auto/desktop/ssh_workspace.png" alt="Không gian làm việc SSH" /><p>Máy chủ, khóa và kết nối SSH.</p></td>
-    <td width="50%"><img src="screenshots/promo/vi/desktop/10_don_dep_o_dia.png" alt="Dọn dẹp ổ đĩa Windows" /><p>Xem kết quả quét và đánh giá trước khi dọn dẹp.</p></td>
+    <td width="50%"><img src="screenshots/promo/vi/desktop/10_don_dep_o_dia.png" alt="Disk Cleaner (Windows, macOS, Android)" /><p>Xem kết quả quét và đánh giá trước khi dọn dẹp.</p></td>
   </tr>
 </table>
 
@@ -107,7 +109,7 @@ CB File Hub là ứng dụng quản lý tập tin đa nền tảng dành cho th�
 - Yêu cầu đánh giá một file/thư mục trước khi dọn dẹp, với ngữ cảnh về đường dẫn, dung lượng và phân loại.
 - Chọn nhà cung cấp AI được hỗ trợ hoặc mô hình GGUF tương thích để chạy trên thiết bị. Khả năng phụ thuộc cấu hình và mô hình.
 
-### Dọn dẹp ổ đĩa Windows
+### Disk Cleaner (Windows, macOS, Android)
 
 - Quét thư mục lớn, file tạm, bộ nhớ đệm trình duyệt, Thùng rác và các mục có thể dọn dẹp.
 - Duyệt cây kết quả linh hoạt, chọn theo mục hoặc danh mục và nhờ CB Agent đánh giá.
@@ -125,7 +127,9 @@ CB File Hub là ứng dụng quản lý tập tin đa nền tảng dành cho th�
 
 ## Nền tảng và bắt đầu sử dụng
 
-Windows, Android, Linux và macOS có các bản phân phối phù hợp. Một số tính năng phụ thuộc nền tảng: dọn ổ đĩa dành cho Windows; tải torrent hiện dành cho máy tính. Kết nối mạng, sao lưu đám mây, nhà cung cấp AI và mô hình cục bộ có thể cần tài khoản hoặc thiết lập riêng.
+Disk Cleaner: **Windows, macOS, Android**.
+
+Windows, Android, Linux và macOS có các bản phân phối phù hợp. Một số tính năng phụ thuộc nền tảng: tải torrent hiện dành cho máy tính. Kết nối mạng, sao lưu đám mây, nhà cung cấp AI và mô hình cục bộ có thể cần tài khoản hoặc thiết lập riêng.
 
 Tải bản phù hợp từ [Releases](https://github.com/coolbirdzik/cb-file-hub/releases/latest), Microsoft Store hoặc Google Play. Mở một thư mục, chọn chế độ xem và ghim vị trí thường dùng. Dùng mục Torrent để nhập thư viện và chọn nơi lưu nội dung tải xuống.
 
