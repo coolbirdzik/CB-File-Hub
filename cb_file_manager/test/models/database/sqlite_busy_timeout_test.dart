@@ -73,14 +73,40 @@ void main() {
     expect(error.toString(), contains('database is locked'));
   });
 
-  test('the shared connection settings wait for the other writer', () async {
-    final error = await writeWhileLocked(
-      configure: SqliteDatabaseProvider.configureConnection,
+  test('the shared connection settings set the busy timeout', () async {
+    final db = await databaseFactoryFfi.openDatabase(
+      dbPath,
+      options: OpenDatabaseOptions(
+        onConfigure: SqliteDatabaseProvider.configureConnection,
+      ),
     );
-    expect(error, isNull);
-    final db = await databaseFactoryFfiNoIsolate.openDatabase(dbPath);
-    final rows = await db.rawQuery('SELECT v FROM t ORDER BY v');
+    final rows = await db.rawQuery('PRAGMA busy_timeout');
     await db.close();
-    expect(rows.map((r) => r['v']), [1, 2]);
+    expect(
+      rows.single.values.single,
+      SqliteDatabaseProvider.busyTimeout.inMilliseconds,
+    );
   });
+
+  test(
+    'the shared connection settings wait for the other writer',
+    () async {
+      final error = await writeWhileLocked(
+        configure: SqliteDatabaseProvider.configureConnection,
+      );
+      expect(error, isNull);
+      final db = await databaseFactoryFfiNoIsolate.openDatabase(dbPath);
+      final rows = await db.rawQuery('SELECT v FROM t ORDER BY v');
+      await db.close();
+      expect(rows.map((r) => r['v']), [1, 2]);
+    },
+    // On Linux the Dart VM profiler (on under `flutter test`, debug and
+    // profile builds) signals isolate threads with SIGPROF. Each signal ends
+    // SQLite's busy-wait nanosleep early while SQLite counts the full delay,
+    // so the 10 s timeout gives up after ~0.2 s. Release builds have no
+    // profiler; Windows and macOS sleeps are not cut short.
+    skip: Platform.isLinux
+        ? 'SIGPROF from the Dart VM profiler shortens SQLite busy waits on Linux'
+        : false,
+  );
 }

@@ -18,6 +18,7 @@ import 'package:cb_file_manager/ui/controllers/selection_tags_controller.dart';
 import 'package:cb_file_manager/ui/widgets/file_properties_pane.dart';
 import 'package:cb_file_manager/ui/widgets/file_pane_layout.dart';
 import 'package:cb_file_manager/ui/widgets/chips_input.dart';
+import 'package:cb_file_manager/ui/widgets/tag_browse_section.dart';
 import 'package:cb_file_manager/ui/widgets/tag_management_section.dart';
 
 void main() {
@@ -111,6 +112,17 @@ void main() {
       );
     }
     expect(controller.saving, isFalse);
+    // The expanded tag browser spins until its catalog loads from SQLite.
+    final loading = find.descendant(
+      of: find.byType(TagBrowseSection),
+      matching: find.byType(CircularProgressIndicator),
+    );
+    for (var i = 0; i < 50 && loading.evaluate().isNotEmpty; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 50)),
+      );
+      await tester.pump();
+    }
     await tester.pumpAndSettle();
     await tester.runAsync(() async {
       await TagManager.getRecentTags();

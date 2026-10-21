@@ -43,7 +43,7 @@ class _SelectionTagEditorState extends State<SelectionTagEditor> {
   int _quickPicksRevision = 0;
   Timer? _debounce;
   int _generation = 0;
-  bool _browseExpanded = false;
+  bool _browseExpanded = true;
   String _draft = '';
   String? _scope;
   List<String> _suggestions = [];

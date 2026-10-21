@@ -120,7 +120,9 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
   DatabaseFactory getDatabaseFactory() => _resolveDatabaseFactory();
 
   /// How long a write waits for another connection's write lock before it
-  /// fails with SQLITE_BUSY ("database is locked").
+  /// fails with SQLITE_BUSY ("database is locked"). On Linux debug and
+  /// profile builds the Dart VM profiler's SIGPROF cuts SQLite's busy-wait
+  /// sleeps short, so the effective wait there is far shorter.
   static const busyTimeout = Duration(seconds: 10);
 
   Future<void> _configureDatabase(Database db) => configureConnection(db);
