@@ -394,6 +394,8 @@ class VideoLibraryNavigationBloc
       case SortOption.dateCreatedDesc:
       case SortOption.attributesAsc:
       case SortOption.attributesDesc:
+      case SortOption.dateAccessedAsc:
+      case SortOption.dateAccessedDesc:
         return true;
       default:
         return false;

@@ -4,8 +4,6 @@ import 'package:cb_file_manager/ui/widgets/file_drag_drop_item.dart';
 import 'dart:io';
 import 'dart:math' as math;
 
-import 'package:cb_file_manager/config/languages/app_localizations.dart';
-import 'package:cb_file_manager/design_system/primitives/cb_tooltip.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/helpers/ui/frame_timing_optimizer.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
@@ -15,15 +13,14 @@ import 'package:cb_file_manager/ui/tab_manager/core/tabbed_folder/tabbed_folder_
 import 'package:cb_file_manager/ui/utils/grid_zoom_constraints.dart';
 import 'package:cb_file_manager/ui/utils/scroll_velocity_notifier.dart';
 import 'package:cb_file_manager/ui/widgets/ctrl_scroll_zoom.dart';
-import 'package:cb_file_manager/ui/components/common/file_details_columns.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import 'file_item.dart';
 import 'file_grid_item.dart';
 import 'folder_item.dart';
 import 'folder_grid_item.dart';
+import 'details_columns.dart';
 import 'file_details_item.dart';
 import 'folder_details_item.dart';
 
@@ -230,260 +227,35 @@ class FileView extends StatelessWidget {
     );
   }
 
-  Widget _buildDetailsView(BuildContext context) {
-    final extraColumns = FileDetailsColumns.maybeOf(context);
-    final table = _buildDetailsTable(context);
-    if (extraColumns == null || extraColumns.visible.isEmpty) return table;
-    final baseFlex =
-        3 +
-        (columnVisibility.type ? 2 : 0) +
-        (columnVisibility.size ? 1 : 0) +
-        (columnVisibility.dateModified ? 2 : 0) +
-        (columnVisibility.dateCreated ? 2 : 0) +
-        (columnVisibility.attributes ? 1 : 0) +
-        (columnVisibility.dateAccessed ? 2 : 0) +
-        (columnVisibility.extension ? 1 : 0) +
-        (columnVisibility.path ? 3 : 0) +
-        (columnVisibility.tags ? 2 : 0) +
-        (columnVisibility.dimensions ? 1 : 0) +
-        (columnVisibility.duration ? 1 : 0) +
-        (columnVisibility.itemCount ? 1 : 0);
-    return FileDetailsViewport(
-      minimumWidth:
-          math.max(720.0, baseFlex * 72.0) +
-          extraColumns.visible.fold<double>(0, (sum, c) => sum + c.width),
-      child: table,
+  Widget _buildDetailsView(BuildContext context) => DetailsLayoutHost(
+    columns: columnVisibility,
+    onChanged: onColumnVisibilityChanged,
+    child: _buildDetailsTable(context),
+  );
+
+  void _selectSortOption(BuildContext context, SortOption option) {
+    if (onSortOptionSelected != null) {
+      onSortOptionSelected!(option);
+      return;
+    }
+    context.read<FolderListBloc>().add(
+      SetSortOption(option, folderPath: state.currentPath.path),
     );
   }
 
   Widget _buildDetailsTable(BuildContext context) {
-    final extraColumns = FileDetailsColumns.maybeOf(context);
     // Optimize scrolling with frame timing
     FrameTimingOptimizer().optimizeScrolling();
     final bool isMobile = Platform.isAndroid || Platform.isIOS;
     final bool isDesktop =
         Platform.isWindows || Platform.isMacOS || Platform.isLinux;
 
-    // Define text style for headers once to be reused
-    final TextStyle headerStyle = TextStyle(
-      fontWeight: FontWeight.bold,
-      color: Theme.of(context).colorScheme.onSurface,
-    );
-    final l10n = AppLocalizations.of(context)!;
-
-    // Debug selection count
-    debugPrint(
-      "FileView _buildDetailsView - Selected files count: ${selectedFiles.length}",
-    );
-
     return Column(
       children: [
-        // Column headers for details view with info tooltip
-        Stack(
-          children: [
-            GestureDetector(
-              onSecondaryTapUp: (details) {
-                _showColumnHeaderContextMenu(
-                  context,
-                  details.globalPosition,
-                  l10n,
-                );
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                ),
-                child: Row(
-                  children: [
-                    // Name column (always visible)
-                    Expanded(
-                      flex: 3,
-                      child: _buildSortableHeaderCell(
-                        context: context,
-                        label: l10n.columnName,
-                        style: headerStyle,
-                        ascendingOption: SortOption.nameAsc,
-                        descendingOption: SortOption.nameDesc,
-                      ),
-                    ),
-
-                    for (final column
-                        in extraColumns?.visible ?? <FileDetailsColumn>[])
-                      SizedBox(
-                        width: column.width,
-                        child: Tooltip(
-                          message: column.description ?? column.label,
-                          child: _buildHeaderCell(
-                            context: context,
-                            label: column.label,
-                            style: headerStyle,
-                          ),
-                        ),
-                      ),
-
-                    // Type column
-                    if (columnVisibility.type)
-                      Expanded(
-                        flex: 2,
-                        child: _buildSortableHeaderCell(
-                          context: context,
-                          label: l10n.columnType,
-                          style: headerStyle,
-                          ascendingOption: SortOption.typeAsc,
-                          descendingOption: SortOption.typeDesc,
-                        ),
-                      ),
-
-                    // Size column
-                    if (columnVisibility.size)
-                      Expanded(
-                        flex: 1,
-                        child: _buildSortableHeaderCell(
-                          context: context,
-                          label: l10n.columnSize,
-                          style: headerStyle,
-                          ascendingOption: SortOption.sizeAsc,
-                          descendingOption: SortOption.sizeDesc,
-                        ),
-                      ),
-
-                    // Date modified column
-                    if (columnVisibility.dateModified)
-                      Expanded(
-                        flex: 2,
-                        child: _buildSortableHeaderCell(
-                          context: context,
-                          label: l10n.columnDateModified,
-                          style: headerStyle,
-                          ascendingOption: SortOption.dateAsc,
-                          descendingOption: SortOption.dateDesc,
-                        ),
-                      ),
-
-                    // Date created column
-                    if (columnVisibility.dateCreated)
-                      Expanded(
-                        flex: 2,
-                        child: _buildSortableHeaderCell(
-                          context: context,
-                          label: l10n.columnDateCreated,
-                          style: headerStyle,
-                          ascendingOption: SortOption.dateCreatedAsc,
-                          descendingOption: SortOption.dateCreatedDesc,
-                        ),
-                      ),
-
-                    // Attributes column
-                    if (columnVisibility.attributes)
-                      Expanded(
-                        flex: 1,
-                        child: _buildSortableHeaderCell(
-                          context: context,
-                          label: l10n.columnAttributes,
-                          style: headerStyle,
-                          ascendingOption: SortOption.attributesAsc,
-                          descendingOption: SortOption.attributesDesc,
-                        ),
-                      ),
-
-                    // Date Accessed column
-                    if (columnVisibility.dateAccessed)
-                      Expanded(
-                        flex: 2,
-                        child: _buildHeaderCell(
-                          context: context,
-                          label: l10n.columnDateAccessed,
-                          style: headerStyle,
-                        ),
-                      ),
-
-                    // Extension column
-                    if (columnVisibility.extension)
-                      Expanded(
-                        flex: 1,
-                        child: _buildSortableHeaderCell(
-                          context: context,
-                          label: l10n.columnExtension,
-                          style: headerStyle,
-                          ascendingOption: SortOption.extensionAsc,
-                          descendingOption: SortOption.extensionDesc,
-                        ),
-                      ),
-
-                    // Path column
-                    if (columnVisibility.path)
-                      Expanded(
-                        flex: 3,
-                        child: _buildHeaderCell(
-                          context: context,
-                          label: l10n.columnPath,
-                          style: headerStyle,
-                        ),
-                      ),
-
-                    // Tags column
-                    if (columnVisibility.tags)
-                      Expanded(
-                        flex: 2,
-                        child: _buildHeaderCell(
-                          context: context,
-                          label: l10n.columnTags,
-                          style: headerStyle,
-                        ),
-                      ),
-
-                    // Dimensions column
-                    if (columnVisibility.dimensions)
-                      Expanded(
-                        flex: 1,
-                        child: _buildHeaderCell(
-                          context: context,
-                          label: l10n.columnDimensions,
-                          style: headerStyle,
-                        ),
-                      ),
-
-                    // Duration column
-                    if (columnVisibility.duration)
-                      Expanded(
-                        flex: 1,
-                        child: _buildHeaderCell(
-                          context: context,
-                          label: l10n.columnDuration,
-                          style: headerStyle,
-                        ),
-                      ),
-
-                    // Item Count column
-                    if (columnVisibility.itemCount)
-                      Expanded(
-                        flex: 1,
-                        child: _buildHeaderCell(
-                          context: context,
-                          label: l10n.columnItemCount,
-                          style: headerStyle,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-
-            // Add info button with tooltip about customizing columns
-            Positioned(
-              right: 8,
-              top: 8,
-              child: CbTooltip(
-                message: l10n.columnVisibilityInstructions,
-                child: Icon(
-                  PhosphorIconsLight.info,
-                  size: 16,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
-          ],
+        // Sortable, movable and resizable column headers
+        DetailsColumnsHeader(
+          sortOption: state.sortOption,
+          onSortOptionSelected: (option) => _selectSortOption(context, option),
         ),
 
         // List of files and folders
@@ -521,7 +293,7 @@ class FileView extends StatelessWidget {
               return Container(
                 padding: const EdgeInsets.symmetric(
                   vertical: 2.0,
-                  horizontal: 12.0,
+                  horizontal: kDetailsRowPadding,
                 ),
                 decoration: BoxDecoration(color: rowColor),
                 // Use KeyedSubtree with a stable key to prevent unnecessary rebuilds
@@ -614,214 +386,6 @@ class FileView extends StatelessWidget {
         ),
       ],
     );
-  }
-
-  Widget _buildSortableHeaderCell({
-    required BuildContext context,
-    required String label,
-    required TextStyle style,
-    required SortOption ascendingOption,
-    required SortOption descendingOption,
-  }) {
-    final currentSort = state.sortOption;
-    final bool isAscending = currentSort == ascendingOption;
-    final bool isDescending = currentSort == descendingOption;
-    final bool isActive = isAscending || isDescending;
-    final Color iconColor = isActive
-        ? Theme.of(context).colorScheme.primary
-        : Theme.of(context).colorScheme.onSurfaceVariant;
-
-    return InkWell(
-      onTap: () {
-        final nextSort = isAscending ? descendingOption : ascendingOption;
-        if (onSortOptionSelected != null) {
-          onSortOptionSelected!(nextSort);
-          return;
-        }
-        context.read<FolderListBloc>().add(
-          SetSortOption(nextSort, folderPath: state.currentPath.path),
-        );
-      },
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 12.0),
-        child: Row(
-          children: [
-            Flexible(
-              child: Text(label, style: style, overflow: TextOverflow.ellipsis),
-            ),
-            const SizedBox(width: 4),
-            Icon(
-              isDescending
-                  ? PhosphorIconsLight.arrowDown
-                  : PhosphorIconsLight.arrowUp,
-              size: 16,
-              color: iconColor,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHeaderCell({
-    required BuildContext context,
-    required String label,
-    required TextStyle style,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 12.0),
-      child: Text(label, style: style, overflow: TextOverflow.ellipsis),
-    );
-  }
-
-  void _showColumnHeaderContextMenu(
-    BuildContext context,
-    Offset position,
-    dynamic l10n,
-  ) {
-    if (onColumnVisibilityChanged == null) return;
-    final extraColumns = FileDetailsColumns.maybeOf(context);
-
-    final RenderBox overlay =
-        Overlay.of(context).context.findRenderObject() as RenderBox;
-
-    showMenu<String>(
-      context: context,
-      position: RelativeRect.fromLTRB(
-        position.dx,
-        position.dy,
-        overlay.size.width - position.dx,
-        overlay.size.height - position.dy,
-      ),
-      items: [
-        for (final column in extraColumns?.columns ?? <FileDetailsColumn>[])
-          _buildColumnToggleItem(
-            column.label,
-            'extra:${column.id}',
-            column.visible,
-          ),
-        if (extraColumns != null) const PopupMenuDivider(),
-        _buildColumnToggleItem(l10n.columnSize, 'size', columnVisibility.size),
-        _buildColumnToggleItem(l10n.columnType, 'type', columnVisibility.type),
-        _buildColumnToggleItem(
-          l10n.columnDateModified,
-          'dateModified',
-          columnVisibility.dateModified,
-        ),
-        _buildColumnToggleItem(
-          l10n.columnDateCreated,
-          'dateCreated',
-          columnVisibility.dateCreated,
-        ),
-        _buildColumnToggleItem(
-          l10n.columnAttributes,
-          'attributes',
-          columnVisibility.attributes,
-        ),
-        _buildColumnToggleItem(
-          l10n.columnDateAccessed,
-          'dateAccessed',
-          columnVisibility.dateAccessed,
-        ),
-        _buildColumnToggleItem(
-          l10n.columnExtension,
-          'extension',
-          columnVisibility.extension,
-        ),
-        _buildColumnToggleItem(l10n.columnPath, 'path', columnVisibility.path),
-        _buildColumnToggleItem(l10n.columnTags, 'tags', columnVisibility.tags),
-        _buildColumnToggleItem(
-          l10n.columnDimensions,
-          'dimensions',
-          columnVisibility.dimensions,
-        ),
-        _buildColumnToggleItem(
-          l10n.columnDuration,
-          'duration',
-          columnVisibility.duration,
-        ),
-        _buildColumnToggleItem(
-          l10n.columnItemCount,
-          'itemCount',
-          columnVisibility.itemCount,
-        ),
-      ],
-    ).then((value) {
-      if (value == null || onColumnVisibilityChanged == null) return;
-      if (value.startsWith('extra:')) {
-        extraColumns?.onToggle(value.substring(6));
-        return;
-      }
-      final newVisibility = _toggleColumn(value);
-      onColumnVisibilityChanged!(newVisibility);
-    });
-  }
-
-  PopupMenuItem<String> _buildColumnToggleItem(
-    String label,
-    String key,
-    bool isVisible,
-  ) {
-    return PopupMenuItem<String>(
-      value: key,
-      child: Row(
-        children: [
-          Icon(
-            isVisible
-                ? PhosphorIconsLight.checkSquare
-                : PhosphorIconsLight.square,
-            size: 20,
-          ),
-          const SizedBox(width: 8),
-          Text(label),
-        ],
-      ),
-    );
-  }
-
-  ColumnVisibility _toggleColumn(String key) {
-    switch (key) {
-      case 'size':
-        return columnVisibility.copyWith(size: !columnVisibility.size);
-      case 'type':
-        return columnVisibility.copyWith(type: !columnVisibility.type);
-      case 'dateModified':
-        return columnVisibility.copyWith(
-          dateModified: !columnVisibility.dateModified,
-        );
-      case 'dateCreated':
-        return columnVisibility.copyWith(
-          dateCreated: !columnVisibility.dateCreated,
-        );
-      case 'attributes':
-        return columnVisibility.copyWith(
-          attributes: !columnVisibility.attributes,
-        );
-      case 'dateAccessed':
-        return columnVisibility.copyWith(
-          dateAccessed: !columnVisibility.dateAccessed,
-        );
-      case 'extension':
-        return columnVisibility.copyWith(
-          extension: !columnVisibility.extension,
-        );
-      case 'path':
-        return columnVisibility.copyWith(path: !columnVisibility.path);
-      case 'tags':
-        return columnVisibility.copyWith(tags: !columnVisibility.tags);
-      case 'dimensions':
-        return columnVisibility.copyWith(
-          dimensions: !columnVisibility.dimensions,
-        );
-      case 'duration':
-        return columnVisibility.copyWith(duration: !columnVisibility.duration);
-      case 'itemCount':
-        return columnVisibility.copyWith(
-          itemCount: !columnVisibility.itemCount,
-        );
-      default:
-        return columnVisibility;
-    }
   }
 
   Widget _buildGridView() {

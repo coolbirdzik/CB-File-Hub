@@ -4,6 +4,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
+import 'package:cb_file_manager/ui/screens/folder_list/folder_display_preferences.dart';
 import 'package:flutter/material.dart';
 import 'package:cb_file_manager/models/database/database_manager.dart';
 import 'package:path_provider/path_provider.dart';
@@ -294,6 +295,16 @@ class UserPreferences {
       return _databaseManager!.saveStringPreference(key, value);
     }
     return false;
+  }
+
+  /// Saves a default that folders without their own setting follow, and
+  /// drops the copy [FolderDisplayPreferences] keeps in memory.
+  Future<bool> _saveDisplayDefault<T>(String key, T value) async {
+    try {
+      return await _savePreference<T>(key, value);
+    } finally {
+      FolderDisplayPreferences.instance.invalidateDefaults();
+    }
   }
 
   /// Generic method to delete a preference
@@ -850,9 +861,8 @@ class UserPreferences {
   }
 
   /// Save the default view mode. Folders with a saved view mode keep theirs.
-  Future<bool> setViewMode(ViewMode viewMode) async {
-    return await _savePreference<int>(_viewModeKey, viewMode.index);
-  }
+  Future<bool> setViewMode(ViewMode viewMode) =>
+      _saveDisplayDefault(_viewModeKey, viewMode.index);
 
   /// Get current sort option preference
   Future<SortOption> getSortOption() async {
@@ -862,9 +872,8 @@ class UserPreferences {
   }
 
   /// Save sort option preference
-  Future<bool> setSortOption(SortOption sortOption) async {
-    return await _savePreference<int>(_sortOptionKey, sortOption.index);
-  }
+  Future<bool> setSortOption(SortOption sortOption) =>
+      _saveDisplayDefault(_sortOptionKey, sortOption.index);
 
   Future<ViewMode> getVideoLibraryViewMode(
     int libraryId, {
@@ -990,7 +999,7 @@ class UserPreferences {
   Future<bool> setGridZoomLevel(int zoomLevel) async {
     // Ensure the zoom level is within bounds
     final validZoom = zoomLevel.clamp(minGridZoomLevel, maxGridZoomLevel);
-    return await _savePreference<int>(_gridZoomLevelKey, validZoom);
+    return await _saveDisplayDefault(_gridZoomLevelKey, validZoom);
   }
 
   /// Get video player volume preference (0-100)
@@ -1616,7 +1625,7 @@ class UserPreferences {
   /// Save column visibility settings
   Future<bool> setColumnVisibility(ColumnVisibility visibility) async {
     final String jsonData = json.encode(visibility.toMap());
-    return await _savePreference<String>(_columnVisibilityKey, jsonData);
+    return await _saveDisplayDefault(_columnVisibilityKey, jsonData);
   }
 
   /// Get show file tags setting
@@ -1629,9 +1638,8 @@ class UserPreferences {
   }
 
   /// Save show file tags setting
-  Future<bool> setShowFileTags(bool showTags) async {
-    return await _savePreference<bool>(_showFileTagsKey, showTags);
-  }
+  Future<bool> setShowFileTags(bool showTags) =>
+      _saveDisplayDefault(_showFileTagsKey, showTags);
 
   /// Use system default app for video (when true). Default false = use in-app player.
   Future<bool> getUseSystemDefaultForVideo() async {
@@ -1712,16 +1720,6 @@ class UserPreferences {
   Future<bool> setPreviewPaneWidth(double width) async {
     return await _savePreference<double>(_previewPaneWidthKey, width);
   }
-
-  Future<bool> getPropertiesPaneVisible() async =>
-      await _getPreference<bool>(
-        'properties_pane_visible',
-        defaultValue: false,
-      ) ??
-      false;
-
-  Future<bool> setPropertiesPaneVisible(bool visible) =>
-      _savePreference<bool>('properties_pane_visible', visible);
 
   Future<double> getPropertiesPaneHeight() async {
     final height =

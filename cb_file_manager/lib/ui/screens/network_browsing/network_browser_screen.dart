@@ -829,14 +829,7 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
               context: context,
               onSearchPressed: () => _toggleSearchBar(context),
               isSearchActive: _showSearchBar,
-              onSortOptionSelected: (SortOption option) {
-                setState(() {
-                  _sortOption = option;
-                });
-                _saveSortSetting(option);
-                // Refresh the list with the new sort option
-                _refreshFileList();
-              },
+              onSortOptionSelected: _applySortOption,
               currentSortOption: _sortOption,
               viewMode: _viewMode,
               onViewModeToggled: _toggleViewMode,
@@ -1156,7 +1149,7 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
     final crossAxisCount = _gridZoomLevel
         .clamp(UserPreferences.minGridZoomLevel, maxZoom)
         .toInt();
-    return BrowserLikeCollectionView<FileSystemEntity>(
+    final view = BrowserLikeCollectionView<FileSystemEntity>(
       viewMode: _viewMode,
       useAdaptiveList: true,
       items: items,
@@ -1183,6 +1176,20 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
       treeChildrenLoader: _loadNetworkChildren,
       treeItemBuilder: (itemContext, node, depth) =>
           _buildNetworkTreeRow(itemContext, node, depth),
+      detailsHeader: _viewMode == ViewMode.details
+          ? folder_list_components.DetailsColumnsHeader(
+              sortOption: _sortOption,
+              onSortOptionSelected: _applySortOption,
+              // Matches the list padding.
+              horizontalPadding: 8.0,
+            )
+          : null,
+    );
+    if (_viewMode != ViewMode.details) return view;
+    return folder_list_components.DetailsLayoutHost(
+      columns: _columnVisibility,
+      onChanged: _applyColumnVisibility,
+      child: view,
     );
   }
 
@@ -1248,8 +1255,34 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
     }
   }
 
+  void _applySortOption(SortOption option) {
+    setState(() {
+      _sortOption = option;
+    });
+    _saveSortSetting(option);
+    // Refresh the list with the new sort option
+    _refreshFileList();
+  }
+
   void _showColumnVisibilityDialog(BuildContext context) {
-    // Implementation for column visibility dialog
+    SharedActionBar.showColumnVisibilityDialog(
+      context,
+      currentVisibility: _columnVisibility,
+      onApply: _applyColumnVisibility,
+    );
+  }
+
+  Future<void> _applyColumnVisibility(ColumnVisibility visibility) async {
+    setState(() {
+      _columnVisibility = visibility;
+    });
+    try {
+      final UserPreferences prefs = UserPreferences.instance;
+      await prefs.init();
+      await prefs.setColumnVisibility(visibility);
+    } catch (e) {
+      // Reduced debug logging
+    }
   }
 
   void _showContextMenu(BuildContext context, Offset position, String? path) {

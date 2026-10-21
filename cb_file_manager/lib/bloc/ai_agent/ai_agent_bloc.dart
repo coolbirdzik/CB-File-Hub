@@ -6,6 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../config/language_controller.dart';
 import '../../models/ai/ai_conversation.dart';
 import '../../models/ai/ai_message.dart';
 import '../../models/ai/ai_provider_model.dart';
@@ -2883,6 +2884,7 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
       workingDirectory: working,
       browsingPath: path,
       platform: Platform.operatingSystem,
+      languageCode: LanguageController().currentLocale.languageCode,
     );
   }
 

@@ -2,6 +2,7 @@ import 'dart:io' show Platform;
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import '../../screens/folder_list/components/details_columns.dart';
 import '../../screens/folder_list/folder_list_state.dart';
 import '../../../helpers/core/user_preferences.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -63,6 +64,8 @@ class SharedActionBar {
       case SortOption.dateCreatedAsc:
       case SortOption.extensionAsc:
       case SortOption.attributesAsc:
+      case SortOption.dateAccessedAsc:
+      case SortOption.pathAsc:
         return true;
       case SortOption.nameDesc:
       case SortOption.dateDesc:
@@ -71,6 +74,8 @@ class SharedActionBar {
       case SortOption.dateCreatedDesc:
       case SortOption.extensionDesc:
       case SortOption.attributesDesc:
+      case SortOption.dateAccessedDesc:
+      case SortOption.pathDesc:
         return false;
     }
   }
@@ -140,6 +145,20 @@ class SharedActionBar {
       ),
       buildSortMenuItem(
         context,
+        SortOption.dateAccessedAsc,
+        l10n.sortDateAccessedOldest,
+        PhosphorIconsLight.clock,
+        currentOption,
+      ),
+      buildSortMenuItem(
+        context,
+        SortOption.dateAccessedDesc,
+        l10n.sortDateAccessedNewest,
+        PhosphorIconsLight.clock,
+        currentOption,
+      ),
+      buildSortMenuItem(
+        context,
         SortOption.sizeAsc,
         l10n.sortSizeSmallest,
         PhosphorIconsLight.chartBar,
@@ -198,6 +217,22 @@ class SharedActionBar {
         SortOption.attributesDesc,
         l10n.sortAttributesDesc,
         PhosphorIconsLight.info,
+        currentOption,
+      ),
+    ]);
+    addGroup([
+      buildSortMenuItem(
+        context,
+        SortOption.pathAsc,
+        l10n.sortPathAsc,
+        PhosphorIconsLight.path,
+        currentOption,
+      ),
+      buildSortMenuItem(
+        context,
+        SortOption.pathDesc,
+        l10n.sortPathDesc,
+        PhosphorIconsLight.path,
         currentOption,
       ),
     ]);
@@ -348,19 +383,8 @@ class SharedActionBar {
     ValueChanged<Set<String>>? onApplyAdditionalColumns,
   }) {
     final l10n = AppLocalizations.of(context)!;
-    // Create a mutable copy of the current visibility
-    bool size = currentVisibility.size;
-    bool type = currentVisibility.type;
-    bool dateModified = currentVisibility.dateModified;
-    bool dateCreated = currentVisibility.dateCreated;
-    bool attributes = currentVisibility.attributes;
-    bool dateAccessed = currentVisibility.dateAccessed;
-    bool extension = currentVisibility.extension;
-    bool path = currentVisibility.path;
-    bool tags = currentVisibility.tags;
-    bool dimensions = currentVisibility.dimensions;
-    bool duration = currentVisibility.duration;
-    bool itemCount = currentVisibility.itemCount;
+    // Edited copy; keeps the widths of the current layout.
+    var columns = currentVisibility;
     final additional = Set<String>.of(visibleAdditionalColumns);
 
     RouteUtils.showAcrylicDialog(
@@ -368,6 +392,10 @@ class SharedActionBar {
       builder: (BuildContext context) {
         return StatefulBuilder(
           builder: (context, setState) {
+            final ordered = columns.orderedColumns
+                .skip(1)
+                .where((column) => column.isAvailable)
+                .toList();
             return AlertDialog(
               title: Row(
                 children: [
@@ -376,198 +404,104 @@ class SharedActionBar {
                   Text(l10n.columnVisibilityTitle),
                 ],
               ),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.primaryContainer,
-                        borderRadius: BorderRadius.circular(16),
+              content: SizedBox(
+                width: 440,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        margin: const EdgeInsets.only(bottom: 8),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primaryContainer,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Text(
+                          l10n.columnVisibilityInstructions,
+                          style: const TextStyle(fontSize: 14),
+                        ),
                       ),
-                      child: Text(
-                        l10n.columnVisibilityInstructions,
-                        style: const TextStyle(fontSize: 14),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    const Divider(),
-                    CheckboxListTile(
-                      title: Text(l10n.columnSize),
-                      subtitle: Text(l10n.columnSizeDescription),
-                      value: size,
-                      onChanged: (value) {
-                        setState(() {
-                          size = value ?? true;
-                        });
-                      },
-                      secondary: const Icon(PhosphorIconsLight.hardDrives),
-                      dense: true,
-                    ),
-                    const Divider(height: 1),
-                    CheckboxListTile(
-                      title: Text(l10n.columnType),
-                      subtitle: Text(l10n.columnTypeDescription),
-                      value: type,
-                      onChanged: (value) {
-                        setState(() {
-                          type = value ?? true;
-                        });
-                      },
-                      secondary: const Icon(PhosphorIconsLight.fileText),
-                      dense: true,
-                    ),
-                    const Divider(height: 1),
-                    CheckboxListTile(
-                      title: Text(l10n.columnDateModified),
-                      subtitle: Text(l10n.columnDateModifiedDescription),
-                      value: dateModified,
-                      onChanged: (value) {
-                        setState(() {
-                          dateModified = value ?? true;
-                        });
-                      },
-                      secondary: const Icon(PhosphorIconsLight.arrowsClockwise),
-                      dense: true,
-                    ),
-                    const Divider(height: 1),
-                    CheckboxListTile(
-                      title: Text(l10n.columnDateCreated),
-                      subtitle: Text(l10n.columnDateCreatedDescription),
-                      value: dateCreated,
-                      onChanged: (value) {
-                        setState(() {
-                          dateCreated = value ?? false;
-                        });
-                      },
-                      secondary: const Icon(PhosphorIconsLight.calendar),
-                      dense: true,
-                    ),
-                    const Divider(height: 1),
-                    CheckboxListTile(
-                      title: Text(l10n.columnAttributes),
-                      subtitle: Text(l10n.columnAttributesDescription),
-                      value: attributes,
-                      onChanged: (value) {
-                        setState(() {
-                          attributes = value ?? false;
-                        });
-                      },
-                      secondary: const Icon(PhosphorIconsLight.info),
-                      dense: true,
-                    ),
-                    const Divider(height: 1),
-                    CheckboxListTile(
-                      title: Text(l10n.columnDateAccessed),
-                      subtitle: Text(l10n.columnDateAccessedDescription),
-                      value: dateAccessed,
-                      onChanged: (value) {
-                        setState(() {
-                          dateAccessed = value ?? false;
-                        });
-                      },
-                      secondary: const Icon(PhosphorIconsLight.clock),
-                      dense: true,
-                    ),
-                    const Divider(height: 1),
-                    CheckboxListTile(
-                      title: Text(l10n.columnExtension),
-                      subtitle: Text(l10n.columnExtensionDescription),
-                      value: extension,
-                      onChanged: (value) {
-                        setState(() {
-                          extension = value ?? false;
-                        });
-                      },
-                      secondary: const Icon(PhosphorIconsLight.fileText),
-                      dense: true,
-                    ),
-                    const Divider(height: 1),
-                    CheckboxListTile(
-                      title: Text(l10n.columnPath),
-                      subtitle: Text(l10n.columnPathDescription),
-                      value: path,
-                      onChanged: (value) {
-                        setState(() {
-                          path = value ?? false;
-                        });
-                      },
-                      secondary: const Icon(PhosphorIconsLight.path),
-                      dense: true,
-                    ),
-                    const Divider(height: 1),
-                    CheckboxListTile(
-                      title: Text(l10n.columnTags),
-                      subtitle: Text(l10n.columnTagsDescription),
-                      value: tags,
-                      onChanged: (value) {
-                        setState(() {
-                          tags = value ?? false;
-                        });
-                      },
-                      secondary: const Icon(PhosphorIconsLight.tag),
-                      dense: true,
-                    ),
-                    const Divider(height: 1),
-                    CheckboxListTile(
-                      title: Text(l10n.columnDimensions),
-                      subtitle: Text(l10n.columnDimensionsDescription),
-                      value: dimensions,
-                      onChanged: (value) {
-                        setState(() {
-                          dimensions = value ?? false;
-                        });
-                      },
-                      secondary: const Icon(PhosphorIconsLight.frameCorners),
-                      dense: true,
-                    ),
-                    const Divider(height: 1),
-                    CheckboxListTile(
-                      title: Text(l10n.columnDuration),
-                      subtitle: Text(l10n.columnDurationDescription),
-                      value: duration,
-                      onChanged: (value) {
-                        setState(() {
-                          duration = value ?? false;
-                        });
-                      },
-                      secondary: const Icon(PhosphorIconsLight.timer),
-                      dense: true,
-                    ),
-                    const Divider(height: 1),
-                    CheckboxListTile(
-                      title: Text(l10n.columnItemCount),
-                      subtitle: Text(l10n.columnItemCountDescription),
-                      value: itemCount,
-                      onChanged: (value) {
-                        setState(() {
-                          itemCount = value ?? false;
-                        });
-                      },
-                      secondary: const Icon(PhosphorIconsLight.listNumbers),
-                      dense: true,
-                    ),
-                    for (final column in additionalColumns.entries) ...[
-                      const Divider(height: 1),
-                      CheckboxListTile(
-                        title: Text(column.value),
-                        value: additional.contains(column.key),
-                        onChanged: (value) => setState(() {
-                          if (value == true) {
-                            additional.add(column.key);
-                          } else {
-                            additional.remove(column.key);
-                          }
+                      ReorderableListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        buildDefaultDragHandles: false,
+                        itemCount: ordered.length,
+                        // `to` is the final index, the slot of the row there now.
+                        onReorderItem: (from, to) => setState(() {
+                          columns = columns.moveColumn(
+                            ordered[from],
+                            ordered[to],
+                          );
                         }),
-                        dense: true,
+                        itemBuilder: (context, index) {
+                          final column = ordered[index];
+                          return Material(
+                            key: ValueKey('column-dialog-${column.name}'),
+                            type: MaterialType.transparency,
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: CheckboxListTile(
+                                    title: Text(column.label(l10n)),
+                                    subtitle: Text(column.description(l10n)),
+                                    value: columns.isVisible(column),
+                                    onChanged: (value) => setState(() {
+                                      columns = columns.withColumn(
+                                        column,
+                                        value ?? false,
+                                      );
+                                    }),
+                                    secondary: Icon(column.icon),
+                                    dense: true,
+                                  ),
+                                ),
+                                ReorderableDragStartListener(
+                                  index: index,
+                                  child: const Padding(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                    ),
+                                    child: MouseRegion(
+                                      cursor: SystemMouseCursors.grab,
+                                      child: Icon(
+                                        PhosphorIconsLight.dotsSixVertical,
+                                        size: 20,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
                       ),
+                      for (final column in additionalColumns.entries) ...[
+                        const Divider(height: 1),
+                        CheckboxListTile(
+                          title: Text(column.value),
+                          value: additional.contains(column.key),
+                          onChanged: (value) => setState(() {
+                            if (value == true) {
+                              additional.add(column.key);
+                            } else {
+                              additional.remove(column.key);
+                            }
+                          }),
+                          dense: true,
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
               actions: [
+                TextButton(
+                  onPressed: () => setState(() {
+                    columns = columns.resetLayout();
+                  }),
+                  child: Text(l10n.columnResetLayout),
+                ),
                 TextButton(
                   onPressed: () {
                     Navigator.pop(context);
@@ -578,21 +512,7 @@ class SharedActionBar {
                   icon: const Icon(PhosphorIconsLight.check),
                   label: Text(l10n.apply),
                   onPressed: () {
-                    final newVisibility = ColumnVisibility(
-                      size: size,
-                      type: type,
-                      dateModified: dateModified,
-                      dateCreated: dateCreated,
-                      attributes: attributes,
-                      dateAccessed: dateAccessed,
-                      extension: extension,
-                      path: path,
-                      tags: tags,
-                      dimensions: dimensions,
-                      duration: duration,
-                      itemCount: itemCount,
-                    );
-                    onApply(newVisibility);
+                    onApply(columns);
                     onApplyAdditionalColumns?.call(additional);
                     Navigator.pop(context);
                   },

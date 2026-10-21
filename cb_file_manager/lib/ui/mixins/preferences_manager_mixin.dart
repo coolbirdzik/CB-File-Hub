@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_bloc.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_event.dart';
+import 'package:cb_file_manager/ui/screens/folder_list/folder_display_preferences.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:cb_file_manager/helpers/files/folder_sort_manager.dart';
 import 'package:cb_file_manager/ui/components/common/shared_action_bar.dart';
@@ -71,63 +72,73 @@ mixin PreferencesManagerMixin<T extends StatefulWidget> on State<T> {
       final UserPreferences prefs = UserPreferences.instance;
       await prefs.init();
 
-      final folderPreferencePath = preferencePath;
-      final folderSortManager = FolderSortManager();
-      final globalViewMode = await prefs.getViewMode();
-      final loadedViewMode =
-          await folderSortManager.getFolderViewMode(folderPreferencePath) ??
-          globalViewMode;
-      final globalSortOption = await prefs.getSortOption();
-      final sortOption =
-          await folderSortManager.getFolderSortOption(folderPreferencePath) ??
-          globalSortOption;
-      final loadedGridZoomLevel =
-          await folderSortManager.getFolderGridZoomLevel(
-            folderPreferencePath,
-          ) ??
-          await prefs.getGridZoomLevel();
-      final loadedColumnVisibility =
-          await folderSortManager.getFolderColumnVisibility(
-            folderPreferencePath,
-          ) ??
-          await prefs.getColumnVisibility();
-      final loadedShowFileTags =
-          await folderSortManager.getFolderShowFileTags(folderPreferencePath) ??
-          await prefs.getShowFileTags();
+      final settings = await FolderDisplayPreferences.instance.resolve(
+        preferencePath,
+      );
       // Preview pane state is not per folder: visibility comes from the host
       // session (e.g. the tab) and falls back to the stored default.
       final loadedPreviewPaneVisible =
           sessionPreviewPaneVisible ?? await prefs.getPreviewPaneVisible();
       final loadedPreviewPaneWidth = await prefs.getPreviewPaneWidth();
-      final effectiveViewMode = ViewModeUtils.normalize(
-        !isDesktopPlatform && loadedViewMode == ViewMode.gridPreview
-            ? ViewMode.grid
-            : loadedViewMode,
-      );
 
       if (mounted) {
-        final maxZoom = GridZoomConstraints.maxGridSizeForContext(
-          context,
-          mode: GridSizeMode.referenceWidth,
-        );
-        final resolvedGridZoom = loadedGridZoomLevel
-            .clamp(UserPreferences.minGridZoomLevel, maxZoom)
-            .toInt();
         setState(() {
-          viewMode = effectiveViewMode;
-          gridZoomLevel = resolvedGridZoom;
-          columnVisibility = loadedColumnVisibility;
-          showFileTags = loadedShowFileTags;
           isPreviewPaneVisible = loadedPreviewPaneVisible;
           previewPaneWidth = loadedPreviewPaneWidth;
         });
-
-        folderListBloc.add(SetViewMode(effectiveViewMode));
-        folderListBloc.add(SetSortOption(sortOption, persist: false));
-        folderListBloc.add(SetGridZoom(resolvedGridZoom));
+        applyDisplaySettings(settings);
       }
     } catch (e) {
       debugPrint('Error loading preferences: $e');
+    }
+  }
+
+  /// Shows [settings] (a folder's view mode, sort, zoom, columns and tags).
+  ///
+  /// Only what differs is sent to the bloc, so settings it already applied
+  /// while loading the folder do not re-sort or rebuild the listing. Pass
+  /// [inInitState] before the first build: fields are set without
+  /// `setState` and the zoom is clamped later, when the size is known.
+  void applyDisplaySettings(
+    FolderDisplaySettings settings, {
+    bool inInitState = false,
+  }) {
+    final zoom = inInitState
+        ? settings.gridZoomLevel
+        : settings.gridZoomLevel
+              .clamp(
+                UserPreferences.minGridZoomLevel,
+                GridZoomConstraints.maxGridSizeForContext(
+                  context,
+                  mode: GridSizeMode.referenceWidth,
+                ),
+              )
+              .toInt();
+    void assign() {
+      viewMode = settings.viewMode;
+      gridZoomLevel = zoom;
+      columnVisibility = settings.columnVisibility;
+      showFileTags = settings.showFileTags;
+    }
+
+    if (inInitState) {
+      assign();
+    } else if (viewMode != settings.viewMode ||
+        gridZoomLevel != zoom ||
+        columnVisibility != settings.columnVisibility ||
+        showFileTags != settings.showFileTags) {
+      setState(assign);
+    }
+
+    final current = folderListBloc.state;
+    if (current.viewMode != settings.viewMode) {
+      folderListBloc.add(SetViewMode(settings.viewMode));
+    }
+    if (current.sortOption != settings.sortOption) {
+      folderListBloc.add(SetSortOption(settings.sortOption, persist: false));
+    }
+    if (current.gridZoomLevel != zoom) {
+      folderListBloc.add(SetGridZoom(zoom));
     }
   }
 
@@ -317,22 +328,27 @@ mixin PreferencesManagerMixin<T extends StatefulWidget> on State<T> {
     SharedActionBar.showColumnVisibilityDialog(
       context,
       currentVisibility: columnVisibility,
-      onApply: (ColumnVisibility visibility) async {
-        setState(() {
-          columnVisibility = visibility;
-        });
-
-        try {
-          await UserPreferences.instance.init();
-          await FolderSortManager().saveFolderColumnVisibility(
-            preferencePath,
-            visibility,
-          );
-        } catch (e) {
-          debugPrint('Error saving column visibility: $e');
-        }
-      },
+      onApply: saveColumnVisibility,
     );
+  }
+
+  /// Applies and persists the Details columns (shown, order, widths) for
+  /// the current folder.
+  Future<void> saveColumnVisibility(ColumnVisibility visibility) async {
+    if (!mounted) return;
+    setState(() {
+      columnVisibility = visibility;
+    });
+
+    try {
+      await UserPreferences.instance.init();
+      await FolderSortManager().saveFolderColumnVisibility(
+        preferencePath,
+        visibility,
+      );
+    } catch (e) {
+      debugPrint('Error saving column visibility: $e');
+    }
   }
 
   Future<void> saveShowFileTagsSetting(bool visible) async {

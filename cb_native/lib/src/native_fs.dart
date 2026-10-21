@@ -48,7 +48,8 @@ class NativeListing {
 }
 
 /// Sort orders of [NativeFs.listDirectory], named like the app's
-/// `SortOption` values they implement.
+/// `SortOption` values they implement. The index is the wire value
+/// (`Sort::from_index` in listing.rs), so only append.
 enum NativeListSort {
   nameAsc,
   nameDesc,
@@ -60,6 +61,20 @@ enum NativeListSort {
   sizeDesc,
   extensionAsc,
   extensionDesc,
+
+  /// package:path extension of the name.
+  typeAsc,
+  typeDesc,
+  dateAccessedAsc,
+  dateAccessedDesc,
+
+  /// Full path, Dart-lower-cased.
+  pathAsc,
+  pathDesc,
+
+  /// The Attributes column's letters (R, H, S, A, ...).
+  attributesAsc,
+  attributesDesc,
 }
 
 /// How [NativeFs.walk] reads a name's extension.
@@ -211,6 +226,30 @@ abstract final class NativeFs {
     final folders = List.generate(folderCount, (_) => entry());
     final files = List.generate(fileCount, (_) => entry());
     return NativeListing(folders, files);
+  }
+
+  /// The order of [paths] (from any folders) under [sort], as indices into
+  /// [paths], using the folder listing's comparators. Stats a date, size or
+  /// attributes order needs are read per parent folder on worker threads;
+  /// a path that is gone sorts as empty. Null when the library is missing.
+  static Future<List<int>?> sortPaths(
+    List<String> paths, {
+    required NativeListSort sort,
+  }) async {
+    final config = WireWriter()
+      ..u8(sort.index)
+      ..strs(paths);
+    final job = NativeJob.start(b.jobSortPaths, config.takeBytes());
+    if (job == null) return null;
+    final Uint8List? out;
+    try {
+      out = await job.result();
+    } on NativeJobException {
+      return null;
+    }
+    if (out == null) return null;
+    final r = WireReader(out);
+    return List.generate(r.u32(), (_) => r.u32());
   }
 
   /// Entries below [roots]. Returns null when unavailable, cancelled, or a

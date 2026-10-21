@@ -38,6 +38,47 @@ class EnglishLocalizations implements AppLocalizations {
   String get torrentDestinationLocked =>
       'Stop this task before changing its download folder.';
   @override
+  String shellColumn(String column) =>
+      const {
+        'owner': 'Owner',
+        'ownerHint': 'Account that owns the item',
+        'authors': 'Authors',
+        'authorsHint': 'Document or media authors',
+        'title': 'Title',
+        'titleHint': 'Title stored in the file',
+        'comments': 'Comments',
+        'commentsHint': 'Comments stored in the file',
+        'pageCount': 'Pages',
+        'pageCountHint': 'Number of pages of a document',
+        'rating': 'Rating',
+        'ratingHint': 'Star rating',
+        'dateTaken': 'Date taken',
+        'dateTakenHint': 'When a photo was taken',
+        'cameraModel': 'Camera model',
+        'cameraModelHint': 'Camera that took a photo',
+        'frameRate': 'Frame rate',
+        'frameRateHint': 'Frames per second of a video',
+        'bitRate': 'Bit rate',
+        'bitRateHint': 'Bit rate of audio or video',
+        'artist': 'Contributing artists',
+        'artistHint': 'Artists of a song',
+        'album': 'Album',
+        'albumHint': 'Album of a song',
+        'genre': 'Genre',
+        'genreHint': 'Genre of a song or video',
+        'year': 'Year',
+        'yearHint': 'Release year',
+        'company': 'Company',
+        'companyHint': 'Company of a program or document',
+        'fileDescription': 'File description',
+        'fileDescriptionHint': 'Description of a program',
+        'fileVersion': 'File version',
+        'fileVersionHint': 'Version of a program or library',
+        'productName': 'Product name',
+        'productNameHint': 'Product a program belongs to',
+      }[column] ??
+      column;
+  @override
   String torrentColumn(String column) =>
       const {
         'status': 'Download status',
@@ -555,6 +596,18 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get sortAttributesDesc => 'Attributes (Z → A)';
 
+  @override
+  String get sortDateAccessedOldest => 'Date Accessed (Oldest First)';
+
+  @override
+  String get sortDateAccessedNewest => 'Date Accessed (Newest First)';
+
+  @override
+  String get sortPathAsc => 'Path (A → Z)';
+
+  @override
+  String get sortPathDesc => 'Path (Z → A)';
+
   // View modes
   @override
   String get viewModeList => 'List';
@@ -753,11 +806,28 @@ class EnglishLocalizations implements AppLocalizations {
   String get columnItemCountDescription =>
       'Display number of items inside folders';
 
+  @override
+  String get columnParentFolder => 'Folder';
+
+  @override
+  String get columnPermissions => 'Permissions';
+
+  @override
+  String get columnParentFolderDescription =>
+      'Show the folder that contains the item';
+
+  @override
+  String get columnPermissionsDescription =>
+      'Show read/write/execute permissions (rwx)';
+
+  @override
+  String get columnResetLayout => 'Reset column order and widths';
+
   // Column visibility dialog
   @override
   String get columnVisibilityInstructions =>
-      'Select the columns you want to display in details view. '
-      'The "Name" column is always displayed and cannot be disabled.';
+      'Select the columns you want to display in details view. The "Name" column is always displayed and cannot be disabled. '
+      'Drag a column header to move it, drag its edge to resize it, and click it to sort.';
 
   // List field visibility
   @override

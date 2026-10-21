@@ -8,6 +8,7 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart' show compute, visibleForTesting;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:path/path.dart' as pathlib;
+import 'package:cb_file_manager/helpers/files/file_attributes.dart';
 import 'package:cb_file_manager/helpers/files/folder_sort_manager.dart';
 import 'package:cb_file_manager/helpers/core/filesystem_sorter.dart';
 import 'package:cb_file_manager/helpers/core/text_utils.dart';
@@ -22,6 +23,7 @@ import 'package:cb_file_manager/services/directory_listing_cache_service.dart';
 
 import 'file_navigation_event.dart';
 import 'file_navigation_state.dart';
+import 'package:cb_file_manager/ui/screens/folder_list/folder_display_preferences.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 
 class FileNavigationBloc
@@ -40,7 +42,13 @@ class FileNavigationBloc
   static const int _searchResultsPageSize = 200;
   List<FileSystemEntity> _pendingSearchResults = [];
 
-  FileNavigationBloc() : super(FileNavigationState.initial('/')) {
+  /// Whether a load applies the folder's saved view mode, sort and grid
+  /// zoom ([FolderDisplayPreferences]) in the same emit as the new path, so
+  /// the folder never shows the previous folder's (or the default) layout.
+  final bool applyFolderDisplay;
+
+  FileNavigationBloc({this.applyFolderDisplay = false})
+    : super(FileNavigationState.initial('/')) {
     // ── Lifecycle ───────────────────────────────────────────────
     on<FileNavigationInit>(_onInit);
     on<FileNavigationLoad>(_onLoad);
@@ -201,12 +209,21 @@ class FileNavigationBloc
     Emitter<FileNavigationState> emit,
     Stopwatch totalSw,
   ) async {
+    final display = applyFolderDisplay
+        ? FolderDisplayPreferences.instance.cached(event.path) ??
+              await _safeCall(
+                () => FolderDisplayPreferences.instance.resolve(event.path),
+              )
+        : null;
     emit(
       state.copyWith(
         isLoading: true,
         isRefreshing: false,
         error: null,
         currentPath: Directory(event.path),
+        viewMode: display?.viewMode,
+        sortOption: display?.sortOption,
+        gridZoomLevel: display?.gridZoomLevel,
         folders: const [],
         files: const [],
         filteredFiles: const [],
@@ -272,11 +289,12 @@ class FileNavigationBloc
       }
 
       // Sort option for this folder
-      final folderSortManager = FolderSortManager();
-      final folderSortOption = await _safeCall(
-        () => folderSortManager.getFolderSortOption(event.path),
-      );
-      final sortOption = folderSortOption ?? state.sortOption;
+      final sortOption =
+          display?.sortOption ??
+          await _safeCall<SortOption?>(
+            () => FolderSortManager().getFolderSortOption(event.path),
+          ) ??
+          state.sortOption;
 
       // ── Cache check ────────────────────────────────────────────────────────────
       // Before scanning the disk, check if we have a cached listing for this
@@ -562,8 +580,6 @@ class FileNavigationBloc
     final requestId = ++_activeSortRequestId;
     bool isStale() => isClosed || requestId != _activeSortRequestId;
 
-    emit(state.copyWith(isLoading: true));
-
     try {
       if (event.persist) {
         final folderSortManager = FolderSortManager();
@@ -578,14 +594,57 @@ class FileNavigationBloc
       if (isStale()) return;
 
       final targetPath = state.currentPath.path;
-      Map<String, FileStat> statsCache = {};
+
+      // A folder listing is re-sorted by listing the folder again on a Rust
+      // thread, which reads the sizes, dates and attributes with the entries
+      // instead of one stat per item on this isolate. Search results are not
+      // one folder, so they take the Dart path below.
+      if (state.searchResults.isEmpty) {
+        final order = await _nativeOrder(targetPath, event.sortOption);
+        if (isStale()) return;
+        if (order != null && state.currentPath.path == targetPath) {
+          final sortedFiles = _inOrder(state.files, order);
+          emit(
+            state.copyWith(
+              isLoading: false,
+              sortOption: event.sortOption,
+              folders: _inOrder(state.folders, order),
+              files: sortedFiles,
+              filteredFiles: _inOrder(state.filteredFiles, order),
+            ),
+          );
+          ThumbnailLoader.updateDisplayIndexMap(
+            sortedFiles.map((f) => f.path).toList(),
+          );
+          return;
+        }
+      }
+
+      emit(state.copyWith(isLoading: true));
+      final needsStats = _sortOptionNeedsStats(event.sortOption);
+      final statsCache = Map<String, FileStat>.of(state.fileStatsCache);
 
       Future<void> cacheStats(List<FileSystemEntity> entities) async {
-        for (final e in entities) {
-          if (!statsCache.containsKey(e.path)) {
-            try {
-              statsCache[e.path] = await e.stat();
-            } catch (_) {}
+        if (!needsStats) return;
+        final missing = [
+          for (final e in entities)
+            if (!statsCache.containsKey(e.path)) e,
+        ];
+        // Parallel chunks, like FileSystemSorter, instead of one at a time.
+        const chunkSize = 50;
+        for (var i = 0; i < missing.length; i += chunkSize) {
+          final chunk = missing.skip(i).take(chunkSize);
+          final stats = await Future.wait(
+            chunk.map((e) async {
+              try {
+                return MapEntry(e.path, await e.stat());
+              } catch (_) {
+                return null;
+              }
+            }),
+          );
+          for (final entry in stats) {
+            if (entry != null) statsCache[entry.key] = entry.value;
           }
         }
       }
@@ -846,6 +905,8 @@ class FileNavigationBloc
       case SortOption.dateCreatedDesc:
       case SortOption.attributesAsc:
       case SortOption.attributesDesc:
+      case SortOption.dateAccessedAsc:
+      case SortOption.dateAccessedDesc:
         return true;
       case SortOption.nameAsc:
       case SortOption.nameDesc:
@@ -853,6 +914,8 @@ class FileNavigationBloc
       case SortOption.typeDesc:
       case SortOption.extensionAsc:
       case SortOption.extensionDesc:
+      case SortOption.pathAsc:
+      case SortOption.pathDesc:
         return false;
     }
   }
@@ -888,6 +951,44 @@ class FileNavigationBloc
     }).toList();
   }
 
+  /// The display position of every entry of [path] in [sort] order, from a
+  /// native listing; null when the library is missing, the path is virtual
+  /// or the folder cannot be listed.
+  Future<Map<String, int>?> _nativeOrder(String path, SortOption sort) async {
+    if (path.isEmpty || path.startsWith('#') || _isDrivesPath(path)) {
+      return null;
+    }
+    final listing = await _safeCall<NativeListing?>(
+      () => NativeFs.listDirectory(
+        path,
+        sort: NativeListSort.values.byName(sort.name),
+        skipSuffixes: const ['.tags'],
+        skipNames: const ['.cbfile_config.json'],
+      ),
+    );
+    if (listing == null) return null;
+    return {
+      for (final (index, entry) in [
+        ...listing.folders,
+        ...listing.files,
+      ].indexed)
+        entry.path: index,
+    };
+  }
+
+  /// [entities] in [order]. Entries the new listing does not have (created
+  /// or removed meanwhile) keep their relative order after the others.
+  List<FileSystemEntity> _inOrder(
+    List<FileSystemEntity> entities,
+    Map<String, int> order,
+  ) {
+    int position(int index, FileSystemEntity entity) =>
+        order[entity.path] ?? order.length + index;
+    final indexed = entities.indexed.toList()
+      ..sort((a, b) => position(a.$1, a.$2).compareTo(position(b.$1, b.$2)));
+    return [for (final (_, entity) in indexed) entity];
+  }
+
   int Function(FileSystemEntity, FileSystemEntity) _buildCompareFunction(
     SortOption option,
     Map<String, FileStat> statsCache,
@@ -902,13 +1003,15 @@ class FileNavigationBloc
 
     int sizeFor(FileSystemEntity entity) => statsCache[entity.path]?.size ?? -1;
 
-    String attributesFor(FileSystemEntity entity) {
-      final stat = statsCache[entity.path];
-      if (stat == null) {
-        return '';
-      }
-      return '${stat.mode},${stat.type}';
-    }
+    DateTime accessedFor(FileSystemEntity entity) =>
+        statsCache[entity.path]?.accessed ??
+        DateTime.fromMillisecondsSinceEpoch(0);
+
+    String attributesFor(FileSystemEntity entity) =>
+        FileAttributes.describe(entity.path, statsCache[entity.path]);
+
+    int comparePaths(FileSystemEntity a, FileSystemEntity b) =>
+        a.path.toLowerCase().compareTo(b.path.toLowerCase());
 
     switch (option) {
       case SortOption.nameAsc:
@@ -949,6 +1052,14 @@ class FileNavigationBloc
         return (a, b) => attributesFor(a).compareTo(attributesFor(b));
       case SortOption.attributesDesc:
         return (a, b) => attributesFor(b).compareTo(attributesFor(a));
+      case SortOption.dateAccessedAsc:
+        return (a, b) => accessedFor(a).compareTo(accessedFor(b));
+      case SortOption.dateAccessedDesc:
+        return (a, b) => accessedFor(b).compareTo(accessedFor(a));
+      case SortOption.pathAsc:
+        return comparePaths;
+      case SortOption.pathDesc:
+        return (a, b) => comparePaths(b, a);
     }
   }
 
@@ -1088,7 +1199,8 @@ class FileNavigationBloc
 
 /// Compact stat fields extracted from FileStat for isolate transfer.
 /// FileStat is not sendable across isolates, but its primitive fields are.
-/// Layout: [modified_ms, changed_ms, size, mode, type_index]
+/// Layout: [modified_ms, changed_ms, size, mode, accessed_ms, attributes]
+/// (attributes only for an attributes sort).
 typedef _StatRow = List<dynamic>;
 
 /// Result returned from [_scanDirectoryInIsolate].
@@ -1096,7 +1208,7 @@ class _ScanResult {
   final List<String> folderPaths;
   final List<String> filePaths;
 
-  /// Maps file/folder path → [modified_ms, changed_ms, size, mode, type_index]
+  /// Maps file/folder path → a [_StatRow]
   final Map<String, _StatRow> statRows;
 
   const _ScanResult({
@@ -1120,11 +1232,10 @@ class _ScanArgs {
 /// navigation, and on Windows the sizes and dates a date or size sort needs
 /// come with the directory entries instead of one `stat` per file.
 Future<_ScanResult> _scanDirectory(String path, SortOption sortOption) async {
+  // Both listings implement every SortOption (by the same names).
   final native = await NativeFs.listDirectory(
     path,
-    sort:
-        NativeListSort.values.asNameMap()[sortOption.name] ??
-        NativeListSort.nameAsc,
+    sort: NativeListSort.values.byName(sortOption.name),
     skipSuffixes: const ['.tags'],
     skipNames: const ['.cbfile_config.json'],
   );
@@ -1174,11 +1285,14 @@ Future<_ScanResult> _scanDirectoryInIsolate(_ScanArgs args) async {
 
   final allPaths = [...folderPaths, ...filePaths];
   final statRows = <String, _StatRow>{};
-  // Only the date and size comparators below read stats. Statting every entry
-  // for a name sort is one extra syscall per file (a network round trip on a
-  // share) before the listing can be shown.
+  // Only the date, size and attribute comparators below read stats. Statting
+  // every entry for a name sort is one extra syscall per file (a network
+  // round trip on a share) before the listing can be shown.
+  final byAttributes = args.sortOption.startsWith('attributes');
   final sortNeedsStats =
-      args.sortOption.startsWith('date') || args.sortOption.startsWith('size');
+      args.sortOption.startsWith('date') ||
+      args.sortOption.startsWith('size') ||
+      byAttributes;
 
   for (var i = 0; sortNeedsStats && i < allPaths.length; i += statChunkSize) {
     final chunk = allPaths.skip(i).take(statChunkSize).toList();
@@ -1191,6 +1305,8 @@ Future<_ScanResult> _scanDirectoryInIsolate(_ScanArgs args) async {
             s.changed.millisecondsSinceEpoch, // [1] changed (creation on Win)
             s.size, // [2] size
             s.mode, // [3] mode
+            s.accessed.millisecondsSinceEpoch, // [4] accessed
+            if (byAttributes) FileAttributes.describe(p, s), // [5] letters
           ]);
         } catch (_) {
           return null;
@@ -1235,6 +1351,24 @@ Future<_ScanResult> _scanDirectoryInIsolate(_ScanArgs args) async {
     return ascending ? cmp : -cmp;
   }
 
+  int cmpType(String a, String b) => pathlib
+      .extension(a)
+      .toLowerCase()
+      .compareTo(pathlib.extension(b).toLowerCase());
+
+  int cmpAccessed(String a, String b) => ((statRows[a]?[4] as int?) ?? 0)
+      .compareTo((statRows[b]?[4] as int?) ?? 0);
+
+  int cmpPath(String a, String b) => a.toLowerCase().compareTo(b.toLowerCase());
+
+  String attributesOf(String p) {
+    final row = statRows[p];
+    return row != null && row.length > 5 ? row[5] as String : '';
+  }
+
+  int cmpAttributes(String a, String b) =>
+      attributesOf(a).compareTo(attributesOf(b));
+
   Comparator<String> comparator;
   switch (args.sortOption) {
     case 'nameDesc':
@@ -1272,7 +1406,31 @@ Future<_ScanResult> _scanDirectoryInIsolate(_ScanArgs args) async {
     case 'extensionDesc':
       comparator = (a, b) => cmpExt(a, b, ascending: false);
       break;
-    default: // nameAsc and all others
+    case 'typeAsc':
+      comparator = cmpType;
+      break;
+    case 'typeDesc':
+      comparator = (a, b) => cmpType(b, a);
+      break;
+    case 'dateAccessedAsc':
+      comparator = cmpAccessed;
+      break;
+    case 'dateAccessedDesc':
+      comparator = (a, b) => cmpAccessed(b, a);
+      break;
+    case 'pathAsc':
+      comparator = cmpPath;
+      break;
+    case 'pathDesc':
+      comparator = (a, b) => cmpPath(b, a);
+      break;
+    case 'attributesAsc':
+      comparator = cmpAttributes;
+      break;
+    case 'attributesDesc':
+      comparator = (a, b) => cmpAttributes(b, a);
+      break;
+    default: // nameAsc
       comparator = cmpName;
       break;
   }

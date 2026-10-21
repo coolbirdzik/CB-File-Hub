@@ -132,6 +132,7 @@ const int jobInpaint = 7;
 const int jobHashFile = 8;
 const int jobArchiveList = 9;
 const int jobArchiveExtract = 10;
+const int jobSortPaths = 11;
 
 // Job states (job.rs).
 const int jobRunning = 0;

@@ -67,6 +67,10 @@ abstract class AppLocalizations {
   String torrentStatus(String status);
   String get torrentStatusLabel;
   String torrentColumn(String column);
+
+  /// Label of a Windows Shell property column; `<name>Hint` is its
+  /// description.
+  String shellColumn(String column);
   String torrentCategory(String category);
   String torrentScanSummary(
     int visited,
@@ -221,6 +225,10 @@ abstract class AppLocalizations {
   String get sortExtensionDesc;
   String get sortAttributesAsc;
   String get sortAttributesDesc;
+  String get sortDateAccessedOldest;
+  String get sortDateAccessedNewest;
+  String get sortPathAsc;
+  String get sortPathDesc;
 
   // View modes
   String get viewModeList;
@@ -294,6 +302,11 @@ abstract class AppLocalizations {
   String get columnDimensionsDescription;
   String get columnDurationDescription;
   String get columnItemCountDescription;
+  String get columnParentFolder;
+  String get columnPermissions;
+  String get columnParentFolderDescription;
+  String get columnPermissionsDescription;
+  String get columnResetLayout;
 
   // Column visibility dialog
   String get columnVisibilityInstructions;

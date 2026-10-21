@@ -1,6 +1,7 @@
 // Export all components for easy importing
 export 'app_bar.dart';
 export 'breadcrumb_navigation.dart';
+export 'details_columns.dart';
 export 'file_grid_item.dart';
 export 'file_item.dart';
 export 'file_view.dart';

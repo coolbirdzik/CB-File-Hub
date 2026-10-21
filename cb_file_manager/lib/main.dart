@@ -47,6 +47,7 @@ import 'ui/components/common/app_toast.dart';
 import 'config/languages/app_localizations.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/services/album_service.dart';
+import 'package:cb_file_manager/ui/screens/folder_list/folder_display_preferences.dart';
 import 'package:cb_file_manager/ui/screens/media_gallery/video_player_full_screen.dart';
 import 'package:cb_file_manager/ui/screens/media_gallery/video_window_app.dart';
 import 'package:cb_file_manager/ui/controllers/archive_navigation.dart';
@@ -589,6 +590,9 @@ Future<void> runCbFileApp() async {
       } else {
         debugPrint('Database manager already initialized');
       }
+      // Folder view mode/sort/columns in memory, so the first tab and every
+      // navigation open in the saved layout instead of flashing the default.
+      await FolderDisplayPreferences.instance.warmUp();
       final networkCredService = locator<NetworkCredentialsService>();
       await networkCredService.init();
 

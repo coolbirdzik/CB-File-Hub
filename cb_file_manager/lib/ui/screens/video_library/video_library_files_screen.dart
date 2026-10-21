@@ -350,13 +350,15 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
     SharedActionBar.showColumnVisibilityDialog(
       context,
       currentVisibility: _columnVisibility,
-      onApply: (visibility) {
-        setState(() {
-          _columnVisibility = visibility;
-        });
-        _saveColumnVisibility(visibility);
-      },
+      onApply: _applyColumnVisibility,
     );
+  }
+
+  void _applyColumnVisibility(ColumnVisibility visibility) {
+    setState(() {
+      _columnVisibility = visibility;
+    });
+    _saveColumnVisibility(visibility);
   }
 
   Future<void> _applySearchWithOptions(String value, bool useRegex) async {
@@ -934,6 +936,7 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
       onDeleteFiles: _showDeleteFilesConfirmation,
       toggleSelectionMode: _toggleSelectionMode,
       columnVisibility: _columnVisibility,
+      onColumnVisibilityChanged: _applyColumnVisibility,
       showContextMenu: (_, _) {},
       isPreviewPaneVisible: false,
       previewPaneWidthListenable: _previewPaneWidthNotifier,

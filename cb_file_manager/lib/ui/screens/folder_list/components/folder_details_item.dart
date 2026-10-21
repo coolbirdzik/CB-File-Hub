@@ -16,6 +16,9 @@ import 'package:cb_file_manager/services/file_metadata_service.dart';
 import 'package:cb_file_manager/core/service_locator.dart';
 import 'package:cb_file_manager/helpers/files/lazy_path_size_calculator.dart';
 import 'package:cb_file_manager/ui/utils/format_utils.dart';
+import 'package:cb_file_manager/helpers/files/file_attributes.dart';
+import 'package:path/path.dart' as pathlib;
+import 'details_columns.dart';
 
 class FolderDetailsItem extends StatefulWidget {
   final Directory folder;
@@ -199,248 +202,13 @@ class _FolderDetailsItemState extends State<FolderDetailsItem> {
             children: [
               Container(
                 decoration: boxDecoration,
-                child: Row(
-                  children: [
-                    // Name column (always visible)
-                    Expanded(
-                      flex: 3,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12.0,
-                          vertical: 10.0,
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              _tagName != null
-                                  ? PhosphorIconsLight.tag
-                                  : PhosphorIconsLight.folder,
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(child: _buildNameWidget(context)),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    // Type column
-                    if (widget.columnVisibility.type)
-                      Expanded(
-                        flex: 2,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12.0,
-                            vertical: 10.0,
-                          ),
-                          child: Text(
-                            _tagName != null
-                                ? AppLocalizations.of(context)!.tagPrefix
-                                : AppLocalizations.of(context)!.folder,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ),
-
-                    // Size column
-                    if (widget.columnVisibility.size)
-                      Expanded(
-                        flex: 1,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12.0,
-                            vertical: 10.0,
-                          ),
-                          child: FutureBuilder<int?>(
-                            future: _folderSizeFuture,
-                            builder: (context, snapshot) {
-                              if (snapshot.connectionState ==
-                                  ConnectionState.waiting) {
-                                return const Text(
-                                  'Calculating...',
-                                  overflow: TextOverflow.ellipsis,
-                                );
-                              }
-                              final size = snapshot.data;
-                              return Text(
-                                size == null
-                                    ? '—'
-                                    : FormatUtils.formatFileSize(size),
-                                overflow: TextOverflow.ellipsis,
-                              );
-                            },
-                          ),
-                        ),
-                      ),
-
-                    // Date modified column
-                    if (widget.columnVisibility.dateModified)
-                      Expanded(
-                        flex: 2,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12.0,
-                            vertical: 10.0,
-                          ),
-                          child: Text(
-                            _fileStat != null
-                                ? _fileStat!.modified.toString().split('.')[0]
-                                : 'Loading...',
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ),
-
-                    // Date created column
-                    if (widget.columnVisibility.dateCreated)
-                      Expanded(
-                        flex: 2,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12.0,
-                            vertical: 10.0,
-                          ),
-                          child: Text(
-                            _fileStat != null
-                                ? _fileStat!.changed.toString().split('.')[0]
-                                : 'Loading...',
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ),
-
-                    // Attributes column
-                    if (widget.columnVisibility.attributes)
-                      Expanded(
-                        flex: 1,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12.0,
-                            vertical: 10.0,
-                          ),
-                          child: Text(
-                            _getAttributes(_fileStat),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ),
-
-                    // Date Accessed column
-                    if (widget.columnVisibility.dateAccessed)
-                      Expanded(
-                        flex: 2,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12.0,
-                            vertical: 10.0,
-                          ),
-                          child: Text(
-                            _fileStat != null
-                                ? _fileStat!.accessed
-                                      .toString()
-                                      .split('.')
-                                      .first
-                                : 'Loading...',
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ),
-
-                    // Extension column (empty for folders)
-                    if (widget.columnVisibility.extension)
-                      Expanded(
-                        flex: 1,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12.0,
-                            vertical: 10.0,
-                          ),
-                          child: const Text(
-                            '',
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ),
-
-                    // Path column
-                    if (widget.columnVisibility.path)
-                      Expanded(
-                        flex: 3,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12.0,
-                            vertical: 10.0,
-                          ),
-                          child: Text(
-                            widget.folder.path,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ),
-
-                    // Tags column (empty for folders)
-                    if (widget.columnVisibility.tags)
-                      Expanded(
-                        flex: 2,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12.0,
-                            vertical: 10.0,
-                          ),
-                          child: const Text(
-                            '',
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ),
-
-                    // Dimensions column (empty for folders)
-                    if (widget.columnVisibility.dimensions)
-                      Expanded(
-                        flex: 1,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12.0,
-                            vertical: 10.0,
-                          ),
-                          child: const Text(
-                            '',
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ),
-
-                    // Duration column (empty for folders)
-                    if (widget.columnVisibility.duration)
-                      Expanded(
-                        flex: 1,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12.0,
-                            vertical: 10.0,
-                          ),
-                          child: const Text(
-                            '',
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ),
-
-                    // Item Count column
-                    if (widget.columnVisibility.itemCount)
-                      Expanded(
-                        flex: 1,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12.0,
-                            vertical: 10.0,
-                          ),
-                          child: _AsyncItemCountCell(
-                            folderPath: widget.folder.path,
-                          ),
-                        ),
-                      ),
-                  ],
+                child: DetailsRowLayout(
+                  columns:
+                      DetailsColumnsScope.maybeOf(context)?.columns ??
+                      widget.columnVisibility,
+                  // Collection columns describe files; folders leave them empty.
+                  extraCellBuilder: (column) => SizedBox(width: column.width),
+                  cellBuilder: (column) => _buildCell(context, column),
                 ),
               ),
               // Replace with optimized interaction layer
@@ -480,17 +248,85 @@ class _FolderDetailsItemState extends State<FolderDetailsItem> {
     );
   }
 
-  String _getAttributes(FileStat? stat) {
-    if (stat == null) return '';
-
-    final List<String> attrs = [];
-
-    if (stat.modeString()[0] == 'd') attrs.add('D');
-    if (stat.modeString()[1] == 'r') attrs.add('R');
-    if (stat.modeString()[2] == 'w') attrs.add('W');
-    if (stat.modeString()[3] == 'x') attrs.add('X');
-
-    return attrs.join(' ');
+  Widget _buildCell(BuildContext context, DetailsColumn column) {
+    final l10n = AppLocalizations.of(context)!;
+    final stat = _fileStat;
+    final cell = switch (column) {
+      DetailsColumn.name => DetailsCell(
+        child: Row(
+          children: [
+            Icon(
+              _tagName != null
+                  ? PhosphorIconsLight.tag
+                  : PhosphorIconsLight.folder,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            const SizedBox(width: 12),
+            Expanded(child: _buildNameWidget(context)),
+          ],
+        ),
+      ),
+      DetailsColumn.type => DetailsCell.text(
+        _tagName != null ? l10n.tagPrefix : l10n.folder,
+      ),
+      DetailsColumn.size => DetailsCell(
+        child: FutureBuilder<int?>(
+          future: _folderSizeFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Text(
+                'Calculating...',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              );
+            }
+            final size = snapshot.data;
+            return Text(
+              size == null ? '—' : FormatUtils.formatFileSize(size),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            );
+          },
+        ),
+      ),
+      DetailsColumn.dateModified => DetailsCell.text(
+        stat != null ? formatDetailsDate(stat.modified) : 'Loading...',
+      ),
+      DetailsColumn.dateCreated => DetailsCell.text(
+        stat != null ? formatDetailsDate(stat.changed) : 'Loading...',
+      ),
+      DetailsColumn.attributes => DetailsCell.text(
+        stat == null ? '' : FileAttributes.describe(widget.folder.path, stat),
+      ),
+      DetailsColumn.dateAccessed => DetailsCell.text(
+        stat != null ? formatDetailsDate(stat.accessed) : 'Loading...',
+      ),
+      DetailsColumn.path => DetailsCell.text(widget.folder.path),
+      DetailsColumn.parentFolder => DetailsCell.text(
+        _tagName != null ? '' : pathlib.dirname(widget.folder.path),
+      ),
+      DetailsColumn.itemCount => DetailsCell(
+        child: _AsyncItemCountCell(folderPath: widget.folder.path),
+      ),
+      DetailsColumn.permissions => DetailsCell.text(stat?.modeString() ?? ''),
+      DetailsColumn.owner when _tagName == null => DetailsCell(
+        child: ShellPropertyCell(
+          path: widget.folder.path,
+          property: column.name,
+        ),
+      ),
+      // Extension, tags, dimensions and duration describe files only.
+      DetailsColumn.extension ||
+      DetailsColumn.tags ||
+      DetailsColumn.dimensions ||
+      DetailsColumn.duration => DetailsCell.text(''),
+      // Other Shell properties describe file contents.
+      _ => DetailsCell.text(''),
+    };
+    return KeyedSubtree(
+      key: ValueKey('details-column-${column.name}-${widget.folder.path}'),
+      child: cell,
+    );
   }
 
   Widget _buildNameWidget(BuildContext context) {

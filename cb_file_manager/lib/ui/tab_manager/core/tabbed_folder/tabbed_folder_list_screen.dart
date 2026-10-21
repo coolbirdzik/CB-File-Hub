@@ -10,7 +10,6 @@ import 'dart:math' as math;
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/config/translation_helper.dart';
 import 'package:cb_file_manager/helpers/ui/frame_timing_optimizer.dart';
-import 'package:cb_file_manager/helpers/files/folder_sort_manager.dart';
 import 'package:cb_file_manager/services/file_drag_drop/file_drag_drop_move_service.dart';
 import 'package:cb_file_manager/services/windowing/windows_explorer_drag_drop_service.dart';
 import 'package:cb_file_manager/ui/components/common/browser_like_action_handlers.dart';
@@ -38,6 +37,7 @@ import 'package:path/path.dart' as path;
 import '../../../screens/folder_list/folder_list_bloc.dart';
 import '../../../screens/folder_list/folder_list_event.dart';
 import '../../../screens/folder_list/folder_list_state.dart';
+import '../../../screens/folder_list/folder_display_preferences.dart';
 
 // Import selection bloc
 import 'package:cb_file_manager/bloc/selection/selection.dart';
@@ -72,7 +72,6 @@ import 'package:cb_file_manager/ui/controllers/inline_rename_controller.dart';
 import 'package:cb_file_manager/ui/widgets/selection_summary_tooltip.dart';
 
 // Import extracted view layer components
-import 'package:cb_file_manager/ui/utils/view_mode_utils.dart';
 import 'package:cb_file_manager/ui/widgets/file_list_view_builder.dart';
 import 'package:cb_file_manager/ui/widgets/ctrl_scroll_zoom.dart';
 import 'package:cb_file_manager/ui/controllers/dialog_manager.dart';
@@ -362,8 +361,17 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
       }
     });
 
-    // Initialize the blocs
-    _folderListBloc = FolderListBloc();
+    // Initialize the blocs. The bloc applies each folder's saved view mode
+    // and sort in the same emit as the new path.
+    _folderListBloc = FolderListBloc(applyFolderDisplayPreferences: true);
+    // Saved settings are usually in memory already: start with them instead
+    // of the defaults, so the first frame does not jump once they load.
+    final cachedDisplay = FolderDisplayPreferences.instance.cached(
+      _currentPath,
+    );
+    if (cachedDisplay != null) {
+      applyDisplaySettings(cachedDisplay, inInitState: true);
+    }
 
     // Initialize tag search using TagSearchInitializer
     final tagSearchConfig = TagSearchInitializer.initialize(
@@ -520,16 +528,13 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
   }
 
   Future<void> _loadPropertiesPanePreferences() async {
-    final prefs = UserPreferences.instance;
-    // Visibility follows the tab; the stored value is only the default for a
-    // new tab. The height stays a global preference.
-    final visible =
-        TabPaneState.propertiesVisible(widget.tabId) ??
-        await prefs.getPropertiesPaneVisible();
-    final height = await prefs.getPropertiesPaneHeight();
+    // Visibility follows the tab and a new tab starts with the pane closed.
+    // The height stays a global preference.
+    final height = await UserPreferences.instance.getPropertiesPaneHeight();
     if (!mounted || _propertiesPaneTouched) return;
     setState(() {
-      _propertiesPaneVisible = visible;
+      _propertiesPaneVisible =
+          TabPaneState.propertiesVisible(widget.tabId) ?? false;
       _propertiesPaneHeight = height;
     });
   }
@@ -1197,7 +1202,14 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
       _currentPath = path;
       _pathController.text = _displayPathForInput(path);
     });
-    unawaited(_applyFolderDisplayPreferences(path));
+    // Apply the folder's settings in this frame when they are in memory;
+    // otherwise as soon as they are read.
+    final cached = FolderDisplayPreferences.instance.cached(path);
+    if (cached != null) {
+      applyDisplaySettings(cached);
+    } else {
+      unawaited(_applyFolderDisplayPreferences(path));
+    }
   }
 
   void _updatePath(String newPath) {
@@ -1230,49 +1242,11 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
 
   Future<void> _applyFolderDisplayPreferences(String path) async {
     try {
-      final prefs = UserPreferences.instance;
-      await prefs.init();
-      final folderSortManager = FolderSortManager();
-      final savedViewMode =
-          await folderSortManager.getFolderViewMode(path) ??
-          await prefs.getViewMode();
-      final effectiveViewMode = ViewModeUtils.normalize(
-        !isDesktopPlatform && savedViewMode == ViewMode.gridPreview
-            ? ViewMode.grid
-            : savedViewMode,
-      );
-      final savedSortOption =
-          await folderSortManager.getFolderSortOption(path) ??
-          await prefs.getSortOption();
-      final savedGridZoomLevel =
-          await folderSortManager.getFolderGridZoomLevel(path) ??
-          await prefs.getGridZoomLevel();
-      final savedColumnVisibility =
-          await folderSortManager.getFolderColumnVisibility(path) ??
-          await prefs.getColumnVisibility();
-      final savedShowFileTags =
-          await folderSortManager.getFolderShowFileTags(path) ??
-          await prefs.getShowFileTags();
+      final settings = await FolderDisplayPreferences.instance.resolve(path);
       // Preview/properties panes are deliberately left alone here: they
       // follow the tab, not the folder.
       if (!mounted || _currentPath != path) return;
-      final maxZoom = GridZoomConstraints.maxGridSizeForContext(
-        context,
-        mode: GridSizeMode.referenceWidth,
-      );
-      final resolvedGridZoom = savedGridZoomLevel
-          .clamp(UserPreferences.minGridZoomLevel, maxZoom)
-          .toInt();
-
-      setState(() {
-        viewMode = effectiveViewMode;
-        gridZoomLevel = resolvedGridZoom;
-        columnVisibility = savedColumnVisibility;
-        showFileTags = savedShowFileTags;
-      });
-      _folderListBloc.add(SetViewMode(effectiveViewMode));
-      _folderListBloc.add(SetSortOption(savedSortOption, persist: false));
-      _folderListBloc.add(SetGridZoom(resolvedGridZoom));
+      applyDisplaySettings(settings);
     } catch (e) {
       debugPrint('Error applying folder display preferences: $e');
     }
@@ -2070,6 +2044,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
                   showAddTagToFileDialog: _showAddTagToFileDialog,
                   toggleSelectionMode: _toggleSelectionMode,
                   columnVisibility: columnVisibility,
+                  onColumnVisibilityChanged: saveColumnVisibility,
                   showContextMenu: _showContextMenu,
                   isPreviewPaneVisible: false,
                   previewPaneWidthListenable: _previewPaneWidthNotifier,

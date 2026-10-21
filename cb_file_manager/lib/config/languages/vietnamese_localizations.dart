@@ -38,6 +38,47 @@ class VietnameseLocalizations implements AppLocalizations {
   String get torrentDestinationLocked =>
       'Dừng tác vụ trước khi đổi thư mục tải.';
   @override
+  String shellColumn(String column) =>
+      const {
+        'owner': 'Chủ sở hữu',
+        'ownerHint': 'Tài khoản sở hữu mục',
+        'authors': 'Tác giả',
+        'authorsHint': 'Tác giả của tài liệu hoặc media',
+        'title': 'Tiêu đề',
+        'titleHint': 'Tiêu đề lưu trong file',
+        'comments': 'Ghi chú',
+        'commentsHint': 'Ghi chú lưu trong file',
+        'pageCount': 'Số trang',
+        'pageCountHint': 'Số trang của tài liệu',
+        'rating': 'Đánh giá',
+        'ratingHint': 'Số sao đánh giá',
+        'dateTaken': 'Ngày chụp',
+        'dateTakenHint': 'Thời điểm chụp ảnh',
+        'cameraModel': 'Máy ảnh',
+        'cameraModelHint': 'Máy ảnh đã chụp',
+        'frameRate': 'Tốc độ khung hình',
+        'frameRateHint': 'Số khung hình mỗi giây của video',
+        'bitRate': 'Tốc độ bit',
+        'bitRateHint': 'Tốc độ bit của âm thanh hoặc video',
+        'artist': 'Nghệ sĩ',
+        'artistHint': 'Nghệ sĩ của bài hát',
+        'album': 'Album',
+        'albumHint': 'Album của bài hát',
+        'genre': 'Thể loại',
+        'genreHint': 'Thể loại bài hát hoặc video',
+        'year': 'Năm',
+        'yearHint': 'Năm phát hành',
+        'company': 'Công ty',
+        'companyHint': 'Công ty của chương trình hoặc tài liệu',
+        'fileDescription': 'Mô tả file',
+        'fileDescriptionHint': 'Mô tả của chương trình',
+        'fileVersion': 'Phiên bản file',
+        'fileVersionHint': 'Phiên bản của chương trình hoặc thư viện',
+        'productName': 'Tên sản phẩm',
+        'productNameHint': 'Sản phẩm mà chương trình thuộc về',
+      }[column] ??
+      column;
+  @override
   String torrentColumn(String column) =>
       const {
         'status': 'Trạng thái tải',
@@ -552,6 +593,18 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get sortAttributesDesc => 'Thuộc tính (Z → A)';
 
+  @override
+  String get sortDateAccessedOldest => 'Ngày truy cập (Cũ nhất trước)';
+
+  @override
+  String get sortDateAccessedNewest => 'Ngày truy cập (Mới nhất trước)';
+
+  @override
+  String get sortPathAsc => 'Đường dẫn (A → Z)';
+
+  @override
+  String get sortPathDesc => 'Đường dẫn (Z → A)';
+
   // View modes
   @override
   String get viewModeList => 'Danh sách';
@@ -749,11 +802,27 @@ class VietnameseLocalizations implements AppLocalizations {
   String get columnItemCountDescription =>
       'Hiển thị số lượng mục trong thư mục';
 
+  @override
+  String get columnParentFolder => 'Thư mục chứa';
+
+  @override
+  String get columnPermissions => 'Quyền';
+
+  @override
+  String get columnParentFolderDescription => 'Hiển thị thư mục chứa mục';
+
+  @override
+  String get columnPermissionsDescription =>
+      'Hiển thị quyền đọc/ghi/thực thi (rwx)';
+
+  @override
+  String get columnResetLayout => 'Đặt lại thứ tự và độ rộng cột';
+
   // Column visibility dialog
   @override
   String get columnVisibilityInstructions =>
-      'Chọn các cột bạn muốn hiển thị trong chế độ xem chi tiết. '
-      'Cột "Tên" luôn được hiển thị và không thể tắt.';
+      'Chọn các cột bạn muốn hiển thị trong chế độ xem chi tiết. Cột "Tên" luôn được hiển thị và không thể tắt. '
+      'Kéo tiêu đề cột để đổi vị trí, kéo mép cột để đổi độ rộng, nhấn vào tiêu đề để sắp xếp.';
 
   // List field visibility
   @override

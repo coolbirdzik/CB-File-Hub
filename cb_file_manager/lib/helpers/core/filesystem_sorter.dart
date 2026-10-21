@@ -1,4 +1,7 @@
 import 'dart:io';
+
+import 'package:cb_native/cb_native.dart';
+import 'package:cb_file_manager/helpers/files/file_attributes.dart';
 import 'package:cb_file_manager/utils/app_logger.dart';
 import 'package:path/path.dart' as pathlib;
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
@@ -31,11 +34,31 @@ class FileSystemSorter {
 
     final stopwatch = Stopwatch()..start();
 
+    // Without stats from the caller, Rust reads what the order needs per
+    // parent folder on worker threads (on Windows from the folder listing,
+    // not one stat per file) and sorts like the folder browser.
+    if (fileStatsCache == null) {
+      final order = await NativeFs.sortPaths([
+        for (final entity in entities) entity.path,
+      ], sort: NativeListSort.values.byName(sortOption.name));
+      if (order != null && order.length == entities.length) {
+        AppLogger.perf(
+          '⏱️ [PERF] FileSystemSorter native sort for ${entities.length} items took: ${stopwatch.elapsedMilliseconds}ms',
+        );
+        return [for (final index in order) entities[index]];
+      }
+    }
+
     // Create a copy to avoid modifying the original list
     final sortedEntities = List<FileSystemEntity>.from(entities);
 
-    // Build or use provided file stats cache
-    final statsCache = fileStatsCache ?? await _buildStatsCache(entities);
+    // Build or use provided file stats cache; orders by name, type, path or
+    // extension read none.
+    final statsCache =
+        fileStatsCache ??
+        (needsStats(sortOption)
+            ? await _buildStatsCache(entities)
+            : const <String, FileStat>{});
     AppLogger.perf(
       '⏱️ [PERF] FileSystemSorter._buildStatsCache for ${entities.length} items took: ${stopwatch.elapsedMilliseconds}ms',
     );
@@ -85,6 +108,19 @@ class FileSystemSorter {
     );
     return sorted.cast<Directory>();
   }
+
+  /// Whether [sortOption] compares file stats (dates, size, attributes).
+  static bool needsStats(SortOption sortOption) => switch (sortOption) {
+    SortOption.nameAsc ||
+    SortOption.nameDesc ||
+    SortOption.typeAsc ||
+    SortOption.typeDesc ||
+    SortOption.extensionAsc ||
+    SortOption.extensionDesc ||
+    SortOption.pathAsc ||
+    SortOption.pathDesc => false,
+    _ => true,
+  };
 
   /// Returns a comparator function for the given sort option.
   ///
@@ -143,6 +179,20 @@ class FileSystemSorter {
       case SortOption.attributesDesc:
         return (a, b) =>
             _compareByAttributes(a, b, fileStatsCache, ascending: false);
+
+      case SortOption.dateAccessedAsc:
+        return (a, b) =>
+            _compareByDateAccessed(a, b, fileStatsCache, ascending: true);
+
+      case SortOption.dateAccessedDesc:
+        return (a, b) =>
+            _compareByDateAccessed(a, b, fileStatsCache, ascending: false);
+
+      case SortOption.pathAsc:
+        return (a, b) => _compareByPath(a, b, ascending: true);
+
+      case SortOption.pathDesc:
+        return (a, b) => _compareByPath(a, b, ascending: false);
     }
   }
 
@@ -247,11 +297,37 @@ class FileSystemSorter {
       return _compareByName(a, b, ascending: true);
     }
 
-    // Create a string representation of attributes for comparison
-    final aAttrs = '${aStat.mode},${aStat.type}';
-    final bAttrs = '${bStat.mode},${bStat.type}';
+    // The letters the Attributes column shows (R, H, S, A, ...).
+    final aAttrs = FileAttributes.describe(a.path, aStat);
+    final bAttrs = FileAttributes.describe(b.path, bStat);
 
     return ascending ? aAttrs.compareTo(bAttrs) : bAttrs.compareTo(aAttrs);
+  }
+
+  static int _compareByDateAccessed(
+    FileSystemEntity a,
+    FileSystemEntity b,
+    Map<String, FileStat> statsCache, {
+    required bool ascending,
+  }) {
+    final aStat = statsCache[a.path];
+    final bStat = statsCache[b.path];
+
+    if (aStat == null || bStat == null) {
+      return _compareByName(a, b, ascending: true);
+    }
+
+    final comparison = aStat.accessed.compareTo(bStat.accessed);
+    return ascending ? comparison : -comparison;
+  }
+
+  static int _compareByPath(
+    FileSystemEntity a,
+    FileSystemEntity b, {
+    required bool ascending,
+  }) {
+    final comparison = a.path.toLowerCase().compareTo(b.path.toLowerCase());
+    return ascending ? comparison : -comparison;
   }
 
   /// Builds a cache of file stats for the given entities.

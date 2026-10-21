@@ -21,10 +21,65 @@ enum SortOption {
   extensionDesc, // Added extension descending
   attributesAsc, // Added file attributes
   attributesDesc, // Added file attributes descending
+  dateAccessedAsc,
+  dateAccessedDesc,
+  pathAsc,
+  pathDesc,
+}
+
+/// Columns of the Details view. Declaration order is the default column
+/// order; new columns are appended so saved orders keep their meaning.
+enum DetailsColumn {
+  name(280),
+  type(140),
+  size(100),
+  dateModified(170),
+  dateCreated(170),
+  attributes(90),
+  dateAccessed(170),
+  extension(90),
+  path(320),
+  tags(160),
+  dimensions(110),
+  duration(90),
+  itemCount(80),
+  parentFolder(240),
+  permissions(110),
+  // Windows Shell properties, as in Explorer's Details view.
+  owner(180, shell: true),
+  authors(160, shell: true),
+  title(200, shell: true),
+  comments(220, shell: true),
+  pageCount(70, shell: true),
+  rating(110, shell: true),
+  dateTaken(170, shell: true),
+  cameraModel(150, shell: true),
+  frameRate(110, shell: true),
+  bitRate(100, shell: true),
+  artist(170, shell: true),
+  album(170, shell: true),
+  genre(110, shell: true),
+  year(70, shell: true),
+  company(170, shell: true),
+  fileDescription(220, shell: true),
+  fileVersion(120, shell: true),
+  productName(180, shell: true);
+
+  const DetailsColumn(this.defaultWidth, {this.shell = false});
+
+  final double defaultWidth;
+
+  /// Read from the Windows Shell property system; Windows only.
+  final bool shell;
+
+  /// Whether this column can be shown on the running platform.
+  bool get isAvailable => !shell || Platform.isWindows;
+
+  static const double minWidth = 48;
 }
 
 // Define column visibility options for details view
-class ColumnVisibility {
+class ColumnVisibility extends Equatable {
   final bool name;
   final bool size;
   final bool type;
@@ -38,6 +93,18 @@ class ColumnVisibility {
   final bool dimensions;
   final bool duration;
   final bool itemCount;
+  final bool parentFolder;
+  final bool permissions;
+
+  /// Column order chosen by the user. It may be partial or stale;
+  /// [orderedColumns] resolves it.
+  final List<DetailsColumn> order;
+
+  /// Widths the user resized columns to; other columns use their default.
+  final Map<DetailsColumn, double> widths;
+
+  /// Shown [DetailsColumn.shell] columns (they have no flag of their own).
+  final Set<DetailsColumn> shellColumns;
 
   const ColumnVisibility({
     this.name = true, // Name is always visible by default
@@ -53,7 +120,100 @@ class ColumnVisibility {
     this.dimensions = false,
     this.duration = false,
     this.itemCount = false,
+    this.parentFolder = false,
+    this.permissions = false,
+    this.order = const [],
+    this.widths = const {},
+    this.shellColumns = const {},
   });
+
+  bool isVisible(DetailsColumn column) => switch (column) {
+    DetailsColumn.name => true,
+    DetailsColumn.type => type,
+    DetailsColumn.size => size,
+    DetailsColumn.dateModified => dateModified,
+    DetailsColumn.dateCreated => dateCreated,
+    DetailsColumn.attributes => attributes,
+    DetailsColumn.dateAccessed => dateAccessed,
+    DetailsColumn.extension => extension,
+    DetailsColumn.path => path,
+    DetailsColumn.tags => tags,
+    DetailsColumn.dimensions => dimensions,
+    DetailsColumn.duration => duration,
+    DetailsColumn.itemCount => itemCount,
+    DetailsColumn.parentFolder => parentFolder,
+    DetailsColumn.permissions => permissions,
+    _ => shellColumns.contains(column),
+  };
+
+  /// Every column in display order: Name first, then the saved order, then
+  /// columns the saved order does not know yet.
+  List<DetailsColumn> get orderedColumns {
+    final seen = <DetailsColumn>{DetailsColumn.name};
+    return [
+      DetailsColumn.name,
+      for (final column in [...order, ...DetailsColumn.values])
+        if (seen.add(column)) column,
+    ];
+  }
+
+  List<DetailsColumn> get visibleColumns => orderedColumns
+      .where((column) => column.isAvailable && isVisible(column))
+      .toList();
+
+  double widthOf(DetailsColumn column) => widths[column] ?? column.defaultWidth;
+
+  ColumnVisibility withColumn(DetailsColumn column, bool visible) =>
+      switch (column) {
+        DetailsColumn.name => this,
+        DetailsColumn.type => copyWith(type: visible),
+        DetailsColumn.size => copyWith(size: visible),
+        DetailsColumn.dateModified => copyWith(dateModified: visible),
+        DetailsColumn.dateCreated => copyWith(dateCreated: visible),
+        DetailsColumn.attributes => copyWith(attributes: visible),
+        DetailsColumn.dateAccessed => copyWith(dateAccessed: visible),
+        DetailsColumn.extension => copyWith(extension: visible),
+        DetailsColumn.path => copyWith(path: visible),
+        DetailsColumn.tags => copyWith(tags: visible),
+        DetailsColumn.dimensions => copyWith(dimensions: visible),
+        DetailsColumn.duration => copyWith(duration: visible),
+        DetailsColumn.itemCount => copyWith(itemCount: visible),
+        DetailsColumn.parentFolder => copyWith(parentFolder: visible),
+        DetailsColumn.permissions => copyWith(permissions: visible),
+        _ => copyWith(
+          shellColumns: visible
+              ? {...shellColumns, column}
+              : ({...shellColumns}..remove(column)),
+        ),
+      };
+
+  /// Sets [column] to [width] (at least [DetailsColumn.minWidth]), or back to
+  /// its default width when [width] is null.
+  ColumnVisibility withWidth(DetailsColumn column, double? width) {
+    final next = Map<DetailsColumn, double>.of(widths);
+    if (width == null) {
+      next.remove(column);
+    } else {
+      next[column] = width < DetailsColumn.minWidth
+          ? DetailsColumn.minWidth
+          : width.roundToDouble();
+    }
+    return copyWith(widths: next);
+  }
+
+  /// Moves [column] into the slot of [target], shifting the columns between
+  /// them, like dropping a dragged header onto another one. Name stays first.
+  ColumnVisibility moveColumn(DetailsColumn column, DetailsColumn target) {
+    if (column == DetailsColumn.name || column == target) return this;
+    final next = orderedColumns;
+    final to = next.indexOf(target);
+    next.remove(column);
+    next.insert(to < 1 ? 1 : to, column);
+    return copyWith(order: next.sublist(1));
+  }
+
+  /// Drops the custom order and widths, keeping which columns are shown.
+  ColumnVisibility resetLayout() => copyWith(order: const [], widths: const {});
 
   // Create a copy with modified values
   ColumnVisibility copyWith({
@@ -70,6 +230,11 @@ class ColumnVisibility {
     bool? dimensions,
     bool? duration,
     bool? itemCount,
+    bool? parentFolder,
+    bool? permissions,
+    List<DetailsColumn>? order,
+    Map<DetailsColumn, double>? widths,
+    Set<DetailsColumn>? shellColumns,
   }) {
     return ColumnVisibility(
       name: name ?? this.name,
@@ -85,11 +250,16 @@ class ColumnVisibility {
       dimensions: dimensions ?? this.dimensions,
       duration: duration ?? this.duration,
       itemCount: itemCount ?? this.itemCount,
+      parentFolder: parentFolder ?? this.parentFolder,
+      permissions: permissions ?? this.permissions,
+      order: order ?? this.order,
+      widths: widths ?? this.widths,
+      shellColumns: shellColumns ?? this.shellColumns,
     );
   }
 
   // Convert to map for storage
-  Map<String, bool> toMap() {
+  Map<String, dynamic> toMap() {
     return {
       'name': name,
       'size': size,
@@ -104,11 +274,24 @@ class ColumnVisibility {
       'dimensions': dimensions,
       'duration': duration,
       'itemCount': itemCount,
+      'parentFolder': parentFolder,
+      'permissions': permissions,
+      if (order.isNotEmpty) 'order': [for (final column in order) column.name],
+      if (widths.isNotEmpty)
+        'widths': {
+          for (final entry in widths.entries) entry.key.name: entry.value,
+        },
+      if (shellColumns.isNotEmpty)
+        'shellColumns': [for (final column in shellColumns) column.name],
     };
   }
 
   // Create from map
   factory ColumnVisibility.fromMap(Map<String, dynamic> map) {
+    final byName = DetailsColumn.values.asNameMap();
+    final order = map['order'];
+    final widths = map['widths'];
+    final shellColumns = map['shellColumns'];
     return ColumnVisibility(
       name: map['name'] ?? true,
       size: map['size'] ?? true,
@@ -123,8 +306,51 @@ class ColumnVisibility {
       dimensions: map['dimensions'] ?? false,
       duration: map['duration'] ?? false,
       itemCount: map['itemCount'] ?? false,
+      parentFolder: map['parentFolder'] ?? false,
+      permissions: map['permissions'] ?? false,
+      order: order is List
+          ? [for (final name in order) ?byName[name]]
+          : const [],
+      widths: widths is Map
+          ? {
+              for (final entry in widths.entries)
+                if ((byName[entry.key], entry.value) case (
+                  final column?,
+                  final num width,
+                ))
+                  column: width.toDouble(),
+            }
+          : const {},
+      shellColumns: shellColumns is List
+          ? {
+              for (final name in shellColumns)
+                if (byName[name] case final column? when column.shell) column,
+            }
+          : const {},
     );
   }
+
+  @override
+  List<Object?> get props => [
+    name,
+    size,
+    type,
+    dateModified,
+    dateCreated,
+    attributes,
+    dateAccessed,
+    extension,
+    path,
+    tags,
+    dimensions,
+    duration,
+    itemCount,
+    parentFolder,
+    permissions,
+    order,
+    widths,
+    shellColumns,
+  ];
 }
 
 // Define field visibility options for list view mode

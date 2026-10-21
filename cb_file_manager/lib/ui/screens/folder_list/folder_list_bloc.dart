@@ -48,9 +48,13 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
   /// child-bloc state merges must not overwrite it while this is set.
   String? _archiveBrowsePath;
 
-  FolderListBloc() : super(FolderListState('/')) {
+  /// [applyFolderDisplayPreferences]: see [FileNavigationBloc.applyFolderDisplay].
+  FolderListBloc({bool applyFolderDisplayPreferences = false})
+    : super(FolderListState('/')) {
     // ── Initialize child BLoCs ──────────────────────────────────
-    _navigationBloc = FileNavigationBloc();
+    _navigationBloc = FileNavigationBloc(
+      applyFolderDisplay: applyFolderDisplayPreferences,
+    );
     _operationsBloc = FileOperationsBloc(
       navigationBloc: _navigationBloc,
       progressController: locator<OperationProgressController>(),

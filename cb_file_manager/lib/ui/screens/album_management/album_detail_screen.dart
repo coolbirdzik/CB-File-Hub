@@ -827,6 +827,18 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
             .toLowerCase()
             .compareTo(pathlib.extension(a.path).toLowerCase());
         break;
+      case SortOption.dateAccessedAsc:
+        result = _statFor(a).accessed.compareTo(_statFor(b).accessed);
+        break;
+      case SortOption.dateAccessedDesc:
+        result = _statFor(b).accessed.compareTo(_statFor(a).accessed);
+        break;
+      case SortOption.pathAsc:
+        result = a.path.toLowerCase().compareTo(b.path.toLowerCase());
+        break;
+      case SortOption.pathDesc:
+        result = b.path.toLowerCase().compareTo(a.path.toLowerCase());
+        break;
       case SortOption.attributesAsc:
       case SortOption.attributesDesc:
       case SortOption.nameAsc:

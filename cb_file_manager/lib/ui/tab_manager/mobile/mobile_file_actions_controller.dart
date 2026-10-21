@@ -231,6 +231,8 @@ class MobileFileActionsController {
       case SortOption.dateCreatedAsc:
       case SortOption.extensionAsc:
       case SortOption.attributesAsc:
+      case SortOption.dateAccessedAsc:
+      case SortOption.pathAsc:
         return true;
       case SortOption.nameDesc:
       case SortOption.dateDesc:
@@ -239,6 +241,8 @@ class MobileFileActionsController {
       case SortOption.dateCreatedDesc:
       case SortOption.extensionDesc:
       case SortOption.attributesDesc:
+      case SortOption.dateAccessedDesc:
+      case SortOption.pathDesc:
         return false;
     }
   }

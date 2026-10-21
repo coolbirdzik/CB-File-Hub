@@ -56,6 +56,7 @@ const JOB_INPAINT: u32 = 7;
 const JOB_HASH_FILE: u32 = 8;
 const JOB_ARCHIVE_LIST: u32 = 9;
 const JOB_ARCHIVE_EXTRACT: u32 = 10;
+const JOB_SORT_PATHS: u32 = 11;
 
 unsafe fn str_arg<'a>(ptr: *const u8, len: usize) -> Option<&'a str> {
     if len == 0 {
@@ -326,6 +327,7 @@ pub unsafe extern "C" fn cb_job_start(
         JOB_HASH_FILE => hashing::start_hash_file(port, &config),
         JOB_ARCHIVE_LIST => archive::start_list(port, &config),
         JOB_ARCHIVE_EXTRACT => archive::start_extract(port, &config),
+        JOB_SORT_PATHS => listing::start_sort_paths(port, &config),
         _ => None,
     };
     match job {

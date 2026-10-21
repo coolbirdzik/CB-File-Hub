@@ -38,6 +38,47 @@ class TurkishLocalizations implements AppLocalizations {
   String get torrentDestinationLocked =>
       'İndirme klasörünü değiştirmeden önce görevi durdurun.';
   @override
+  String shellColumn(String column) =>
+      const {
+        'owner': 'Sahip',
+        'ownerHint': 'Öğenin sahibi olan hesap',
+        'authors': 'Yazarlar',
+        'authorsHint': 'Belge veya medya yazarları',
+        'title': 'Başlık',
+        'titleHint': 'Dosyada saklanan başlık',
+        'comments': 'Açıklamalar',
+        'commentsHint': 'Dosyada saklanan açıklamalar',
+        'pageCount': 'Sayfa',
+        'pageCountHint': 'Belgenin sayfa sayısı',
+        'rating': 'Derecelendirme',
+        'ratingHint': 'Yıldız derecelendirmesi',
+        'dateTaken': 'Çekim tarihi',
+        'dateTakenHint': 'Fotoğrafın çekildiği zaman',
+        'cameraModel': 'Kamera modeli',
+        'cameraModelHint': 'Fotoğrafı çeken kamera',
+        'frameRate': 'Kare hızı',
+        'frameRateHint': 'Videonun saniyedeki kare sayısı',
+        'bitRate': 'Bit hızı',
+        'bitRateHint': 'Ses veya videonun bit hızı',
+        'artist': 'Katkıda bulunan sanatçılar',
+        'artistHint': 'Şarkının sanatçıları',
+        'album': 'Albüm',
+        'albumHint': 'Şarkının albümü',
+        'genre': 'Tür',
+        'genreHint': 'Şarkı veya video türü',
+        'year': 'Yıl',
+        'yearHint': 'Yayın yılı',
+        'company': 'Şirket',
+        'companyHint': 'Programın veya belgenin şirketi',
+        'fileDescription': 'Dosya açıklaması',
+        'fileDescriptionHint': 'Programın açıklaması',
+        'fileVersion': 'Dosya sürümü',
+        'fileVersionHint': 'Programın veya kitaplığın sürümü',
+        'productName': 'Ürün adı',
+        'productNameHint': 'Programın ait olduğu ürün',
+      }[column] ??
+      column;
+  @override
   String torrentColumn(String column) =>
       const {
         'status': 'İndirme durumu',
@@ -557,6 +598,18 @@ class TurkishLocalizations implements AppLocalizations {
   @override
   String get sortAttributesDesc => 'Öznitelikler (Z → A)';
 
+  @override
+  String get sortDateAccessedOldest => 'Erişim tarihi (Önce en eski)';
+
+  @override
+  String get sortDateAccessedNewest => 'Erişim tarihi (Önce en yeni)';
+
+  @override
+  String get sortPathAsc => 'Yol (A → Z)';
+
+  @override
+  String get sortPathDesc => 'Yol (Z → A)';
+
   // View modes
   @override
   String get viewModeList => 'Liste';
@@ -758,11 +811,27 @@ class TurkishLocalizations implements AppLocalizations {
   String get columnItemCountDescription =>
       'Klasörlerin içindeki öğe sayısını göster';
 
+  @override
+  String get columnParentFolder => 'Klasör';
+
+  @override
+  String get columnPermissions => 'İzinler';
+
+  @override
+  String get columnParentFolderDescription => 'Öğeyi içeren klasörü göster';
+
+  @override
+  String get columnPermissionsDescription =>
+      'Okuma/yazma/çalıştırma izinlerini göster (rwx)';
+
+  @override
+  String get columnResetLayout => 'Sütun sırasını ve genişliklerini sıfırla';
+
   // Column visibility dialog
   @override
   String get columnVisibilityInstructions =>
-      'Ayrıntılar görünümünde göstermek istediğiniz sütunları seçin. '
-      '"Ad" sütunu her zaman gösterilir ve devre dışı bırakılamaz.';
+      'Ayrıntılar görünümünde göstermek istediğiniz sütunları seçin. "Ad" sütunu her zaman gösterilir ve devre dışı bırakılamaz. '
+      'Taşımak için sütun başlığını, boyutlandırmak için kenarını sürükleyin; sıralamak için başlığa tıklayın.';
 
   // List field visibility
   @override

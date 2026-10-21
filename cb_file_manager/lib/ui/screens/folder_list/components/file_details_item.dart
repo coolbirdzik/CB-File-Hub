@@ -1,7 +1,9 @@
 import 'dart:io';
 import 'package:cb_file_manager/ui/widgets/file_tags_tooltip.dart';
 import 'package:flutter/material.dart';
-import 'package:cb_file_manager/ui/components/common/file_details_columns.dart';
+import 'package:cb_file_manager/helpers/files/file_attributes.dart';
+import 'package:cb_file_manager/services/windows_shell_properties.dart';
+import 'details_columns.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -234,314 +236,19 @@ class _FileDetailsItemState extends State<FileDetailsItem> {
             children: [
               Container(
                 decoration: boxDecoration,
-                child: Row(
-                  children: [
-                    // Name column (always visible)
-                    Expanded(
-                      flex: 3,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12.0,
-                          vertical: 10.0,
-                        ),
-                        child: Row(
-                          children: [
-                            // Use a dedicated widget for file icon with a key to prevent rebuilds
-                            _OptimizedFileIcon(
-                              key: _thumbnailKey,
-                              file: widget.file,
-                              isVideo: isVideo,
-                              isImage: isImage,
-                              icon: fileIcon,
-                              color: iconColor,
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(child: _buildNameWidget(context)),
-
-                            // Show file tags if available and enabled
-                            if (widget.showFileTags &&
-                                (widget
-                                        .state
-                                        .fileTags[widget.file.path]
-                                        ?.isNotEmpty ??
-                                    false))
-                              Padding(
-                                padding: const EdgeInsets.only(left: 4.0),
-                                child: Icon(
-                                  PhosphorIconsLight.bookmark,
-                                  size: 16,
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.secondary,
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    for (final column
-                        in FileDetailsColumns.maybeOf(context)?.visible ??
-                            <FileDetailsColumn>[])
+                child: DetailsRowLayout(
+                  columns:
+                      DetailsColumnsScope.maybeOf(context)?.columns ??
+                      widget.columnVisibility,
+                  extraCellBuilder: (column) =>
                       column.cell(context, widget.file.path),
-
-                    // Type column
-                    if (widget.columnVisibility.type)
-                      Expanded(
-                        flex: 2,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12.0,
-                            vertical: 10.0,
-                          ),
-                          child: Text(
-                            _getFileTypeLabel(fileExtension),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ),
-
-                    // Size column (prefer WebDAV metadata)
-                    if (widget.columnVisibility.size)
-                      Expanded(
-                        flex: 1,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12.0,
-                            vertical: 10.0,
-                          ),
-                          child: Builder(
-                            builder: (context) {
-                              String text = 'Loading...';
-                              final svc = StreamingHelper
-                                  .instance
-                                  .currentNetworkService;
-                              if (svc is WebDAVService) {
-                                final remotePath = svc.getRemotePathFromLocal(
-                                  widget.file.path,
-                                );
-                                if (remotePath != null) {
-                                  final meta = svc.getMeta(remotePath);
-                                  if (meta != null && meta.size >= 0) {
-                                    text = _formatFileSize(meta.size);
-                                  }
-                                }
-                              } else if (svc is FTPService) {
-                                final meta = svc.getMeta(widget.file.path);
-                                if (meta != null && meta.size >= 0) {
-                                  text = _formatFileSize(meta.size);
-                                }
-                              }
-                              if (text == 'Loading...' && _fileStat != null) {
-                                text = _formatFileSize(_fileStat!.size);
-                              }
-                              return Text(
-                                text,
-                                overflow: TextOverflow.ellipsis,
-                              );
-                            },
-                          ),
-                        ),
-                      ),
-
-                    // Date modified column (prefer WebDAV metadata)
-                    if (widget.columnVisibility.dateModified)
-                      Expanded(
-                        flex: 2,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12.0,
-                            vertical: 10.0,
-                          ),
-                          child: Builder(
-                            builder: (context) {
-                              String text = 'Loading...';
-                              final svc = StreamingHelper
-                                  .instance
-                                  .currentNetworkService;
-                              if (svc is WebDAVService) {
-                                final remotePath = svc.getRemotePathFromLocal(
-                                  widget.file.path,
-                                );
-                                if (remotePath != null) {
-                                  final meta = svc.getMeta(remotePath);
-                                  if (meta != null) {
-                                    text = meta.modified
-                                        .toString()
-                                        .split('.')
-                                        .first;
-                                  }
-                                }
-                              } else if (svc is FTPService) {
-                                final meta = svc.getMeta(widget.file.path);
-                                if (meta != null) {
-                                  final dt = meta.modified ?? DateTime.now();
-                                  text = dt.toString().split('.').first;
-                                }
-                              }
-                              if (text == 'Loading...' && _fileStat != null) {
-                                text = _fileStat!.modified
-                                    .toString()
-                                    .split('.')
-                                    .first;
-                              }
-                              return Text(
-                                text,
-                                overflow: TextOverflow.ellipsis,
-                              );
-                            },
-                          ),
-                        ),
-                      ),
-
-                    // Date created column (fallback to FileStat)
-                    if (widget.columnVisibility.dateCreated)
-                      Expanded(
-                        flex: 2,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12.0,
-                            vertical: 10.0,
-                          ),
-                          child: Text(
-                            _fileStat != null
-                                ? _fileStat!.changed.toString().split('.').first
-                                : 'Loading...',
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ),
-
-                    // Attributes column
-                    if (widget.columnVisibility.attributes)
-                      Expanded(
-                        flex: 1,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12.0,
-                            vertical: 10.0,
-                          ),
-                          child: Text(
-                            _getAttributes(_fileStat),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ),
-
-                    // Date Accessed column
-                    if (widget.columnVisibility.dateAccessed)
-                      Expanded(
-                        flex: 2,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12.0,
-                            vertical: 10.0,
-                          ),
-                          child: Text(
-                            _fileStat != null
-                                ? _fileStat!.accessed
-                                      .toString()
-                                      .split('.')
-                                      .first
-                                : 'Loading...',
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ),
-
-                    // Extension column
-                    if (widget.columnVisibility.extension)
-                      Expanded(
-                        flex: 1,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12.0,
-                            vertical: 10.0,
-                          ),
-                          child: Text(
-                            path.extension(widget.file.path).toLowerCase(),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ),
-
-                    // Path column
-                    if (widget.columnVisibility.path)
-                      Expanded(
-                        flex: 3,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12.0,
-                            vertical: 10.0,
-                          ),
-                          child: Text(
-                            widget.file.path,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ),
-
-                    // Tags column
-                    if (widget.columnVisibility.tags)
-                      Expanded(
-                        flex: 2,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12.0,
-                            vertical: 10.0,
-                          ),
-                          child: Text(
-                            (widget.state.fileTags[widget.file.path] ?? [])
-                                .join(', '),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ),
-
-                    // Dimensions column
-                    if (widget.columnVisibility.dimensions)
-                      Expanded(
-                        flex: 1,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12.0,
-                            vertical: 10.0,
-                          ),
-                          child: _AsyncDimensionsCell(
-                            filePath: widget.file.path,
-                          ),
-                        ),
-                      ),
-
-                    // Duration column
-                    if (widget.columnVisibility.duration)
-                      Expanded(
-                        flex: 1,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12.0,
-                            vertical: 10.0,
-                          ),
-                          child: _AsyncDurationCell(filePath: widget.file.path),
-                        ),
-                      ),
-
-                    // Item Count column (empty for files)
-                    if (widget.columnVisibility.itemCount)
-                      Expanded(
-                        flex: 1,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12.0,
-                            vertical: 10.0,
-                          ),
-                          child: const Text(
-                            '',
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ),
-                  ],
+                  cellBuilder: (column) => _buildCell(
+                    context,
+                    column,
+                    fileExtension: fileExtension,
+                    fileIcon: fileIcon,
+                    iconColor: iconColor,
+                  ),
                 ),
               ),
               // Add optimized interaction layer on top
@@ -577,25 +284,135 @@ class _FileDetailsItemState extends State<FileDetailsItem> {
     );
   }
 
+  Widget _buildCell(
+    BuildContext context,
+    DetailsColumn column, {
+    required String fileExtension,
+    required IconData fileIcon,
+    required Color iconColor,
+  }) {
+    final stat = _fileStat;
+    final cell = switch (column) {
+      DetailsColumn.name => DetailsCell(
+        child: Row(
+          children: [
+            // Use a dedicated widget for file icon with a key to prevent rebuilds
+            _OptimizedFileIcon(
+              key: _thumbnailKey,
+              file: widget.file,
+              isVideo: isVideo,
+              isImage: isImage,
+              icon: fileIcon,
+              color: iconColor,
+            ),
+            const SizedBox(width: 12),
+            Expanded(child: _buildNameWidget(context)),
+
+            // Show file tags if available and enabled
+            if (widget.showFileTags &&
+                (widget.state.fileTags[widget.file.path]?.isNotEmpty ?? false))
+              Padding(
+                padding: const EdgeInsets.only(left: 4.0),
+                child: Icon(
+                  PhosphorIconsLight.bookmark,
+                  size: 16,
+                  color: Theme.of(context).colorScheme.secondary,
+                ),
+              ),
+          ],
+        ),
+      ),
+      DetailsColumn.type => DetailsCell.text(_getFileTypeLabel(fileExtension)),
+      DetailsColumn.size => DetailsCell.text(_sizeText()),
+      DetailsColumn.dateModified => DetailsCell.text(_modifiedText()),
+      DetailsColumn.dateCreated => DetailsCell.text(
+        stat != null ? formatDetailsDate(stat.changed) : 'Loading...',
+      ),
+      DetailsColumn.attributes => DetailsCell.text(
+        stat == null ? '' : FileAttributes.describe(widget.file.path, stat),
+      ),
+      DetailsColumn.dateAccessed => DetailsCell.text(
+        stat != null ? formatDetailsDate(stat.accessed) : 'Loading...',
+      ),
+      DetailsColumn.extension => DetailsCell.text(fileExtension),
+      DetailsColumn.path => DetailsCell.text(widget.file.path),
+      DetailsColumn.parentFolder => DetailsCell.text(
+        path.dirname(widget.file.path),
+      ),
+      DetailsColumn.tags => DetailsCell.text(
+        (widget.state.fileTags[widget.file.path] ?? []).join(', '),
+      ),
+      // Windows reads both from the Shell, which knows videos and audio too
+      // and does not decode the whole image.
+      DetailsColumn.dimensions || DetailsColumn.duration
+          when WindowsShellProperties.isSupported =>
+        DetailsCell(
+          child: ShellPropertyCell(
+            path: widget.file.path,
+            property: column.name,
+          ),
+        ),
+      DetailsColumn.dimensions => DetailsCell(
+        child: _AsyncDimensionsCell(filePath: widget.file.path),
+      ),
+      DetailsColumn.duration => DetailsCell(
+        child: _AsyncDurationCell(filePath: widget.file.path),
+      ),
+      // Item count is empty for files
+      DetailsColumn.itemCount => DetailsCell.text(''),
+      DetailsColumn.permissions => DetailsCell.text(stat?.modeString() ?? ''),
+      _ => DetailsCell(
+        child: ShellPropertyCell(path: widget.file.path, property: column.name),
+      ),
+    };
+    return KeyedSubtree(
+      key: ValueKey('details-column-${column.name}-${widget.file.path}'),
+      child: cell,
+    );
+  }
+
+  /// Size text, preferring WebDAV/FTP metadata.
+  String _sizeText() {
+    final svc = StreamingHelper.instance.currentNetworkService;
+    if (svc is WebDAVService) {
+      final remotePath = svc.getRemotePathFromLocal(widget.file.path);
+      if (remotePath != null) {
+        final meta = svc.getMeta(remotePath);
+        if (meta != null && meta.size >= 0) return _formatFileSize(meta.size);
+      }
+    } else if (svc is FTPService) {
+      final meta = svc.getMeta(widget.file.path);
+      if (meta != null && meta.size >= 0) return _formatFileSize(meta.size);
+    }
+    final stat = _fileStat;
+    return stat != null ? _formatFileSize(stat.size) : 'Loading...';
+  }
+
+  /// Date modified text, preferring WebDAV/FTP metadata.
+  String _modifiedText() {
+    final svc = StreamingHelper.instance.currentNetworkService;
+    if (svc is WebDAVService) {
+      final remotePath = svc.getRemotePathFromLocal(widget.file.path);
+      if (remotePath != null) {
+        final meta = svc.getMeta(remotePath);
+        if (meta != null) return formatDetailsDate(meta.modified);
+      }
+    } else if (svc is FTPService) {
+      final meta = svc.getMeta(widget.file.path);
+      if (meta != null) {
+        return formatDetailsDate(meta.modified ?? DateTime.now());
+      }
+    }
+    final stat = _fileStat;
+    return stat != null ? formatDetailsDate(stat.modified) : 'Loading...';
+  }
+
   String _getFileTypeLabel(String extension) {
     return FileTypeUtils.getFileTypeLabel(context, extension);
   }
 
   String _formatFileSize(int size) {
     return FileUtils.formatFileSize(size);
-  }
-
-  String _getAttributes(FileStat? stat) {
-    if (stat == null) return '';
-
-    final List<String> attrs = [];
-
-    if (stat.modeString()[0] == 'd') attrs.add('D');
-    if (stat.modeString()[1] == 'r') attrs.add('R');
-    if (stat.modeString()[2] == 'w') attrs.add('W');
-    if (stat.modeString()[3] == 'x') attrs.add('X');
-
-    return attrs.join(' ');
   }
 
   Widget _buildNameWidget(BuildContext context) {

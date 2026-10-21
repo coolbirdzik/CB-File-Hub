@@ -7,6 +7,48 @@ import 'package:flutter/material.dart';
 import 'package:path/path.dart' as pathlib;
 import 'package:sqflite_common/sqlite_api.dart';
 
+/// The display settings a folder overrides; null fields follow the defaults.
+class FolderDisplayOverrides {
+  const FolderDisplayOverrides({
+    this.viewMode,
+    this.sortOption,
+    this.gridZoomLevel,
+    this.columnVisibility,
+    this.showFileTags,
+  });
+
+  factory FolderDisplayOverrides._fromConfig(Map<String, dynamic> config) {
+    T? enumValue<T>(String key, List<T> values) {
+      final index = config[key];
+      return index is int && index >= 0 && index < values.length
+          ? values[index]
+          : null;
+    }
+
+    final zoom = config[FolderSortManager._gridZoomLevelKey];
+    final columns = config[FolderSortManager._columnVisibilityKey];
+    final showTags = config[FolderSortManager._showFileTagsKey];
+    return FolderDisplayOverrides(
+      viewMode: enumValue(FolderSortManager._viewModeKey, ViewMode.values),
+      sortOption: enumValue(
+        FolderSortManager._sortOptionKey,
+        SortOption.values,
+      ),
+      gridZoomLevel: zoom is int ? zoom : null,
+      columnVisibility: columns is Map
+          ? ColumnVisibility.fromMap(Map<String, dynamic>.from(columns))
+          : null,
+      showFileTags: showTags is bool ? showTags : null,
+    );
+  }
+
+  final ViewMode? viewMode;
+  final SortOption? sortOption;
+  final int? gridZoomLevel;
+  final ColumnVisibility? columnVisibility;
+  final bool? showFileTags;
+}
+
 /// Stores display preferences per folder in the application's SQLite database.
 class FolderSortManager {
   static const String _tableName = 'folder_display_preferences';
@@ -29,6 +71,49 @@ class FolderSortManager {
 
   final Map<String, Map<String, dynamic>> _folderConfigCache = {};
   Future<void>? _tableInitialization;
+
+  /// Set once [preloadAll] has read every stored folder into the cache, so a
+  /// folder missing from it has no stored settings.
+  bool _allStoredLoaded = false;
+
+  /// Reads every stored folder config into memory, so [cachedOverrides] can
+  /// answer for any folder without a query. The table holds one small row
+  /// per customised folder.
+  Future<void> preloadAll() async {
+    final database = await _getDatabase();
+    final rows = await database.query(_tableName);
+    for (final row in rows) {
+      final path = row['path'];
+      if (path is! String || _folderConfigCache.containsKey(path)) continue;
+      try {
+        _folderConfigCache[path] = _configFromRow(row);
+      } catch (e) {
+        debugPrint('Skipping unreadable folder preferences for $path: $e');
+      }
+    }
+    _allStoredLoaded = true;
+  }
+
+  /// [folderPath]'s overrides from memory, or null when they are not loaded
+  /// yet. Never waits on the database.
+  ///
+  /// After [preloadAll] an unknown folder reports no overrides; a legacy
+  /// `.cbfile_config.json` in it is only picked up by [getOverrides].
+  FolderDisplayOverrides? cachedOverrides(String folderPath) {
+    final config = _folderConfigCache[_normalizePath(folderPath)];
+    if (config != null) return FolderDisplayOverrides._fromConfig(config);
+    return _allStoredLoaded ? const FolderDisplayOverrides() : null;
+  }
+
+  /// [folderPath]'s overrides, reading them from storage when needed.
+  Future<FolderDisplayOverrides> getOverrides(String folderPath) async {
+    try {
+      return FolderDisplayOverrides._fromConfig(await _readConfig(folderPath));
+    } catch (e) {
+      debugPrint('Unexpected error in getOverrides: $e');
+      return const FolderDisplayOverrides();
+    }
+  }
 
   Future<SortOption?> getFolderSortOption(String folderPath) async {
     try {
@@ -380,8 +465,10 @@ class FolderSortManager {
     if (rows.isEmpty) {
       return null;
     }
+    return _configFromRow(rows.first);
+  }
 
-    final row = rows.first;
+  Map<String, dynamic> _configFromRow(Map<String, Object?> row) {
     final config = <String, dynamic>{};
     _copyIntColumn(row, 'view_mode', config, _viewModeKey);
     _copyIntColumn(row, 'sort_option', config, _sortOptionKey);

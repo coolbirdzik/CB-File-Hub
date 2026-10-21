@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart' as sqflite;
@@ -118,7 +119,21 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
   /// Exposed for backup/restore operations.
   DatabaseFactory getDatabaseFactory() => _resolveDatabaseFactory();
 
-  Future<void> _configureDatabase(Database db) async {
+  /// How long a write waits for another connection's write lock before it
+  /// fails with SQLITE_BUSY ("database is locked").
+  static const busyTimeout = Duration(seconds: 10);
+
+  Future<void> _configureDatabase(Database db) => configureConnection(db);
+
+  /// Connection settings of the shared database. Every desktop window is its
+  /// own process with its own connection to the same file (main, spare,
+  /// video and secondary windows), and sqflite starts every transaction with
+  /// `BEGIN IMMEDIATE`. Without a busy timeout a write that meets another
+  /// process's transaction fails at once instead of waiting for it.
+  @visibleForTesting
+  static Future<void> configureConnection(Database db) async {
+    // Set first, so the pragmas below also wait for the lock.
+    await db.rawQuery('PRAGMA busy_timeout = ${busyTimeout.inMilliseconds}');
     await db.execute('PRAGMA foreign_keys = ON');
 
     try {

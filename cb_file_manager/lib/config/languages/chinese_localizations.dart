@@ -32,6 +32,47 @@ class ChineseLocalizations implements AppLocalizations {
   @override
   String get torrentDestinationLocked => '更改下载文件夹前，请先停止此任务。';
   @override
+  String shellColumn(String column) =>
+      const {
+        'owner': '所有者',
+        'ownerHint': '拥有该项目的帐户',
+        'authors': '作者',
+        'authorsHint': '文档或媒体的作者',
+        'title': '标题',
+        'titleHint': '文件中保存的标题',
+        'comments': '备注',
+        'commentsHint': '文件中保存的备注',
+        'pageCount': '页数',
+        'pageCountHint': '文档的页数',
+        'rating': '分级',
+        'ratingHint': '星级评分',
+        'dateTaken': '拍摄日期',
+        'dateTakenHint': '照片的拍摄时间',
+        'cameraModel': '照相机型号',
+        'cameraModelHint': '拍摄照片的相机',
+        'frameRate': '帧速率',
+        'frameRateHint': '视频每秒帧数',
+        'bitRate': '比特率',
+        'bitRateHint': '音频或视频的比特率',
+        'artist': '参与创作的艺术家',
+        'artistHint': '歌曲的艺术家',
+        'album': '唱片集',
+        'albumHint': '歌曲所属唱片集',
+        'genre': '流派',
+        'genreHint': '歌曲或视频的流派',
+        'year': '年',
+        'yearHint': '发行年份',
+        'company': '公司',
+        'companyHint': '程序或文档的公司',
+        'fileDescription': '文件说明',
+        'fileDescriptionHint': '程序的说明',
+        'fileVersion': '文件版本',
+        'fileVersionHint': '程序或库的版本',
+        'productName': '产品名称',
+        'productNameHint': '程序所属的产品',
+      }[column] ??
+      column;
+  @override
   String torrentColumn(String column) =>
       const {
         'status': '下载状态',
@@ -519,6 +560,18 @@ class ChineseLocalizations implements AppLocalizations {
   @override
   String get sortAttributesDesc => '属性 (Z → A)';
 
+  @override
+  String get sortDateAccessedOldest => '访问日期 (最早优先)';
+
+  @override
+  String get sortDateAccessedNewest => '访问日期 (最新优先)';
+
+  @override
+  String get sortPathAsc => '路径 (A → Z)';
+
+  @override
+  String get sortPathDesc => '路径 (Z → A)';
+
   // View modes
   @override
   String get viewModeList => '列表';
@@ -707,11 +760,26 @@ class ChineseLocalizations implements AppLocalizations {
   @override
   String get columnItemCountDescription => '显示文件夹内的项目数量';
 
+  @override
+  String get columnParentFolder => '所在文件夹';
+
+  @override
+  String get columnPermissions => '权限';
+
+  @override
+  String get columnParentFolderDescription => '显示项目所在的文件夹';
+
+  @override
+  String get columnPermissionsDescription => '显示读/写/执行权限 (rwx)';
+
+  @override
+  String get columnResetLayout => '重置列顺序和宽度';
+
   // Column visibility dialog
   @override
   String get columnVisibilityInstructions =>
-      '选择要在详细信息视图中显示的列。'
-      '“名称”列始终显示，无法禁用。';
+      '选择要在详细信息视图中显示的列。“名称”列始终显示，无法禁用。'
+      '拖动列标题可移动列，拖动边缘可调整宽度，点击标题可排序。';
 
   // List field visibility
   @override

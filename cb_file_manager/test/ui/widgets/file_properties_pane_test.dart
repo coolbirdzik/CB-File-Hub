@@ -119,13 +119,10 @@ void main() {
     await tester.pump();
   }
 
-  test('properties pane preferences default and round trip', () async {
+  test('properties pane height defaults and round trips', () async {
     final prefs = UserPreferences.instance;
-    expect(await prefs.getPropertiesPaneVisible(), isFalse);
     expect(await prefs.getPropertiesPaneHeight(), 260);
-    await prefs.setPropertiesPaneVisible(true);
     await prefs.setPropertiesPaneHeight(310);
-    expect(await prefs.getPropertiesPaneVisible(), isTrue);
     expect(await prefs.getPropertiesPaneHeight(), 310);
   });
 
