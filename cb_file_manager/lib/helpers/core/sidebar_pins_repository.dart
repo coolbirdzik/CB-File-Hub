@@ -90,9 +90,7 @@ class SidebarPinsRepository {
   /// A single transaction commits the defaults and marker. Removing every
   /// default remains an intentional empty list on every later app launch.
   Future<bool> seedMacosDefaults(List<String> defaults) async {
-    final candidates = defaults
-        .where((value) => p.posix.isAbsolute(value))
-        .toList();
+    final candidates = defaults.where((value) => p.isAbsolute(value)).toList();
     if (candidates.isEmpty) return false;
     return database.transaction((txn) async {
       if (await _read(txn, _macosDefaultsKey) == '1') return false;

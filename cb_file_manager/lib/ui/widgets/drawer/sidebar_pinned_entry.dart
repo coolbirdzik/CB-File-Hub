@@ -65,15 +65,12 @@ class SidebarPinnedEntry {
     return SidebarPinnedEntry(path: path, title: title, icon: icon);
   }
 
+  /// Windows accepts both separators, so pins such as `/work/x` or a path
+  /// with a trailing `\` still show their last segment.
   static String _basename(String path) {
-    var normalized = path;
-    if (normalized.endsWith(Platform.pathSeparator) && normalized.length > 1) {
-      normalized = normalized.substring(0, normalized.length - 1);
-    }
-    if (normalized == '/') return '/';
-    return normalized
-        .split(Platform.pathSeparator)
-        .lastWhere((part) => part.isNotEmpty, orElse: () => normalized);
+    final separators = Platform.isWindows ? RegExp(r'[\\/]') : RegExp('/');
+    final parts = path.split(separators).where((part) => part.isNotEmpty);
+    return parts.isEmpty ? path : parts.last;
   }
 
   static IconData _fallbackIcon(String path) {

@@ -126,7 +126,7 @@ void main() {
       isEmpty,
     );
     await tester.tap(
-      find.byIcon(PhosphorIconsLight.x),
+      find.byIcon(PhosphorIconsLight.x).first,
       kind: PointerDeviceKind.mouse,
     );
     await tester.pumpAndSettle();
