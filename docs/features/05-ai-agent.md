@@ -145,7 +145,7 @@ Supported tools:
 
 - `list_directory`: list files, folders, or available drives.
 - `search_files`: recursively search by filename or extension.
-- `read_file`: read supported text files up to safe limits.
+- `read_file`: read text files up to safe limits, and the text of PDF, Office (docx/xlsx/pptx), OpenDocument, EPUB and RTF documents, with the line numbers `search_content` reports.
 - `write_file`: create, overwrite, or append text files.
 - `delete_file`: move one or more files to the recycle bin.
 - `get_file_info`: return metadata for a file or directory.
@@ -153,7 +153,7 @@ Supported tools:
 - `search_by_tag`: find files with a tag globally or within a path.
 - `get_file_tags`: list tags attached to one file.
 - `list_all_tags`: list all known tags.
-- `search_content`: grep-like recursive search inside text files.
+- `search_content`: find files by what they contain. Words match anywhere in a file, ignoring case and diacritics (`"quoted phrase"` stays whole); `match: any` ranks partial matches. It reads text files and the text of PDF, Office, OpenDocument, EPUB and RTF documents, and returns one ranked item per file with snippets. It runs in Rust (`cb_native` `content.rs`/`doctext.rs`) on every pool thread, so a whole drive fits its bounds (400k entries, 2 GiB read, 45 s); without the native library a Dart isolate searches with smaller bounds and no PDF reader. Cloud placeholders (OneDrive, iCloud) are never read, so searching does not download them; `AppData` and system folders right below a drive root are skipped unless the search starts inside one. Anything skipped (scanned PDFs without a text layer, legacy .doc/.xls/.ppt, oversized files) is listed in `warnings` and makes `scope_complete` false.
 - `select_cleaner_scan_items`: select exact paths from the current Cleaner scan for review, without deleting files. Read `get_current_cleaner_scan` first and pass its `scan_id`; `replace: false` adds to existing checked targets.
 
 After a fresh Disk usage scan, **Quick review** explains what the data appears to be and whether to keep it or consider removing it. Every click starts a new conversation; previous reviews remain in history, and follow-up chat stays in the new conversation. It shows short CLEAN/REVIEW/KEEP recommendations beside the tree without selecting or deleting files. Users choose targets themselves, then use the existing review and cleanup confirmation controls. Explicit chat requests to select targets still use the scan identity and safety checks.

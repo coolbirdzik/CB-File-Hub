@@ -7,6 +7,7 @@
 library;
 
 export 'src/native_archive.dart';
+export 'src/native_content.dart';
 export 'src/native_disk_scan.dart';
 export 'src/native_fs.dart';
 export 'src/native_hash.dart';

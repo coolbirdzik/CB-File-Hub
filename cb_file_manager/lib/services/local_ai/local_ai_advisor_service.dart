@@ -33,7 +33,12 @@ class LocalAiAdvisorService {
   /// context) fit without exhausting memory on lower-end machines.
   static const int minContextTokens = 1024;
   static const int maxContextTokens = 32768;
-  static const int defaultContextTokens = 4096;
+
+  /// The agent's system prompt alone is ~2,000 tokens and one tool page up
+  /// to ~3,500, so 4,096 overflowed after the first search. Qwen3.5-4B needs
+  /// ~400 MB more at 16K than at 4K; 8K is a safe middle for every catalog
+  /// model.
+  static const int defaultContextTokens = 8192;
 
   final FlutterSecureStorage _secureStorage;
   final SharedPreferences _prefs;

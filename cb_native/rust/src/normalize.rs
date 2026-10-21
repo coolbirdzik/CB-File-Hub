@@ -124,9 +124,50 @@ pub fn search_key(value: &str) -> String {
     collapsed.trim_matches(is_trim_space).to_string()
 }
 
+/// `search_key(value)` written into `out` (cleared first). ASCII text, most
+/// lines of most files, skips the tables: no fold entry is ASCII and Dart
+/// lower-cases ASCII as A-Z to a-z.
+pub fn search_key_into(value: &str, out: &mut String) {
+    out.clear();
+    if !value.is_ascii() {
+        out.push_str(&search_key(value));
+        return;
+    }
+    let mut pending_space = false;
+    for &byte in value.as_bytes() {
+        let c = byte as char;
+        if is_separator(c) || is_regexp_space(c) {
+            pending_space = !out.is_empty();
+            continue;
+        }
+        if pending_space {
+            out.push(' ');
+            pending_space = false;
+        }
+        out.push(c.to_ascii_lowercase());
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{dart_compare, search_key};
+    use super::{dart_compare, search_key, search_key_into};
+
+    #[test]
+    fn ascii_fast_path_equals_search_key() {
+        let mut out = String::new();
+        for sample in [
+            "",
+            "   ",
+            "Hello World",
+            "  a__b--c..d((e))[[f]]{{g}}  ",
+            "\tTabs\u{0B}vt\u{0C}ff\r\nend  ",
+            "MiXeD_Case-File.Name (1).TXT",
+            "Đường đi",
+        ] {
+            search_key_into(sample, &mut out);
+            assert_eq!(out, search_key(sample), "{sample:?}");
+        }
+    }
     use std::cmp::Ordering;
 
     #[test]

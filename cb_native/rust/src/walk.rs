@@ -30,14 +30,14 @@ const MAX_THREADS: usize = 32;
 const STUCK_AFTER_MS: u64 = 1_000;
 
 pub struct Task {
-    path: String,
-    depth: u32,
+    pub(crate) path: String,
+    pub(crate) depth: u32,
     /// A path given as a file rather than a directory to read.
-    file: bool,
+    pub(crate) file: bool,
 }
 
 impl Task {
-    fn dir(path: String, depth: u32) -> Task {
+    pub(crate) fn dir(path: String, depth: u32) -> Task {
         Task {
             path,
             depth,
@@ -46,7 +46,7 @@ impl Task {
     }
 }
 
-trait Kind: Send + Sync {
+pub(crate) trait Kind: Send + Sync {
     /// Reads one directory (or stats one file task) and returns the
     /// subdirectories to visit.
     fn scan(&self, walk: &Walk, task: &Task) -> Vec<Task>;
@@ -57,7 +57,7 @@ trait Kind: Send + Sync {
 }
 
 pub struct Walk {
-    job: Arc<Job>,
+    pub(crate) job: Arc<Job>,
     kind: Box<dyn Kind>,
     stack: Mutex<Vec<Task>>,
     /// Queued plus running directories; the walk ends when it reaches zero.
@@ -65,11 +65,11 @@ pub struct Walk {
     /// In the pool's queue. Only changed under the pool lock.
     queued: AtomicBool,
     /// A result limit was reached: stop, but complete normally.
-    stop: AtomicBool,
+    pub(crate) stop: AtomicBool,
 }
 
 impl Walk {
-    fn halted(&self) -> bool {
+    pub(crate) fn halted(&self) -> bool {
         self.stop.load(Ordering::Relaxed) || self.job.cancelled()
     }
 
@@ -81,7 +81,7 @@ impl Walk {
     }
 }
 
-fn start(port: i64, roots: Vec<Task>, kind: Box<dyn Kind>) -> Arc<Job> {
+pub(crate) fn start(port: i64, roots: Vec<Task>, kind: Box<dyn Kind>) -> Arc<Job> {
     let job = Job::new(port);
     let walk = Arc::new(Walk {
         job: Arc::clone(&job),
@@ -153,15 +153,33 @@ impl Pool {
         if state.idle == 0
             && (state.threads < self.base_threads || (stuck && state.threads < MAX_THREADS))
         {
-            let spawned = thread::Builder::new()
-                .name("cb_native_walk".into())
-                .spawn(move || self.work());
-            if spawned.is_ok() {
-                state.threads += 1;
-            }
+            self.spawn_thread(&mut state);
         }
         drop(state);
         self.wake.notify_one();
+    }
+
+    fn spawn_thread(&'static self, state: &mut PoolState) -> bool {
+        let spawned = thread::Builder::new()
+            .name("cb_native_walk".into())
+            .spawn(move || self.work());
+        if spawned.is_ok() {
+            state.threads += 1;
+        }
+        spawned.is_ok()
+    }
+
+    /// Grows to the base size at once instead of one thread per submitted
+    /// walk.
+    fn widen(&'static self) {
+        let mut state = lock(&self.state);
+        while state.threads < self.base_threads {
+            if !self.spawn_thread(&mut state) {
+                break;
+            }
+        }
+        drop(state);
+        self.wake.notify_all();
     }
 
     fn next(&self) -> Next {
@@ -226,7 +244,14 @@ impl Pool {
     }
 }
 
-fn read_dir(walk: &Walk, task: &Task) -> Option<fs::ReadDir> {
+/// Lets one walk whose tasks are CPU-bound (the content search) run on
+/// every base pool thread. Other walks keep growing the pool one thread per
+/// submitted walk.
+pub(crate) fn widen_pool() {
+    pool().widen();
+}
+
+pub(crate) fn read_dir(walk: &Walk, task: &Task) -> Option<fs::ReadDir> {
     walk.job.set_current(&task.path);
     fs::read_dir(&task.path).ok()
 }

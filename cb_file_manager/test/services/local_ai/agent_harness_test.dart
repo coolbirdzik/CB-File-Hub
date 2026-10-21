@@ -57,6 +57,11 @@ void main() {
       jsonEncode([model.toJson()]),
     );
     await prefs.setString('local_ai_selected_model_id', model.catalogId);
+    // Live runs: match the window llama-server was started with (-c).
+    final window = int.tryParse(
+      Platform.environment['CB_LOCAL_CHAT_TEST_CTX'] ?? '',
+    );
+    if (window != null) await prefs.setInt('local_ai_max_tokens', window);
     final service = LocalAiAdvisorService(
       secureStorage: const FlutterSecureStorage(),
       prefs: prefs,
@@ -72,6 +77,73 @@ void main() {
     bloc.add(InitializeAiAgent(workspacePath: sandbox.path));
     await until(() => bloc.state.selectedProviderId == '__local_ai__');
     return bloc;
+  }
+
+  test('a small local window gets small tool pages and older results are '
+      'shortened so every request fits', () async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('local_ai_max_tokens', 4096);
+    for (var i = 0; i < 300; i++) {
+      await File(
+        p.join(sandbox.path, 'quarterly-report-${'x' * 40}-$i.txt'),
+      ).writeAsString('x');
+    }
+    final runtime = _Runtime([
+      for (final pattern in ['report', 'quarterly', 'txt', 'x'])
+        call('list_directory', {'pattern': pattern, 'limit': 100}),
+      'Done',
+    ]);
+    final bloc = await local(runtime);
+    bloc.add(const SendMessage('List the reports'));
+    await until(() => runtime.requests.length == 5 && !bloc.state.isLoading);
+    expect(bloc.state.error, isNull);
+    // The bloc's own estimate: ~4 characters a token for the system prompt,
+    // ~2.8 for messages, with a quarter of the window left for the answer.
+    for (var i = 0; i < runtime.requests.length; i++) {
+      final messageChars = runtime.requests[i].fold<int>(
+        0,
+        (sum, m) => sum + m['content']!.length + 24,
+      );
+      final tokens = runtime.systemPrompts[i]!.length / 4 + messageChars / 2.8;
+      expect(tokens, lessThanOrEqualTo(3072), reason: 'request $i');
+    }
+    final last = runtime.requests.last.map((m) => m['content']!).join('\n');
+    // Earlier pages collapse to a marker; the newest result survives.
+    expect(last, contains('earlier result omitted to fit the model context'));
+    // Tool output is JSON inside the block, not an escaped string.
+    expect(last, contains('"output":{"ok":true'));
+  });
+
+  for (final (label, first) in [
+    (
+      'an announced tool step ending on a colon',
+      'Để tìm file theo tên chính xác hơn, tôi sẽ dùng công cụ tìm kiếm tên '
+          'file thay vì nội dung trong file:',
+    ),
+    (
+      'a reply cut off at the length limit',
+      'Mình cần xem danh sách file trước khi trả lời'
+          '${LlamaCppChatClient.lengthLimitMarker}',
+    ),
+  ]) {
+    test('$label continues the turn instead of ending it', () async {
+      final runtime = _Runtime([
+        first,
+        call('search_files', {'query': 'report'}),
+        'Đã tìm thấy report.txt.',
+      ]);
+      final bloc = await local(runtime);
+      bloc.add(const SendMessage('Tìm file report'));
+      await until(() => runtime.requests.length == 3 && !bloc.state.isLoading);
+      expect(bloc.state.error, isNull);
+      expect(tools.calls.map((c) => c.name), ['search_files']);
+      expect(bloc.state.messages.last.content, 'Đã tìm thấy report.txt.');
+      // The unfinished reply is never shown as the answer.
+      expect(
+        bloc.state.messages.map((m) => m.content),
+        isNot(contains(startsWith('Để tìm file theo tên'))),
+      );
+    });
   }
 
   test('unknown tool and invalid args are repaired before execution', () async {
@@ -943,16 +1015,32 @@ void main() {
     timeout: const Timeout(Duration(minutes: 3)),
   );
 
-  for (final scenario in ['files', 'tags', 'read', 'manage']) {
+  for (final scenario in ['files', 'tags', 'read', 'manage', 'content']) {
     test(
       'live local model common workflow: $scenario',
       () async {
+        if (scenario == 'content') {
+          // Enough look-alike documents that one search page is large.
+          for (var i = 0; i < 150; i++) {
+            await File(p.join(sandbox.path, 'notes', 'meeting-$i.md'))
+                .create(recursive: true)
+                .then(
+                  (file) => file.writeAsString(
+                    'Meeting $i: invoice review, budget and vendor follow-up. '
+                    'Invoice drafts are pending approval.',
+                  ),
+                );
+          }
+        }
         final runtime = _Runtime([], liveUrl: liveUrl);
         final bloc = await local(runtime);
         final prompt = switch (scenario) {
           'files' => 'Tìm file report.txt trong thư mục hiện tại.',
           'tags' => 'Trong thư mục hiện tại có file nào gắn tag Work?',
           'read' => 'Đọc report.txt và cho tôi biết số hóa đơn.',
+          'content' =>
+            'Trong thư mục này, file nào có ghi số hóa đơn INV-2048? Tìm theo '
+                'nội dung file.',
           _ => 'Copy report.txt thành backup.txt ngay trong thư mục này.',
         };
         final approved = <String>{};
@@ -985,6 +1073,9 @@ void main() {
           case 'read':
             expect(names, contains('read_file'));
             expect(bloc.state.messages.last.content, contains('INV-2048'));
+          case 'content':
+            expect(names, contains('search_content'));
+            expect(bloc.state.messages.last.content, contains('report.txt'));
           case 'manage':
             expect(names, contains('copy_file'));
             expect(
@@ -1052,6 +1143,7 @@ class _Runtime extends LocalAiChatRuntime
   final List<String> responses;
   final String? liveUrl;
   final requests = <List<Map<String, String>>>[];
+  final systemPrompts = <String?>[];
   final http = _RealHttp().createHttpClient(null);
   final String Function()? respond;
   final Future<String> Function()? asyncRespond;
@@ -1091,6 +1183,7 @@ class _Runtime extends LocalAiChatRuntime
     bool direct = false,
   }) {
     requests.add(List.of(messages));
+    systemPrompts.add(systemPrompt);
     if (liveUrl != null) {
       return LlamaCppChatClient(http).stream(
         baseUri: Uri.parse(liveUrl!),
@@ -1104,7 +1197,16 @@ class _Runtime extends LocalAiChatRuntime
       );
     }
     if (asyncRespond != null) return Stream.fromFuture(asyncRespond!());
-    return Stream.value(respond?.call() ?? responses[requests.length - 1]);
+    final text = respond?.call() ?? responses[requests.length - 1];
+    // Like LlamaCppChatClient: the cut-off marker follows the text.
+    const marker = LlamaCppChatClient.lengthLimitMarker;
+    if (text.endsWith(marker)) {
+      return Stream.fromIterable([
+        text.substring(0, text.length - marker.length),
+        marker,
+      ]);
+    }
+    return Stream.value(text);
   }
 
   @override

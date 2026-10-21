@@ -15,6 +15,7 @@ import 'components/conversation_list_panel.dart';
 import '../../tab_manager/core/tab_data.dart';
 import '../../tab_manager/core/tab_manager.dart';
 import '../../tab_manager/core/tab_paths.dart';
+import 'components/agent_context_label.dart';
 import 'components/chat_input_bar.dart';
 import 'components/chat_message_bubble.dart';
 import 'components/raw_payload_dialog.dart';
@@ -271,6 +272,7 @@ class _AiSidePanelState extends State<AiSidePanel> {
                                 theme,
                                 state,
                               ),
+                              modelSelector: _buildModelSelector(l, state),
                             ),
                           ],
                         );
@@ -313,12 +315,6 @@ class _AiSidePanelState extends State<AiSidePanel> {
     ThemeData theme,
     AiAgentState state,
   ) {
-    final path = state.currentPath;
-    // Show just the last folder segment for compactness
-    final folderName = path.isNotEmpty
-        ? path.split(Platform.pathSeparator).where((s) => s.isNotEmpty).last
-        : null;
-
     // Calculate total context size from messages
     int totalChars = 0;
     for (final m in state.messages) {
@@ -331,37 +327,7 @@ class _AiSidePanelState extends State<AiSidePanel> {
       decoration: CbDecorations.bar(context),
       child: Row(
         children: [
-          Icon(
-            folderName != null
-                ? PhosphorIconsLight.folderOpen
-                : PhosphorIconsLight.hardDrives,
-            size: 11,
-            color: theme.colorScheme.primary.withValues(alpha: 0.8),
-          ),
-          const SizedBox(width: 5),
-          Expanded(
-            child: Text(
-              folderName ?? context.tr.aiAllDrives,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-                color: theme.colorScheme.primary.withValues(alpha: 0.8),
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          if (path.isNotEmpty)
-            Tooltip(
-              message: path,
-              child: Icon(
-                PhosphorIconsLight.info,
-                size: 11,
-                color: theme.colorScheme.onSurfaceVariant.withValues(
-                  alpha: 0.4,
-                ),
-              ),
-            ),
+          Expanded(child: AgentContextLabel(currentPath: state.currentPath)),
           // Context size indicator
           if (state.messages.isNotEmpty) ...[
             const SizedBox(width: 6),
@@ -538,31 +504,15 @@ class _AiSidePanelState extends State<AiSidePanel> {
               style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
             ),
           ),
-          if (state.providerModelCatalogs.isNotEmpty ||
-              state.isLoadingProviderModels) ...[
-            ModelSelectorButton(
-              catalogs: state.providerModelCatalogs,
-              selectedProviderId: state.selectedProviderId,
-              selectedModelName: state.selectedModelName,
-              isLoading: state.isLoadingProviderModels,
-              tooltip: l.selectModel,
-              defaultLabel: l.defaultModel,
-              loadingLabel: l.loadingModels,
-              emptyLabel: l.noModelConfigured,
-              searchHint: l.modelSearchHint,
-              noMatchesLabel: l.noModelsFound,
-              compact: true,
-              onSelected: (value) {
-                _bloc.add(
-                  SelectChatModel(
-                    providerId: value.providerId,
-                    modelName: value.modelName,
-                  ),
-                );
-              },
-            ),
-            const SizedBox(width: 4),
-          ],
+          // Always visible: starting over should not need the history list.
+          _PanelHeaderIconButton(
+            key: const ValueKey('ai-panel-new-conversation'),
+            icon: PhosphorIconsLight.plus,
+            tooltip: l.newConversation,
+            isDark: isDark,
+            onPressed: () => _bloc.add(const NewConversation()),
+          ),
+          const SizedBox(width: 2),
           _PanelHeaderIconButton(
             icon: PhosphorIconsLight.x,
             tooltip: l.cancel,
@@ -571,6 +521,36 @@ class _AiSidePanelState extends State<AiSidePanel> {
           ),
         ],
       ),
+    );
+  }
+
+  /// Model picker in the composer footer, beside the send button, so the
+  /// model choice sits next to the message being written. Null while there is
+  /// nothing to pick from.
+  Widget? _buildModelSelector(AppLocalizations l, AiAgentState state) {
+    if (state.providerModelCatalogs.isEmpty && !state.isLoadingProviderModels) {
+      return null;
+    }
+    return ModelSelectorButton(
+      catalogs: state.providerModelCatalogs,
+      selectedProviderId: state.selectedProviderId,
+      selectedModelName: state.selectedModelName,
+      isLoading: state.isLoadingProviderModels,
+      tooltip: l.selectModel,
+      defaultLabel: l.defaultModel,
+      loadingLabel: l.loadingModels,
+      emptyLabel: l.noModelConfigured,
+      searchHint: l.modelSearchHint,
+      noMatchesLabel: l.noModelsFound,
+      compact: true,
+      onSelected: (value) {
+        _bloc.add(
+          SelectChatModel(
+            providerId: value.providerId,
+            modelName: value.modelName,
+          ),
+        );
+      },
     );
   }
 
@@ -625,11 +605,13 @@ class _AiSidePanelState extends State<AiSidePanel> {
                         color: theme.colorScheme.primary,
                       ),
                       const SizedBox(width: 4),
-                      Text(
-                        l.setupAiProvider,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: theme.colorScheme.primary,
+                      Flexible(
+                        child: Text(
+                          l.setupAiProvider,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: theme.colorScheme.primary,
+                          ),
                         ),
                       ),
                     ],
@@ -980,6 +962,7 @@ class _PanelHeaderIconButton extends StatefulWidget {
   final VoidCallback? onPressed;
 
   const _PanelHeaderIconButton({
+    super.key,
     required this.icon,
     required this.isDark,
     this.tooltip,

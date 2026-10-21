@@ -5828,6 +5828,34 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get aiAllDrives => 'Tất cả ổ đĩa';
   @override
+  String aiLocalContextFull(int tokens) =>
+      'Cửa sổ ngữ cảnh của model cục bộ ($tokens token) đã đầy. Hãy tăng Cửa sổ ngữ cảnh trong Cài đặt > Trợ lý AI nội bộ, hoặc bắt đầu cuộc trò chuyện mới.';
+  @override
+  String get aiContextWorkingIn => 'Đang làm việc trong';
+  @override
+  String get aiContextCleanerScan => 'Kết quả quét Dọn dẹp';
+  @override
+  String get aiContextNetwork => 'Thư mục mạng';
+  @override
+  String get aiContextAppScreen => 'Màn hình ứng dụng';
+  @override
+  String aiContextDefaultFolder(String folder) => 'thư mục mặc định: $folder';
+  @override
+  String aiContextFolderHint(String path) =>
+      'CB Agent tìm, đọc và thay đổi file trong thư mục này và các thư mục con; đường dẫn tương đối tính từ đây.\n$path';
+  @override
+  String aiContextDrivesHint(String path) =>
+      'CB Agent thấy mọi ổ đĩa. Nếu tin nhắn không nêu thư mục, nó làm việc trong:\n$path';
+  @override
+  String aiContextCleanerHint(String path) =>
+      'CB Agent đọc kết quả quét Dọn dẹp đang mở ở tab này. Với các file khác, nó làm việc trong:\n$path';
+  @override
+  String aiContextScreenHint(String path) =>
+      'Màn hình này không phải thư mục nên CB Agent làm việc trong:\n$path\nHãy nêu tên thư mục trong tin nhắn nếu muốn làm việc ở chỗ khác.';
+  @override
+  String aiContextNetworkHint(String path) =>
+      'CB Agent chưa đọc được thư mục mạng (SMB, FTP...), nên nó làm việc trong:\n$path';
+  @override
   String get aiThinking => 'Đang suy nghĩ...';
   @override
   String get aiDropToMention => 'Thả để nhắc đến';

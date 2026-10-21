@@ -183,7 +183,12 @@ calling isolate:
   image thumbnails (photo, SMB/network; JPEGs decode at a reduced DCT scale),
   the editor's encode and inpaint (an exact port of `inpaint.dart`), SHA-256
   (`helpers/core/file_hash.dart`), and archives (`ArchiveService`: zip, tar,
-  tar.gz/bz2/xz, gz, bz2 and 7z without 7-Zip; RAR still needs 7-Zip).
+  tar.gz/bz2/xz, gz, bz2 and 7z without 7-Zip; RAR still needs 7-Zip),
+  and the CB Agent's `search_content`/`read_file` (`ContentSearch`,
+  `content.rs` + `doctext.rs`: text, Office, EPUB, RTF and PDF through
+  `pdf-extract`; cloud placeholders are never read).
+  `test/services/local_ai/agent_content_search_test.dart` checks native and
+  Dart return the same items and document text.
   Every caller keeps its Dart code as the fallback.
 
 - **Optional by design:** if cargo, the rustup target or the build is missing,

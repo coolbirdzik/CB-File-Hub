@@ -94,13 +94,21 @@ void main() {
       });
       expect(result['items'], hasLength(1));
       expect((result['items'] as List).first['size_bytes'], isA<int>());
+      for (var i = 0; i < 25; i++) {
+        await file('note-$i.txt', 'needle $i');
+      }
       final search = await run('search_content', {
         'query': 'needle',
         'extension': 'txt',
         'limit': 20,
       });
-      expect(search['matched_in_scan'], 120);
+      // One item per file; the file with the most hits ranks first.
+      expect(search['matched_in_scan'], 26);
       expect(search['next_cursor'], isNotNull);
+      final best = (search['items'] as List).first as Map<String, dynamic>;
+      expect(best['name'], 'report.txt');
+      expect(best['hits'], 120);
+      expect(best['snippets'], hasLength(3));
       final read = await run('read_file', {
         'path': 'report.txt',
         'start_line': 51,

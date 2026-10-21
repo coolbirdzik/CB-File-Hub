@@ -14,11 +14,11 @@ import '../../../models/ai/ai_search_result.dart';
 import 'components/approval_card.dart';
 import '../../../services/ai/ai_chat_history_service.dart';
 import '../../../services/ai/ai_provider_service.dart';
-import '../../../services/ai/file_context_builder.dart';
 import '../../../services/local_ai/local_ai_advisor_service.dart';
 import '../../tab_manager/core/tab_data.dart';
 import '../../tab_manager/core/tab_manager.dart';
 import '../../tab_manager/core/tab_paths.dart';
+import 'components/agent_context_label.dart';
 import 'components/chat_input_bar.dart';
 import 'components/chat_message_bubble.dart';
 import 'components/raw_payload_dialog.dart';
@@ -281,28 +281,6 @@ class _AiChatBodyState extends State<_AiChatBody> {
     AiAgentState state,
   ) {
     final isDark = theme.brightness == Brightness.dark;
-    final hasPath = state.currentPath.isNotEmpty;
-    // Derive display label from scope
-    late IconData scopeIcon;
-    late String scopeLabel;
-    switch (state.searchScope) {
-      case SearchScope.currentDirectory:
-        scopeIcon = PhosphorIconsLight.folder;
-        scopeLabel = l.currentFolder;
-        break;
-      case SearchScope.recursive:
-        scopeIcon = PhosphorIconsLight.folderOpen;
-        scopeLabel = l.recursiveSearch;
-        break;
-      case SearchScope.taggedFiles:
-        scopeIcon = PhosphorIconsLight.tag;
-        scopeLabel = l.aiTaggedFiles;
-        break;
-      default:
-        scopeIcon = PhosphorIconsLight.hardDrives;
-        scopeLabel = l.allDrives;
-    }
-
     // Calculate total context size from messages
     final contextInfo = _calcContextInfo(state.messages);
 
@@ -312,43 +290,7 @@ class _AiChatBodyState extends State<_AiChatBody> {
       decoration: CbDecorations.bar(context),
       child: Row(
         children: [
-          Icon(
-            scopeIcon,
-            size: 12,
-            color: theme.colorScheme.primary.withValues(alpha: 0.85),
-          ),
-          const SizedBox(width: 5),
-          Text(
-            scopeLabel,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: theme.colorScheme.primary.withValues(alpha: 0.85),
-            ),
-          ),
-          if (hasPath) ...[
-            const SizedBox(width: 6),
-            Icon(
-              PhosphorIconsLight.caretRight,
-              size: 10,
-              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.45),
-            ),
-            const SizedBox(width: 4),
-            Expanded(
-              child: Text(
-                state.currentPath,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: theme.colorScheme.onSurfaceVariant.withValues(
-                    alpha: 0.7,
-                  ),
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ] else
-            const Spacer(),
+          Expanded(child: AgentContextLabel(currentPath: state.currentPath)),
           // Context size indicator
           if (state.messages.isNotEmpty) ...[
             const SizedBox(width: 8),

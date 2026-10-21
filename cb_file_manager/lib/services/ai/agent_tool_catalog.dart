@@ -70,15 +70,17 @@ class AgentToolCatalog {
       {'path': 'string'},
     ),
     'read_file': AgentToolSpec(
-      'Read a page of UTF-8 text, with numbered lines and next_start_line. Not a binary/media reader.',
+      'Read a page of text with numbered lines and next_start_line. Also reads the text of PDF, docx/xlsx/pptx, OpenDocument, EPUB and RTF files, with the same line numbers search_content reports. Not an OCR, binary or media reader.',
       {'path': 'string', 'start_line': 'int?', 'max_lines': 'int?'},
     ),
     'search_content': AgentToolSpec(
-      'Search literal text inside text files. Paginated; extension optional.',
+      'Find files by what they contain: text/code files and the text of PDF, docx/xlsx/pptx, OpenDocument, EPUB and RTF documents (not scanned PDFs or images: no OCR). Fast enough for a whole drive. Words match anywhere in the file, ignoring case and diacritics; "quoted phrase" matches together. match all (default) needs every word, any ranks files by how many match. Returns one item per file, best first, with matched_terms, hits and snippets {line,text}. Recursive by default; paginated.',
       {
         'path': 'string?',
         'query': 'string',
+        'match': 'string?',
         'extension': 'string?',
+        'recursive': 'bool?',
         'case_sensitive': 'bool?',
         'cursor': 'string?',
         'limit': 'int?',
@@ -219,6 +221,12 @@ class AgentToolCatalog {
         (args['remove'] as List? ?? []).isEmpty) {
       return 'Supply add and/or remove tags.';
     }
+    if (name == 'search_content' &&
+        args['match'] != null &&
+        args['match'] != 'all' &&
+        args['match'] != 'any') {
+      return 'match must be "all" or "any".';
+    }
     if (name == 'search_files' &&
         (args['query'] as String? ?? '').isEmpty &&
         (args['extension'] as String? ?? '').isEmpty &&
@@ -277,7 +285,7 @@ $definitions
 WORKFLOWS:
 - Browse: list_directory, follow cursor, then get_file_info/read_file as needed.
 - Find by name/extension: search_files; supplied filters combine with AND.
-- Find by text: search_content, then read_file around the returned line.
+- Find by content ("the file that mentions X", "my contract with Y"): search_content with a few distinctive words the file would contain, not the user's whole sentence. If nothing matches, retry with match any, synonyms, or the other language (Vietnamese and English). Then read_file at a snippet line to confirm before answering.
 - Tags: list_all_tags to discover names, search_by_tag to find files, get_file_tags to inspect one file. Tags are app metadata, not filenames.
 - Organize: inspect source and destination, then create_directory/copy_file/move_file/update_file_tags. The app asks for approval.
 - Compare files: list_directory with exact sizes, then file_checksum only for equal-size candidates. Same name or size alone does not prove identical content. No dedicated duplicate-finder tool is needed.

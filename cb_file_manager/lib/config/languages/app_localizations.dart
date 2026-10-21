@@ -2498,6 +2498,17 @@ abstract class AppLocalizations {
   String get aiToolActivity;
   String aiContextInfo(int messages, String chars);
   String get aiAllDrives;
+  String aiLocalContextFull(int tokens);
+  String get aiContextWorkingIn;
+  String get aiContextCleanerScan;
+  String get aiContextNetwork;
+  String get aiContextAppScreen;
+  String aiContextDefaultFolder(String folder);
+  String aiContextFolderHint(String path);
+  String aiContextDrivesHint(String path);
+  String aiContextCleanerHint(String path);
+  String aiContextScreenHint(String path);
+  String aiContextNetworkHint(String path);
   String get aiThinking;
   String get aiDropToMention;
   String aiFilesAttached(int count);

@@ -22,6 +22,8 @@ flate2 = { version = "1", default-features = false, features = ["zlib-rs"] }
 bzip2 = "0.6"
 lzma-rust2 = { version = "0.22", default-features = false, features = ["std", "xz"] }
 sevenz-rust2 = { version = "0.20", default-features = false, features = ["bzip2", "deflate"] }
+# Text of PDFs for the agent's content search (lopdf underneath).
+pdf-extract = "0.12"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = [

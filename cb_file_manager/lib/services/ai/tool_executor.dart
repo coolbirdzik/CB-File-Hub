@@ -17,6 +17,7 @@ import '../disk_cleaner/scan_target_resolver.dart' show editDistance;
 import 'cleaner_scan_registry.dart';
 import 'assistant_response_text.dart';
 import 'agent_tool_catalog.dart';
+import 'agent_workspace.dart';
 import 'agent_file_tools.dart';
 import 'agent_tag_tools.dart';
 import 'disk_cleaner_skill.dart';
@@ -58,19 +59,17 @@ class ToolExecutor {
   String _browsingPath = '';
   bool Function() _isCancelled = () => false;
 
+  /// [maxPageChars] bounds one page of listing, search or file text, so a
+  /// tool result fits the model's context.
   void beginTurn({
     required String currentPath,
     required bool Function() isCancelled,
+    int maxPageChars = AgentFileTools.defaultPageChars,
   }) {
-    _browsingPath = currentPath;
-    _workingDirectory =
-        currentPath.isNotEmpty &&
-            !currentPath.startsWith('#') &&
-            !currentPath.contains('://')
-        ? currentPath
-        : Platform.environment['USERPROFILE'] ??
-              Platform.environment['HOME'] ??
-              '';
+    _fileTools.pageChars = maxPageChars;
+    final workspace = AgentWorkspace.resolve(currentPath);
+    _browsingPath = workspace.browsingPath;
+    _workingDirectory = workspace.workingDirectory;
     _isCancelled = isCancelled;
   }
 
@@ -79,7 +78,14 @@ class ToolExecutor {
 
   ToolCall prepareCall(ToolCall call) {
     final normalized = normalizeCall(call);
-    final args = Map<String, dynamic>.from(normalized.arguments);
+    // Small models fill optional arguments with null or an empty cursor;
+    // both mean "not given", not a page to resume.
+    final args = Map<String, dynamic>.from(normalized.arguments)
+      ..removeWhere(
+        (key, value) =>
+            value == null ||
+            (key == 'cursor' && value is String && value.trim().isEmpty),
+      );
     // These paths identify rows in an existing scan, not files relative to
     // the agent's working directory. A Windows scan can also be inspected
     // on a non-Windows host (for example in unit tests).
@@ -348,7 +354,7 @@ class ToolExecutor {
         final topic = call.arguments['topic'];
         final guide = switch (topic) {
           'files' =>
-            'Browse/search in the current folder. Follow next_cursor with unchanged filters. Inspect sources and destinations before changes. For identical content, compare exact size_bytes, then file_checksum for candidates; report incomplete scans honestly. Use read_file start_line and next_start_line for text pages. Never infer duplicates from matching names alone.',
+            'Browse/search in the current folder. Follow next_cursor with unchanged filters. Inspect sources and destinations before changes. For identical content, compare exact size_bytes, then file_checksum for candidates; report incomplete scans honestly. Use read_file start_line and next_start_line for text pages. To find a file by what it contains, use search_content with distinctive words (match all, then any); it reads text files and PDF/docx/xlsx/pptx/OpenDocument/EPUB/RTF documents (no OCR for scans or images), and its warnings list what it skipped. Never infer duplicates from matching names alone.',
           'tags' =>
             'Tags are stored by CB File Hub, not the filesystem. Discover actual names with list_all_tags(query). Read get_file_tags(path); search_by_tag(tag,path,global:false) is scoped to a folder. global:true crosses drives. Follow next_cursor. update_file_tags(add/remove) preserves other tags and requires approval.',
           'media' =>

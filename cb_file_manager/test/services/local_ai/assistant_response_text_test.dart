@@ -18,6 +18,12 @@ void main() {
         'To locate Docker storage, I will check the current scan:',
         'I\'ll search the scanned files.',
         '<think>Need data</think>Mình sẽ tìm Docker trong scan.',
+        // Seen from Qwen3.5-4B: announced the next tool, then stopped.
+        'Để tìm file theo tên chính xác hơn, tôi sẽ dùng công cụ tìm kiếm '
+            'tên file thay vì nội dung trong file:',
+        'Tôi sẽ sử dụng search_files.',
+        'I\'ll use search_files instead.',
+        'Kết quả chưa đủ. Tiếp theo là danh sách:',
       ]) {
         expect(endsWithPendingInspection(text), isTrue, reason: text);
       }

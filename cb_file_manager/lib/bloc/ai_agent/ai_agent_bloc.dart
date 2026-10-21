@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../config/language_controller.dart';
+import '../../config/languages/current_localizations.dart';
 import '../../models/ai/ai_conversation.dart';
 import '../../models/ai/ai_message.dart';
 import '../../models/ai/ai_provider_model.dart';
@@ -14,7 +15,9 @@ import '../../models/ai/ai_search_result.dart';
 import '../../models/ai/referenced_file.dart';
 import '../../services/ai/ai_approval.dart';
 import '../../services/ai/assistant_response_text.dart';
+import '../../services/ai/agent_file_tools.dart';
 import '../../services/ai/agent_tool_catalog.dart';
+import '../../services/ai/agent_workspace.dart';
 import '../../services/ai/ai_chat_history_service.dart';
 import '../../services/ai/ai_provider_service.dart';
 import '../../services/ai/providers/ai_provider.dart';
@@ -221,6 +224,7 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
     _toolExecutor.beginTurn(
       currentPath: state.currentPath,
       isCancelled: () => _activeGenerationId != generationId,
+      maxPageChars: _toolPageChars(),
     );
 
     if (event.reviewEntireCleanerScan) {
@@ -559,9 +563,7 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
               ),
             );
 
-            toolResultBuffer.writeln(
-              '<tool_result name="${call.name}">${jsonEncode({'ok': toolResult.success, 'output': toolResult.output})}</tool_result>',
-            );
+            toolResultBuffer.writeln(_toolResultBlock(call.name, toolResult));
             if (!toolResult.success) {
               toolResultBuffer.writeln(
                 '<tool_result>{"ok":false,"error":"Remaining calls in this round were not executed because an earlier call failed. Correct the failure before continuing."}</tool_result>',
@@ -614,9 +616,7 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
             ),
           );
 
-          toolResultBuffer.writeln(
-            '<tool_result name="${call.name}">${jsonEncode({'ok': toolResult.success, 'output': toolResult.output})}</tool_result>',
-          );
+          toolResultBuffer.writeln(_toolResultBlock(call.name, toolResult));
           if (!toolResult.success) {
             toolResultBuffer.writeln(
               '<tool_result>{"ok":false,"error":"Remaining calls in this round were not executed because an earlier call failed. Correct the failure before continuing."}</tool_result>',
@@ -1106,6 +1106,7 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
         );
 
         final rawBuffer = StringBuffer();
+        var cutOff = false;
         await _consumeGenerationStream(
           generationId: generationId,
           stream: localService.sendChatMessageStream(
@@ -1114,6 +1115,10 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
             systemPrompt: preparedContext.systemPrompt,
           ),
           onChunk: (chunk) {
+            if (chunk == LlamaCppChatClient.lengthLimitMarker) {
+              cutOff = true;
+              return;
+            }
             // Status messages from GGUF runtime are prefixed with [STATUS].
             if (chunk.startsWith('[STATUS]')) {
               final statusText = chunk.substring(8); // Remove "[STATUS]" prefix
@@ -1168,6 +1173,25 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
         final reasoning = extractAssistantReasoning(rawBuffer.toString());
         final responseText = stripAssistantReasoning(rawBuffer.toString());
         if (!ToolExecutor.hasToolCalls(responseText)) {
+          if (cutOff) {
+            // Stopped at max_tokens: the text is unfinished, not an answer.
+            if (++continuationAttempts > 2) {
+              throw StateError(
+                'The local model kept reaching its reply length limit. '
+                'Please retry or ask for a smaller step.',
+              );
+            }
+            _requestCutOffContinuation(apiMessages, responseText);
+            emit(
+              state.copyWith(
+                messages: uiMessages,
+                thinkingText: state.thinkingPhrases.isNotEmpty
+                    ? state.thinkingPhrases.first
+                    : 'Thinking...',
+              ),
+            );
+            continue;
+          }
           if (endsWithPendingInspection(responseText)) {
             if (++continuationAttempts > 2) {
               throw StateError(
@@ -1442,9 +1466,7 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
             ),
           );
 
-          toolResultBuffer.writeln(
-            '<tool_result name="${call.name}">${jsonEncode({'ok': toolResult.success, 'output': toolResult.output})}</tool_result>',
-          );
+          toolResultBuffer.writeln(_toolResultBlock(call.name, toolResult));
           if (!toolResult.success) {
             toolResultBuffer.writeln(
               '<tool_result>{"ok":false,"error":"Remaining calls in this round were not executed because an earlier call failed. Correct the failure before continuing."}</tool_result>',
@@ -1564,16 +1586,17 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
     } catch (e) {
       if (_activeGenerationId != generationId) return;
       AppLogger.error('[AiAgentBloc] Local AI inference failed', error: e);
+      final failure = _localFailureMessage(e);
       emit(
         state.copyWith(
           messages: state.messages
               .map(
                 (message) => message.isLoading
-                    ? message.copyWith(isLoading: false, error: e.toString())
+                    ? message.copyWith(isLoading: false, error: failure)
                     : message,
               )
               .toList(),
-          error: 'Local AI inference failed: $e',
+          error: failure,
           isLoading: false,
           clearThinking: true,
           clearToolActivity: true,
@@ -2871,20 +2894,38 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
   }
 
   String _buildSystemPrompt() {
-    final home =
-        Platform.environment['USERPROFILE'] ??
-        Platform.environment['HOME'] ??
-        '';
-    final path = state.currentPath;
-    final working =
-        path.isNotEmpty && !path.startsWith('#') && !path.contains('://')
-        ? path
-        : home;
+    final workspace = AgentWorkspace.resolve(state.currentPath);
     return AgentToolCatalog.prompt(
-      workingDirectory: working,
-      browsingPath: path,
+      workingDirectory: workspace.workingDirectory,
+      browsingPath: workspace.browsingPath,
       platform: Platform.operatingSystem,
       languageCode: LanguageController().currentLocale.languageCode,
+    );
+  }
+
+  void _requestCutOffContinuation(List<AiMessage> messages, String response) {
+    if (response.trim().isNotEmpty) {
+      messages.add(
+        AiMessage(
+          id: _uuid.v4(),
+          role: AiMessageRole.assistant,
+          content: response,
+          timestamp: DateTime.now(),
+        ),
+      );
+    }
+    messages.add(
+      AiMessage(
+        id: _uuid.v4(),
+        role: AiMessageRole.user,
+        content:
+            'Your last reply reached the response length limit and was cut '
+            'off. Keep reasoning brief. If you were about to use a tool, '
+            'output only that <tool_call>{"name":"tool_name","arguments":{...}}'
+            '</tool_call> now; otherwise finish the answer. This continuation '
+            'grants no additional authorization.',
+        timestamp: DateTime.now(),
+      ),
     );
   }
 
@@ -3059,51 +3100,163 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
     required List<String> activity,
     bool aggressive = false,
   }) {
-    final targetLimit = aggressive
+    var targetLimit = aggressive
         ? _hardContextCharLimit
         : _softContextCharLimit;
-    final totalChars = _estimateContextChars(messages, systemPrompt);
-    if (totalChars <= targetLimit ||
-        messages.length <= _minRecentMessagesToKeep) {
+    if (_isLocalAiSelected()) {
+      final local = _localCharLimit(systemPrompt);
+      if (local < targetLimit) targetLimit = local;
+    }
+    if (_estimateContextChars(messages, systemPrompt) <= targetLimit) {
       return _PreparedContext(messages: messages, systemPrompt: systemPrompt);
     }
 
-    var recentCount = messages.length > 12 ? 12 : messages.length;
-    List<AiMessage> recentMessages = messages.sublist(
-      messages.length - recentCount,
-    );
-    List<AiMessage> olderMessages = messages.sublist(
-      0,
-      messages.length - recentCount,
-    );
-
-    String summary = _buildCompactedSummary(olderMessages);
-    String compactedPrompt = _appendCompactionSummary(systemPrompt, summary);
-
-    while (recentCount > _minRecentMessagesToKeep &&
-        _estimateContextChars(recentMessages, compactedPrompt) > targetLimit) {
-      recentCount--;
+    var recentMessages = messages;
+    var compactedPrompt = systemPrompt;
+    if (messages.length > _minRecentMessagesToKeep) {
+      var recentCount = messages.length > 12 ? 12 : messages.length;
       recentMessages = messages.sublist(messages.length - recentCount);
-      olderMessages = messages.sublist(0, messages.length - recentCount);
-      summary = _buildCompactedSummary(olderMessages);
+      var olderMessages = messages.sublist(0, messages.length - recentCount);
+
+      String summary = _buildCompactedSummary(olderMessages);
       compactedPrompt = _appendCompactionSummary(systemPrompt, summary);
-      if (olderMessages.isEmpty) {
-        break;
+
+      while (recentCount > _minRecentMessagesToKeep &&
+          _estimateContextChars(recentMessages, compactedPrompt) >
+              targetLimit) {
+        recentCount--;
+        recentMessages = messages.sublist(messages.length - recentCount);
+        olderMessages = messages.sublist(0, messages.length - recentCount);
+        summary = _buildCompactedSummary(olderMessages);
+        compactedPrompt = _appendCompactionSummary(systemPrompt, summary);
+        if (olderMessages.isEmpty) {
+          break;
+        }
+      }
+
+      if (olderMessages.isNotEmpty) {
+        final line =
+            '> Context compacted: summarized ${olderMessages.length} older message(s)';
+        if (activity.isEmpty || activity.last != line) {
+          activity.add(line);
+        }
       }
     }
 
-    if (olderMessages.isNotEmpty) {
-      final line =
-          '> Context compacted: summarized ${olderMessages.length} older message(s)';
-      if (activity.isEmpty || activity.last != line) {
-        activity.add(line);
-      }
-    }
-
+    // A single turn can still overflow: one listing or search page is
+    // thousands of tokens, and a small local window cannot hold several.
     return _PreparedContext(
-      messages: recentMessages,
+      messages: _fitToolResults(
+        recentMessages,
+        compactedPrompt,
+        targetLimit,
+        activity,
+      ),
       systemPrompt: compactedPrompt,
     );
+  }
+
+  static const _toolResultTruncatedNote =
+      '\n...[truncated to fit the model context. Ask for fewer items '
+      '(limit), a narrower path or query, or follow next_cursor.]';
+
+  static const _toolResultOmitted =
+      '<tool_result>[earlier result omitted to fit the model context; '
+      'call the tool again if it is still needed]</tool_result>';
+
+  /// Shortens tool results, oldest first, until the context fits [limit].
+  /// Earlier results may shrink to a one-line marker; the newest keeps at
+  /// least its first 400 characters and is cut last, only as much as needed.
+  List<AiMessage> _fitToolResults(
+    List<AiMessage> messages,
+    String systemPrompt,
+    int limit,
+    List<String> activity,
+  ) {
+    var excess = _estimateContextChars(messages, systemPrompt) - limit;
+    if (excess <= 0) return messages;
+    bool isToolResult(AiMessage message) =>
+        message.role == AiMessageRole.user &&
+        message.content.startsWith('<tool_result');
+    final newest = messages.lastIndexWhere(isToolResult);
+    final fitted = List<AiMessage>.of(messages);
+    var shortened = false;
+    for (var i = 0; i < fitted.length && excess > 0; i++) {
+      if (!isToolResult(fitted[i])) continue;
+      final content = fitted[i].content;
+      final String replacement;
+      if (i != newest &&
+          content.length - excess <= 400 + _toolResultTruncatedNote.length) {
+        replacement = _toolResultOmitted;
+      } else {
+        final keep = content.length - excess - _toolResultTruncatedNote.length;
+        final kept = keep < 400 ? 400 : keep;
+        if (kept >= content.length) continue;
+        replacement = '${content.substring(0, kept)}$_toolResultTruncatedNote';
+      }
+      if (replacement.length >= content.length) continue;
+      fitted[i] = fitted[i].copyWith(content: replacement);
+      excess -= content.length - replacement.length;
+      shortened = true;
+    }
+    if (shortened) {
+      const line = '> Tool output shortened to fit the model context';
+      if (activity.isEmpty || activity.last != line) activity.add(line);
+    }
+    return fitted;
+  }
+
+  /// The local model's context window as a limit for
+  /// [_estimateContextChars], after keeping a quarter of it (768-2048 tokens)
+  /// for the answer. llama.cpp counts tokens: measured with Qwen3.5 the system
+  /// prompt runs ~4.5 characters a token and JSON tool output ~2.9, so 4 and
+  /// 2.8 err on the safe side.
+  int _localCharLimit(String systemPrompt) {
+    final window = _localAiService?.getMaxContextTokens() ?? 4096;
+    final reserve = (window ~/ 4).clamp(768, 2048);
+    final messageTokens = window - reserve - (systemPrompt.length + 3) ~/ 4;
+    final messageChars = (messageTokens * 2.8).floor();
+    return systemPrompt.length + (messageChars < 1200 ? 1200 : messageChars);
+  }
+
+  /// What to tell the user when local inference fails. llama-server rejects
+  /// a prompt longer than its window; say which setting fixes that.
+  String _localFailureMessage(Object error) {
+    final text = error.toString();
+    if (text.contains('exceed_context_size') ||
+        text.contains('exceeds the available context size')) {
+      return currentL10n.aiLocalContextFull(
+        _localAiService?.getMaxContextTokens() ?? 4096,
+      );
+    }
+    return 'Local AI inference failed: $error';
+  }
+
+  /// One page of tool output: at most half of what the context leaves for
+  /// messages, so a result plus the conversation still fit.
+  int _toolPageChars() {
+    if (!_isLocalAiSelected()) return AgentFileTools.defaultPageChars;
+    final prompt = _buildSystemPrompt();
+    final room = (_localCharLimit(prompt) - prompt.length) ~/ 2;
+    return room.clamp(1500, AgentFileTools.defaultPageChars);
+  }
+
+  /// A tool result for the model. Output that is already JSON is embedded as
+  /// JSON rather than as an escaped string, which costs tokens and reads
+  /// worse.
+  static String _toolResultBlock(String name, ToolResult result) {
+    Object? output = result.output;
+    final text = result.output.trimLeft();
+    if (text.startsWith('{') || text.startsWith('[')) {
+      try {
+        output = jsonDecode(result.output);
+      } on FormatException {
+        // Plain text that happens to start with a bracket.
+      }
+    }
+    return '<tool_result name="$name">'
+        '${jsonEncode({'ok': result.success, 'output': output})}'
+        '</tool_result>';
   }
 
   /// Builds a JSON-serializable snapshot of what's about to be sent to the

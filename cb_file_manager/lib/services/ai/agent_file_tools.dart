@@ -1,12 +1,15 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:cb_native/cb_native.dart';
 import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
 
 import '../../helpers/core/text_utils.dart';
+import 'content_search.dart';
+import 'document_text.dart';
 
 /// Shared filesystem primitives, with bounded scans and resumable result pages.
 /// Approval is owned by the agent loop, before calling any mutating primitive.
@@ -24,6 +27,11 @@ class AgentFileTools {
     'write_file',
   };
   final _pages = <String, _ResultSnapshot>{};
+
+  /// Characters of items one result or text page may hold. A small local
+  /// model's context cannot take the default; the agent lowers it per turn.
+  int pageChars = defaultPageChars;
+  static const defaultPageChars = 10000;
   int _sequence = 0;
 
   static String resolvePath(String input, String workingDirectory) {
@@ -69,10 +77,35 @@ class AgentFileTools {
       }
       return page(name, args, drives);
     }
-    if (name == 'list_directory' ||
-        name == 'search_files' ||
-        name == 'search_content') {
+    if (name == 'list_directory' || name == 'search_files') {
       return _scan(name, args, check);
+    }
+    if (name == 'search_content') {
+      if (!await Directory(path).exists()) {
+        throw FileSystemException('Directory not found', path);
+      }
+      final outcome = await ContentSearch.run(
+        ContentSearchRequest(
+          root: path,
+          query: args['query'] as String,
+          extension: args['extension'] as String? ?? '',
+          caseSensitive: args['case_sensitive'] == true,
+          matchAll: (args['match'] as String? ?? 'all') != 'any',
+          recursive: args['recursive'] as bool? ?? true,
+        ),
+        isCancelled: isCancelled,
+      );
+      return page(
+        name,
+        args,
+        outcome.items,
+        complete: outcome.complete,
+        warnings: outcome.warnings,
+        extra: {'files_searched': outcome.filesSearched},
+      );
+    }
+    if (name == 'read_file' && DocumentText.formatOf(path) != 'text') {
+      return _readDocument(path, args);
     }
     if (name == 'read_file') {
       final bytes = await File(path)
@@ -89,31 +122,11 @@ class AgentFileTools {
       if (bytes.contains(0)) {
         throw ArgumentError('Binary file. Use get_file_info or file_checksum.');
       }
-      final lines = const LineSplitter().convert(utf8.decode(bytes));
-      final start = args['start_line'] as int? ?? 1;
-      final count = (args['max_lines'] as int? ?? 50).clamp(1, 100);
-      final selected = <Map<String, dynamic>>[];
-      var chars = 0;
-      var index = start - 1;
-      for (; index < lines.length && selected.length < count; index++) {
-        if (chars + lines[index].length > 10000) {
-          if (selected.isEmpty) {
-            throw ArgumentError(
-              'Line ${index + 1} exceeds the text page limit. Use an approved command to inspect it.',
-            );
-          }
-          break;
-        }
-        chars += lines[index].length;
-        selected.add({'line': index + 1, 'text': lines[index]});
-      }
-      return {
-        'ok': true,
-        'path': path,
-        'lines': selected,
-        'total_lines': lines.length,
-        'next_start_line': index < lines.length ? index + 1 : null,
-      };
+      return _linePage(
+        path,
+        const LineSplitter().convert(utf8.decode(bytes)),
+        args,
+      );
     }
     if (name == 'get_file_info' || name == 'file_checksum') {
       final before = await FileStat.stat(path);
@@ -275,7 +288,6 @@ class AgentFileTools {
         .toLowerCase();
     final ext = (args['extension'] as String? ?? '').toLowerCase();
     var visited = 0;
-    var textBytes = 0;
     var complete = true;
     final entities = directory
         .list(recursive: recursive, followLinks: false)
@@ -304,65 +316,11 @@ class AgentFileTools {
             !filename.endsWith(ext.startsWith('.') ? ext : '.$ext')) {
           continue;
         }
-        if (name != 'search_content' &&
-            query.isNotEmpty &&
-            !TextUtils.matchesSearch(filename, query)) {
+        if (query.isNotEmpty && !TextUtils.matchesSearch(filename, query)) {
           continue;
         }
         try {
-          final stat = await entity.stat();
-          if (name != 'search_content') {
-            results.add(_metadata(entity.path, stat));
-            continue;
-          }
-          if (stat.size > 1024 * 1024) {
-            complete = false;
-            if (!warnings.contains(
-              'Files larger than 1 MiB were skipped by text search.',
-            )) {
-              warnings.add(
-                'Files larger than 1 MiB were skipped by text search.',
-              );
-            }
-            continue;
-          }
-          if ((textBytes += stat.size) > 32 * 1024 * 1024) {
-            complete = false;
-            warnings.add(
-              'Text search byte budget reached. Narrow the folder or extension.',
-            );
-            break;
-          }
-          final bytes = await File(entity.path).readAsBytes();
-          if (bytes.contains(0)) continue;
-          String content;
-          try {
-            content = utf8.decode(bytes);
-          } on FormatException {
-            continue;
-          }
-          final lines = const LineSplitter().convert(content);
-          for (var i = 0; i < lines.length; i++) {
-            check();
-            final haystack = args['case_sensitive'] == true
-                ? lines[i]
-                : lines[i].toLowerCase();
-            final needle = args['case_sensitive'] == true
-                ? args['query'] as String
-                : query;
-            if (!haystack.contains(needle)) continue;
-            results.add({
-              'path': entity.path,
-              'line': i + 1,
-              'text': lines[i].length > 200
-                  ? '${lines[i].substring(0, 200)}…'
-                  : lines[i],
-            });
-            if (results.length >= 10000) {
-              complete = false;
-              break;
-            }
-          }
+          results.add(_metadata(entity.path, await entity.stat()));
         } on FileSystemException catch (error) {
           complete = false;
           if (warnings.length < 5) warnings.add(error.toString());
@@ -384,6 +342,7 @@ class AgentFileTools {
     List<Map<String, dynamic>>? items, {
     bool complete = true,
     List<String> warnings = const [],
+    Map<String, dynamic> extra = const {},
   }) {
     _pages.removeWhere(
       (_, value) =>
@@ -421,7 +380,13 @@ class AgentFileTools {
         _pages.remove(_pages.keys.first);
       }
       id = '${DateTime.now().microsecondsSinceEpoch}-${++_sequence}';
-      snapshot = _ResultSnapshot(fingerprint, items!, complete, warnings);
+      snapshot = _ResultSnapshot(
+        fingerprint,
+        items!,
+        complete,
+        warnings,
+        extra,
+      );
       _pages[id] = snapshot;
     }
     final limit = (args['limit'] as int? ?? 30).clamp(1, 100);
@@ -430,7 +395,7 @@ class AgentFileTools {
     while (offset < snapshot.items.length && selected.length < limit) {
       final item = snapshot.items[offset];
       final length = jsonEncode(item).length;
-      if (selected.isNotEmpty && chars + length > 10000) break;
+      if (selected.isNotEmpty && chars + length > pageChars) break;
       selected.add(item);
       chars += length;
       offset++;
@@ -442,6 +407,79 @@ class AgentFileTools {
       'scope_complete': snapshot.complete,
       'next_cursor': offset < snapshot.items.length ? '$id:$offset' : null,
       'warnings': snapshot.warnings,
+      ...snapshot.extra,
+    };
+  }
+
+  /// Text of an Office, OpenDocument, EPUB, RTF or PDF file, paged like
+  /// read_file pages plain text. It comes from the same extractor
+  /// search_content used, so its line numbers point at the same text.
+  Future<Map<String, dynamic>> _readDocument(
+    String path,
+    Map<String, dynamic> args,
+  ) async {
+    final format = DocumentText.formatOf(path);
+    final native = CbNative.isAvailable;
+    if (format == 'unsupported' ||
+        format == 'binary' ||
+        (format == 'pdf' && !native)) {
+      throw ArgumentError(
+        'No text reader for ${p.extension(path)} files. Use get_file_info.',
+      );
+    }
+    final size = await File(path).length();
+    if (size > DocumentText.maxDocumentBytes) {
+      throw ArgumentError('Document is larger than 64 MiB.');
+    }
+    final String? text;
+    final document = native
+        ? await NativeContent.documentText(path, format)
+        : null;
+    if (document != null) {
+      text = document.text;
+    } else {
+      text = await Isolate.run(
+        () => DocumentText.extract(format, File(path).readAsBytesSync()),
+      );
+    }
+    if (text == null) {
+      throw ArgumentError(
+        format == 'pdf'
+            ? 'This PDF has no text layer (a scan?); OCR is not supported.'
+            : 'Could not read text from this $format file.',
+      );
+    }
+    return {'format': format, ..._linePage(path, text.split('\n'), args)};
+  }
+
+  Map<String, dynamic> _linePage(
+    String path,
+    List<String> lines,
+    Map<String, dynamic> args,
+  ) {
+    final start = args['start_line'] as int? ?? 1;
+    final count = (args['max_lines'] as int? ?? 50).clamp(1, 100);
+    final selected = <Map<String, dynamic>>[];
+    var chars = 0;
+    var index = start - 1;
+    for (; index < lines.length && selected.length < count; index++) {
+      if (chars + lines[index].length > pageChars) {
+        if (selected.isEmpty) {
+          throw ArgumentError(
+            'Line ${index + 1} exceeds the text page limit. Use an approved command to inspect it.',
+          );
+        }
+        break;
+      }
+      chars += lines[index].length;
+      selected.add({'line': index + 1, 'text': lines[index]});
+    }
+    return {
+      'ok': true,
+      'path': path,
+      'lines': selected,
+      'total_lines': lines.length,
+      'next_start_line': index < lines.length ? index + 1 : null,
     };
   }
 
@@ -459,6 +497,13 @@ class _ResultSnapshot {
   final List<Map<String, dynamic>> items;
   final bool complete;
   final List<String> warnings;
+  final Map<String, dynamic> extra;
   final DateTime created = DateTime.now();
-  _ResultSnapshot(this.fingerprint, this.items, this.complete, this.warnings);
+  _ResultSnapshot(
+    this.fingerprint,
+    this.items,
+    this.complete,
+    this.warnings, [
+    this.extra = const {},
+  ]);
 }

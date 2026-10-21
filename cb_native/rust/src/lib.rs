@@ -14,8 +14,10 @@
 #![allow(clippy::missing_safety_doc)]
 
 mod archive;
+mod content;
 mod dart_api;
 mod disk_scan;
+mod doctext;
 mod fold_table;
 mod fsx;
 mod glob;
@@ -57,6 +59,8 @@ const JOB_HASH_FILE: u32 = 8;
 const JOB_ARCHIVE_LIST: u32 = 9;
 const JOB_ARCHIVE_EXTRACT: u32 = 10;
 const JOB_SORT_PATHS: u32 = 11;
+const JOB_CONTENT_SEARCH: u32 = 12;
+const JOB_DOCUMENT_TEXT: u32 = 13;
 
 unsafe fn str_arg<'a>(ptr: *const u8, len: usize) -> Option<&'a str> {
     if len == 0 {
@@ -328,6 +332,8 @@ pub unsafe extern "C" fn cb_job_start(
         JOB_ARCHIVE_LIST => archive::start_list(port, &config),
         JOB_ARCHIVE_EXTRACT => archive::start_extract(port, &config),
         JOB_SORT_PATHS => listing::start_sort_paths(port, &config),
+        JOB_CONTENT_SEARCH => content::start_content_search(port, &config),
+        JOB_DOCUMENT_TEXT => content::start_document_text(port, &config),
         _ => None,
     };
     match job {

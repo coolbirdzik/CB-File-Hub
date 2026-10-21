@@ -133,6 +133,8 @@ const int jobHashFile = 8;
 const int jobArchiveList = 9;
 const int jobArchiveExtract = 10;
 const int jobSortPaths = 11;
+const int jobContentSearch = 12;
+const int jobDocumentText = 13;
 
 // Job states (job.rs).
 const int jobRunning = 0;

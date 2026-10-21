@@ -5508,6 +5508,34 @@ class ChineseLocalizations implements AppLocalizations {
   @override
   String get aiAllDrives => '所有驱动器';
   @override
+  String aiLocalContextFull(int tokens) =>
+      '本地模型的上下文窗口（$tokens 个 Token）已满。请在 设置 > 本地 AI 顾问 中调大上下文窗口，或开始新的对话。';
+  @override
+  String get aiContextWorkingIn => '工作位置';
+  @override
+  String get aiContextCleanerScan => '磁盘清理扫描结果';
+  @override
+  String get aiContextNetwork => '网络文件夹';
+  @override
+  String get aiContextAppScreen => '应用界面';
+  @override
+  String aiContextDefaultFolder(String folder) => '默认文件夹：$folder';
+  @override
+  String aiContextFolderHint(String path) =>
+      'CB Agent 会在此文件夹及其子文件夹中搜索、读取和修改文件；相对路径从这里开始。\n$path';
+  @override
+  String aiContextDrivesHint(String path) =>
+      'CB Agent 可以看到所有驱动器。如果消息中未指定文件夹，它将在以下位置工作：\n$path';
+  @override
+  String aiContextCleanerHint(String path) =>
+      'CB Agent 读取此标签页中打开的磁盘清理扫描结果。其他文件将在以下位置处理：\n$path';
+  @override
+  String aiContextScreenHint(String path) =>
+      '此界面不是文件夹，因此 CB Agent 在以下位置工作：\n$path\n如需在其他位置工作，请在消息中指明文件夹。';
+  @override
+  String aiContextNetworkHint(String path) =>
+      'CB Agent 暂时无法读取网络文件夹（SMB、FTP 等），因此在以下位置工作：\n$path';
+  @override
   String get aiThinking => '正在思考...';
   @override
   String get aiDropToMention => '拖放以提及';

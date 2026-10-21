@@ -65,8 +65,9 @@ class _ModelSelectorButtonState extends State<ModelSelectorButton> {
     if (!_isEnabled) return;
     _query = '';
     _searchController.clear();
-    _overlay = _buildOverlay();
-    Overlay.of(context).insert(_overlay!);
+    final overlay = Overlay.of(context);
+    _overlay = _buildOverlay(overlay);
+    overlay.insert(_overlay!);
     setState(() {});
   }
 
@@ -81,11 +82,16 @@ class _ModelSelectorButtonState extends State<ModelSelectorButton> {
     widget.onSelected(value);
   }
 
-  OverlayEntry _buildOverlay() {
+  OverlayEntry _buildOverlay(OverlayState overlay) {
     final theme = Theme.of(context);
     final renderBox = context.findRenderObject() as RenderBox?;
+    final overlayBox = overlay.context.findRenderObject() as RenderBox?;
     final buttonSize = renderBox?.size ?? Size.zero;
-    final buttonTopLeft = renderBox?.localToGlobal(Offset.zero) ?? Offset.zero;
+    // In the overlay's own coordinates: it need not cover the whole window
+    // (a tab's navigator, the macOS inset panel).
+    final buttonTopLeft =
+        renderBox?.localToGlobal(Offset.zero, ancestor: overlayBox) ??
+        Offset.zero;
 
     const double gap = 6;
     const double margin = 8;
@@ -94,8 +100,7 @@ class _ModelSelectorButtonState extends State<ModelSelectorButton> {
 
     return OverlayEntry(
       builder: (overlayContext) {
-        final media = MediaQuery.of(overlayContext);
-        final screen = media.size;
+        final screen = overlayBox?.size ?? MediaQuery.of(overlayContext).size;
 
         // Panel width: at least the button width, capped, and never wider than
         // the screen (minus margins).
@@ -120,10 +125,6 @@ class _ModelSelectorButtonState extends State<ModelSelectorButton> {
         final maxHeight = (opensUp ? spaceAbove : spaceBelow) - gap - margin;
         final panelHeight = maxHeight.clamp(120.0, panelMaxHeight);
 
-        final top = opensUp
-            ? buttonTopLeft.dy - gap - panelHeight
-            : buttonTopLeft.dy + buttonSize.height + gap;
-
         return Stack(
           children: [
             // Full-screen barrier to dismiss on outside tap.
@@ -133,17 +134,23 @@ class _ModelSelectorButtonState extends State<ModelSelectorButton> {
                 onTap: _removeOverlay,
               ),
             ),
+            // Opening up, the panel's bottom edge is anchored to the button:
+            // a short model list then sits right above it instead of at the
+            // top of a full-height slot.
             Positioned(
               left: left,
-              top: top,
+              top: opensUp ? null : buttonTopLeft.dy + buttonSize.height + gap,
+              bottom: opensUp ? screen.height - buttonTopLeft.dy + gap : null,
               width: panelWidth,
-              child: Material(
-                elevation: 8,
-                borderRadius: BorderRadius.circular(10),
-                color: theme.colorScheme.surfaceContainerHigh,
+              // The shared popover recipe: an opaque overlay surface with a
+              // shadow. Theme container colours are translucent under
+              // acrylic, which let the chat show through the menu.
+              child: Container(
+                decoration: CbDecorations.floating(context, radius: 10),
                 clipBehavior: Clip.antiAlias,
-                child: DecoratedBox(
-                  decoration: CbDecorations.card(context, radius: 10),
+                // The search field's TextField needs a Material ancestor.
+                child: Material(
+                  type: MaterialType.transparency,
                   child: ConstrainedBox(
                     constraints: BoxConstraints(maxHeight: panelHeight),
                     child: StatefulBuilder(

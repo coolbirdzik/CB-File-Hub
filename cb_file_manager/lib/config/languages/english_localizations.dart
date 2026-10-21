@@ -5839,6 +5839,34 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get aiAllDrives => 'All Drives';
   @override
+  String aiLocalContextFull(int tokens) =>
+      'The local model\'s context window ($tokens tokens) is full. Raise Context window in Settings > Local AI Advisor, or start a new conversation.';
+  @override
+  String get aiContextWorkingIn => 'Working in';
+  @override
+  String get aiContextCleanerScan => 'Disk Cleaner scan';
+  @override
+  String get aiContextNetwork => 'Network folder';
+  @override
+  String get aiContextAppScreen => 'App screen';
+  @override
+  String aiContextDefaultFolder(String folder) => 'default folder: $folder';
+  @override
+  String aiContextFolderHint(String path) =>
+      'CB Agent searches, reads and changes files in this folder and its subfolders; relative paths start here.\n$path';
+  @override
+  String aiContextDrivesHint(String path) =>
+      'CB Agent can see every drive. Unless your message names a folder, it works in:\n$path';
+  @override
+  String aiContextCleanerHint(String path) =>
+      'CB Agent reads the Disk Cleaner scan open in this tab. For other files it works in:\n$path';
+  @override
+  String aiContextScreenHint(String path) =>
+      'This screen is not a folder, so CB Agent works in:\n$path\nName a folder in your message to work somewhere else.';
+  @override
+  String aiContextNetworkHint(String path) =>
+      'CB Agent cannot read network folders (SMB, FTP...) yet, so it works in:\n$path';
+  @override
   String get aiThinking => 'Thinking...';
   @override
   String get aiDropToMention => 'Drop to mention';

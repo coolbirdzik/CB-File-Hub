@@ -52,6 +52,9 @@ bool endsWithPendingInspection(String text) {
   if (lines.isEmpty) return false;
   final last = lines.last.trim().replaceAll(RegExp(r'[*_`]'), '').toLowerCase();
   if (last.length > 500 || last.endsWith('?')) return false;
+  // "...I will use the name search tool instead:" with nothing after it
+  // introduces a step that never came; no finished reply ends on a colon.
+  if (last.endsWith(':') || last.endsWith('：')) return true;
   if (RegExp(r'[.!]\s+\S').hasMatch(last)) return false;
   // Conditional offers and requests for user input are valid stopping points.
   if (RegExp(
@@ -63,8 +66,10 @@ bool endsWithPendingInspection(String text) {
   return RegExp(
     r'^(?:(?:để|to)\s+[^.!?\n]{1,180}[,:]\s*)?'
     r'(?:(?:tôi|mình|em|chúng ta)\s+sẽ\s+'
-    r'(?:kiểm tra|xem|tìm|đọc|quét|phân tích)|'
+    r'(?:kiểm tra|xem|tìm|đọc|quét|phân tích|dùng|sử dụng|gọi|thử|'
+    r'liệt kê|chạy|tra cứu|mở|lấy|so sánh)|'
     r'(?:i(?: will|[\x27’]ll| am going to)|let me)\s+'
-    r'(?:check|inspect|search|read|scan|look|analyze|analyse)\b)',
+    r'(?:check|inspect|search|read|scan|look|analyze|analyse|use|call|try|'
+    r'list|run|open|fetch|get|find|compare)\b)',
   ).hasMatch(last);
 }

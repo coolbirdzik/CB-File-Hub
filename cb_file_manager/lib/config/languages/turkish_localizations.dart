@@ -5890,6 +5890,34 @@ class TurkishLocalizations implements AppLocalizations {
   @override
   String get aiAllDrives => 'Tüm sürücüler';
   @override
+  String aiLocalContextFull(int tokens) =>
+      'Yerel modelin bağlam penceresi ($tokens belirteç) doldu. Ayarlar > Yerel yapay zeka danışmanı bölümünden Bağlam penceresini artırın veya yeni bir sohbet başlatın.';
+  @override
+  String get aiContextWorkingIn => 'Çalışma klasörü';
+  @override
+  String get aiContextCleanerScan => 'Disk Temizleyici taraması';
+  @override
+  String get aiContextNetwork => 'Ağ klasörü';
+  @override
+  String get aiContextAppScreen => 'Uygulama ekranı';
+  @override
+  String aiContextDefaultFolder(String folder) => 'varsayılan klasör: $folder';
+  @override
+  String aiContextFolderHint(String path) =>
+      'CB Agent bu klasörde ve alt klasörlerinde dosya arar, okur ve değiştirir; göreli yollar buradan başlar.\n$path';
+  @override
+  String aiContextDrivesHint(String path) =>
+      'CB Agent tüm sürücüleri görebilir. Mesajınızda bir klasör belirtilmezse şurada çalışır:\n$path';
+  @override
+  String aiContextCleanerHint(String path) =>
+      'CB Agent bu sekmede açık olan Disk Temizleyici taramasını okur. Diğer dosyalar için şurada çalışır:\n$path';
+  @override
+  String aiContextScreenHint(String path) =>
+      'Bu ekran bir klasör değil, bu yüzden CB Agent şurada çalışır:\n$path\nBaşka bir yerde çalışması için mesajınızda bir klasör belirtin.';
+  @override
+  String aiContextNetworkHint(String path) =>
+      'CB Agent ağ klasörlerini (SMB, FTP...) henüz okuyamıyor, bu yüzden şurada çalışır:\n$path';
+  @override
   String get aiThinking => 'Düşünüyor...';
   @override
   String get aiDropToMention => 'Anmak için bırakın';

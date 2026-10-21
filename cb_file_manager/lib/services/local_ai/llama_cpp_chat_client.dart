@@ -13,6 +13,12 @@ class LocalAiMissingAnswerException extends StateError {
 class LlamaCppChatClient {
   final HttpClient httpClient;
 
+  /// Yielded after the text when generation stopped at `max_tokens`
+  /// (`finish_reason: length`): the reply is cut off, often right before the
+  /// tool call it announced. A `[STATUS]` chunk, so consumers that only want
+  /// text already skip it.
+  static const lengthLimitMarker = '[STATUS]Reply length limit reached';
+
   LlamaCppChatClient(this.httpClient);
 
   Stream<String> stream({
@@ -88,10 +94,13 @@ class LlamaCppChatClient {
           reasoningOpen = false;
         }
         finished = true;
-        if (choice['finish_reason'] == 'length' && !hasContent) {
-          throw LocalAiMissingAnswerException(
-            'The local model reached its response limit without an answer.',
-          );
+        if (choice['finish_reason'] == 'length') {
+          if (!hasContent) {
+            throw LocalAiMissingAnswerException(
+              'The local model reached its response limit without an answer.',
+            );
+          }
+          yield lengthLimitMarker;
         }
       }
     }
