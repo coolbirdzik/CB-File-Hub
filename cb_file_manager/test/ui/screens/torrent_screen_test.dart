@@ -2377,20 +2377,17 @@ void main() {
   });
 
   testWidgets(
-    'selected torrent progress remains live above the shared file view',
+    'selecting an active torrent does not shift the shared file view',
     (tester) async {
       repo.taskStatus = 'active';
       repo.completedBytes = 20;
       await mount(tester);
-      await tester.tap(find.text('Torrent 179.mp4'), warnIfMissed: false);
+      final item = find.text('Torrent 179.mp4');
+      final before = tester.getTopLeft(item);
+      await tester.tap(item, warnIfMissed: false);
       await tester.pumpAndSettle();
-      expect(find.textContaining('20.0%'), findsOneWidget);
-      repo.completedBytes = 80;
-      (service as _Service).emitChange();
-      await tester.pump(const Duration(milliseconds: 750));
-      await tester.pumpAndSettle();
-      expect(find.textContaining('80.0%'), findsOneWidget);
       expect(find.textContaining('20.0%'), findsNothing);
+      expect(tester.getTopLeft(item), before);
       expect(tester.takeException(), isNull);
     },
   );

@@ -1544,7 +1544,6 @@ class _TorrentScreenState extends State<TorrentScreen> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           _torrentToolbar(),
-                          _taskStatus(selection),
                           if (_recentEntry != null) _recentImportNotice(),
                           if (!_desktop)
                             Padding(
@@ -1734,35 +1733,6 @@ class _TorrentScreenState extends State<TorrentScreen> {
                 ),
             ],
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _taskStatus(SelectionState selection) {
-    final paths = selection.selectedFilePaths;
-    final entry = paths.length == 1 ? _entryForPath(paths.single) : null;
-    if (entry == null || entry.status == 'library') {
-      return const SizedBox.shrink();
-    }
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            '${entry.name} · ${_entryStatus(entry)} · ${_size(entry.completedBytes)} / ${_size(entry.totalBytes)} · ${_size(entry.downloadSpeed)}/s',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          LinearProgressIndicator(value: entry.progress, minHeight: 2),
-          if (entry.error != null)
-            Text(
-              entry.error!,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
-            ),
         ],
       ),
     );
