@@ -854,6 +854,11 @@ build_android_aab() {
     flutter build appbundle --release --build-name "$VERSION_NAME" --build-number "$VERSION_CODE" "${CLOUD_DEFINES[@]}"
     
     if [ $? -eq 0 ]; then
+        if ! node ../scripts/check_android_page_sizes.mjs build/app/outputs/bundle/release/app-release.aab; then
+            print_error "Android AAB failed the 16 KB native library check!"
+            cd ..
+            return 1
+        fi
         print_success "Android AAB build completed!"
         print_info "Output: $BUILD_DIR/app/outputs/bundle/release/"
     else

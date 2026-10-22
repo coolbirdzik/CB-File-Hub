@@ -45,9 +45,25 @@ Files, media, network access, torrents, backups, storage cleanup, and AI assista
 - **Network and SSH:** SMB, FTP, SFTP, WebDAV, saved hosts, keys, and an in-app terminal.
 - **CB Agent:** natural-language file search, guided organization, and cleanup review.
 - **Disk Cleaner:** scan large folders, review cleanup candidates, and manage storage on Windows, macOS, and Android.
+- **Rust acceleration:** heavy scans, search, thumbnails, hashing, and archive processing run on native worker threads. See [measured performance](#rust-powered-performance).
 - **Library tools:** torrent indexing and desktop downloads, archive browsing, settings/tag backups, and themes.
 
 Features vary by platform. See the [feature guides](docs/features/) for requirements and setup.
+
+## Rust-powered performance
+
+CB File Hub uses Rust worker threads for disk scans, folder listings and sizes, recursive search, image thumbnails and editing, hashing, archives, and document text extraction.
+
+**3.3× faster full rescans than TreeSize Free in our 100,000-file benchmark:**
+
+| Application | Scan technology | Full rescan, 100,000 files | Relative speed |
+|-------------|-----------------|--------------------------:|---------------:|
+| **CB File Hub** | Rust workers + Win32 directory enumeration | **84.9 ms** | **3.3×** |
+| TreeSize Free 4.8.1.609 | NTFS MFT / two-thread filesystem traversal¹ | 283.3 ms | 1.0× (baseline) |
+
+Measured on 2026-10-22: Core i5-14600K, NVMe SSD, Windows 11; median of five alternating runs after warm-up, with warm OS caches. CB used its production Cleaner screen in a standalone release benchmark launcher. Both counted 100,000 files and 12,800,000 logical bytes. Results apply to this synthetic folder-scan workflow; whole-drive performance varies. [Timing boundaries, raw samples, screenshots, and reproduction](docs/quality/03-rust-benchmarks.md#folder-scan-ui-comparison-with-treesize-free).
+
+¹ TreeSize's listed technologies are [documented by JAM Software](https://www.jam-software.com/treesize/features.shtml); the internal scan strategy selected during this run was not instrumented.
 
 ## Preview
 

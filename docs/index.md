@@ -13,6 +13,7 @@
   - [Development setup](contributing/04-development-setup.md) — Toolchains, builds, tests, and screenshot automation
   - `quality/01-testing-strategy.md`
   - `quality/02-e2e-desktop-integration.md` — Desktop E2E (`integration_test`, Makefile, logs, CI)
+  - [Rust benchmarks](quality/03-rust-benchmarks.md) — Measured acceleration, raw samples, and reproduction commands
 - **Technical**
   - `technical/index.md`
 - **Agent Graph**

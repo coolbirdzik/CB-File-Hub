@@ -22,7 +22,23 @@ CB File Hub là ứng dụng quản lý tập tin đa nền tảng dành cho th�
 - **Tập tin mạng và SSH:** SMB, FTP, SFTP, WebDAV, hồ sơ SSH, khóa và terminal.
 - **CB Agent:** tìm tập tin bằng ngôn ngữ tự nhiên, đề xuất tổ chức và hỗ trợ đánh giá trước khi dọn dẹp.
 - **Disk Cleaner (Windows, macOS, Android):** xem thư mục lớn, file tạm, bộ nhớ đệm và chọn chính xác mục cần xử lý.
+- **Tăng tốc bằng Rust:** quét ổ đĩa, tìm kiếm, tạo ảnh thu nhỏ, tính hash và xử lý file nén trên luồng native. Xem [số đo hiệu năng](#hiệu-năng-với-rust).
 - **Sao lưu và cá nhân hóa:** sao lưu cài đặt/tag, các tích hợp đám mây khả dụng, giao diện sáng/tối và màu nhấn.
+
+## Hiệu năng với Rust
+
+CB File Hub dùng các luồng Rust để quét ổ đĩa, liệt kê và tính dung lượng thư mục, tìm kiếm đệ quy, tạo ảnh thu nhỏ và chỉnh sửa ảnh, tính hash, xử lý file nén và trích xuất văn bản tài liệu.
+
+**Quét lại toàn bộ nhanh hơn TreeSize Free 3,3× trong benchmark 100.000 file:**
+
+| Ứng dụng | Công nghệ quét | Quét lại toàn bộ 100.000 file | Tốc độ tương đối |
+|----------|----------------|-----------------------------:|----------------:|
+| **CB File Hub** | Luồng Rust + duyệt thư mục qua Win32 | **84,9 ms** | **3,3×** |
+| TreeSize Free 4.8.1.609 | NTFS MFT / duyệt hệ thống file bằng 2 luồng¹ | 283,3 ms | 1,0× (mốc so sánh) |
+
+Đo ngày 22/10/2026: Core i5-14600K, SSD NVMe, Windows 11; lấy trung vị 5 lượt chạy xen kẽ sau khi khởi động, với cache hệ điều hành đã được làm nóng. CB dùng màn hình Cleaner thật trong bản release chạy benchmark riêng. Hai bên cùng đếm đúng 100.000 file và 12.800.000 byte dữ liệu. Kết quả áp dụng cho luồng quét thư mục trên bộ dữ liệu tổng hợp này; hiệu năng quét toàn ổ đĩa có thể khác. [Mốc tính thời gian, số đo gốc, ảnh kết quả và cách chạy lại](docs/quality/03-rust-benchmarks.md#folder-scan-ui-comparison-with-treesize-free).
+
+¹ Công nghệ của TreeSize được ghi theo [tài liệu JAM Software](https://www.jam-software.com/treesize/features.shtml); benchmark chưa xác định chính xác chiến lược nội bộ được TreeSize chọn trong lượt đo.
 
 ## Hình ảnh
 

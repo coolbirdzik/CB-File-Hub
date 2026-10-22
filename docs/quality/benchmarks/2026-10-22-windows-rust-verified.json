@@ -1,0 +1,423 @@
+{
+  "schema": 1,
+  "date_utc": "2026-10-22T05:24:11.228277Z",
+  "os": "\"Windows 11 Pro\" 10.0 (Build 26300)",
+  "dart": "3.13.2 (stable) (Tue Aug 25 01:01:12 2026 -0700) on \"windows_x64\"",
+  "processors": 20,
+  "native_available": true,
+  "corpus": "L:\\Code\\coolbirdfm-flutter\\cb_file_manager\\build\\benchmarks\\corpus",
+  "hash_file": "L:\\Code\\coolbirdfm-flutter\\cb_file_manager\\build\\benchmarks\\hash-256m.bin",
+  "hash_bytes": 268435456,
+  "query": "bo nao",
+  "rounds": 5,
+  "warmups_per_engine_per_task": 1,
+  "cache": "warm OS cache; no app result reuse; alternating engine order",
+  "disk_scan": {
+    "max_depth": 20,
+    "min_display_entry_bytes": 1048576,
+    "max_children_per_directory": 200,
+    "junk_rules": 0,
+    "incremental": false,
+    "includes": "isolate startup, scan, tree processing and result transfer",
+    "excludes": "Flutter frame rendering"
+  },
+  "summaries": [
+    {
+      "task": "disk_cleaner_full_scan",
+      "dart_median_us": 84629,
+      "rust_median_us": 28320,
+      "dart_over_rust": 2.9883121468926555,
+      "dart_min_us": 81934,
+      "dart_max_us": 90377,
+      "rust_min_us": 26200,
+      "rust_max_us": 37472,
+      "result": {
+        "files": 100000,
+        "directories_including_root": 1111,
+        "bytes": 12800000,
+        "display_nodes": 2111,
+        "tree_sha256": "fe71c303393466b6e6d3c41530a6872c8c84421acec9449cef03bf08dc934207",
+        "coverage_issues": 0
+      }
+    },
+    {
+      "task": "recursive_name_search",
+      "dart_median_us": 587248,
+      "rust_median_us": 44372,
+      "dart_over_rust": 13.234652483548183,
+      "dart_min_us": 574618,
+      "dart_max_us": 629953,
+      "rust_min_us": 42441,
+      "rust_max_us": 60252,
+      "result": {
+        "hits": 10000,
+        "paths_sha256": "fee63e1578147b58ee00fe8fbc1df810104d46fb930318ee185b15eca84a9f57"
+      }
+    },
+    {
+      "task": "sha256",
+      "dart_median_us": 1660460,
+      "rust_median_us": 146492,
+      "dart_over_rust": 11.334816918330011,
+      "dart_min_us": 1644115,
+      "dart_max_us": 1918220,
+      "rust_min_us": 143863,
+      "rust_max_us": 151944,
+      "result": {
+        "sha256": "b03a613687aa1960759d0bfa5826b85fed3b01465e72dbe560724a903e4c74db"
+      }
+    }
+  ],
+  "samples": [
+    {
+      "task": "disk_cleaner_full_scan",
+      "round": 1,
+      "engine": "rust",
+      "microseconds": 26641,
+      "result": {
+        "files": 100000,
+        "directories_including_root": 1111,
+        "bytes": 12800000,
+        "display_nodes": 2111,
+        "tree_sha256": "fe71c303393466b6e6d3c41530a6872c8c84421acec9449cef03bf08dc934207",
+        "coverage_issues": 0
+      }
+    },
+    {
+      "task": "disk_cleaner_full_scan",
+      "round": 1,
+      "engine": "dart",
+      "microseconds": 81934,
+      "result": {
+        "files": 100000,
+        "directories_including_root": 1111,
+        "bytes": 12800000,
+        "display_nodes": 2111,
+        "tree_sha256": "fe71c303393466b6e6d3c41530a6872c8c84421acec9449cef03bf08dc934207",
+        "coverage_issues": 0
+      }
+    },
+    {
+      "task": "disk_cleaner_full_scan",
+      "round": 2,
+      "engine": "dart",
+      "microseconds": 86281,
+      "result": {
+        "files": 100000,
+        "directories_including_root": 1111,
+        "bytes": 12800000,
+        "display_nodes": 2111,
+        "tree_sha256": "fe71c303393466b6e6d3c41530a6872c8c84421acec9449cef03bf08dc934207",
+        "coverage_issues": 0
+      }
+    },
+    {
+      "task": "disk_cleaner_full_scan",
+      "round": 2,
+      "engine": "rust",
+      "microseconds": 37472,
+      "result": {
+        "files": 100000,
+        "directories_including_root": 1111,
+        "bytes": 12800000,
+        "display_nodes": 2111,
+        "tree_sha256": "fe71c303393466b6e6d3c41530a6872c8c84421acec9449cef03bf08dc934207",
+        "coverage_issues": 0
+      }
+    },
+    {
+      "task": "disk_cleaner_full_scan",
+      "round": 3,
+      "engine": "rust",
+      "microseconds": 26200,
+      "result": {
+        "files": 100000,
+        "directories_including_root": 1111,
+        "bytes": 12800000,
+        "display_nodes": 2111,
+        "tree_sha256": "fe71c303393466b6e6d3c41530a6872c8c84421acec9449cef03bf08dc934207",
+        "coverage_issues": 0
+      }
+    },
+    {
+      "task": "disk_cleaner_full_scan",
+      "round": 3,
+      "engine": "dart",
+      "microseconds": 90377,
+      "result": {
+        "files": 100000,
+        "directories_including_root": 1111,
+        "bytes": 12800000,
+        "display_nodes": 2111,
+        "tree_sha256": "fe71c303393466b6e6d3c41530a6872c8c84421acec9449cef03bf08dc934207",
+        "coverage_issues": 0
+      }
+    },
+    {
+      "task": "disk_cleaner_full_scan",
+      "round": 4,
+      "engine": "dart",
+      "microseconds": 84629,
+      "result": {
+        "files": 100000,
+        "directories_including_root": 1111,
+        "bytes": 12800000,
+        "display_nodes": 2111,
+        "tree_sha256": "fe71c303393466b6e6d3c41530a6872c8c84421acec9449cef03bf08dc934207",
+        "coverage_issues": 0
+      }
+    },
+    {
+      "task": "disk_cleaner_full_scan",
+      "round": 4,
+      "engine": "rust",
+      "microseconds": 30816,
+      "result": {
+        "files": 100000,
+        "directories_including_root": 1111,
+        "bytes": 12800000,
+        "display_nodes": 2111,
+        "tree_sha256": "fe71c303393466b6e6d3c41530a6872c8c84421acec9449cef03bf08dc934207",
+        "coverage_issues": 0
+      }
+    },
+    {
+      "task": "disk_cleaner_full_scan",
+      "round": 5,
+      "engine": "rust",
+      "microseconds": 28320,
+      "result": {
+        "files": 100000,
+        "directories_including_root": 1111,
+        "bytes": 12800000,
+        "display_nodes": 2111,
+        "tree_sha256": "fe71c303393466b6e6d3c41530a6872c8c84421acec9449cef03bf08dc934207",
+        "coverage_issues": 0
+      }
+    },
+    {
+      "task": "disk_cleaner_full_scan",
+      "round": 5,
+      "engine": "dart",
+      "microseconds": 84400,
+      "result": {
+        "files": 100000,
+        "directories_including_root": 1111,
+        "bytes": 12800000,
+        "display_nodes": 2111,
+        "tree_sha256": "fe71c303393466b6e6d3c41530a6872c8c84421acec9449cef03bf08dc934207",
+        "coverage_issues": 0
+      }
+    },
+    {
+      "task": "recursive_name_search",
+      "round": 1,
+      "engine": "rust",
+      "microseconds": 42441,
+      "result": {
+        "hits": 10000,
+        "paths_sha256": "fee63e1578147b58ee00fe8fbc1df810104d46fb930318ee185b15eca84a9f57"
+      }
+    },
+    {
+      "task": "recursive_name_search",
+      "round": 1,
+      "engine": "dart",
+      "microseconds": 606161,
+      "result": {
+        "hits": 10000,
+        "paths_sha256": "fee63e1578147b58ee00fe8fbc1df810104d46fb930318ee185b15eca84a9f57"
+      }
+    },
+    {
+      "task": "recursive_name_search",
+      "round": 2,
+      "engine": "dart",
+      "microseconds": 629953,
+      "result": {
+        "hits": 10000,
+        "paths_sha256": "fee63e1578147b58ee00fe8fbc1df810104d46fb930318ee185b15eca84a9f57"
+      }
+    },
+    {
+      "task": "recursive_name_search",
+      "round": 2,
+      "engine": "rust",
+      "microseconds": 60252,
+      "result": {
+        "hits": 10000,
+        "paths_sha256": "fee63e1578147b58ee00fe8fbc1df810104d46fb930318ee185b15eca84a9f57"
+      }
+    },
+    {
+      "task": "recursive_name_search",
+      "round": 3,
+      "engine": "rust",
+      "microseconds": 44372,
+      "result": {
+        "hits": 10000,
+        "paths_sha256": "fee63e1578147b58ee00fe8fbc1df810104d46fb930318ee185b15eca84a9f57"
+      }
+    },
+    {
+      "task": "recursive_name_search",
+      "round": 3,
+      "engine": "dart",
+      "microseconds": 587248,
+      "result": {
+        "hits": 10000,
+        "paths_sha256": "fee63e1578147b58ee00fe8fbc1df810104d46fb930318ee185b15eca84a9f57"
+      }
+    },
+    {
+      "task": "recursive_name_search",
+      "round": 4,
+      "engine": "dart",
+      "microseconds": 578908,
+      "result": {
+        "hits": 10000,
+        "paths_sha256": "fee63e1578147b58ee00fe8fbc1df810104d46fb930318ee185b15eca84a9f57"
+      }
+    },
+    {
+      "task": "recursive_name_search",
+      "round": 4,
+      "engine": "rust",
+      "microseconds": 58794,
+      "result": {
+        "hits": 10000,
+        "paths_sha256": "fee63e1578147b58ee00fe8fbc1df810104d46fb930318ee185b15eca84a9f57"
+      }
+    },
+    {
+      "task": "recursive_name_search",
+      "round": 5,
+      "engine": "rust",
+      "microseconds": 44105,
+      "result": {
+        "hits": 10000,
+        "paths_sha256": "fee63e1578147b58ee00fe8fbc1df810104d46fb930318ee185b15eca84a9f57"
+      }
+    },
+    {
+      "task": "recursive_name_search",
+      "round": 5,
+      "engine": "dart",
+      "microseconds": 574618,
+      "result": {
+        "hits": 10000,
+        "paths_sha256": "fee63e1578147b58ee00fe8fbc1df810104d46fb930318ee185b15eca84a9f57"
+      }
+    },
+    {
+      "task": "sha256",
+      "round": 1,
+      "engine": "rust",
+      "microseconds": 151002,
+      "result": {
+        "sha256": "b03a613687aa1960759d0bfa5826b85fed3b01465e72dbe560724a903e4c74db"
+      }
+    },
+    {
+      "task": "sha256",
+      "round": 1,
+      "engine": "dart",
+      "microseconds": 1918220,
+      "result": {
+        "sha256": "b03a613687aa1960759d0bfa5826b85fed3b01465e72dbe560724a903e4c74db"
+      }
+    },
+    {
+      "task": "sha256",
+      "round": 2,
+      "engine": "dart",
+      "microseconds": 1667965,
+      "result": {
+        "sha256": "b03a613687aa1960759d0bfa5826b85fed3b01465e72dbe560724a903e4c74db"
+      }
+    },
+    {
+      "task": "sha256",
+      "round": 2,
+      "engine": "rust",
+      "microseconds": 151944,
+      "result": {
+        "sha256": "b03a613687aa1960759d0bfa5826b85fed3b01465e72dbe560724a903e4c74db"
+      }
+    },
+    {
+      "task": "sha256",
+      "round": 3,
+      "engine": "rust",
+      "microseconds": 145641,
+      "result": {
+        "sha256": "b03a613687aa1960759d0bfa5826b85fed3b01465e72dbe560724a903e4c74db"
+      }
+    },
+    {
+      "task": "sha256",
+      "round": 3,
+      "engine": "dart",
+      "microseconds": 1660460,
+      "result": {
+        "sha256": "b03a613687aa1960759d0bfa5826b85fed3b01465e72dbe560724a903e4c74db"
+      }
+    },
+    {
+      "task": "sha256",
+      "round": 4,
+      "engine": "dart",
+      "microseconds": 1644115,
+      "result": {
+        "sha256": "b03a613687aa1960759d0bfa5826b85fed3b01465e72dbe560724a903e4c74db"
+      }
+    },
+    {
+      "task": "sha256",
+      "round": 4,
+      "engine": "rust",
+      "microseconds": 143863,
+      "result": {
+        "sha256": "b03a613687aa1960759d0bfa5826b85fed3b01465e72dbe560724a903e4c74db"
+      }
+    },
+    {
+      "task": "sha256",
+      "round": 5,
+      "engine": "rust",
+      "microseconds": 146492,
+      "result": {
+        "sha256": "b03a613687aa1960759d0bfa5826b85fed3b01465e72dbe560724a903e4c74db"
+      }
+    },
+    {
+      "task": "sha256",
+      "round": 5,
+      "engine": "dart",
+      "microseconds": 1644188,
+      "result": {
+        "sha256": "b03a613687aa1960759d0bfa5826b85fed3b01465e72dbe560724a903e4c74db"
+      }
+    }
+  ],
+  "environment": {
+    "source_revision": "5b425ca9e8fa50b934c0bfc9eb65c8e62651f5ed",
+    "source_changes": "benchmark tool and documentation only",
+    "build": "dart build cli --target=tool/bench_rust.dart --output=build/benchmarks/cli-verified",
+    "mode": "Dart AOT, Rust release",
+    "rustc": "rustc 1.91.1 (ed61e7d7e 2025-11-07)",
+    "flutter": "3.47.2",
+    "cpu": "Intel Core i5-14600K",
+    "physical_cores": 14,
+    "ram_gib": 63.7,
+    "disk": "Samsung SSD 980 1TB, NVMe",
+    "filesystem": "NTFS",
+    "windows": "Windows 11 Pro, build 26300",
+    "elevated": false,
+    "native_dll_sha256": "4c29db7d7428d2804439ac422176a5d14d589b259cd8561affc0b1d331888b54",
+    "benchmark_source_sha256": "bfdb2fac97161c67ea059820a3d6dde86f7a2924b5fbb2212227a8174474d18e",
+    "benchmark_executable_sha256": "9095ee24f76939af5aac673efb6ba4cdcff7238feee1900ea44045e4696b39f3",
+    "treesize_free_version": "4.8.1.609",
+    "treesize_measurement": "unavailable: Computer Use native pipe connection failed (Windows error 2), including after kernel reset and reinitialization"
+  }
+}

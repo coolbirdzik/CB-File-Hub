@@ -1,0 +1,1585 @@
+{
+  "schema": 1,
+  "date_utc": "2026-10-22T06:11:17Z",
+  "rounds": 5,
+  "warmups_per_application": 1,
+  "cache": "warm OS cache; alternating application order; full rescans",
+  "window_layout": {
+    "width_each": 960,
+    "height_each": 1032,
+    "both_visible": true
+  },
+  "start": "immediately before UI Automation Invoke on the scan-again control",
+  "cb_finish": "completion file observed after the production Cleaner result frame built",
+  "treesize_finish": "Stop Scan observed disabled after it was observed enabled",
+  "summaries": {
+    "cb_cleaner_ui": {
+      "median_ns": 84931300,
+      "min_ns": 75035900,
+      "max_ns": 86241500
+    },
+    "treesize_free": {
+      "median_ns": 283346300,
+      "min_ns": 272991800,
+      "max_ns": 297996400
+    }
+  },
+  "treesize_over_cb": 3.3361823026375435,
+  "warmups": [
+    {
+      "round": 0,
+      "application": "cb_cleaner_ui",
+      "elapsed_ns": 102634600,
+      "invoke_ns": 12582200,
+      "completion_observation_interval_ns": [
+        100837800,
+        102634600
+      ],
+      "result": {
+        "generation": 2,
+        "files": 100000,
+        "bytes": 12800000,
+        "display_nodes": 2111,
+        "partial": false,
+        "mode": "full",
+        "coverage_issues": 0
+      }
+    },
+    {
+      "round": 0,
+      "application": "treesize_free",
+      "elapsed_ns": 238506000,
+      "invoke_ns": 29299100,
+      "completion_observation_interval_ns": [
+        232401800,
+        238506000
+      ],
+      "poll_trace": [
+        [
+          29303900,
+          114073100,
+          false
+        ],
+        [
+          115531800,
+          116046300,
+          false
+        ],
+        [
+          117071700,
+          139933000,
+          false
+        ],
+        [
+          141029200,
+          142843200,
+          false
+        ],
+        [
+          143884200,
+          175739900,
+          false
+        ],
+        [
+          176776400,
+          186359600,
+          false
+        ],
+        [
+          187391700,
+          189994900,
+          false
+        ],
+        [
+          191053600,
+          192780700,
+          false
+        ],
+        [
+          193815900,
+          197961600,
+          false
+        ],
+        [
+          199486900,
+          202260200,
+          false
+        ],
+        [
+          203282000,
+          203491300,
+          true
+        ],
+        [
+          205013200,
+          205198200,
+          true
+        ],
+        [
+          206750200,
+          206962300,
+          true
+        ],
+        [
+          208488800,
+          208729400,
+          true
+        ],
+        [
+          210251600,
+          210438300,
+          true
+        ],
+        [
+          211959000,
+          212519500,
+          true
+        ],
+        [
+          213533500,
+          213717700,
+          true
+        ],
+        [
+          215237800,
+          215398600,
+          true
+        ],
+        [
+          216983200,
+          217535500,
+          true
+        ],
+        [
+          218927400,
+          219099600,
+          true
+        ],
+        [
+          220460600,
+          220684000,
+          true
+        ],
+        [
+          222204100,
+          222382400,
+          true
+        ],
+        [
+          223902000,
+          224093900,
+          true
+        ],
+        [
+          225615700,
+          225793700,
+          true
+        ],
+        [
+          227313600,
+          227527400,
+          true
+        ],
+        [
+          229044400,
+          229317700,
+          true
+        ],
+        [
+          230841300,
+          231046800,
+          true
+        ],
+        [
+          232401800,
+          232994100,
+          true
+        ],
+        [
+          234061800,
+          238506000,
+          false
+        ]
+      ],
+      "result": "12,800,000 Bytes  L:\\Code\\coolbirdfm-flutter\\cb_file_manager\\build\\benchmarks\\corpus\\  on  [M2 1TB]; Size: 12,800,000 Bytes; Allocated: 0 Bytes; Files: 100,000; Folders: 1,110; % of Parent (Size): 100.0 %; Last Modified: 10/22/2026"
+    }
+  ],
+  "samples": [
+    {
+      "round": 1,
+      "application": "treesize_free",
+      "elapsed_ns": 297996400,
+      "invoke_ns": 16653000,
+      "completion_observation_interval_ns": [
+        291938500,
+        297996400
+      ],
+      "poll_trace": [
+        [
+          16657000,
+          159552500,
+          false
+        ],
+        [
+          160585500,
+          163966200,
+          false
+        ],
+        [
+          165097400,
+          165711600,
+          false
+        ],
+        [
+          167101700,
+          188050700,
+          false
+        ],
+        [
+          189086600,
+          205285800,
+          false
+        ],
+        [
+          206816400,
+          210956400,
+          false
+        ],
+        [
+          212482700,
+          216903400,
+          false
+        ],
+        [
+          217932200,
+          219386100,
+          false
+        ],
+        [
+          220408600,
+          221847800,
+          false
+        ],
+        [
+          222874600,
+          227027300,
+          false
+        ],
+        [
+          228546700,
+          231965100,
+          false
+        ],
+        [
+          232998700,
+          233602400,
+          true
+        ],
+        [
+          234619000,
+          234804900,
+          true
+        ],
+        [
+          236132700,
+          236312700,
+          true
+        ],
+        [
+          237840600,
+          238026100,
+          true
+        ],
+        [
+          239549200,
+          239699500,
+          true
+        ],
+        [
+          241216800,
+          241432900,
+          true
+        ],
+        [
+          242952600,
+          243105800,
+          true
+        ],
+        [
+          244624500,
+          244767800,
+          true
+        ],
+        [
+          246288900,
+          246461700,
+          true
+        ],
+        [
+          248031900,
+          248258600,
+          true
+        ],
+        [
+          249780700,
+          250026500,
+          true
+        ],
+        [
+          251547400,
+          251705300,
+          true
+        ],
+        [
+          253223400,
+          253428300,
+          true
+        ],
+        [
+          254951600,
+          255205700,
+          true
+        ],
+        [
+          256722200,
+          256875300,
+          true
+        ],
+        [
+          258395300,
+          258625100,
+          true
+        ],
+        [
+          260143200,
+          260292600,
+          true
+        ],
+        [
+          261810300,
+          261956400,
+          true
+        ],
+        [
+          263543900,
+          263800500,
+          true
+        ],
+        [
+          265028400,
+          265722500,
+          true
+        ],
+        [
+          267243700,
+          284450100,
+          true
+        ],
+        [
+          285480600,
+          285807500,
+          true
+        ],
+        [
+          286827100,
+          290918300,
+          true
+        ],
+        [
+          291938500,
+          295979700,
+          true
+        ],
+        [
+          297506900,
+          297996400,
+          false
+        ]
+      ],
+      "result": "12,800,000 Bytes  L:\\Code\\coolbirdfm-flutter\\cb_file_manager\\build\\benchmarks\\corpus\\  on  [M2 1TB]; Size: 12,800,000 Bytes; Allocated: 0 Bytes; Files: 100,000; Folders: 1,110; % of Parent (Size): 100.0 %; Last Modified: 10/22/2026"
+    },
+    {
+      "round": 1,
+      "application": "cb_cleaner_ui",
+      "elapsed_ns": 86086400,
+      "invoke_ns": 10219900,
+      "completion_observation_interval_ns": [
+        84272400,
+        86086400
+      ],
+      "result": {
+        "generation": 3,
+        "files": 100000,
+        "bytes": 12800000,
+        "display_nodes": 2111,
+        "partial": false,
+        "mode": "full",
+        "coverage_issues": 0
+      }
+    },
+    {
+      "round": 2,
+      "application": "cb_cleaner_ui",
+      "elapsed_ns": 75035900,
+      "invoke_ns": 4194400,
+      "completion_observation_interval_ns": [
+        73395600,
+        75035900
+      ],
+      "result": {
+        "generation": 4,
+        "files": 100000,
+        "bytes": 12800000,
+        "display_nodes": 2111,
+        "partial": false,
+        "mode": "full",
+        "coverage_issues": 0
+      }
+    },
+    {
+      "round": 2,
+      "application": "treesize_free",
+      "elapsed_ns": 294201400,
+      "invoke_ns": 21894900,
+      "completion_observation_interval_ns": [
+        288627200,
+        294201400
+      ],
+      "poll_trace": [
+        [
+          21899700,
+          174478100,
+          false
+        ],
+        [
+          175514100,
+          176109500,
+          false
+        ],
+        [
+          177132900,
+          180378000,
+          false
+        ],
+        [
+          181407200,
+          200706400,
+          false
+        ],
+        [
+          201737800,
+          207699600,
+          false
+        ],
+        [
+          208743000,
+          210030900,
+          true
+        ],
+        [
+          211244200,
+          211458200,
+          true
+        ],
+        [
+          212743900,
+          212950000,
+          true
+        ],
+        [
+          214350700,
+          214733000,
+          true
+        ],
+        [
+          215758400,
+          216056200,
+          true
+        ],
+        [
+          217261300,
+          217581100,
+          true
+        ],
+        [
+          218600100,
+          219330100,
+          true
+        ],
+        [
+          220343500,
+          221036900,
+          true
+        ],
+        [
+          222052800,
+          223080500,
+          true
+        ],
+        [
+          224601300,
+          224971300,
+          true
+        ],
+        [
+          225993300,
+          226530300,
+          true
+        ],
+        [
+          227551200,
+          228186800,
+          true
+        ],
+        [
+          229395500,
+          230616700,
+          true
+        ],
+        [
+          231713300,
+          231891700,
+          true
+        ],
+        [
+          233215100,
+          233362900,
+          true
+        ],
+        [
+          234879700,
+          235024300,
+          true
+        ],
+        [
+          236543300,
+          236703000,
+          true
+        ],
+        [
+          238219000,
+          238360700,
+          true
+        ],
+        [
+          239880800,
+          240106500,
+          true
+        ],
+        [
+          241631300,
+          241915500,
+          true
+        ],
+        [
+          243142100,
+          243303800,
+          true
+        ],
+        [
+          244721600,
+          245231000,
+          true
+        ],
+        [
+          246253700,
+          246586500,
+          true
+        ],
+        [
+          247723900,
+          248216100,
+          true
+        ],
+        [
+          249239600,
+          249700500,
+          true
+        ],
+        [
+          250717600,
+          250965500,
+          true
+        ],
+        [
+          252488200,
+          252655300,
+          true
+        ],
+        [
+          253999000,
+          254161600,
+          true
+        ],
+        [
+          255501900,
+          255864600,
+          true
+        ],
+        [
+          256881200,
+          257120500,
+          true
+        ],
+        [
+          258639200,
+          258908500,
+          true
+        ],
+        [
+          260485200,
+          260749300,
+          true
+        ],
+        [
+          261766400,
+          261944300,
+          true
+        ],
+        [
+          263464600,
+          263631500,
+          true
+        ],
+        [
+          265149400,
+          265295800,
+          true
+        ],
+        [
+          266841200,
+          267137700,
+          true
+        ],
+        [
+          268161500,
+          268318600,
+          true
+        ],
+        [
+          269834700,
+          270024500,
+          true
+        ],
+        [
+          271539200,
+          271695000,
+          true
+        ],
+        [
+          273246800,
+          273545400,
+          true
+        ],
+        [
+          274576600,
+          274797500,
+          true
+        ],
+        [
+          276381700,
+          276957000,
+          true
+        ],
+        [
+          277978100,
+          280551700,
+          true
+        ],
+        [
+          281601000,
+          281933200,
+          true
+        ],
+        [
+          282952900,
+          287105100,
+          true
+        ],
+        [
+          288627200,
+          291726400,
+          true
+        ],
+        [
+          293265200,
+          294201400,
+          false
+        ]
+      ],
+      "result": "12,800,000 Bytes  L:\\Code\\coolbirdfm-flutter\\cb_file_manager\\build\\benchmarks\\corpus\\  on  [M2 1TB]; Size: 12,800,000 Bytes; Allocated: 0 Bytes; Files: 100,000; Folders: 1,110; % of Parent (Size): 100.0 %; Last Modified: 10/22/2026"
+    },
+    {
+      "round": 3,
+      "application": "treesize_free",
+      "elapsed_ns": 283346300,
+      "invoke_ns": 16648700,
+      "completion_observation_interval_ns": [
+        277524200,
+        283346300
+      ],
+      "poll_trace": [
+        [
+          16652800,
+          148995000,
+          false
+        ],
+        [
+          150206700,
+          177758900,
+          false
+        ],
+        [
+          179034100,
+          187157400,
+          false
+        ],
+        [
+          188184500,
+          188660200,
+          true
+        ],
+        [
+          189681600,
+          190248000,
+          true
+        ],
+        [
+          191268100,
+          191482000,
+          true
+        ],
+        [
+          192781400,
+          192990500,
+          true
+        ],
+        [
+          194513700,
+          194695800,
+          true
+        ],
+        [
+          196221400,
+          196655600,
+          true
+        ],
+        [
+          197678900,
+          198493900,
+          true
+        ],
+        [
+          199515100,
+          199736300,
+          true
+        ],
+        [
+          201256000,
+          201481300,
+          true
+        ],
+        [
+          203000300,
+          203153200,
+          true
+        ],
+        [
+          204667400,
+          204802400,
+          true
+        ],
+        [
+          206393200,
+          206803900,
+          true
+        ],
+        [
+          207828000,
+          208041200,
+          true
+        ],
+        [
+          209564200,
+          209778600,
+          true
+        ],
+        [
+          211297900,
+          211477500,
+          true
+        ],
+        [
+          212991700,
+          213175000,
+          true
+        ],
+        [
+          214696300,
+          214860800,
+          true
+        ],
+        [
+          216380300,
+          216604700,
+          true
+        ],
+        [
+          218120800,
+          218264500,
+          true
+        ],
+        [
+          219783000,
+          219927900,
+          true
+        ],
+        [
+          221488500,
+          221763400,
+          true
+        ],
+        [
+          222785100,
+          224463700,
+          true
+        ],
+        [
+          225488100,
+          227324300,
+          true
+        ],
+        [
+          228352000,
+          258864300,
+          true
+        ],
+        [
+          260389800,
+          263006300,
+          true
+        ],
+        [
+          264027200,
+          264221400,
+          true
+        ],
+        [
+          265740000,
+          265924200,
+          true
+        ],
+        [
+          267445100,
+          267639600,
+          true
+        ],
+        [
+          269231700,
+          269714400,
+          true
+        ],
+        [
+          270733000,
+          273994900,
+          true
+        ],
+        [
+          275526500,
+          276378600,
+          true
+        ],
+        [
+          277524200,
+          281534000,
+          true
+        ],
+        [
+          282955800,
+          283346300,
+          false
+        ]
+      ],
+      "result": "12,800,000 Bytes  L:\\Code\\coolbirdfm-flutter\\cb_file_manager\\build\\benchmarks\\corpus\\  on  [M2 1TB]; Size: 12,800,000 Bytes; Allocated: 0 Bytes; Files: 100,000; Folders: 1,110; % of Parent (Size): 100.0 %; Last Modified: 10/22/2026"
+    },
+    {
+      "round": 3,
+      "application": "cb_cleaner_ui",
+      "elapsed_ns": 86241500,
+      "invoke_ns": 13610000,
+      "completion_observation_interval_ns": [
+        84652900,
+        86241500
+      ],
+      "result": {
+        "generation": 5,
+        "files": 100000,
+        "bytes": 12800000,
+        "display_nodes": 2111,
+        "partial": false,
+        "mode": "full",
+        "coverage_issues": 0
+      }
+    },
+    {
+      "round": 4,
+      "application": "cb_cleaner_ui",
+      "elapsed_ns": 76102600,
+      "invoke_ns": 4439000,
+      "completion_observation_interval_ns": [
+        74298800,
+        76102600
+      ],
+      "result": {
+        "generation": 6,
+        "files": 100000,
+        "bytes": 12800000,
+        "display_nodes": 2111,
+        "partial": false,
+        "mode": "full",
+        "coverage_issues": 0
+      }
+    },
+    {
+      "round": 4,
+      "application": "treesize_free",
+      "elapsed_ns": 272991800,
+      "invoke_ns": 20203200,
+      "completion_observation_interval_ns": [
+        267835100,
+        272991800
+      ],
+      "poll_trace": [
+        [
+          20208000,
+          20463600,
+          false
+        ],
+        [
+          22072300,
+          152469800,
+          false
+        ],
+        [
+          153512700,
+          154201400,
+          false
+        ],
+        [
+          155229800,
+          158447400,
+          false
+        ],
+        [
+          160065600,
+          167120300,
+          false
+        ],
+        [
+          168759500,
+          169467100,
+          true
+        ],
+        [
+          170653300,
+          171283700,
+          true
+        ],
+        [
+          172694000,
+          194262800,
+          true
+        ],
+        [
+          195804300,
+          196221600,
+          true
+        ],
+        [
+          197238900,
+          197879000,
+          true
+        ],
+        [
+          198898200,
+          199094500,
+          true
+        ],
+        [
+          200614400,
+          200805200,
+          true
+        ],
+        [
+          202324100,
+          202514700,
+          true
+        ],
+        [
+          204037800,
+          204323900,
+          true
+        ],
+        [
+          205356500,
+          205548200,
+          true
+        ],
+        [
+          206846500,
+          207024100,
+          true
+        ],
+        [
+          208629600,
+          208927300,
+          true
+        ],
+        [
+          209949000,
+          210216200,
+          true
+        ],
+        [
+          211732100,
+          211879200,
+          true
+        ],
+        [
+          213393200,
+          213652300,
+          true
+        ],
+        [
+          215172200,
+          215363600,
+          true
+        ],
+        [
+          216886200,
+          217137500,
+          true
+        ],
+        [
+          218653500,
+          218862600,
+          true
+        ],
+        [
+          220380300,
+          220541600,
+          true
+        ],
+        [
+          222058000,
+          222291100,
+          true
+        ],
+        [
+          223906400,
+          224284000,
+          true
+        ],
+        [
+          225302500,
+          225715700,
+          true
+        ],
+        [
+          226730200,
+          226876700,
+          true
+        ],
+        [
+          228391000,
+          228544000,
+          true
+        ],
+        [
+          230056800,
+          230199800,
+          true
+        ],
+        [
+          231716500,
+          231953400,
+          true
+        ],
+        [
+          233474200,
+          233670200,
+          true
+        ],
+        [
+          235186900,
+          235365900,
+          true
+        ],
+        [
+          236700200,
+          236875700,
+          true
+        ],
+        [
+          238200500,
+          238410400,
+          true
+        ],
+        [
+          239744900,
+          240055700,
+          true
+        ],
+        [
+          241077000,
+          241312400,
+          true
+        ],
+        [
+          242831700,
+          243037700,
+          true
+        ],
+        [
+          244553400,
+          244688200,
+          true
+        ],
+        [
+          246203200,
+          246336000,
+          true
+        ],
+        [
+          247856200,
+          248052300,
+          true
+        ],
+        [
+          249575600,
+          249860800,
+          true
+        ],
+        [
+          250879400,
+          251058300,
+          true
+        ],
+        [
+          252576100,
+          252728600,
+          true
+        ],
+        [
+          254244900,
+          254401400,
+          true
+        ],
+        [
+          255748100,
+          259683600,
+          true
+        ],
+        [
+          260709400,
+          260980900,
+          true
+        ],
+        [
+          262502000,
+          266810000,
+          true
+        ],
+        [
+          267835100,
+          270962400,
+          true
+        ],
+        [
+          272489500,
+          272991800,
+          false
+        ]
+      ],
+      "result": "12,800,000 Bytes  L:\\Code\\coolbirdfm-flutter\\cb_file_manager\\build\\benchmarks\\corpus\\  on  [M2 1TB]; Size: 12,800,000 Bytes; Allocated: 0 Bytes; Files: 100,000; Folders: 1,110; % of Parent (Size): 100.0 %; Last Modified: 10/22/2026"
+    },
+    {
+      "round": 5,
+      "application": "treesize_free",
+      "elapsed_ns": 279377700,
+      "invoke_ns": 16175700,
+      "completion_observation_interval_ns": [
+        275240400,
+        279377700
+      ],
+      "poll_trace": [
+        [
+          16179900,
+          156632200,
+          false
+        ],
+        [
+          157670500,
+          162030400,
+          false
+        ],
+        [
+          163067000,
+          169569000,
+          false
+        ],
+        [
+          171651100,
+          172337600,
+          true
+        ],
+        [
+          173374600,
+          173778200,
+          true
+        ],
+        [
+          174801600,
+          175657500,
+          true
+        ],
+        [
+          176677900,
+          176972200,
+          true
+        ],
+        [
+          178000000,
+          178749800,
+          true
+        ],
+        [
+          179773900,
+          181116900,
+          true
+        ],
+        [
+          182139200,
+          182589800,
+          true
+        ],
+        [
+          183649000,
+          184323400,
+          true
+        ],
+        [
+          185343500,
+          186129700,
+          true
+        ],
+        [
+          187154200,
+          188006400,
+          true
+        ],
+        [
+          189029400,
+          189214600,
+          true
+        ],
+        [
+          190730200,
+          190881400,
+          true
+        ],
+        [
+          192401200,
+          192622900,
+          true
+        ],
+        [
+          194148900,
+          194351800,
+          true
+        ],
+        [
+          195881200,
+          196201600,
+          true
+        ],
+        [
+          197221900,
+          197387400,
+          true
+        ],
+        [
+          198957900,
+          199464100,
+          true
+        ],
+        [
+          200482700,
+          201134000,
+          true
+        ],
+        [
+          202151700,
+          202567900,
+          true
+        ],
+        [
+          203589700,
+          203775900,
+          true
+        ],
+        [
+          205299700,
+          205487000,
+          true
+        ],
+        [
+          207008200,
+          207266000,
+          true
+        ],
+        [
+          208791800,
+          209181300,
+          true
+        ],
+        [
+          210199400,
+          210366000,
+          true
+        ],
+        [
+          211883500,
+          212030600,
+          true
+        ],
+        [
+          213582800,
+          214202000,
+          true
+        ],
+        [
+          215241700,
+          215406600,
+          true
+        ],
+        [
+          216927800,
+          217147400,
+          true
+        ],
+        [
+          218665400,
+          218818700,
+          true
+        ],
+        [
+          220364300,
+          220566600,
+          true
+        ],
+        [
+          222087000,
+          222281600,
+          true
+        ],
+        [
+          223800200,
+          223951400,
+          true
+        ],
+        [
+          225475700,
+          225764300,
+          true
+        ],
+        [
+          226972000,
+          227150900,
+          true
+        ],
+        [
+          228542400,
+          228861200,
+          true
+        ],
+        [
+          229980100,
+          230166800,
+          true
+        ],
+        [
+          231687900,
+          231886600,
+          true
+        ],
+        [
+          233410200,
+          233727700,
+          true
+        ],
+        [
+          234747000,
+          234905100,
+          true
+        ],
+        [
+          236459800,
+          236685500,
+          true
+        ],
+        [
+          238205000,
+          238400100,
+          true
+        ],
+        [
+          239918100,
+          240094200,
+          true
+        ],
+        [
+          241616200,
+          241901800,
+          true
+        ],
+        [
+          242919100,
+          243095200,
+          true
+        ],
+        [
+          244681400,
+          245073500,
+          true
+        ],
+        [
+          246090300,
+          246340400,
+          true
+        ],
+        [
+          247857800,
+          248582200,
+          true
+        ],
+        [
+          249598200,
+          249741800,
+          true
+        ],
+        [
+          251256700,
+          251560000,
+          true
+        ],
+        [
+          252575000,
+          252714400,
+          true
+        ],
+        [
+          254089900,
+          254317100,
+          true
+        ],
+        [
+          255838300,
+          256014300,
+          true
+        ],
+        [
+          257530500,
+          257720700,
+          true
+        ],
+        [
+          259038300,
+          259193700,
+          true
+        ],
+        [
+          260782700,
+          261459000,
+          true
+        ],
+        [
+          262478700,
+          265849500,
+          true
+        ],
+        [
+          266872800,
+          267118000,
+          true
+        ],
+        [
+          268637700,
+          273714600,
+          true
+        ],
+        [
+          275240400,
+          277926500,
+          true
+        ],
+        [
+          278947300,
+          279377700,
+          false
+        ]
+      ],
+      "result": "12,800,000 Bytes  L:\\Code\\coolbirdfm-flutter\\cb_file_manager\\build\\benchmarks\\corpus\\  on  [M2 1TB]; Size: 12,800,000 Bytes; Allocated: 0 Bytes; Files: 100,000; Folders: 1,110; % of Parent (Size): 100.0 %; Last Modified: 10/22/2026"
+    },
+    {
+      "round": 5,
+      "application": "cb_cleaner_ui",
+      "elapsed_ns": 84931300,
+      "invoke_ns": 10291600,
+      "completion_observation_interval_ns": [
+        83106400,
+        84931300
+      ],
+      "result": {
+        "generation": 7,
+        "files": 100000,
+        "bytes": 12800000,
+        "display_nodes": 2111,
+        "partial": false,
+        "mode": "full",
+        "coverage_issues": 0
+      }
+    }
+  ],
+  "environment": {
+    "source_revision": "5b425ca9e8fa50b934c0bfc9eb65c8e62651f5ed",
+    "cpu": "Intel Core i5-14600K",
+    "ram_gib": 63.7,
+    "disk": "Samsung SSD 980 1TB, NVMe",
+    "filesystem": "NTFS",
+    "windows": "Windows 11 Pro, build 26300",
+    "flutter": "3.47.2",
+    "dart": "3.13.2",
+    "rustc": "1.91.1",
+    "python": "3.13.14 (tags/v3.13.14:fd17997, Jun 10 2026, 13:03:48) [MSC v.1944 64 bit (AMD64)]",
+    "build": "flutter build windows --release --target=tool/bench_cleaner_ui.dart",
+    "cb_launcher": "production CbAgentCleanerScreen in a standalone MaterialApp; production spawnFullDiskScan with Rust; no junk rules, scan cache or E2E mode",
+    "cb_elevated": false,
+    "treesize_elevated": true,
+    "treesize_version": "4.8.1.609",
+    "treesize_maximum_threads_setting": 2,
+    "treesize_scan_strategy": "default; internal MFT versus traversal path not instrumented",
+    "treesize_view": "logical Size; Values in Byte; root expanded one level; treemap hidden",
+    "corpus": "L:\\Code\\coolbirdfm-flutter\\cb_file_manager\\build\\benchmarks\\corpus",
+    "files": 100000,
+    "bytes": 12800000,
+    "subdirectories": 1110,
+    "native_dll_sha256": "4c29db7d7428d2804439ac422176a5d14d589b259cd8561affc0b1d331888b54",
+    "cb_executable_sha256": "df7d44dd6dc47ab830c9966848a8254656c64ea40f2684d5a5566704edae1a0f",
+    "treesize_executable_sha256": "53b6c2ef187438881896ecd48f9c5142f8719a5c8f4e563acd009d81b42e0f0e",
+    "launcher_source_sha256": "f3cb49a36a811a9c88aa2f78280dce5ba77d5b1acfdc9fa1c4bb41c39da46445",
+    "runner_source_sha256": "99b2e16c4b2c96611ee41d39891a785702424f4888ed34c279f26275a3221939",
+    "pubspec_lock_sha256": "7746d7a4f075bfaa6fddf68def52dfb1c282745d776b5974d3df87a5b3c1cc4a",
+    "source_note": "Other concurrent workspace changes existed in Android build/release files; native DLL matches the earlier Rust/Dart benchmark."
+  }
+}

@@ -1,0 +1,422 @@
+{
+  "schema": 1,
+  "date_utc": "2026-10-21T19:32:09.925504Z",
+  "os": "\"Windows 11 Pro\" 10.0 (Build 26300)",
+  "dart": "3.13.2 (stable) (Tue Aug 25 01:01:12 2026 -0700) on \"windows_x64\"",
+  "processors": 20,
+  "native_available": true,
+  "corpus": "L:\\Code\\coolbirdfm-flutter\\cb_file_manager\\build\\benchmarks\\corpus",
+  "hash_file": "L:\\Code\\coolbirdfm-flutter\\cb_file_manager\\build\\benchmarks\\hash-256m.bin",
+  "hash_bytes": 268435456,
+  "query": "bo nao",
+  "rounds": 5,
+  "warmups_per_engine_per_task": 1,
+  "cache": "warm OS cache; no app result reuse; alternating engine order",
+  "disk_scan": {
+    "max_depth": 20,
+    "min_display_entry_bytes": 1048576,
+    "max_children_per_directory": 200,
+    "junk_rules": 0,
+    "incremental": false,
+    "includes": "isolate startup, scan, tree processing and result transfer",
+    "excludes": "Flutter frame rendering"
+  },
+  "summaries": [
+    {
+      "task": "disk_cleaner_full_scan",
+      "dart_median_us": 117639,
+      "rust_median_us": 41072,
+      "dart_over_rust": 2.864214063108687,
+      "dart_min_us": 111190,
+      "dart_max_us": 122282,
+      "rust_min_us": 32015,
+      "rust_max_us": 43695,
+      "result": {
+        "files": 100000,
+        "directories_including_root": 1111,
+        "bytes": 12800000,
+        "display_nodes": 2111,
+        "tree_sha256": "fe71c303393466b6e6d3c41530a6872c8c84421acec9449cef03bf08dc934207",
+        "coverage_issues": 0
+      }
+    },
+    {
+      "task": "recursive_name_search",
+      "dart_median_us": 892381,
+      "rust_median_us": 66451,
+      "dart_over_rust": 13.429158327188455,
+      "dart_min_us": 858956,
+      "dart_max_us": 1007145,
+      "rust_min_us": 64492,
+      "rust_max_us": 86566,
+      "result": {
+        "hits": 10000,
+        "paths_sha256": "fee63e1578147b58ee00fe8fbc1df810104d46fb930318ee185b15eca84a9f57"
+      }
+    },
+    {
+      "task": "sha256",
+      "dart_median_us": 2382416,
+      "rust_median_us": 176745,
+      "dart_over_rust": 13.47939687119862,
+      "dart_min_us": 2273030,
+      "dart_max_us": 2556577,
+      "rust_min_us": 174937,
+      "rust_max_us": 197560,
+      "result": {
+        "sha256": "b03a613687aa1960759d0bfa5826b85fed3b01465e72dbe560724a903e4c74db"
+      }
+    }
+  ],
+  "samples": [
+    {
+      "task": "disk_cleaner_full_scan",
+      "round": 1,
+      "engine": "rust",
+      "microseconds": 41314,
+      "result": {
+        "files": 100000,
+        "directories_including_root": 1111,
+        "bytes": 12800000,
+        "display_nodes": 2111,
+        "tree_sha256": "fe71c303393466b6e6d3c41530a6872c8c84421acec9449cef03bf08dc934207",
+        "coverage_issues": 0
+      }
+    },
+    {
+      "task": "disk_cleaner_full_scan",
+      "round": 1,
+      "engine": "dart",
+      "microseconds": 111190,
+      "result": {
+        "files": 100000,
+        "directories_including_root": 1111,
+        "bytes": 12800000,
+        "display_nodes": 2111,
+        "tree_sha256": "fe71c303393466b6e6d3c41530a6872c8c84421acec9449cef03bf08dc934207",
+        "coverage_issues": 0
+      }
+    },
+    {
+      "task": "disk_cleaner_full_scan",
+      "round": 2,
+      "engine": "dart",
+      "microseconds": 122282,
+      "result": {
+        "files": 100000,
+        "directories_including_root": 1111,
+        "bytes": 12800000,
+        "display_nodes": 2111,
+        "tree_sha256": "fe71c303393466b6e6d3c41530a6872c8c84421acec9449cef03bf08dc934207",
+        "coverage_issues": 0
+      }
+    },
+    {
+      "task": "disk_cleaner_full_scan",
+      "round": 2,
+      "engine": "rust",
+      "microseconds": 43695,
+      "result": {
+        "files": 100000,
+        "directories_including_root": 1111,
+        "bytes": 12800000,
+        "display_nodes": 2111,
+        "tree_sha256": "fe71c303393466b6e6d3c41530a6872c8c84421acec9449cef03bf08dc934207",
+        "coverage_issues": 0
+      }
+    },
+    {
+      "task": "disk_cleaner_full_scan",
+      "round": 3,
+      "engine": "rust",
+      "microseconds": 39784,
+      "result": {
+        "files": 100000,
+        "directories_including_root": 1111,
+        "bytes": 12800000,
+        "display_nodes": 2111,
+        "tree_sha256": "fe71c303393466b6e6d3c41530a6872c8c84421acec9449cef03bf08dc934207",
+        "coverage_issues": 0
+      }
+    },
+    {
+      "task": "disk_cleaner_full_scan",
+      "round": 3,
+      "engine": "dart",
+      "microseconds": 112561,
+      "result": {
+        "files": 100000,
+        "directories_including_root": 1111,
+        "bytes": 12800000,
+        "display_nodes": 2111,
+        "tree_sha256": "fe71c303393466b6e6d3c41530a6872c8c84421acec9449cef03bf08dc934207",
+        "coverage_issues": 0
+      }
+    },
+    {
+      "task": "disk_cleaner_full_scan",
+      "round": 4,
+      "engine": "dart",
+      "microseconds": 117639,
+      "result": {
+        "files": 100000,
+        "directories_including_root": 1111,
+        "bytes": 12800000,
+        "display_nodes": 2111,
+        "tree_sha256": "fe71c303393466b6e6d3c41530a6872c8c84421acec9449cef03bf08dc934207",
+        "coverage_issues": 0
+      }
+    },
+    {
+      "task": "disk_cleaner_full_scan",
+      "round": 4,
+      "engine": "rust",
+      "microseconds": 32015,
+      "result": {
+        "files": 100000,
+        "directories_including_root": 1111,
+        "bytes": 12800000,
+        "display_nodes": 2111,
+        "tree_sha256": "fe71c303393466b6e6d3c41530a6872c8c84421acec9449cef03bf08dc934207",
+        "coverage_issues": 0
+      }
+    },
+    {
+      "task": "disk_cleaner_full_scan",
+      "round": 5,
+      "engine": "rust",
+      "microseconds": 41072,
+      "result": {
+        "files": 100000,
+        "directories_including_root": 1111,
+        "bytes": 12800000,
+        "display_nodes": 2111,
+        "tree_sha256": "fe71c303393466b6e6d3c41530a6872c8c84421acec9449cef03bf08dc934207",
+        "coverage_issues": 0
+      }
+    },
+    {
+      "task": "disk_cleaner_full_scan",
+      "round": 5,
+      "engine": "dart",
+      "microseconds": 119921,
+      "result": {
+        "files": 100000,
+        "directories_including_root": 1111,
+        "bytes": 12800000,
+        "display_nodes": 2111,
+        "tree_sha256": "fe71c303393466b6e6d3c41530a6872c8c84421acec9449cef03bf08dc934207",
+        "coverage_issues": 0
+      }
+    },
+    {
+      "task": "recursive_name_search",
+      "round": 1,
+      "engine": "rust",
+      "microseconds": 64492,
+      "result": {
+        "hits": 10000,
+        "paths_sha256": "fee63e1578147b58ee00fe8fbc1df810104d46fb930318ee185b15eca84a9f57"
+      }
+    },
+    {
+      "task": "recursive_name_search",
+      "round": 1,
+      "engine": "dart",
+      "microseconds": 876523,
+      "result": {
+        "hits": 10000,
+        "paths_sha256": "fee63e1578147b58ee00fe8fbc1df810104d46fb930318ee185b15eca84a9f57"
+      }
+    },
+    {
+      "task": "recursive_name_search",
+      "round": 2,
+      "engine": "dart",
+      "microseconds": 858956,
+      "result": {
+        "hits": 10000,
+        "paths_sha256": "fee63e1578147b58ee00fe8fbc1df810104d46fb930318ee185b15eca84a9f57"
+      }
+    },
+    {
+      "task": "recursive_name_search",
+      "round": 2,
+      "engine": "rust",
+      "microseconds": 86566,
+      "result": {
+        "hits": 10000,
+        "paths_sha256": "fee63e1578147b58ee00fe8fbc1df810104d46fb930318ee185b15eca84a9f57"
+      }
+    },
+    {
+      "task": "recursive_name_search",
+      "round": 3,
+      "engine": "rust",
+      "microseconds": 66451,
+      "result": {
+        "hits": 10000,
+        "paths_sha256": "fee63e1578147b58ee00fe8fbc1df810104d46fb930318ee185b15eca84a9f57"
+      }
+    },
+    {
+      "task": "recursive_name_search",
+      "round": 3,
+      "engine": "dart",
+      "microseconds": 893929,
+      "result": {
+        "hits": 10000,
+        "paths_sha256": "fee63e1578147b58ee00fe8fbc1df810104d46fb930318ee185b15eca84a9f57"
+      }
+    },
+    {
+      "task": "recursive_name_search",
+      "round": 4,
+      "engine": "dart",
+      "microseconds": 892381,
+      "result": {
+        "hits": 10000,
+        "paths_sha256": "fee63e1578147b58ee00fe8fbc1df810104d46fb930318ee185b15eca84a9f57"
+      }
+    },
+    {
+      "task": "recursive_name_search",
+      "round": 4,
+      "engine": "rust",
+      "microseconds": 71461,
+      "result": {
+        "hits": 10000,
+        "paths_sha256": "fee63e1578147b58ee00fe8fbc1df810104d46fb930318ee185b15eca84a9f57"
+      }
+    },
+    {
+      "task": "recursive_name_search",
+      "round": 5,
+      "engine": "rust",
+      "microseconds": 64807,
+      "result": {
+        "hits": 10000,
+        "paths_sha256": "fee63e1578147b58ee00fe8fbc1df810104d46fb930318ee185b15eca84a9f57"
+      }
+    },
+    {
+      "task": "recursive_name_search",
+      "round": 5,
+      "engine": "dart",
+      "microseconds": 1007145,
+      "result": {
+        "hits": 10000,
+        "paths_sha256": "fee63e1578147b58ee00fe8fbc1df810104d46fb930318ee185b15eca84a9f57"
+      }
+    },
+    {
+      "task": "sha256",
+      "round": 1,
+      "engine": "rust",
+      "microseconds": 179943,
+      "result": {
+        "sha256": "b03a613687aa1960759d0bfa5826b85fed3b01465e72dbe560724a903e4c74db"
+      }
+    },
+    {
+      "task": "sha256",
+      "round": 1,
+      "engine": "dart",
+      "microseconds": 2382416,
+      "result": {
+        "sha256": "b03a613687aa1960759d0bfa5826b85fed3b01465e72dbe560724a903e4c74db"
+      }
+    },
+    {
+      "task": "sha256",
+      "round": 2,
+      "engine": "dart",
+      "microseconds": 2373426,
+      "result": {
+        "sha256": "b03a613687aa1960759d0bfa5826b85fed3b01465e72dbe560724a903e4c74db"
+      }
+    },
+    {
+      "task": "sha256",
+      "round": 2,
+      "engine": "rust",
+      "microseconds": 174937,
+      "result": {
+        "sha256": "b03a613687aa1960759d0bfa5826b85fed3b01465e72dbe560724a903e4c74db"
+      }
+    },
+    {
+      "task": "sha256",
+      "round": 3,
+      "engine": "rust",
+      "microseconds": 176745,
+      "result": {
+        "sha256": "b03a613687aa1960759d0bfa5826b85fed3b01465e72dbe560724a903e4c74db"
+      }
+    },
+    {
+      "task": "sha256",
+      "round": 3,
+      "engine": "dart",
+      "microseconds": 2556577,
+      "result": {
+        "sha256": "b03a613687aa1960759d0bfa5826b85fed3b01465e72dbe560724a903e4c74db"
+      }
+    },
+    {
+      "task": "sha256",
+      "round": 4,
+      "engine": "dart",
+      "microseconds": 2392979,
+      "result": {
+        "sha256": "b03a613687aa1960759d0bfa5826b85fed3b01465e72dbe560724a903e4c74db"
+      }
+    },
+    {
+      "task": "sha256",
+      "round": 4,
+      "engine": "rust",
+      "microseconds": 175730,
+      "result": {
+        "sha256": "b03a613687aa1960759d0bfa5826b85fed3b01465e72dbe560724a903e4c74db"
+      }
+    },
+    {
+      "task": "sha256",
+      "round": 5,
+      "engine": "rust",
+      "microseconds": 197560,
+      "result": {
+        "sha256": "b03a613687aa1960759d0bfa5826b85fed3b01465e72dbe560724a903e4c74db"
+      }
+    },
+    {
+      "task": "sha256",
+      "round": 5,
+      "engine": "dart",
+      "microseconds": 2273030,
+      "result": {
+        "sha256": "b03a613687aa1960759d0bfa5826b85fed3b01465e72dbe560724a903e4c74db"
+      }
+    }
+  ],
+  "environment": {
+    "source_revision": "bbf654b4559d371072bd078b63e9dbbd4c33b140",
+    "source_changes": "benchmark tool and documentation only",
+    "build": "dart build cli --target=tool/bench_rust.dart --output=build/benchmarks/cli",
+    "mode": "Dart AOT, Rust release",
+    "rustc": "rustc 1.91.1 (ed61e7d7e 2025-11-07)",
+    "flutter": "3.47.2",
+    "cpu": "Intel Core i5-14600K",
+    "physical_cores": 14,
+    "ram_gib": 63.7,
+    "disk": "Samsung SSD 980 1TB, NVMe",
+    "filesystem": "NTFS",
+    "windows": "Windows 11 Pro, build 26300",
+    "elevated": false,
+    "native_dll_sha256": "4c29db7d7428d2804439ac422176a5d14d589b259cd8561affc0b1d331888b54",
+    "benchmark_source_sha256": "bfdb2fac97161c67ea059820a3d6dde86f7a2924b5fbb2212227a8174474d18e",
+    "treesize_free_version": "4.8.1.609",
+    "treesize_measurement": "unavailable: Computer Use native pipe connection failed (Windows error 2)"
+  }
+}

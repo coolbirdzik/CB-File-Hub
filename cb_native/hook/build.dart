@@ -168,13 +168,17 @@ Map<String, String> _linkerEnvironment(CodeConfig code, String triple) {
     case OS.android:
       final compiler = code.cCompiler?.compiler;
       if (compiler == null) return const {};
+      // Native Assets bypasses Gradle's CMake settings. Keep cb_native's ELF
+      // LOAD segments compatible with Android 16 KB pages on every NDK.
       final clangTarget = triple == 'armv7-linux-androideabi'
           ? 'armv7a-linux-androideabi'
           : triple;
       return {
         'CARGO_TARGET_${envTriple}_LINKER': compiler.toFilePath(),
         'CARGO_TARGET_${envTriple}_RUSTFLAGS':
-            '-C link-arg=--target=$clangTarget${code.android.targetNdkApi}',
+            '-C link-arg=--target=$clangTarget${code.android.targetNdkApi} '
+            '-C link-arg=-Wl,-z,max-page-size=16384 '
+            '-C link-arg=-Wl,-z,common-page-size=16384',
       };
     case OS.macOS:
     case OS.iOS:

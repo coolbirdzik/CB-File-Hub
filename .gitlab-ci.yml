@@ -37,7 +37,7 @@ build_android_release:
       artifacts: true
   before_script:
     - apt-get update
-    - apt-get install -y bash make zip curl
+    - apt-get install -y bash make zip curl nodejs
     - bash scripts/ci/setup_rust_android.sh
   script:
     - make android
