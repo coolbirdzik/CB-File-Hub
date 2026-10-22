@@ -50,6 +50,35 @@ For Microsoft Store and MSIX signing details, see:
 
 ---
 
+## Android-only Google Play release
+
+Use **Actions → Android Only Release → Run workflow** for an Android hotfix
+when the Windows release is already approved. Push the workflow to the default
+branch first, then select the branch containing the Android fix (normally
+`main`). No retag is needed.
+
+- `play_track`: defaults to `internal`; use `production` for the production
+  track, another testing track name, or `internalsharing` for a sharing build.
+- `play_status`: `completed` uploads a release ready for Google's review and
+  publishing process; `draft` leaves a draft. Internal sharing ignores this
+  field.
+- The version name comes from the selected commit's `pubspec.yaml`. Android's
+  version code is `max(pubspec build + 1, highest Google Play version code + 1)`.
+  For example, Play's highest code `35` results in at least `36`.
+- The workflow signs the AAB, checks its native libraries for 16 KB alignment,
+  saves a versioned workflow artifact, and uploads it using the existing
+  `Production` environment's Android signing and Google Play configuration.
+- It does not modify `pubspec.yaml`, push commits/tags, update the GitHub
+  Release, or build/submit Windows packages. The approved Microsoft Store
+  release stays in place.
+
+For another upload, start a **new workflow run** so the version code is queried
+again. To include a newer fix, select its branch; rerunning an old run uses its
+original source commit. `retag` and **Build and Release** still run the full
+multi-platform release.
+
+---
+
 ## Manual Build (Local or Custom CI)
 
 ### Check current version
