@@ -490,6 +490,11 @@ Future<void> runCbFileApp() async {
             );
           } catch (_) {}
         }
+      } else if (Platform.isMacOS && !isSecondaryWindow && !kCbE2E) {
+        try {
+          // Zoom to the screen's visible frame (not full screen).
+          await windowManager.maximize();
+        } catch (_) {}
       }
     }
 

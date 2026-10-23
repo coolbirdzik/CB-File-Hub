@@ -17,7 +17,7 @@ let package = Package(
     dependencies: [
         .package(name: "background_downloader", path: "../.packages/background_downloader-9.5.9"),
         .package(name: "file_picker_darwin", path: "../.packages/file_picker_darwin-1.1.0"),
-        .package(name: "flutter_gemma", path: "../.packages/flutter_gemma-1.7.0"),
+        .package(name: "flutter_gemma", path: "../.packages/flutter_gemma-1.11.4"),
         .package(name: "flutter_secure_storage_darwin", path: "../.packages/flutter_secure_storage_darwin-0.4.0"),
         .package(name: "gal", path: "../.packages/gal-2.3.3"),
         .package(name: "google_sign_in_ios", path: "../.packages/google_sign_in_ios-6.3.5"),
