@@ -109,6 +109,26 @@ Future<void> _browseDownloadFolder(
   await tester.pumpAndSettle();
 }
 
+Future<void> _toggleColumnInChooser(
+  WidgetTester tester,
+  String columnId,
+  String query,
+) async {
+  // The chooser builds its available rows lazily; search brings the column
+  // into view even when the collection has many additional columns.
+  await tester.enterText(
+    find.descendant(
+      of: find.byKey(const ValueKey('column-dialog-search')),
+      matching: find.byType(EditableText),
+    ),
+    query,
+  );
+  // The focused search field keeps its cursor animating.
+  await tester.pump();
+  await tester.tap(find.byKey(ValueKey('column-dialog-$columnId')));
+  await tester.pump();
+}
+
 class _Preferences extends Fake implements UserPreferences {
   @override
   Future<ViewMode> getViewMode() async => ViewMode.list;
@@ -2474,12 +2494,8 @@ void main() {
       await tester.ensureVisible(find.byTooltip('Column settings'));
       await tester.tap(find.byTooltip('Column settings'));
       await tester.pumpAndSettle();
-      final sizeToggle = find.descendant(
-        of: find.byType(AlertDialog),
-        matching: find.widgetWithText(CheckboxListTile, 'Size'),
-      );
-      await tester.tap(sizeToggle);
-      await tester.tap(find.text('APPLY'));
+      await _toggleColumnInChooser(tester, 'size', 'Size');
+      await tester.tap(find.byKey(const ValueKey('column-dialog-apply')));
       await tester.pumpAndSettle();
       expect(
         tester
@@ -2577,13 +2593,9 @@ void main() {
     await mount(tester);
     await tester.tap(find.byTooltip('Column settings'));
     await tester.pumpAndSettle();
-    for (final label in ['Seeds', 'Upload speed']) {
-      final toggle = find.widgetWithText(CheckboxListTile, label);
-      await tester.ensureVisible(toggle);
-      await tester.tap(toggle);
-      await tester.pumpAndSettle();
-    }
-    await tester.tap(find.text('APPLY'));
+    await _toggleColumnInChooser(tester, 'extra-seeds', 'Seeds');
+    await _toggleColumnInChooser(tester, 'extra-upSpeed', 'Upload speed');
+    await tester.tap(find.byKey(const ValueKey('column-dialog-apply')));
     await tester.pumpAndSettle();
     expect(find.text('Seeds'), findsNothing);
     expect(find.text('Upload speed'), findsOneWidget);

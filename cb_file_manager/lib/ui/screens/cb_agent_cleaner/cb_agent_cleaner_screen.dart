@@ -5452,6 +5452,8 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
         : (Platform.isMacOS ? l.trashBin : l.diskCleanerRecycleBinLabel);
     final reasonText = details.isInUse
         ? l.diskCleanerFileInUse
+        : details.canRetryAsAdministrator
+        ? l.accessDeniedAdminMessage(details.item.path)
         : details.reason;
 
     var skipAll = false;
@@ -5523,9 +5525,16 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
                 if (!details.isInUse)
                   FilledButton(
                     style: FilledButton.styleFrom(shape: _cleanerButtonShape),
-                    onPressed: () =>
-                        Navigator.of(ctx).pop(CleanFailureAction.retry),
-                    child: Text(l.diskCleanerTryAgain),
+                    onPressed: () => Navigator.of(ctx).pop(
+                      details.canRetryAsAdministrator
+                          ? CleanFailureAction.retryAsAdministrator
+                          : CleanFailureAction.retry,
+                    ),
+                    child: Text(
+                      details.canRetryAsAdministrator
+                          ? '${l.retry} (${l.adminAccess})'
+                          : l.diskCleanerTryAgain,
+                    ),
                   ),
               ],
             ),

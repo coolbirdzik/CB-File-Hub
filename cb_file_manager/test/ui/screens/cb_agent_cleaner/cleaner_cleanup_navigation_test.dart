@@ -70,6 +70,9 @@ class _Cleaner extends DiskCleanerService {
   );
   int scans = 0;
   final requests = <({List<JunkItem> items, bool permanent})>[];
+  bool failDelete = false;
+  bool requiresAdmin = false;
+  final failureActions = <CleanFailureAction>[];
 
   @override
   Future<List<DriveSpace>> getDriveSpace() async => const [
@@ -107,6 +110,20 @@ class _Cleaner extends DiskCleanerService {
     onDeleteFailure,
   }) async {
     requests.add((items: items, permanent: permanent));
+    if (failDelete && onDeleteFailure != null) {
+      failureActions.add(
+        await onDeleteFailure(
+          CleanFailureDetails(
+            item: items.first,
+            reason: 'Delete failed',
+            isInUse: false,
+            blockedPath: null,
+            permanent: permanent,
+            canRetryAsAdministrator: requiresAdmin,
+          ),
+        ),
+      );
+    }
     return CleanReport(
       freedBytes: items.fold(0, (sum, item) => sum + item.sizeBytes),
       succeeded: items.map((item) => item.path).toList(),
@@ -170,6 +187,45 @@ Future<void> _finishCleanup(WidgetTester tester) async {
 }
 
 void main() {
+  for (final requiresAdmin in [true, false]) {
+    testWidgets(
+      'delete failure offers the appropriate retry (admin: $requiresAdmin)',
+      (tester) async {
+        final cleaner = _Cleaner()
+          ..failDelete = true
+          ..requiresAdmin = requiresAdmin;
+        await _pumpCleaner(tester, cleaner);
+        await _select(tester);
+        await tester.sendKeyEvent(LogicalKeyboardKey.delete);
+        await tester.pumpAndSettle();
+        await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+        for (var i = 0; i < 10 && cleaner.requests.isEmpty; i++) {
+          await tester.pump(const Duration(milliseconds: 16));
+        }
+        await tester.pump();
+        final retry = find.widgetWithText(
+          FilledButton,
+          requiresAdmin ? 'Retry (Admin Access)' : 'Try again',
+        );
+        expect(retry, findsOneWidget);
+        expect(cleaner.failureActions, isEmpty);
+        if (requiresAdmin) {
+          expect(
+            find.textContaining('Administrator privileges required'),
+            findsOneWidget,
+          );
+        }
+        await tester.tap(retry);
+        await _finishCleanup(tester);
+        expect(cleaner.failureActions, [
+          requiresAdmin
+              ? CleanFailureAction.retryAsAdministrator
+              : CleanFailureAction.retry,
+        ]);
+      },
+    );
+  }
+
   for (final permanent in [false, true]) {
     testWidgets('Enter confirms selected deletion (permanent: $permanent)', (
       tester,

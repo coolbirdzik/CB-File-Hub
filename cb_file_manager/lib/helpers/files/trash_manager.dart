@@ -2,9 +2,11 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:cb_native/cb_native.dart';
+import 'package:ffi/ffi.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as pathlib;
 import 'package:path_provider/path_provider.dart';
+import 'package:win32/win32.dart' as win32;
 
 import '../../utils/app_logger.dart';
 import '../../services/disk_cleaner/macos_cleaner_platform.dart';
@@ -593,6 +595,7 @@ class TrashManager {
         onChunkStart: onChunkStart,
         onChunkDone: onChunkDone,
         timeoutOverride: timeoutOverride,
+        onError: onError,
       );
     }
 
@@ -745,13 +748,19 @@ class TrashManager {
   /// with an explicit elevation request. No ownership or ACL changes are made.
   Future<Set<String>> retryPermanentDeleteAsAdministrator(
     List<String> failedPaths,
-  ) async {
+  ) => retryDeleteAsAdministrator(failedPaths, permanent: true);
+
+  /// Retries only the supplied failed targets, preserving the approved mode.
+  Future<Set<String>> retryDeleteAsAdministrator(
+    List<String> failedPaths, {
+    required bool permanent,
+  }) async {
     if (!Platform.isWindows || failedPaths.isEmpty) return <String>{};
 
     final exactPaths = failedPaths.toSet().toList(growable: false);
     await WindowsFileOperations.deleteItems(
       sources: exactPaths,
-      permanent: true,
+      permanent: permanent,
       silent: true,
       requireElevation: true,
       timeout: const Duration(minutes: 2),
@@ -775,6 +784,7 @@ class TrashManager {
     void Function(String currentPath, int done, int total)? onChunkStart,
     void Function(int done, int total)? onChunkDone,
     Duration? timeoutOverride,
+    void Function(String path, Object error)? onError,
   }) async {
     final succeeded = <String>{};
     final total = filePaths.length;
@@ -802,6 +812,7 @@ class TrashManager {
         permanent: permanent,
         silent: true,
         timeout: batchTimeout,
+        onError: onError,
       );
       stopwatch.stop();
       AppLogger.info(
@@ -875,14 +886,23 @@ class TrashManager {
   }
 
   bool _isPathGoneAfterDelete(String path) {
+    if (Platform.isWindows) {
+      final nativePath = win32.PCWSTR(path.toNativeUtf16());
+      try {
+        final attributes = win32.GetFileAttributes(nativePath);
+        return attributes.value == 0xFFFFFFFF &&
+            (attributes.error == win32.ERROR_FILE_NOT_FOUND ||
+                attributes.error == win32.ERROR_PATH_NOT_FOUND);
+      } finally {
+        calloc.free(nativePath);
+      }
+    }
     try {
       return FileSystemEntity.typeSync(path, followLinks: false) ==
           FileSystemEntityType.notFound;
     } catch (_) {
-      // If the shell/native layer deleted the path while metadata/stat calls are
-      // racing, err on the side of considering it gone rather than surfacing a
-      // false delete failure.
-      return true;
+      // An inaccessible path is not evidence that deletion succeeded.
+      return false;
     }
   }
 

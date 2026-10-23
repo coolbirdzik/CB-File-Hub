@@ -2,8 +2,56 @@ import 'dart:io';
 
 import 'package:cb_file_manager/helpers/files/trash_manager.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/services.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  for (final permanent in [false, true]) {
+    test(
+      'admin retry checks targets disappeared (permanent: $permanent)',
+      () async {
+        const channel = MethodChannel('cb_file_manager/file_operations');
+        final directory = await Directory.systemTemp.createTemp(
+          'cb_admin_retry_',
+        );
+        final file = await File(
+          '${directory.path}/target.tmp',
+        ).writeAsString('test');
+        addTearDown(() async {
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+              .setMockMethodCallHandler(channel, null);
+          await directory.delete(recursive: true);
+        });
+        var removeTarget = false;
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, (call) async {
+              final args = call.arguments as Map;
+              expect(args['sources'], [file.path]);
+              expect(args['permanent'], permanent);
+              expect(args['requireElevation'], isTrue);
+              if (removeTarget) await file.delete();
+              return true;
+            });
+        expect(
+          await TrashManager().retryDeleteAsAdministrator([
+            file.path,
+            file.path,
+          ], permanent: permanent),
+          isEmpty,
+        );
+        expect(await file.exists(), isTrue);
+        removeTarget = true;
+        expect(
+          await TrashManager().retryDeleteAsAdministrator([
+            file.path,
+          ], permanent: permanent),
+          {file.path},
+        );
+      },
+      skip: !Platform.isWindows,
+    );
+  }
+
   for (final useNative in [true, false]) {
     group('TrashManager permanent deletion (native: $useNative)', () {
       late Directory tempDirectory;

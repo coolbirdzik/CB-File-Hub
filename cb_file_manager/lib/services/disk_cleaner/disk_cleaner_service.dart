@@ -297,14 +297,19 @@ int _countCleanableNodes(DiskTreeNode root) {
 /// identical results from identical code paths.
 class DiskCleanerService {
   DiskCleanerService._({FullDiskScanSpawner? fullDiskScanSpawner})
-    : _fullDiskScanSpawner = fullDiskScanSpawner ?? spawnFullDiskScan;
+    : _fullDiskScanSpawner = fullDiskScanSpawner ?? spawnFullDiskScan,
+      _trashForTesting = null;
 
   @visibleForTesting
-  DiskCleanerService.forTesting({required this._fullDiskScanSpawner});
+  DiskCleanerService.forTesting({
+    required this._fullDiskScanSpawner,
+    TrashManager? trashManager,
+  }) : _trashForTesting = trashManager;
 
   static final DiskCleanerService instance = DiskCleanerService._();
 
   final FullDiskScanSpawner _fullDiskScanSpawner;
+  final TrashManager? _trashForTesting;
 
   final StreamController<DiskCleanerAgentActivity> _agentActivityController =
       StreamController<DiskCleanerAgentActivity>.broadcast();
@@ -907,6 +912,14 @@ class DiskCleanerService {
     Future<CleanFailureAction> Function(CleanFailureDetails details)?
     onDeleteFailure,
   }) async {
+    if (_trashForTesting != null) {
+      return _cleanJunkInternal(
+        items: items,
+        permanent: permanent,
+        onProgress: onProgress,
+        onDeleteFailure: onDeleteFailure,
+      );
+    }
     final receivePort = ReceivePort();
     final errorPort = ReceivePort();
     final exitPort = ReceivePort();
@@ -1028,7 +1041,7 @@ class DiskCleanerService {
     var skipAllRemainingDeletes = false;
     int freed = 0;
 
-    final trash = TrashManager();
+    final trash = _trashForTesting ?? TrashManager();
     onProgress?.call(0, 0, null);
     final expandedItems = await _expandDirectoryTargets(
       items,
@@ -1139,21 +1152,35 @@ class DiskCleanerService {
       );
     }
 
-    Future<bool> retryDeleteSingleItem(JunkItem item) async {
+    Future<bool> retryDeleteSingleItem(
+      JunkItem item, {
+      required void Function(String path, Object error) onError,
+    }) async {
       final paths = [item.path];
       final ok = permanent
-          ? await trash.deleteMultiplePermanently(paths, chunkSize: 1)
-          : await trash.moveMultipleToTrashBatched(paths, chunkSize: 1);
+          ? await trash.deleteMultiplePermanently(
+              paths,
+              chunkSize: 1,
+              onError: onError,
+            )
+          : await trash.moveMultipleToTrashBatched(
+              paths,
+              chunkSize: 1,
+              onError: onError,
+            );
       return ok.contains(item.path);
     }
 
     Future<void> resolveFailedItem(
       JunkItem item, {
       String? fallbackReason,
+      Object? error,
       String? actionLabel,
       bool knownInUse = false,
     }) async {
       var lastReason = fallbackReason;
+      var lastError = error;
+      var triedAsAdministrator = false;
 
       while (true) {
         if (skipAllRemainingDeletes) {
@@ -1166,6 +1193,13 @@ class DiskCleanerService {
           return;
         }
 
+        final currentError = lastError;
+        final canRetryAsAdministrator =
+            Platform.isWindows &&
+            !knownInUse &&
+            !triedAsAdministrator &&
+            currentError is FileSystemException &&
+            currentError.osError?.errorCode == 5;
         final classification = knownInUse
             ? _DeleteFailureClassification(
                 isInUse: true,
@@ -1210,6 +1244,7 @@ class DiskCleanerService {
             isInUse: classification.isInUse,
             blockedPath: classification.blockedPath,
             permanent: permanent,
+            canRetryAsAdministrator: canRetryAsAdministrator,
           ),
         );
 
@@ -1238,15 +1273,37 @@ class DiskCleanerService {
           AppLogger.info(
             '[DiskCleaner] Retrying ${actionLabel ?? (permanent ? "permanent delete" : "recycle-bin move")}: ${item.path}',
           );
-          final retried = await retryDeleteSingleItem(item);
+          final elevated = action == CleanFailureAction.retryAsAdministrator;
+          // A callback cannot broaden elevation to non-permission failures.
+          if (elevated && !canRetryAsAdministrator) {
+            failed[item.path] = effectiveReason;
+            return;
+          }
+          triedAsAdministrator |= elevated;
+          lastError = null;
+          final retried = elevated
+              ? (await trash.retryDeleteAsAdministrator(
+                  [item.path],
+                  permanent:
+                      permanent ||
+                      item.isRecycleBinItem ||
+                      item.categoryId == 'recycle_bin',
+                )).contains(item.path)
+              : await retryDeleteSingleItem(
+                  item,
+                  onError: (_, error) => lastError = error,
+                );
           if (retried) {
             recordSuccess(item, actionLabel: actionLabel);
             return;
           }
-          lastReason = permanent
-              ? 'Retry failed to delete'
-              : 'Retry failed to move to Recycle Bin';
+          lastReason =
+              lastError?.toString() ??
+              (permanent
+                  ? 'Retry failed to delete'
+                  : 'Retry failed to move to Recycle Bin');
         } catch (e, st) {
+          lastError = e;
           lastReason = '$e';
           AppLogger.error(
             '[DiskCleaner] Exception while retrying ${actionLabel ?? (permanent ? "delete" : "move to Recycle Bin")}: ${item.path}',
@@ -1413,6 +1470,7 @@ class DiskCleanerService {
               await resolveFailedItem(
                 item,
                 fallbackReason: deleteErrors[item.path]?.toString(),
+                error: deleteErrors[item.path],
               );
             }
             done++;
@@ -1440,7 +1498,7 @@ class DiskCleanerService {
               onProgress?.call(done, total, remaining.last.path);
               break;
             }
-            await resolveFailedItem(item, fallbackReason: '$e');
+            await resolveFailedItem(item, fallbackReason: '$e', error: e);
             done++;
             onProgress?.call(done, total, item.path);
           }
@@ -1473,6 +1531,7 @@ class DiskCleanerService {
         await resolveFailedItem(
           item,
           fallbackReason: e.message,
+          error: e,
           actionLabel: 'delete from Recycle Bin',
         );
       } catch (e) {
@@ -1740,8 +1799,7 @@ class DiskCleanerService {
       final error = opened.error;
       return error == win32.ERROR_SHARING_VIOLATION ||
           error == win32.ERROR_LOCK_VIOLATION ||
-          error == win32.ERROR_USER_MAPPED_FILE ||
-          error == win32.ERROR_ACCESS_DENIED;
+          error == win32.ERROR_USER_MAPPED_FILE;
     } finally {
       calloc.free(nativePath);
     }

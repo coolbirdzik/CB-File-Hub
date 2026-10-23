@@ -327,7 +327,7 @@ class CleanReport {
   int get skippedByUserCount => skippedByUser.length;
 }
 
-enum CleanFailureAction { skip, skipAll, retry }
+enum CleanFailureAction { skip, skipAll, retry, retryAsAdministrator }
 
 class CleanFailureDetails {
   final JunkItem item;
@@ -335,6 +335,7 @@ class CleanFailureDetails {
   final bool isInUse;
   final String? blockedPath;
   final bool permanent;
+  final bool canRetryAsAdministrator;
 
   const CleanFailureDetails({
     required this.item,
@@ -342,5 +343,6 @@ class CleanFailureDetails {
     required this.isInUse,
     required this.blockedPath,
     required this.permanent,
+    this.canRetryAsAdministrator = false,
   });
 }

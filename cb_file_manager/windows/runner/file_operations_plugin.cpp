@@ -164,6 +164,57 @@ namespace file_operations_plugin
             OutputDebugStringW(line.c_str());
         }
 
+        void RecordDeleteFailure(const std::wstring &source, HRESULT hr,
+                                 flutter::EncodableList *errors)
+        {
+            if (!errors || SUCCEEDED(hr)) return;
+            const int size = WideCharToMultiByte(CP_UTF8, 0, source.data(),
+                static_cast<int>(source.size()), nullptr, 0, nullptr, nullptr);
+            std::string path(static_cast<size_t>(size), '\0');
+            WideCharToMultiByte(CP_UTF8, 0, source.data(),
+                static_cast<int>(source.size()), path.data(), size, nullptr, nullptr);
+            const int code = hr == COPYENGINE_E_ACCESS_DENIED_SRC ||
+                             hr == COPYENGINE_E_ACCESS_DENIED_DEST
+                ? ERROR_ACCESS_DENIED
+                : HRESULT_FACILITY(hr) == FACILITY_WIN32 ? HRESULT_CODE(hr) : hr;
+            errors->emplace_back(flutter::EncodableMap{
+                {flutter::EncodableValue("source"), flutter::EncodableValue(path)},
+                {flutter::EncodableValue("errorCode"), flutter::EncodableValue(code)}});
+        }
+
+        // One sink per approved target attributes child failures to that target.
+        class DeleteProgressSink : public Microsoft::WRL::RuntimeClass<
+            Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>,
+            IFileOperationProgressSink>
+        {
+        public:
+            DeleteProgressSink(std::wstring source, flutter::EncodableList *errors)
+                : source_(std::move(source)), errors_(errors) {}
+            IFACEMETHODIMP StartOperations() override { return S_OK; }
+            IFACEMETHODIMP FinishOperations(HRESULT) override { return S_OK; }
+            IFACEMETHODIMP PreRenameItem(DWORD, IShellItem *, LPCWSTR) override { return S_OK; }
+            IFACEMETHODIMP PostRenameItem(DWORD, IShellItem *, LPCWSTR, HRESULT, IShellItem *) override { return S_OK; }
+            IFACEMETHODIMP PreMoveItem(DWORD, IShellItem *, IShellItem *, LPCWSTR) override { return S_OK; }
+            IFACEMETHODIMP PostMoveItem(DWORD, IShellItem *, IShellItem *, LPCWSTR, HRESULT, IShellItem *) override { return S_OK; }
+            IFACEMETHODIMP PreCopyItem(DWORD, IShellItem *, IShellItem *, LPCWSTR) override { return S_OK; }
+            IFACEMETHODIMP PostCopyItem(DWORD, IShellItem *, IShellItem *, LPCWSTR, HRESULT, IShellItem *) override { return S_OK; }
+            IFACEMETHODIMP PreDeleteItem(DWORD, IShellItem *) override { return S_OK; }
+            IFACEMETHODIMP PostDeleteItem(DWORD, IShellItem *, HRESULT hr, IShellItem *) override
+            {
+                RecordDeleteFailure(source_, hr, errors_);
+                return S_OK;
+            }
+            IFACEMETHODIMP PreNewItem(DWORD, IShellItem *, LPCWSTR) override { return S_OK; }
+            IFACEMETHODIMP PostNewItem(DWORD, IShellItem *, LPCWSTR, LPCWSTR, DWORD, HRESULT, IShellItem *) override { return S_OK; }
+            IFACEMETHODIMP UpdateProgress(UINT, UINT) override { return S_OK; }
+            IFACEMETHODIMP ResetTimer() override { return S_OK; }
+            IFACEMETHODIMP PauseTimer() override { return S_OK; }
+            IFACEMETHODIMP ResumeTimer() override { return S_OK; }
+        private:
+            std::wstring source_;
+            flutter::EncodableList *errors_;
+        };
+
         // Send the given items to the Recycle Bin (or permanently delete
         // them) using IFileOperation in a SINGLE batched call. The whole
         // batch goes through one PerformOperations() so we avoid the
@@ -173,7 +224,8 @@ namespace file_operations_plugin
             const std::vector<std::wstring> &source_paths,
             bool permanent,
             bool silent,
-            bool require_elevation)
+            bool require_elevation,
+            flutter::EncodableList *errors = nullptr)
         {
             if (source_paths.empty())
             {
@@ -225,7 +277,7 @@ namespace file_operations_plugin
                 DWORD flags = 0;
                 if (!permanent)
                 {
-                    flags |= FOF_ALLOWUNDO;
+                    flags |= FOF_ALLOWUNDO | FOFX_RECYCLEONDELETE;
                 }
                 if (silent)
                 {
@@ -268,19 +320,24 @@ namespace file_operations_plugin
                         IID_PPV_ARGS(&psiSource));
                     if (FAILED(hr))
                     {
+                        RecordDeleteFailure(source, hr, errors);
                         LogOperationMessage(
                             L"SHCreateItemFromParsingName failed | hr=" +
                             std::to_wstring(hr) + L" | path=" + source);
                         continue;
                     }
 
-                    hr = pfo->DeleteItem(psiSource.Get(), nullptr);
+                    auto sink = errors
+                        ? Microsoft::WRL::Make<DeleteProgressSink>(source, errors)
+                        : Microsoft::WRL::ComPtr<DeleteProgressSink>();
+                    hr = pfo->DeleteItem(psiSource.Get(), sink.Get());
                     if (SUCCEEDED(hr))
                     {
                         ++queued;
                     }
                     else
                     {
+                        RecordDeleteFailure(source, hr, errors);
                         LogOperationMessage(
                             L"DeleteItem queue failed | hr=" +
                             std::to_wstring(hr) + L" | path=" + source);
@@ -301,6 +358,8 @@ namespace file_operations_plugin
                 hr = pfo->PerformOperations();
                 if (FAILED(hr))
                 {
+                    if (source_paths.size() == 1 && errors && errors->empty())
+                        RecordDeleteFailure(source_paths.front(), hr, errors);
                     LogOperationMessage(
                         L"PerformOperations failed | hr=" + std::to_wstring(hr));
                     break;
@@ -308,7 +367,8 @@ namespace file_operations_plugin
 
                 BOOL aborted = FALSE;
                 pfo->GetAnyOperationsAborted(&aborted);
-                result_ok = !aborted;
+                result_ok = !aborted && queued == source_paths.size() &&
+                    (!errors || errors->empty());
                 LogOperationMessage(
                     L"PerformOperations finished | aborted=" +
                     std::to_wstring(aborted ? 1 : 0) + L" | ok=" +
@@ -647,13 +707,9 @@ namespace file_operations_plugin
                     if (const auto *b = std::get_if<bool>(&elevation_it->second)) require_elevation = *b;
                 }
 
-                if (require_elevation && !permanent)
-                {
-                    result->Error(
-                        "INVALID_ARGUMENTS",
-                        "requireElevation is valid only for permanent deletion.");
-                    return;
-                }
+                const auto details_it = arguments->find(flutter::EncodableValue("returnResults"));
+                const bool return_results = details_it != arguments->end() &&
+                    std::get_if<bool>(&details_it->second) && std::get<bool>(details_it->second);
 
                 int timeout_ms = 0;
                 if (auto timeout_it = arguments->find(flutter::EncodableValue("timeoutMs"));
@@ -729,13 +785,14 @@ namespace file_operations_plugin
                 }
 
                 std::thread(
-                    [pending_delete_manager, request_id, hwnd, completion_window, source_paths = std::move(source_paths), permanent, silent, require_elevation]() mutable
+                    [pending_delete_manager, request_id, hwnd, completion_window, source_paths = std::move(source_paths), permanent, silent, require_elevation, return_results]() mutable
                     {
                         LogOperationMessage(
                             L"deleteItems worker started | requestId=" +
                             std::to_wstring(request_id) + L" | first=" +
                             source_paths.front());
                         bool ok = false;
+                        flutter::EncodableList errors;
                         try
                         {
                             ok = PerformDeleteOperation(
@@ -743,7 +800,8 @@ namespace file_operations_plugin
                                 source_paths,
                                 permanent,
                                 silent,
-                                require_elevation);
+                                require_elevation,
+                                return_results ? &errors : nullptr);
                         }
                         catch (...)
                         {
@@ -757,7 +815,8 @@ namespace file_operations_plugin
                         if (!TrySetRequestStatus(
                                 pending_delete_manager,
                                 request_id,
-                                ok))
+                                ok,
+                                return_results ? &errors : nullptr))
                         {
                             LogOperationMessage(
                                 L"deleteItems worker finished after response was already completed | requestId=" +

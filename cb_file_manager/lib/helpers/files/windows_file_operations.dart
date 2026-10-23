@@ -79,7 +79,8 @@ class WindowsFileOperations {
 
   /// Delete files/folders using Windows native IFileOperation in a single
   /// batched call. When [permanent] is false the items are sent to the
-  /// Recycle Bin (FOF_ALLOWUNDO). When [silent] is true no UI is shown.
+  /// Recycle Bin (FOF_ALLOWUNDO). [silent] hides progress/error UI;
+  /// [requireElevation] still allows the Windows UAC prompt.
   ///
   /// This is dramatically faster than spawning powershell.exe per file.
   static Future<bool> deleteItems({
@@ -88,6 +89,7 @@ class WindowsFileOperations {
     bool silent = true,
     bool requireElevation = false,
     Duration? timeout,
+    void Function(String path, Object error)? onError,
   }) async {
     if (sources.isEmpty) {
       return false;
@@ -100,11 +102,12 @@ class WindowsFileOperations {
         '[WindowsFileOperations] Starting $action | count=${sources.length} | silent=$silent | first=${sources.first}'
         '${sources.length > 1 ? ' | last=${sources.last}' : ''}',
       );
-      final nativeCall = _channel.invokeMethod<bool>('deleteItems', {
+      final nativeCall = _channel.invokeMethod<dynamic>('deleteItems', {
         'sources': sources,
         'permanent': permanent,
         'silent': silent,
         'requireElevation': requireElevation,
+        if (onError != null) 'returnResults': true,
         if (timeout != null) 'timeoutMs': timeout.inMilliseconds,
       });
       // Dart-side guard: if the native side hangs (COM deadlock, OneDrive
@@ -122,7 +125,21 @@ class WindowsFileOperations {
               },
             ));
       stopwatch.stop();
-      final ok = result ?? false;
+      final ok = result is Map ? result['success'] == true : result == true;
+      if (result is Map && onError != null) {
+        for (final item in result['items'] as List? ?? const []) {
+          final path = item['source'] as String;
+          final code = item['errorCode'] as int;
+          onError(
+            path,
+            FileSystemException(
+              'Windows delete failed',
+              path,
+              OSError('Windows delete failed', code),
+            ),
+          );
+        }
+      }
       AppLogger.info(
         '[WindowsFileOperations] Finished $action | count=${sources.length} | ok=$ok | elapsedMs=${stopwatch.elapsedMilliseconds} | first=${sources.first}',
       );
