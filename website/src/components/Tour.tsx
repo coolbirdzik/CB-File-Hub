@@ -1,6 +1,6 @@
 import * as React from "react";
 import { AnimatePresence, motion, useInView, useScroll, useSpring } from "motion/react";
-import { FolderOpen, Images, ShareNetwork, Tag, type Icon } from "@phosphor-icons/react";
+import { FolderOpen, Images, Magnet, ShareNetwork, Tag, type Icon } from "@phosphor-icons/react";
 import { T, type Copy, useCopy } from "./lang";
 import { SplitText, easeOut } from "./motion";
 import { Eyebrow } from "./Eyebrow";
@@ -50,9 +50,12 @@ const steps: Step[] = [
     },
     image: {
       src: "/media/tour-tags.webp",
-      width: 1152,
-      height: 720,
-      alt: { en: "Tag tree with nested tags", vi: "Cây thẻ với các thẻ lồng nhau" },
+      width: 1600,
+      height: 803,
+      alt: {
+        en: "Manage Tags dialog with popular, recent and nested tags",
+        vi: "Hộp thoại Quản lý thẻ với thẻ phổ biến, thẻ gần đây và thẻ lồng nhau",
+      },
     },
   },
   {
@@ -67,6 +70,20 @@ const steps: Step[] = [
       width: 1152,
       height: 720,
       alt: { en: "Network services list: SMB, FTP, SFTP, WebDAV and SSH", vi: "Danh sách dịch vụ mạng: SMB, FTP, SFTP, WebDAV và SSH" },
+    },
+  },
+  {
+    icon: Magnet,
+    title: { en: "Torrents in one library.", vi: "Torrent gom về một thư viện." },
+    body: {
+      en: "Keep .torrent files and magnet links in one searchable library, import from qBittorrent or Transmission, and choose where each download lands.",
+      vi: "Giữ tệp .torrent và liên kết magnet trong một thư viện dễ tìm, nhập từ qBittorrent hoặc Transmission và chọn nơi lưu cho từng lượt tải.",
+    },
+    image: {
+      src: "/media/tour-torrents.webp",
+      width: 1288,
+      height: 805,
+      alt: { en: "Import from qBittorrent dialog", vi: "Hộp thoại nhập từ qBittorrent" },
     },
   },
 ];
@@ -211,7 +228,7 @@ export function Tour() {
           </div>
 
           <div ref={list} className="relative lg:col-span-5 lg:pl-10">
-            {/* Progress rail through the four steps (desktop only). */}
+            {/* Progress rail through the steps (desktop only). */}
             <div aria-hidden className="absolute top-0 bottom-0 left-0 hidden w-px bg-line lg:block">
               <motion.div style={{ scaleY: progress }} className="h-full w-full origin-top bg-accent" />
             </div>

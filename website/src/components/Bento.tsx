@@ -247,7 +247,7 @@ export function Bento() {
                 <img
                   src="/media/bento-cleaner.webp"
                   width={1400}
-                  height={511}
+                  height={382}
                   loading="lazy"
                   decoding="async"
                   alt={copy({
