@@ -110,10 +110,9 @@ dependencies:
   desktop_drop: ^0.8.4 # OS-level file drag-and-drop support
   flutter_markdown_plus: ^1.0.12 # Continues the discontinued flutter_markdown
   flutter_secure_storage: ^11.0.0 # Secure token storage for local AI advisor
-  flutter_gemma: ^1.9.0
-  # 1.8.0 fixes QNN Hexagon Skel ELF alignment rejected by Google Play.
-  # 1.8.2 also fixes Android Mali GPU loading in that native runtime.
-  flutter_gemma_litertlm: ^1.8.2
+  # Successor of flutter_gemma (renamed upstream; flutter_gemma is discontinued).
+  flutter_edge_ai: ^2.5.1
+  flutter_edge_ai_litertlm: ^1.17.0
   google_fonts: ^8.2.1
   highlight: ^0.7.0
   archive: ^4.0.9
@@ -123,6 +122,7 @@ dependencies:
   pinenacl: ^0.6.0
   google_sign_in: ^7.2.0
   in_app_update: ^5.0.0
+  photo_manager: 3.12.0
 dev_dependencies:
   flutter_test:
     sdk: flutter

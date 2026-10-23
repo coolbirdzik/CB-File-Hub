@@ -73,6 +73,12 @@ class AiProviderService {
   /// Stream emitting provider IDs whose health status changed.
   Stream<String> get onHealthChanged => _healthController.stream;
 
+  final _configController = StreamController<void>.broadcast();
+
+  /// Fires after a provider is added, updated, toggled or deleted, so open
+  /// chats can refresh their model list without being recreated.
+  Stream<void> get onConfigChanged => _configController.stream;
+
   /// In-memory cache of configs (refreshed on every CRUD operation).
   List<AiProviderConfig> _configsCache = [];
   bool _configsLoaded = false;
@@ -243,6 +249,7 @@ class AiProviderService {
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
     await _refreshCache();
+    _configController.add(null);
     AppLogger.info('[AI] Provider added: ${config.name} (${config.id})');
     return config;
   }
@@ -262,6 +269,7 @@ class AiProviderService {
     // Dispose old instance so a fresh one is created on next use
     _disposeProvider(config.id);
     await _refreshCache();
+    _configController.add(null);
     AppLogger.info('[AI] Provider updated: ${config.name} (${config.id})');
   }
 
@@ -272,6 +280,7 @@ class AiProviderService {
     await db.delete(_tableName, where: 'id = ?', whereArgs: [id]);
     _healthCache.remove(id);
     await _refreshCache();
+    _configController.add(null);
     AppLogger.info('[AI] Provider deleted: $id');
   }
 
@@ -585,5 +594,6 @@ class AiProviderService {
     }
     _providerInstances.clear();
     _healthController.close();
+    _configController.close();
   }
 }

@@ -2,6 +2,14 @@ import 'app_localizations.dart';
 
 class ChineseLocalizations implements AppLocalizations {
   @override
+  String get deviceMediaOnDevice => '此设备上的媒体';
+  @override
+  String get deviceMediaLimited => '仅显示您允许访问的照片和视频。';
+  @override
+  String get deviceMediaPermission => '允许访问照片和视频以显示设备相册。';
+  @override
+  String get deviceMediaManageAccess => '选择更多照片和视频';
+  @override
   String get torrentReceiveInBackground => '在后台添加打开的种子';
   @override
   String get torrentReceiveInBackgroundHint =>
@@ -783,6 +791,43 @@ class ChineseLocalizations implements AppLocalizations {
 
   @override
   String get columnResetLayout => '重置列顺序和宽度';
+
+  // Column chooser
+  @override
+  String get columnChooserSubtitle => '勾选要显示的列，拖动已显示的列以调整顺序。';
+
+  @override
+  String get columnChooserSearchHint => '搜索列';
+
+  @override
+  String get columnChooserAvailable => '可用列';
+
+  @override
+  String columnChooserShown(int count) => '已显示 ($count)';
+
+  @override
+  String get columnChooserBasicGroup => '基本';
+
+  @override
+  String get columnChooserCollectionGroup => '此集合';
+
+  @override
+  String get columnChooserSystemGroup => 'Windows 属性';
+
+  @override
+  String get columnChooserSystemNote => '显示在基本列之后，暂不支持按这些列排序。';
+
+  @override
+  String get columnChooserLoadingSystem => '正在加载 Windows 属性…';
+
+  @override
+  String get columnChooserNoMatch => '没有匹配的列';
+
+  @override
+  String get columnChooserAlwaysShown => '始终显示';
+
+  @override
+  String get columnChooserHide => '隐藏列';
 
   // Column visibility dialog
   @override
@@ -3685,6 +3730,41 @@ class ChineseLocalizations implements AppLocalizations {
   @override
   String get noProviderConfigured => '未配置 AI 提供商';
   @override
+  String get aiProviderSettings => 'AI 提供商设置';
+  @override
+  String get localModelGuideTitle => '在你的设备上运行 AI';
+  @override
+  String get localModelGuideIntro =>
+      '云端提供商需要 API 密钥，并可能限制或按次收费。本地模型直接在本机运行：免费、无限制，文件也不会离开这台设备。';
+  @override
+  String get localModelGuideStep1 => '点击下方按钮打开本地 AI 设置，模型列表会立即打开。';
+  @override
+  String localModelGuideStep2(String installLabel) =>
+      '选择一个模型并点击“$installLabel”。它会在后台下载，之后可离线使用。';
+  @override
+  String get localModelGuideStep3 => '回到这里，在发送按钮旁的模型菜单中选择它。';
+  @override
+  String get localModelGuideNote =>
+      '较小的模型占用内存更少、响应更快。只有受限访问的模型才需要 Hugging Face 令牌。';
+  @override
+  String get localModelGuideOpenSettings => '打开本地 AI 设置';
+  @override
+  String get localModelGuideLater => '稍后';
+  @override
+  String get localModelGuideLink => '使用免费的本地模型';
+  @override
+  String get installLocalModel => '安装模型';
+  @override
+  String get localModelRecommended => '推荐';
+  @override
+  String get localModelInstalledBadge => '已安装';
+  @override
+  String get localModelBackgroundHint => '下载会在后台进行，你可以关闭此窗口。';
+  @override
+  String localModelDownloading(String modelName) => '正在下载 $modelName';
+  @override
+  String localModelReady(String modelName) => '$modelName 已安装，可以使用';
+  @override
   String get relevanceScore => '相关度';
   @override
   String get aiExplanation => 'AI 说明';
@@ -4581,6 +4661,20 @@ class ChineseLocalizations implements AppLocalizations {
   String get localAiTokensSuffix => 'Token';
   @override
   String get localAiInvalidTokenCount => '请输入有效的数字';
+  @override
+  String get localAiModelStorage => '模型存储位置';
+  @override
+  String get localAiModelStorageHint => '下载的模型保存在此文件夹中。更改后，已安装的模型将移动到新位置。';
+  @override
+  String get localAiModelStorageReset => '使用默认位置';
+  @override
+  String get localAiModelStorageNotWritable => '无法将模型保存到此文件夹';
+  @override
+  String get localAiMovingModels => '正在移动模型';
+  @override
+  String get localAiModelsMoved => '模型已移动';
+  @override
+  String get localAiMoveModelsFailed => '无法移动模型';
   @override
   String get aiReasoning => '思考';
 

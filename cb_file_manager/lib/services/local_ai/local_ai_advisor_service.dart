@@ -2,8 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter_gemma/flutter_gemma.dart' as gemma;
-import 'package:flutter_gemma_litertlm/flutter_gemma_litertlm.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
@@ -13,6 +11,7 @@ import '../../models/local_ai/local_ai_advisor_model.dart';
 import '../../services/disk_cleaner/cleaner_models.dart';
 import '../../utils/app_logger.dart';
 import 'gguf_llama_cpp_runtime.dart';
+import 'litert_lm_runtime.dart';
 
 /// Manages local AI advisor state: HF token storage, model catalog caching,
 /// model downloads, and on-device advisory inference.
@@ -25,6 +24,15 @@ class LocalAiAdvisorService {
   static const String _installedModelsKey = 'local_ai_installed_models';
   static const String _selectedModelIdKey = 'local_ai_selected_model_id';
   static const String _maxTokensKey = 'local_ai_max_tokens';
+  static const String _modelStorageDirKey = 'local_ai_model_storage_dir';
+  static const String _chatGuideShownKey = 'local_ai_chat_guide_shown';
+
+  final _installedModelsController = StreamController<void>.broadcast();
+
+  /// Fires after a model is installed, uninstalled or moved, so open chats can
+  /// offer it without being recreated.
+  Stream<void> get onInstalledModelsChanged =>
+      _installedModelsController.stream;
 
   /// Allowed range for the configurable context window (in tokens).
   ///
@@ -48,8 +56,6 @@ class LocalAiAdvisorService {
   final LocalAiChatRuntime _ggufChatRuntime;
 
   static const List<HuggingFaceModelEntry> _curatedModels = [
-    // Artifact names/sizes verified against HF on 2026-09-06. Selection notes:
-    // docs/research/2026-09-06-small-local-agent-models.md (workspace root).
     HuggingFaceModelEntry(
       id: 'unsloth/Qwen3.5-4B-GGUF',
       displayName: 'Qwen3.5 4B · Q4_K_M',
@@ -81,16 +87,6 @@ class LocalAiAdvisorService {
       artifactFileName: 'Qwen3-4B-Instruct-2507-Q4_K_M.gguf',
     ),
     HuggingFaceModelEntry(
-      id: 'litert-community/functiongemma-270m-ft-mobile-actions',
-      displayName: 'FunctionGemma 270M Mobile Actions',
-      description:
-          'Very small LiteRT-LM model tuned for mobile action/function calling. Best used as a local tool router.',
-      sizeBytes: 289 * 1024 * 1024,
-      license: 'Gemma',
-      compatible: true,
-      artifactFileName: 'mobile_actions_q8_ekv1024.litertlm',
-    ),
-    HuggingFaceModelEntry(
       id: 'unsloth/Qwen3-0.6B-GGUF',
       displayName: 'Qwen3 0.6B GGUF Q4_K_M',
       description:
@@ -112,6 +108,50 @@ class LocalAiAdvisorService {
       compatible: true,
       artifactFileName: 'Qwen3-1.7B-Q4_K_M.gguf',
     ),
+    // LiteRT-LM bundles run on the GPU on phones (OpenCL / Metal) and are the
+    // only kind iOS can run. Sizes verified against HF on 2026-10-23.
+    HuggingFaceModelEntry(
+      id: 'litert-community/gemma-4-E2B-it-litert-lm',
+      displayName: 'Gemma 4 E2B',
+      description:
+          'Recommended on phones: fast on the GPU, follows file tools well and '
+          'speaks Vietnamese. Needs about 2 GB of free memory.',
+      sizeBytes: 2588147712,
+      license: 'Apache 2.0',
+      artifactFileName: 'gemma-4-E2B-it.litertlm',
+    ),
+    HuggingFaceModelEntry(
+      id: 'litert-community/gemma-4-E4B-it-litert-lm',
+      displayName: 'Gemma 4 E4B',
+      description:
+          'Stronger Gemma 4 for multi-step tasks; slower, for phones with 8 GB '
+          'of RAM or more.',
+      sizeBytes: 3659530240,
+      license: 'Apache 2.0',
+      artifactFileName: 'gemma-4-E4B-it.litertlm',
+    ),
+    HuggingFaceModelEntry(
+      id: 'litert-community/Qwen3-1.7B',
+      displayName: 'Qwen3 1.7B',
+      description:
+          'Light LiteRT-LM model for older phones. Simple searches work; '
+          'multi-step tool requests are less reliable than Gemma 4.',
+      sizeBytes: 977184032,
+      license: 'Apache 2.0',
+      artifactFileName: 'Qwen3-1.7B_dynamic_wi4b32_afp32.litertlm',
+    ),
+    HuggingFaceModelEntry(
+      id: 'litert-community/Qwen3.5-0.8B',
+      displayName: 'Qwen3.5 0.8B',
+      description:
+          'Smallest download for basic chat on low-memory phones. Not suited '
+          'to file tool workflows.',
+      sizeBytes: 964566992,
+      license: 'Apache 2.0',
+      artifactFileName: 'Qwen3.5-0.8B_int8.litertlm',
+    ),
+    // Artifact names/sizes verified against HF on 2026-09-06. Selection notes:
+    // docs/research/2026-09-06-small-local-agent-models.md (workspace root).
   ];
 
   LocalAiAdvisorService({
@@ -127,13 +167,25 @@ class LocalAiAdvisorService {
              mOptions: MacOsOptions(usesDataProtectionKeychain: false),
            ),
        _httpClient = httpClient ?? http.Client(),
-       _chatRuntime = chatRuntime ?? const GemmaLiteRtLocalAiChatRuntime(),
+       _chatRuntime = chatRuntime ?? LiteRtLmLocalAiChatRuntime(),
        _ggufChatRuntime = ggufChatRuntime ?? GgufLlamaCppLocalAiChatRuntime(),
        _documentsDirectoryProvider =
            documentsDirectoryProvider ?? getApplicationDocumentsDirectory;
 
-  /// Windows uses bundled llama.cpp; retain the LiteRT recommendation elsewhere.
-  HuggingFaceModelEntry get pinnedModel => _curatedModels.firstWhere(
+  /// Models offered on this platform. iOS cannot start llama-server, so it
+  /// gets LiteRT-LM bundles only; Android lists them before its CPU-only GGUF.
+  static List<HuggingFaceModelEntry> get _curatedCatalog {
+    if (!(Platform.isAndroid || Platform.isIOS)) return _curatedModels;
+    bool liteRt(HuggingFaceModelEntry e) =>
+        e.artifactFileName.endsWith('.litertlm');
+    return [
+      ..._curatedModels.where(liteRt),
+      if (Platform.isAndroid) ..._curatedModels.where((e) => !liteRt(e)),
+    ];
+  }
+
+  /// Windows uses bundled llama.cpp; LiteRT-LM (GPU) everywhere else.
+  HuggingFaceModelEntry get pinnedModel => _curatedCatalog.firstWhere(
     (model) =>
         model.compatible &&
         model.artifactFileName.endsWith(
@@ -238,7 +290,7 @@ class LocalAiAdvisorService {
   ) {
     final curatedIds = _curatedModels.map((entry) => entry.id).toSet();
     return [
-      ..._curatedModels,
+      ..._curatedCatalog,
       ...entries.where((entry) => !curatedIds.contains(entry.id)),
     ];
   }
@@ -326,6 +378,11 @@ class LocalAiAdvisorService {
     );
   }
 
+  /// Whether CB Agent has already shown its local-model setup guide.
+  bool get chatGuideShown => _prefs.getBool(_chatGuideShownKey) ?? false;
+
+  Future<void> markChatGuideShown() => _prefs.setBool(_chatGuideShownKey, true);
+
   /// Marks a model as the active model for inference.
   Future<void> setSelectedModel(String catalogId) async {
     await _prefs.setString(_selectedModelIdKey, catalogId);
@@ -338,20 +395,239 @@ class LocalAiAdvisorService {
     AppLogger.info('[LocalAI] Selected model: $catalogId');
   }
 
+  /// The folder the user picked for new model downloads, or null when the
+  /// default location is used.
+  String? getCustomModelStorageDirectory() {
+    final stored = _prefs.getString(_modelStorageDirKey);
+    if (stored == null || stored.trim().isEmpty) return null;
+    return _normalizeLocalPath(stored);
+  }
+
+  /// Folder that new downloads are saved into: the user's choice, otherwise
+  /// `<Documents>/local_ai_models`. Installed models keep their own path.
+  Future<String> getModelStorageDirectory() async {
+    final custom = getCustomModelStorageDirectory();
+    if (custom != null) return custom;
+    final dir = await _documentsDirectoryProvider();
+    return _normalizeLocalPath(
+      '${dir.path}${Platform.pathSeparator}local_ai_models',
+    );
+  }
+
+  /// Sets the folder for new model downloads; null restores the default.
+  ///
+  /// Throws a [FileSystemException] when the folder cannot be written, so a
+  /// read-only or sandboxed pick fails here instead of mid-download.
+  Future<void> setModelStorageDirectory(String? path) async {
+    if (path == null || path.trim().isEmpty) {
+      await _prefs.remove(_modelStorageDirKey);
+      AppLogger.info('[LocalAI] Model storage reset to default');
+      return;
+    }
+
+    final normalized = _normalizeLocalPath(path.trim());
+    final dir = Directory(normalized);
+    await dir.create(recursive: true);
+    final probe = File(
+      '${dir.path}${Platform.pathSeparator}.cb_write_test_${DateTime.now().microsecondsSinceEpoch}',
+    );
+    await probe.writeAsString('');
+    await probe.delete();
+
+    await _prefs.setString(_modelStorageDirKey, normalized);
+    AppLogger.info('[LocalAI] Model storage set to $normalized');
+  }
+
+  /// Installed models whose file exists but lies outside the current storage
+  /// folder, i.e. the ones [moveInstalledModelsToStorage] would move.
+  Future<List<InstalledLocalModel>> modelsOutsideStorage() async {
+    final storageDir = await getModelStorageDirectory();
+    final result = <InstalledLocalModel>[];
+    for (final model in getInstalledModels()) {
+      if (_samePath(model.localPath, _storagePathFor(storageDir, model))) {
+        continue;
+      }
+      if (await File(model.localPath).exists()) result.add(model);
+    }
+    return result;
+  }
+
+  /// Moves every installed model into the current storage folder and updates
+  /// its metadata as soon as it lands, so a failure part-way leaves each model
+  /// usable at exactly one recorded path.
+  ///
+  /// A same-volume move is a rename; across volumes the file is copied with
+  /// progress and the original deleted afterwards.
+  Future<void> moveInstalledModelsToStorage({
+    required void Function(ModelMoveProgress) onProgress,
+  }) async {
+    final storageDir = await getModelStorageDirectory();
+    final pending = await modelsOutsideStorage();
+    final sizes = <String, int>{
+      for (final model in pending)
+        model.catalogId: await File(model.localPath).length(),
+    };
+    final totalBytes = sizes.values.fold<int>(0, (sum, size) => sum + size);
+    var movedBytes = 0;
+
+    void report(int movedModels, String? currentName, int bytes) {
+      onProgress(
+        ModelMoveProgress(
+          currentModelName: currentName,
+          movedModels: movedModels,
+          totalModels: pending.length,
+          movedBytes: bytes,
+          totalBytes: totalBytes,
+        ),
+      );
+    }
+
+    if (pending.isEmpty) {
+      report(0, null, 0);
+      return;
+    }
+
+    // llama-server keeps the GGUF open, which blocks rename/delete on Windows.
+    for (final runtime in [_ggufChatRuntime, _chatRuntime]) {
+      if (runtime is LocalAiModelFileHolder) {
+        await (runtime as LocalAiModelFileHolder).releaseModelFiles();
+      }
+    }
+
+    for (var i = 0; i < pending.length; i++) {
+      final model = pending[i];
+      final destination = _storagePathFor(storageDir, model);
+      final baseBytes = movedBytes;
+      report(i, model.displayName, baseBytes);
+
+      AppLogger.info('[LocalAI] Moving ${model.catalogId} to $destination');
+      await _moveModelFile(
+        model.localPath,
+        destination,
+        onBytes: (bytes) => report(i, model.displayName, baseBytes + bytes),
+      );
+      movedBytes += sizes[model.catalogId]!;
+
+      final models = getInstalledModels();
+      final index = models.indexWhere((m) => m.catalogId == model.catalogId);
+      if (index >= 0) {
+        models[index] = InstalledLocalModel(
+          catalogId: model.catalogId,
+          displayName: model.displayName,
+          localPath: destination,
+          sizeBytes: model.sizeBytes,
+          installedAt: model.installedAt,
+          runtimeArtifactId: model.runtimeArtifactId,
+        );
+        await _saveInstalledModels(models);
+      }
+      await _deleteIfEmpty(File(model.localPath).parent);
+    }
+
+    report(pending.length, null, movedBytes);
+    AppLogger.info('[LocalAI] Moved ${pending.length} model(s) to $storageDir');
+  }
+
+  String _storagePathFor(String storageDir, InstalledLocalModel model) {
+    final fileName = model.localPath.split(RegExp(r'[\\/]')).last;
+    return _normalizeLocalPath(
+      '$storageDir${Platform.pathSeparator}'
+      '${model.catalogId.replaceAll('/', '_')}'
+      '${Platform.pathSeparator}$fileName',
+    );
+  }
+
+  bool _samePath(String a, String b) {
+    final left = _normalizeLocalPath(a);
+    final right = _normalizeLocalPath(b);
+    return Platform.isWindows
+        ? left.toLowerCase() == right.toLowerCase()
+        : left == right;
+  }
+
+  Future<void> _moveModelFile(
+    String sourcePath,
+    String destinationPath, {
+    required void Function(int bytes) onBytes,
+  }) async {
+    final source = File(sourcePath);
+    final destination = File(destinationPath);
+    await destination.parent.create(recursive: true);
+    if (await destination.exists()) {
+      await destination.delete();
+    }
+
+    try {
+      await source.rename(destinationPath);
+      onBytes(await destination.length());
+      return;
+    } on FileSystemException {
+      // Different volume (or a transient lock): fall back to copy + delete.
+    }
+
+    final temp = File('$destinationPath.part');
+    final sink = temp.openWrite();
+    var copied = 0;
+    var lastReported = 0;
+    try {
+      await for (final chunk in source.openRead()) {
+        sink.add(chunk);
+        copied += chunk.length;
+        // Per-chunk callbacks would rebuild the dialog thousands of times.
+        if (copied - lastReported >= 8 * 1024 * 1024) {
+          lastReported = copied;
+          onBytes(copied);
+        }
+      }
+      await sink.flush();
+      await sink.close();
+    } catch (_) {
+      await sink.close();
+      if (await temp.exists()) await temp.delete();
+      rethrow;
+    }
+    await temp.rename(destinationPath);
+    onBytes(copied);
+
+    try {
+      await source.delete();
+    } catch (e) {
+      // The copy is complete and becomes the recorded path; a leftover
+      // original only costs disk space.
+      AppLogger.warning(
+        '[LocalAI] Moved model but could not delete $sourcePath',
+        error: e,
+      );
+    }
+  }
+
+  Future<void> _deleteIfEmpty(Directory dir) async {
+    try {
+      if (await dir.exists() && await dir.list().isEmpty) {
+        await dir.delete();
+      }
+    } catch (_) {
+      // Best effort: an empty leftover folder is harmless.
+    }
+  }
+
   /// Downloads and installs a model artifact from Hugging Face.
   ///
   /// HF token is only required for private/gated models.
+  ///
+  /// When [isCancelled] turns true the partial download is deleted and
+  /// [LocalModelDownloadCancelled] is thrown.
   Future<InstalledLocalModel> installModel(
     HuggingFaceModelEntry entry, {
     required void Function(ModelDownloadProgress) onProgress,
+    bool Function()? isCancelled,
   }) async {
     AppLogger.info('[LocalAI] Installing model: ${entry.id}');
 
-    final dir = await _documentsDirectoryProvider();
+    final storageDir = await getModelStorageDirectory();
     final modelDir = Directory(
       _normalizeLocalPath(
-        '${dir.path}${Platform.pathSeparator}local_ai_models'
-        '${Platform.pathSeparator}${entry.id.replaceAll('/', '_')}',
+        '$storageDir${Platform.pathSeparator}${entry.id.replaceAll('/', '_')}',
       ),
     );
     await modelDir.create(recursive: true);
@@ -395,6 +671,9 @@ class LocalAiAdvisorService {
 
     try {
       await for (final chunk in response.stream) {
+        if (isCancelled?.call() ?? false) {
+          throw const LocalModelDownloadCancelled();
+        }
         downloadedBytes += chunk.length;
         sink.add(chunk);
         onProgress(
@@ -502,6 +781,7 @@ class LocalAiAdvisorService {
     try {
       final json = jsonEncode(models.map((m) => m.toJson()).toList());
       await _prefs.setString(_installedModelsKey, json);
+      _installedModelsController.add(null);
     } catch (e) {
       AppLogger.error('[LocalAI] Failed to save installed models', error: e);
     }
@@ -614,113 +894,17 @@ class LocalAiAdvisorService {
   /// Releases both chat runtimes. Must be called on app shutdown so any
   /// spawned llama-server.exe child process is terminated instead of leaking.
   Future<void> dispose() async {
+    await _installedModelsController.close();
     await _ggufChatRuntime.dispose();
     await _chatRuntime.dispose();
   }
 }
 
-/// Local chat runtime backed by Flutter Gemma + LiteRT-LM.
-class GemmaLiteRtLocalAiChatRuntime implements LocalAiChatRuntime {
-  static Future<void>? _initialization;
-
-  const GemmaLiteRtLocalAiChatRuntime();
-
-  @override
-  Future<void> dispose() async {
-    // LiteRT-LM models are loaded and closed per request, so there is no
-    // long-lived resource to release here.
-  }
+/// Thrown by [LocalAiAdvisorService.installModel] when its download is
+/// cancelled.
+class LocalModelDownloadCancelled implements Exception {
+  const LocalModelDownloadCancelled();
 
   @override
-  Future<String> sendMessage({
-    required InstalledLocalModel model,
-    required String message,
-    String? systemPrompt,
-    int maxTokens = 4096,
-  }) async {
-    final buffer = StringBuffer();
-    await for (final chunk in sendMessageStream(
-      model: model,
-      message: message,
-      systemPrompt: systemPrompt,
-      maxTokens: maxTokens,
-    )) {
-      buffer.write(chunk);
-    }
-    return buffer.toString().trim();
-  }
-
-  @override
-  Stream<String> sendMessageStream({
-    required InstalledLocalModel model,
-    required String message,
-    String? systemPrompt,
-    int maxTokens = 4096,
-  }) async* {
-    final file = File(model.localPath);
-    if (!await file.exists()) {
-      throw FileSystemException('Local model file not found', model.localPath);
-    }
-    if (!model.localPath.toLowerCase().endsWith('.litertlm')) {
-      throw UnsupportedError(
-        'The installed model artifact is ${model.runtimeArtifactId ?? model.localPath}. '
-        'Local CB Agent chat requires a .litertlm model artifact.',
-      );
-    }
-
-    await _ensureInitialized();
-    await gemma.FlutterGemma.installModel(
-      modelType: gemma.ModelType.gemma4,
-      fileType: gemma.ModelFileType.litertlm,
-    ).fromFile(model.localPath).install();
-
-    final inferenceModel = await gemma.FlutterGemma.getActiveModel(
-      maxTokens: maxTokens,
-      maxConcurrentSessions: 1,
-    );
-
-    try {
-      final chat = await inferenceModel.createChat(
-        temperature: 0.3,
-        topK: 64,
-        topP: 0.95,
-        modelType: gemma.ModelType.gemma4,
-        systemInstruction: systemPrompt,
-        supportsFunctionCalls: false,
-      );
-      await chat.addQueryChunk(gemma.Message.text(text: message, isUser: true));
-      await for (final response in chat.generateChatResponseAsync()) {
-        final text = _responseToText(response);
-        if (text.isNotEmpty) yield text;
-      }
-    } finally {
-      await inferenceModel.close();
-    }
-  }
-
-  static Future<void> _ensureInitialized() {
-    return _initialization ??= gemma.FlutterGemma.initialize(
-      inferenceEngines: const [LiteRtLmEngine()],
-    );
-  }
-
-  String _responseToText(gemma.ModelResponse response) {
-    if (response is gemma.TextResponse) {
-      return response.token;
-    }
-    if (response is gemma.ThinkingResponse) {
-      return response.content;
-    }
-    if (response is gemma.FunctionCallResponse) {
-      return jsonEncode({'name': response.name, 'arguments': response.args});
-    }
-    if (response is gemma.ParallelFunctionCallResponse) {
-      return jsonEncode(
-        response.calls
-            .map((call) => {'name': call.name, 'arguments': call.args})
-            .toList(),
-      );
-    }
-    return '';
-  }
+  String toString() => 'Model download cancelled.';
 }

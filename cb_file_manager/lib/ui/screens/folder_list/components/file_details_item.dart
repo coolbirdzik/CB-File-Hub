@@ -242,6 +242,8 @@ class _FileDetailsItemState extends State<FileDetailsItem> {
                       widget.columnVisibility,
                   extraCellBuilder: (column) =>
                       column.cell(context, widget.file.path),
+                  systemCellBuilder: (column) =>
+                      systemPropertyCell(widget.file.path, column),
                   cellBuilder: (column) => _buildCell(
                     context,
                     column,

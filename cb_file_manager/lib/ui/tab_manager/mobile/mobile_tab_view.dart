@@ -639,6 +639,12 @@ class MobileTabView extends StatelessWidget {
 
     // System paths
     if (path.startsWith('#')) {
+      final deviceMedia = DeviceMediaPath.tryParse(path);
+      if (deviceMedia != null) {
+        return deviceMedia.isVideo
+            ? PhosphorIconsLight.videoCamera
+            : PhosphorIconsLight.image;
+      }
       if (path == '#home') return PhosphorIconsLight.house;
       if (path == '#gallery' || path.startsWith('#album')) {
         return PhosphorIconsLight.image;

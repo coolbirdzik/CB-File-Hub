@@ -63,4 +63,29 @@ void main() {
       greaterThan(0),
     );
   }, skip: skip);
+
+  test('lists Windows property columns and reads them by name', () async {
+    final properties = WindowsShellProperties.instance;
+    final columns = await properties.systemColumns();
+    final names = {for (final column in columns) column.name};
+
+    expect(columns.length, greaterThan(100));
+    expect(names, contains('System.Music.Composer'));
+    expect(names.intersection(ShellProperty.builtIn), isEmpty);
+    expect(columns.every((column) => column.label.isNotEmpty), isTrue);
+    expect(properties.systemLabel('System.Music.Composer'), isNotEmpty);
+
+    final exe = p.join(
+      Platform.environment['SystemRoot'] ?? r'C:\Windows',
+      'explorer.exe',
+    );
+    expect(
+      await properties.get(exe, ShellProperty.system('System.FileVersion')),
+      matches(RegExp(r'^\d+(\.\d+)*')),
+    );
+    expect(
+      await properties.get(exe, ShellProperty.system('System.NotAProperty')),
+      isEmpty,
+    );
+  }, skip: skip);
 }

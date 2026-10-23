@@ -31,6 +31,7 @@ import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:cb_file_manager/ui/screens/settings/ai_settings_section.dart';
 import 'package:cb_file_manager/ui/screens/settings/local_ai_advisor_settings_section.dart';
+import 'package:cb_file_manager/ui/screens/settings/settings_navigation.dart';
 import 'package:cb_file_manager/ui/screens/settings/context_menu_layout_settings_screen.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
@@ -106,14 +107,46 @@ class _SettingsScreenState extends State<SettingsScreen> {
   int? _tagThumbnailBytes;
   int? _tagThumbnailFiles;
 
+  // Targets for [pendingSettingsAnchor].
+  final GlobalKey _aiProvidersKey = GlobalKey();
+  final GlobalKey _localAiKey = GlobalKey();
+
   @override
   void initState() {
     super.initState();
+    pendingSettingsAnchor.addListener(_scrollToPendingAnchor);
     _loadPreferences();
     _loadCacheInfo();
     _loadAppInfo();
     _loadDatabaseStats();
     _loadUpdateSupport();
+  }
+
+  @override
+  void dispose() {
+    pendingSettingsAnchor.removeListener(_scrollToPendingAnchor);
+    super.dispose();
+  }
+
+  /// Scrolls to the section another screen asked for. Sections exist only
+  /// after preferences load, so this also runs when loading finishes.
+  void _scrollToPendingAnchor() {
+    if (pendingSettingsAnchor.value == null || _isLoading) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final anchor = pendingSettingsAnchor.value;
+      if (!mounted || anchor == null) return;
+      final target = switch (anchor) {
+        SettingsAnchor.aiProviders => _aiProvidersKey,
+        SettingsAnchor.localAi => _localAiKey,
+      }.currentContext;
+      if (target == null) return;
+      pendingSettingsAnchor.value = null;
+      Scrollable.ensureVisible(
+        target,
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeOutCubic,
+      );
+    });
   }
 
   Future<void> _loadUpdateSupport() async {
@@ -178,6 +211,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _tabInactiveThresholdMinutes = tabInactiveMinutes;
           _isLoading = false;
         });
+        _scrollToPendingAnchor();
       }
     } catch (e) {
       debugPrint('Error loading preferences: $e');
@@ -185,6 +219,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         setState(() {
           _isLoading = false;
         });
+        _scrollToPendingAnchor();
         final l10n = AppLocalizations.of(context)!;
         AppToast.error(context, '${l10n.errorLoadingTags}$e');
       }
@@ -488,6 +523,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         _buildCacheManagementSection(),
                         const SizedBox(height: 24),
                         AiSettingsSection(
+                          key: _aiProvidersKey,
                           buildSectionCard:
                               ({
                                 required String title,
@@ -515,6 +551,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                         const SizedBox(height: 24),
                         LocalAiAdvisorSettingsSection(
+                          key: _localAiKey,
                           buildSectionCard:
                               ({
                                 required String title,

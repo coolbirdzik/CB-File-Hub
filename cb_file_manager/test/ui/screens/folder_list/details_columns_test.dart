@@ -109,6 +109,51 @@ void main() {
       );
     });
 
+    test('system property columns keep order, widths and persist', () {
+      final columns = const ColumnVisibility()
+          .withSystemColumn('System.Music.Composer', true)
+          .withSystemColumn('System.Video.Director', true)
+          .withSystemColumn('System.Keywords', true)
+          .withSystemColumn('System.Keywords', true)
+          .moveSystemColumn('System.Keywords', 'System.Music.Composer')
+          .withSystemWidth('System.Video.Director', 20);
+      expect(columns.systemColumns, [
+        'System.Keywords',
+        'System.Music.Composer',
+        'System.Video.Director',
+      ]);
+      expect(
+        columns.systemWidthOf('System.Video.Director'),
+        DetailsColumn.minWidth,
+      );
+      expect(
+        columns.systemWidthOf('System.Keywords'),
+        ColumnVisibility.systemColumnWidth,
+      );
+      expect(columns.withSystemColumn('System.Keywords', false).systemColumns, [
+        'System.Music.Composer',
+        'System.Video.Director',
+      ]);
+
+      final restored = ColumnVisibility.fromMap(
+        jsonDecode(jsonEncode(columns.toMap())) as Map<String, dynamic>,
+      );
+      expect(restored, columns);
+      expect(restored.resetLayout().systemWidths, isEmpty);
+      expect(restored.resetLayout().systemColumns, columns.systemColumns);
+      expect(
+        restored.visibleSystemColumns,
+        Platform.isWindows ? columns.systemColumns : isEmpty,
+      );
+      expect(
+        ColumnVisibility.fromMap({
+          'systemColumns': ['System.Keywords', 3, 'System.Keywords'],
+          'systemWidths': {'System.Keywords': 'wide'},
+        }),
+        const ColumnVisibility(systemColumns: ['System.Keywords']),
+      );
+    });
+
     test('reads maps saved before order and widths existed', () {
       final restored = ColumnVisibility.fromMap({
         'size': false,

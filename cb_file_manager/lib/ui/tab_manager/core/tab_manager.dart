@@ -682,6 +682,12 @@ class TabManagerBloc extends Bloc<TabEvent, TabManagerState> {
     // Named system screens get their localized title instead of leaking the
     // raw hash path into the tab strip after back/forward navigation.
     if (path.startsWith('#')) {
+      final deviceMedia = DeviceMediaPath.tryParse(path);
+      if (deviceMedia != null) {
+        return deviceMedia.isVideo
+            ? l10n?.videoGallery ?? 'Video Gallery'
+            : l10n?.imageGallery ?? 'Image Gallery';
+      }
       if (path.startsWith('#torrents?')) return l10n?.torrents ?? 'Torrents';
       switch (path) {
         case '#video':

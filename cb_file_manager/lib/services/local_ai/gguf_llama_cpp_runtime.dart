@@ -28,7 +28,8 @@ class GgufLlamaCppLocalAiChatRuntime
     implements
         LocalAiChatRuntime,
         LocalAiConversationRuntime,
-        LocalAiDirectConversationRuntime {
+        LocalAiDirectConversationRuntime,
+        LocalAiModelFileHolder {
   /// GPU layers to offload. 99 offloads all layers to the GPU (via the bundled
   /// Vulkan backend); the server falls back to CPU for layers the GPU cannot
   /// fit. Set to 0 to force CPU-only inference.
@@ -327,6 +328,11 @@ class GgufLlamaCppLocalAiChatRuntime
       process.kill(ProcessSignal.sigkill);
     }
   }
+
+  /// Stops the server so Windows releases its lock on the model file. The
+  /// next request starts it again.
+  @override
+  Future<void> releaseModelFiles() => _stopServer();
 
   /// Stops the server process and releases the HTTP client.
   @override

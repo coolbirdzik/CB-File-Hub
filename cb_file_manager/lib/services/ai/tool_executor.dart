@@ -20,6 +20,7 @@ import 'assistant_response_text.dart';
 import 'agent_tool_catalog.dart';
 import 'agent_workspace.dart';
 import 'agent_file_tools.dart';
+import 'agent_mobile_tools.dart';
 import 'agent_tag_tools.dart';
 import 'disk_cleaner_skill.dart';
 import '../video_library_service.dart';
@@ -49,13 +50,21 @@ class ToolCall {
 class ToolExecutor {
   final String? ownerTabId;
 
-  ToolExecutor({this.ownerTabId, AgentTagStore? tagStore})
-    : _tagStoreOverride = tagStore;
+  ToolExecutor({
+    this.ownerTabId,
+    AgentTagStore? tagStore,
+    AgentMobileTools Function(AgentFileTools fileTools)? mobileTools,
+  }) : _tagStoreOverride = tagStore,
+       _mobileToolsFactory = mobileTools ?? AgentMobileTools.new;
 
   AgentTagStore? _tagStoreOverride;
   AgentTagStore get _tagStore => _tagStoreOverride ??= AgentTagStore();
   AgentFileTools? _fileToolsCache;
   AgentFileTools get _fileTools => _fileToolsCache ??= AgentFileTools();
+  final AgentMobileTools Function(AgentFileTools fileTools) _mobileToolsFactory;
+  AgentMobileTools? _mobileToolsCache;
+  AgentMobileTools get _mobileTools =>
+      _mobileToolsCache ??= _mobileToolsFactory(_fileTools);
   String _workingDirectory = '';
   String _browsingPath = '';
   bool Function() _isCancelled = () => false;
@@ -122,6 +131,9 @@ class ToolExecutor {
           'search_files',
           'search_content',
           'search_by_tag',
+          'folder_size',
+          'find_large_files',
+          'find_recent_files',
         ].contains(call.name) &&
         !args.containsKey('path')) {
       args['path'] = _workingDirectory;
@@ -340,6 +352,23 @@ class ToolExecutor {
       }
       call = prepareCall(call);
       if (cancelled()) throw StateError('Operation stopped by user.');
+      final private = [
+        call.arguments['path'],
+        call.arguments['source'],
+        ...?(call.arguments['paths'] as List?),
+      ].whereType<String>().where(AgentWorkspace.isAppPrivate);
+      if (private.isNotEmpty) {
+        return ToolResult(
+          toolName: call.name,
+          output: jsonEncode({
+            'ok': false,
+            'error':
+                'Android keeps ${private.first} private to the app that owns '
+                'it; no file manager can read it. Look elsewhere.',
+          }),
+          success: false,
+        );
+      }
       if (call.name == 'get_context') {
         return ToolResult(
           toolName: call.name,
@@ -360,7 +389,11 @@ class ToolExecutor {
             'Tags are stored by CB File Hub, not the filesystem. Discover actual names with list_all_tags(query). Read get_file_tags(path); search_by_tag(tag,path,global:false) is scoped to a folder. global:true crosses drives. Follow next_cursor. update_file_tags(add/remove) preserves other tags and requires approval.',
           'media' =>
             'list_video_libraries({}) -> get_video_library_files({"library_id":actual_id}); list_albums({}) -> get_album_files({"album_id":actual_id}). Use only IDs returned by the listing tool. Read metadata, not binary media contents.',
+          'cleaner' when AgentToolCatalog.isMobile =>
+            'The Disk Cleaner is a desktop feature. On this phone use folder_size, find_large_files and find_recent_files to see what uses space, and delete_file to recycle what the user approves.',
           'cleaner' => DiskCleanerSkill.skillBlock,
+          'app' when AgentToolCatalog.isMobile =>
+            'CB File Hub uses tabs and app tags. Virtual #home/#tags/#albums/#video/#ai-chat screens are not filesystem directories. Use get_context for the working folder and list_storage for the phone storage volumes.',
           'app' =>
             'CB File Hub uses tabs and app tags. Virtual #home/#tags/#albums/#video/#ai-chat screens are not filesystem directories. Use get_context for the working folder. get_current_app_storage({}) inspects existing app storage analysis; get_current_cleaner_scan({}) reads an existing scan.',
           _ => throw ArgumentError(
@@ -368,6 +401,26 @@ class ToolExecutor {
           ),
         };
         return ToolResult(toolName: call.name, output: guide);
+      }
+      if (AgentMobileTools.names.contains(call.name)) {
+        final data = await _mobileTools.execute(
+          call.name,
+          call.arguments,
+          isCancelled: cancelled,
+        );
+        return ToolResult(toolName: call.name, output: jsonEncode(data));
+      }
+      // A phone has no "/" to browse: its drives are the storage volumes.
+      if (AgentToolCatalog.isMobile &&
+          call.name == 'list_directory' &&
+          call.arguments['path'] == '' &&
+          call.arguments['cursor'] == null) {
+        final data = _fileTools.page(
+          call.name,
+          call.arguments,
+          await _mobileTools.storageRoots(),
+        );
+        return ToolResult(toolName: call.name, output: jsonEncode(data));
       }
       if (AgentFileTools.names.contains(call.name)) {
         List<String>? sourceTags;

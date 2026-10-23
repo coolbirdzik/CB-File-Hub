@@ -295,6 +295,12 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
   }
 
   String _tabNameForRestoredPath(String path) {
+    final deviceMedia = DeviceMediaPath.tryParse(path);
+    if (deviceMedia != null) {
+      return deviceMedia.isVideo
+          ? context.tr.videoGallery
+          : context.tr.imageGallery;
+    }
     if (path == '#home') return context.tr.homeTab;
     if (path == '#gallery') return context.tr.imageGallery;
     if (path == '#video') return context.tr.videoHubTitle;

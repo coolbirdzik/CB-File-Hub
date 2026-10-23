@@ -2,6 +2,16 @@ import 'app_localizations.dart';
 
 class EnglishLocalizations implements AppLocalizations {
   @override
+  String get deviceMediaOnDevice => 'On this device';
+  @override
+  String get deviceMediaLimited =>
+      'Showing only the photos and videos you allowed.';
+  @override
+  String get deviceMediaPermission =>
+      'Allow photo and video access to show your device albums.';
+  @override
+  String get deviceMediaManageAccess => 'Choose more photos and videos';
+  @override
   String get torrentReceiveInBackground =>
       'Add opened torrents in the background';
   @override
@@ -832,6 +842,45 @@ class EnglishLocalizations implements AppLocalizations {
 
   @override
   String get columnResetLayout => 'Reset column order and widths';
+
+  // Column chooser
+  @override
+  String get columnChooserSubtitle =>
+      'Tick the columns to show. Drag shown columns to reorder them.';
+
+  @override
+  String get columnChooserSearchHint => 'Search columns';
+
+  @override
+  String get columnChooserAvailable => 'Available columns';
+
+  @override
+  String columnChooserShown(int count) => 'Shown ($count)';
+
+  @override
+  String get columnChooserBasicGroup => 'Basic';
+
+  @override
+  String get columnChooserCollectionGroup => 'This collection';
+
+  @override
+  String get columnChooserSystemGroup => 'Windows properties';
+
+  @override
+  String get columnChooserSystemNote =>
+      'Shown after the basic columns; sorting by them is not supported yet.';
+
+  @override
+  String get columnChooserLoadingSystem => 'Loading Windows properties…';
+
+  @override
+  String get columnChooserNoMatch => 'No matching columns';
+
+  @override
+  String get columnChooserAlwaysShown => 'Always shown';
+
+  @override
+  String get columnChooserHide => 'Hide column';
 
   // Column visibility dialog
   @override
@@ -3875,6 +3924,45 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get noProviderConfigured => 'No AI provider configured';
   @override
+  String get aiProviderSettings => 'AI provider settings';
+  @override
+  String get localModelGuideTitle => 'Run AI on your own device';
+  @override
+  String get localModelGuideIntro =>
+      'Cloud providers need an API key and can limit or bill each request. A local model runs right here: free, unlimited, and your files never leave this device.';
+  @override
+  String get localModelGuideStep1 =>
+      'Open Local AI settings with the button below. The list of models opens right away.';
+  @override
+  String localModelGuideStep2(String installLabel) =>
+      'Pick a model and click "$installLabel". It downloads in the background, then works offline.';
+  @override
+  String get localModelGuideStep3 =>
+      'Come back here and pick it in the model menu next to the Send button.';
+  @override
+  String get localModelGuideNote =>
+      'Smaller models need less RAM and answer faster. A Hugging Face token is only needed for gated models.';
+  @override
+  String get localModelGuideOpenSettings => 'Open Local AI settings';
+  @override
+  String get localModelGuideLater => 'Later';
+  @override
+  String get localModelGuideLink => 'Use a free local model';
+  @override
+  String get installLocalModel => 'Install a model';
+  @override
+  String get localModelRecommended => 'Recommended';
+  @override
+  String get localModelInstalledBadge => 'Installed';
+  @override
+  String get localModelBackgroundHint =>
+      'Downloads keep running in the background, so you can close this window.';
+  @override
+  String localModelDownloading(String modelName) => 'Downloading $modelName';
+  @override
+  String localModelReady(String modelName) =>
+      '$modelName is installed and ready';
+  @override
   String get relevanceScore => 'Relevance';
   @override
   String get aiExplanation => 'AI Explanation';
@@ -4866,6 +4954,22 @@ class EnglishLocalizations implements AppLocalizations {
   String get localAiTokensSuffix => 'tokens';
   @override
   String get localAiInvalidTokenCount => 'Please enter a valid number';
+  @override
+  String get localAiModelStorage => 'Model storage location';
+  @override
+  String get localAiModelStorageHint =>
+      'Downloaded models are saved in this folder. Changing it moves installed models there.';
+  @override
+  String get localAiModelStorageReset => 'Use default location';
+  @override
+  String get localAiModelStorageNotWritable =>
+      'Cannot save models to this folder';
+  @override
+  String get localAiMovingModels => 'Moving models';
+  @override
+  String get localAiModelsMoved => 'Models moved';
+  @override
+  String get localAiMoveModelsFailed => 'Could not move models';
   @override
   String get aiReasoning => 'Thinking';
 

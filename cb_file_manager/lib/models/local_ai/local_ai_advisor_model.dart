@@ -5,6 +5,8 @@
 /// are kept isolated from existing remote AI providers.
 library;
 
+import 'dart:io';
+
 /// Download state for a model.
 enum LocalModelDownloadState { notStarted, downloading, completed, failed }
 
@@ -110,7 +112,9 @@ class InstalledLocalModel {
   /// are Transformers-format and cannot run on-device.
   bool get isRunnableArtifact {
     final lower = localPath.toLowerCase();
-    return lower.endsWith('.litertlm') || lower.endsWith('.gguf');
+    // iOS cannot launch llama-server, so GGUF models only run elsewhere.
+    return lower.endsWith('.litertlm') ||
+        (lower.endsWith('.gguf') && !Platform.isIOS);
   }
 
   /// The on-device runtime family required to run this artifact.
@@ -142,6 +146,29 @@ class ModelDownloadProgress {
       totalBytes > 0 ? (downloadedBytes / totalBytes).clamp(0.0, 1.0) : 0.0;
 }
 
+/// Progress of moving installed models into a new storage folder.
+class ModelMoveProgress {
+  /// Display name of the model being moved, or null once all are done.
+  final String? currentModelName;
+  final int movedModels;
+  final int totalModels;
+  final int movedBytes;
+  final int totalBytes;
+
+  const ModelMoveProgress({
+    required this.currentModelName,
+    required this.movedModels,
+    required this.totalModels,
+    required this.movedBytes,
+    required this.totalBytes,
+  });
+
+  bool get isComplete => movedModels >= totalModels;
+
+  double get progress =>
+      totalBytes > 0 ? (movedBytes / totalBytes).clamp(0.0, 1.0) : 0.0;
+}
+
 /// Adapter boundary for local chat inference.
 abstract class LocalAiChatRuntime {
   Future<String> sendMessage({
@@ -163,6 +190,12 @@ abstract class LocalAiChatRuntime {
   /// Default is a no-op for runtimes that hold nothing; process-backed runtimes
   /// override this to terminate their server and close clients.
   Future<void> dispose() async {}
+}
+
+/// Optional capability for runtimes that keep a model file open between
+/// requests, so it can be closed before the file is moved or deleted.
+abstract interface class LocalAiModelFileHolder {
+  Future<void> releaseModelFiles();
 }
 
 /// Optional capability for runtimes whose chat template preserves turn roles.

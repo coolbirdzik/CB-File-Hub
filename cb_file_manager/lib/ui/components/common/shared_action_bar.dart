@@ -9,6 +9,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../../config/languages/app_localizations.dart';
 import '../../utils/grid_zoom_constraints.dart';
 import '../../utils/route.dart';
+import 'column_chooser_dialog.dart';
 
 class SharedActionBar {
   /// Tạo popup menu item cho các tùy chọn sắp xếp
@@ -379,146 +380,15 @@ class SharedActionBar {
     Set<String> visibleAdditionalColumns = const {},
     ValueChanged<Set<String>>? onApplyAdditionalColumns,
   }) {
-    final l10n = AppLocalizations.of(context)!;
-    // Edited copy; keeps the widths of the current layout.
-    var columns = currentVisibility;
-    final additional = Set<String>.of(visibleAdditionalColumns);
-
     RouteUtils.showAcrylicDialog(
       context: context,
-      builder: (BuildContext context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            final ordered = columns.orderedColumns
-                .skip(1)
-                .where((column) => column.isAvailable)
-                .toList();
-            return AlertDialog(
-              title: Row(
-                children: [
-                  const Icon(PhosphorIconsLight.columns, size: 24),
-                  const SizedBox(width: 8),
-                  Text(l10n.columnVisibilityTitle),
-                ],
-              ),
-              content: SizedBox(
-                width: 440,
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        margin: const EdgeInsets.only(bottom: 8),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.primaryContainer,
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Text(
-                          l10n.columnVisibilityInstructions,
-                          style: const TextStyle(fontSize: 14),
-                        ),
-                      ),
-                      ReorderableListView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        buildDefaultDragHandles: false,
-                        itemCount: ordered.length,
-                        // `to` is the final index, the slot of the row there now.
-                        onReorderItem: (from, to) => setState(() {
-                          columns = columns.moveColumn(
-                            ordered[from],
-                            ordered[to],
-                          );
-                        }),
-                        itemBuilder: (context, index) {
-                          final column = ordered[index];
-                          return Material(
-                            key: ValueKey('column-dialog-${column.name}'),
-                            type: MaterialType.transparency,
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: CheckboxListTile(
-                                    title: Text(column.label(l10n)),
-                                    subtitle: Text(column.description(l10n)),
-                                    value: columns.isVisible(column),
-                                    onChanged: (value) => setState(() {
-                                      columns = columns.withColumn(
-                                        column,
-                                        value ?? false,
-                                      );
-                                    }),
-                                    secondary: Icon(column.icon),
-                                    dense: true,
-                                  ),
-                                ),
-                                ReorderableDragStartListener(
-                                  index: index,
-                                  child: const Padding(
-                                    padding: EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                    ),
-                                    child: MouseRegion(
-                                      cursor: SystemMouseCursors.grab,
-                                      child: Icon(
-                                        PhosphorIconsLight.dotsSixVertical,
-                                        size: 20,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-                      for (final column in additionalColumns.entries) ...[
-                        const Divider(height: 1),
-                        CheckboxListTile(
-                          title: Text(column.value),
-                          value: additional.contains(column.key),
-                          onChanged: (value) => setState(() {
-                            if (value == true) {
-                              additional.add(column.key);
-                            } else {
-                              additional.remove(column.key);
-                            }
-                          }),
-                          dense: true,
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => setState(() {
-                    columns = columns.resetLayout();
-                  }),
-                  child: Text(l10n.columnResetLayout),
-                ),
-                TextButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                  },
-                  child: Text(l10n.cancel.toUpperCase()),
-                ),
-                ElevatedButton.icon(
-                  icon: const Icon(PhosphorIconsLight.check),
-                  label: Text(l10n.apply),
-                  onPressed: () {
-                    onApply(columns);
-                    onApplyAdditionalColumns?.call(additional);
-                    Navigator.pop(context);
-                  },
-                ),
-              ],
-            );
-          },
-        );
-      },
+      builder: (context) => ColumnChooserDialog(
+        initial: currentVisibility,
+        onApply: onApply,
+        additionalColumns: additionalColumns,
+        visibleAdditionalColumns: visibleAdditionalColumns,
+        onApplyAdditionalColumns: onApplyAdditionalColumns,
+      ),
     );
   }
 

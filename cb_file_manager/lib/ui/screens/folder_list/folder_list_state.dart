@@ -160,6 +160,16 @@ class ColumnVisibility extends Equatable {
   /// Shown [DetailsColumn.shell] columns (they have no flag of their own).
   final Set<DetailsColumn> shellColumns;
 
+  /// Shown Windows property columns beyond [DetailsColumn], by canonical
+  /// name (`System.Music.Composer`), in display order after the built-in
+  /// columns.
+  final List<String> systemColumns;
+
+  /// Widths the user resized [systemColumns] to.
+  final Map<String, double> systemWidths;
+
+  static const double systemColumnWidth = 160;
+
   const ColumnVisibility({
     this.name = true, // Name is always visible by default
     this.size = true,
@@ -179,6 +189,8 @@ class ColumnVisibility extends Equatable {
     this.order = const [],
     this.widths = const {},
     this.shellColumns = const {},
+    this.systemColumns = const [],
+    this.systemWidths = const {},
   });
 
   bool isVisible(DetailsColumn column) => switch (column) {
@@ -217,6 +229,50 @@ class ColumnVisibility extends Equatable {
 
   double widthOf(DetailsColumn column) => widths[column] ?? column.defaultWidth;
 
+  /// [systemColumns] the running platform can show.
+  List<String> get visibleSystemColumns =>
+      Platform.isWindows ? systemColumns : const [];
+
+  double systemWidthOf(String column) =>
+      systemWidths[column] ?? systemColumnWidth;
+
+  /// Shows [column] after the other system columns, or hides it.
+  ColumnVisibility withSystemColumn(String column, bool visible) {
+    if (systemColumns.contains(column) == visible) return this;
+    return copyWith(
+      systemColumns: visible
+          ? [...systemColumns, column]
+          : [
+              for (final other in systemColumns)
+                if (other != column) other,
+            ],
+    );
+  }
+
+  /// [withWidth] for a system column.
+  ColumnVisibility withSystemWidth(String column, double? width) {
+    final next = Map<String, double>.of(systemWidths);
+    if (width == null) {
+      next.remove(column);
+    } else {
+      next[column] = _clampWidth(width);
+    }
+    return copyWith(systemWidths: next);
+  }
+
+  /// [moveColumn] among the system columns.
+  ColumnVisibility moveSystemColumn(String column, String target) {
+    final next = [...systemColumns];
+    final to = next.indexOf(target);
+    if (column == target || to < 0 || !next.remove(column)) return this;
+    next.insert(to, column);
+    return copyWith(systemColumns: next);
+  }
+
+  static double _clampWidth(double width) => width < DetailsColumn.minWidth
+      ? DetailsColumn.minWidth
+      : width.roundToDouble();
+
   ColumnVisibility withColumn(DetailsColumn column, bool visible) =>
       switch (column) {
         DetailsColumn.name => this,
@@ -248,9 +304,7 @@ class ColumnVisibility extends Equatable {
     if (width == null) {
       next.remove(column);
     } else {
-      next[column] = width < DetailsColumn.minWidth
-          ? DetailsColumn.minWidth
-          : width.roundToDouble();
+      next[column] = _clampWidth(width);
     }
     return copyWith(widths: next);
   }
@@ -267,7 +321,8 @@ class ColumnVisibility extends Equatable {
   }
 
   /// Drops the custom order and widths, keeping which columns are shown.
-  ColumnVisibility resetLayout() => copyWith(order: const [], widths: const {});
+  ColumnVisibility resetLayout() =>
+      copyWith(order: const [], widths: const {}, systemWidths: const {});
 
   // Create a copy with modified values
   ColumnVisibility copyWith({
@@ -289,6 +344,8 @@ class ColumnVisibility extends Equatable {
     List<DetailsColumn>? order,
     Map<DetailsColumn, double>? widths,
     Set<DetailsColumn>? shellColumns,
+    List<String>? systemColumns,
+    Map<String, double>? systemWidths,
   }) {
     return ColumnVisibility(
       name: name ?? this.name,
@@ -309,6 +366,8 @@ class ColumnVisibility extends Equatable {
       order: order ?? this.order,
       widths: widths ?? this.widths,
       shellColumns: shellColumns ?? this.shellColumns,
+      systemColumns: systemColumns ?? this.systemColumns,
+      systemWidths: systemWidths ?? this.systemWidths,
     );
   }
 
@@ -337,6 +396,8 @@ class ColumnVisibility extends Equatable {
         },
       if (shellColumns.isNotEmpty)
         'shellColumns': [for (final column in shellColumns) column.name],
+      if (systemColumns.isNotEmpty) 'systemColumns': systemColumns,
+      if (systemWidths.isNotEmpty) 'systemWidths': systemWidths,
     };
   }
 
@@ -346,6 +407,8 @@ class ColumnVisibility extends Equatable {
     final order = map['order'];
     final widths = map['widths'];
     final shellColumns = map['shellColumns'];
+    final systemColumns = map['systemColumns'];
+    final systemWidths = map['systemWidths'];
     return ColumnVisibility(
       name: map['name'] ?? true,
       size: map['size'] ?? true,
@@ -381,6 +444,22 @@ class ColumnVisibility extends Equatable {
                 if (byName[name] case final column? when column.shell) column,
             }
           : const {},
+      systemColumns: systemColumns is List
+          ? {
+              for (final name in systemColumns)
+                if (name is String) name,
+            }.toList()
+          : const [],
+      systemWidths: systemWidths is Map
+          ? {
+              for (final entry in systemWidths.entries)
+                if ((entry.key, entry.value) case (
+                  final String column,
+                  final num width,
+                ))
+                  column: width.toDouble(),
+            }
+          : const {},
     );
   }
 
@@ -404,6 +483,8 @@ class ColumnVisibility extends Equatable {
     order,
     widths,
     shellColumns,
+    systemColumns,
+    systemWidths,
   ];
 }
 

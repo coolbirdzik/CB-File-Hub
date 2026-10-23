@@ -1,5 +1,7 @@
 import 'package:cb_file_manager/ui/widgets/gallery_nsfw_toggle.dart';
 import 'package:flutter/material.dart';
+import 'package:photo_manager/photo_manager.dart';
+import '../media_gallery/device_media_sources.dart';
 import 'package:cb_file_manager/models/objectbox/video_library.dart';
 import 'package:cb_file_manager/services/video_library_service.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
@@ -234,79 +236,88 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
       title: localizations.videoGallery,
       icon: PhosphorIconsLight.filmStrip,
       onRefresh: _refreshData,
-      body: Container(
-        decoration: isDesktopPlatform
-            ? const BoxDecoration(color: Colors.transparent)
-            : (isLightMode
-                  ? BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: backgroundGradientColors,
-                      ),
-                    )
-                  : BoxDecoration(color: darkBackgroundColor)),
-        child: RefreshIndicator(
-          onRefresh: _refreshData,
-          child: CustomScrollView(
-            slivers: [
-              // Welcome Section
-              SliverToBoxAdapter(
-                child: _buildWelcomeSection(
-                  theme,
-                  localizations,
-                  isLightMode,
-                  isDesktopPlatform,
+      body: DeviceMediaSources(
+        tabId: widget.tabId,
+        type: RequestType.video,
+        builder: (context, sources, loading, refresh) =>
+            _buildMobileSources(sources, loading, refresh),
+        child: Container(
+          decoration: isDesktopPlatform
+              ? const BoxDecoration(color: Colors.transparent)
+              : (isLightMode
+                    ? BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: backgroundGradientColors,
+                        ),
+                      )
+                    : BoxDecoration(color: darkBackgroundColor)),
+          child: RefreshIndicator(
+            onRefresh: _refreshData,
+            child: CustomScrollView(
+              slivers: [
+                // Welcome Section
+                SliverToBoxAdapter(
+                  child: _buildWelcomeSection(
+                    theme,
+                    localizations,
+                    isLightMode,
+                    isDesktopPlatform,
+                  ),
                 ),
-              ),
 
-              // Libraries Grid
-              SliverPadding(
-                padding: const EdgeInsets.all(16),
-                sliver: _isLoading
-                    ? SliverGrid(
-                        gridDelegate:
-                            const SliverGridDelegateWithMaxCrossAxisExtent(
-                              maxCrossAxisExtent: 300,
-                              mainAxisSpacing: 16,
-                              crossAxisSpacing: 16,
-                              childAspectRatio: 1.2,
-                            ),
-                        delegate: SliverChildBuilderDelegate(
-                          (context, index) =>
-                              _VideoLibrarySkeletonCard(index: index),
-                          childCount: 6,
-                        ),
-                      )
-                    : _libraries.isEmpty
-                    ? SliverFillRemaining(
-                        child: _buildEmptyState(
-                          theme,
-                          localizations,
-                          isLightMode,
-                          isDesktopPlatform,
-                        ),
-                      )
-                    : SliverGrid(
-                        gridDelegate:
-                            const SliverGridDelegateWithMaxCrossAxisExtent(
-                              maxCrossAxisExtent: 300,
-                              mainAxisSpacing: 16,
-                              crossAxisSpacing: 16,
-                              childAspectRatio: 1.2,
-                            ),
-                        delegate: SliverChildBuilderDelegate((context, index) {
-                          return _buildLibraryCard(
+                // Libraries Grid
+                SliverPadding(
+                  padding: const EdgeInsets.all(16),
+                  sliver: _isLoading
+                      ? SliverGrid(
+                          gridDelegate:
+                              const SliverGridDelegateWithMaxCrossAxisExtent(
+                                maxCrossAxisExtent: 300,
+                                mainAxisSpacing: 16,
+                                crossAxisSpacing: 16,
+                                childAspectRatio: 1.2,
+                              ),
+                          delegate: SliverChildBuilderDelegate(
+                            (context, index) =>
+                                _VideoLibrarySkeletonCard(index: index),
+                            childCount: 6,
+                          ),
+                        )
+                      : _libraries.isEmpty
+                      ? SliverFillRemaining(
+                          child: _buildEmptyState(
                             theme,
                             localizations,
-                            _libraries[index],
                             isLightMode,
                             isDesktopPlatform,
-                          );
-                        }, childCount: _libraries.length),
-                      ),
-              ),
-            ],
+                          ),
+                        )
+                      : SliverGrid(
+                          gridDelegate:
+                              const SliverGridDelegateWithMaxCrossAxisExtent(
+                                maxCrossAxisExtent: 300,
+                                mainAxisSpacing: 16,
+                                crossAxisSpacing: 16,
+                                childAspectRatio: 1.2,
+                              ),
+                          delegate: SliverChildBuilderDelegate((
+                            context,
+                            index,
+                          ) {
+                            return _buildLibraryCard(
+                              theme,
+                              localizations,
+                              _libraries[index],
+                              isLightMode,
+                              isDesktopPlatform,
+                            );
+                          }, childCount: _libraries.length),
+                        ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -314,6 +325,55 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
         onPressed: _showCreateLibraryDialog,
         tooltip: localizations.createVideoLibrary,
         child: const Icon(PhosphorIconsLight.plus),
+      ),
+    );
+  }
+
+  Widget _buildMobileSources(
+    List<DeviceMediaSource> sources,
+    bool loading,
+    Future<void> Function() refreshDevice,
+  ) {
+    final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
+    final isLight = theme.brightness == Brightness.light;
+    final items = <Object>[..._libraries, ...sources];
+    return RefreshIndicator(
+      onRefresh: () async {
+        await Future.wait([refreshDevice(), _refreshData()]);
+      },
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          SliverToBoxAdapter(
+            child: _buildWelcomeSection(theme, l10n, isLight, false),
+          ),
+          if (loading || _isLoading)
+            const SliverToBoxAdapter(child: LinearProgressIndicator()),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 80),
+            sliver: SliverGrid(
+              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                maxCrossAxisExtent: 300,
+                mainAxisSpacing: 16,
+                crossAxisSpacing: 16,
+                childAspectRatio: 1.2,
+              ),
+              delegate: SliverChildBuilderDelegate((context, index) {
+                final item = items[index];
+                return item is DeviceMediaSource
+                    ? item.buildTile(context)
+                    : _buildLibraryCard(
+                        theme,
+                        l10n,
+                        item as VideoLibrary,
+                        isLight,
+                        false,
+                      );
+              }, childCount: items.length),
+            ),
+          ),
+        ],
       ),
     );
   }

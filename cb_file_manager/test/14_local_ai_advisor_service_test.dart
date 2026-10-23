@@ -47,7 +47,7 @@ void main() {
           catalog.map((entry) => entry.id).toSet(),
           hasLength(catalog.length),
         );
-        expect(catalog, hasLength(6));
+        expect(catalog, hasLength(9));
         expect(catalog.every((entry) => entry.compatible), isTrue);
         expect(
           catalog.take(3).every((entry) => entry.sizeBytes! < 2800000000),
@@ -199,6 +199,86 @@ void main() {
         final models = service.getInstalledModels();
         expect(models, hasLength(1));
         expect(models.first.localPath, installed.localPath);
+      },
+    );
+
+    test(
+      '14.08b saves downloads to the chosen folder and moves installed models',
+      () async {
+        final docsDir = await Directory.systemTemp.createTemp('local_ai_docs_');
+        final customDir = await Directory.systemTemp.createTemp(
+          'local_ai_custom_',
+        );
+        final releasingRuntime = _ReleasingChatRuntime();
+        addTearDown(() async {
+          for (final dir in [docsDir, customDir]) {
+            if (await dir.exists()) await dir.delete(recursive: true);
+          }
+        });
+
+        service = LocalAiAdvisorService(
+          secureStorage: const FlutterSecureStorage(),
+          prefs: prefs,
+          httpClient: _FakeDownloadClient(chunks: [utf8.encode('abc')]),
+          documentsDirectoryProvider: () async => docsDir,
+          ggufChatRuntime: releasingRuntime,
+        );
+
+        expect(service.getCustomModelStorageDirectory(), isNull);
+        expect(
+          await service.getModelStorageDirectory(),
+          endsWith('local_ai_models'),
+        );
+
+        final target = '${customDir.path}${Platform.pathSeparator}models';
+        await service.setModelStorageDirectory(target);
+        expect(service.getCustomModelStorageDirectory(), isNotNull);
+        expect(await Directory(target).exists(), isTrue);
+        // The write probe must not be left behind.
+        expect(await Directory(target).list().isEmpty, isTrue);
+
+        final installed = await service.installModel(
+          const HuggingFaceModelEntry(
+            id: 'test/custom-location',
+            displayName: 'Custom Location',
+            artifactFileName: 'model.gguf',
+          ),
+          onProgress: (_) {},
+        );
+        expect(
+          File(installed.localPath).parent.parent.path,
+          await service.getModelStorageDirectory(),
+        );
+        expect(await File(installed.localPath).readAsString(), 'abc');
+
+        await service.setModelStorageDirectory(null);
+        expect(service.getCustomModelStorageDirectory(), isNull);
+        expect(
+          await service.getModelStorageDirectory(),
+          startsWith(docsDir.path),
+        );
+        // Changing the folder alone does not touch installed models.
+        expect(
+          service.getInstalledModels().single.localPath,
+          installed.localPath,
+        );
+        expect(await service.modelsOutsideStorage(), hasLength(1));
+
+        final updates = <ModelMoveProgress>[];
+        await service.moveInstalledModelsToStorage(onProgress: updates.add);
+
+        final moved = service.getInstalledModels().single;
+        expect(moved.localPath, startsWith(docsDir.path));
+        expect(moved.localPath, endsWith('model.gguf'));
+        expect(await File(moved.localPath).readAsString(), 'abc');
+        expect(await File(installed.localPath).exists(), isFalse);
+        // The emptied per-model folder is cleaned up.
+        expect(await File(installed.localPath).parent.exists(), isFalse);
+        expect(updates.last.isComplete, isTrue);
+        expect(updates.last.movedBytes, 3);
+        expect(updates.last.totalBytes, 3);
+        expect(await service.modelsOutsideStorage(), isEmpty);
+        expect(releasingRuntime.releaseCount, 1);
       },
     );
 
@@ -368,4 +448,28 @@ class _FakeChatRuntime implements LocalAiChatRuntime {
 
   @override
   Future<void> dispose() async {}
+}
+
+class _ReleasingChatRuntime extends LocalAiChatRuntime
+    implements LocalAiModelFileHolder {
+  int releaseCount = 0;
+
+  @override
+  Future<void> releaseModelFiles() async => releaseCount++;
+
+  @override
+  Future<String> sendMessage({
+    required InstalledLocalModel model,
+    required String message,
+    String? systemPrompt,
+    int maxTokens = 4096,
+  }) async => '';
+
+  @override
+  Stream<String> sendMessageStream({
+    required InstalledLocalModel model,
+    required String message,
+    String? systemPrompt,
+    int maxTokens = 4096,
+  }) => const Stream<String>.empty();
 }

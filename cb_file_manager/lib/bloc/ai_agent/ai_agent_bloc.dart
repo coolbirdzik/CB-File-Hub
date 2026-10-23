@@ -38,7 +38,10 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
   final LocalAiAdvisorService? _localAiService;
   final ToolExecutor _toolExecutor;
   static const _uuid = Uuid();
-  static const String _localAiProviderId = '__local_ai__';
+  static const String _localAiProviderId = localAiProviderId;
+
+  /// Provider id of the on-device model catalog in [AiAgentState.providerModelCatalogs].
+  static const String localAiProviderId = '__local_ai__';
   static const String _lastProviderIdKey = 'ai_chat_last_provider_id';
   static const String _lastModelNameKey = 'ai_chat_last_model_name';
   static const int _softContextCharLimit = 24000;
@@ -51,6 +54,7 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
   int _generationSequence = 0;
   int? _activeGenerationId;
   StreamSubscription<String>? _activeStreamSubscription;
+  late final List<StreamSubscription<void>> _configSubscriptions;
   Completer<void>? _activeStreamCompleter;
   Future<void>? _initializationFuture;
 
@@ -92,6 +96,26 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
     on<ClearError>((event, emit) {
       emit(state.copyWith(clearError: true));
     });
+
+    // Providers and local models are set up in Settings while this chat stays
+    // open, so its model picker has to follow those changes.
+    _configSubscriptions = [
+      _providerService.onConfigChanged.listen(
+        (_) => add(const ProviderChanged()),
+      ),
+      if (_localAiService != null)
+        _localAiService.onInstalledModelsChanged.listen(
+          (_) => add(const ProviderChanged()),
+        ),
+    ];
+  }
+
+  @override
+  Future<void> close() async {
+    for (final subscription in _configSubscriptions) {
+      await subscription.cancel();
+    }
+    return super.close();
   }
 
   /// Auto-saves the current conversation whenever messages settle (not loading).
@@ -1216,6 +1240,29 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
             _stripToolCallTags(rawContent),
           );
           final searchResults = _parseSearchResults(rawContent);
+          // A turn with no answer (nothing, or only reasoning) is not a reply:
+          // ask once or twice before showing the user an empty bubble.
+          if (displayContent.trim().isEmpty &&
+              searchResults.isEmpty &&
+              continuationAttempts < 2) {
+            continuationAttempts++;
+            activity.add(
+              reasoning.isEmpty
+                  ? '> Local model returned no text; asking again'
+                  : '> Local model only reasoned; asking for the answer',
+            );
+            _requestAnswerContinuation(apiMessages, rawBuffer.toString());
+            emit(
+              state.copyWith(
+                messages: uiMessages,
+                toolActivity: List.of(activity),
+                thinkingText: state.thinkingPhrases.isNotEmpty
+                    ? state.thinkingPhrases.first
+                    : 'Thinking...',
+              ),
+            );
+            continue;
+          }
 
           if (searchResults.isNotEmpty) {
             activity.add('> Found ${searchResults.length} file(s)');
@@ -2923,6 +2970,22 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
             'off. Keep reasoning brief. If you were about to use a tool, '
             'output only that <tool_call>{"name":"tool_name","arguments":{...}}'
             '</tool_call> now; otherwise finish the answer. This continuation '
+            'grants no additional authorization.',
+        timestamp: DateTime.now(),
+      ),
+    );
+  }
+
+  void _requestAnswerContinuation(List<AiMessage> messages, String response) {
+    final hadReasoning = extractAssistantReasoning(response).isNotEmpty;
+    messages.add(
+      AiMessage(
+        id: _uuid.v4(),
+        role: AiMessageRole.user,
+        content:
+            'Your last reply contained no answer${hadReasoning ? ', only reasoning' : ''}. '
+            'Reply now with either one <tool_call>{"name":"tool_name","arguments":{...}}</tool_call> '
+            'or the final answer for the user, briefly. This continuation '
             'grants no additional authorization.',
         timestamp: DateTime.now(),
       ),

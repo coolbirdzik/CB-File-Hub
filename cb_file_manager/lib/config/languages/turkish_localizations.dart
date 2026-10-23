@@ -2,6 +2,16 @@ import 'app_localizations.dart';
 
 class TurkishLocalizations implements AppLocalizations {
   @override
+  String get deviceMediaOnDevice => 'Bu cihazda';
+  @override
+  String get deviceMediaLimited =>
+      'Yalnızca erişimine izin verdiğiniz fotoğraf ve videolar gösteriliyor.';
+  @override
+  String get deviceMediaPermission =>
+      'Cihaz albümlerini göstermek için fotoğraf ve video erişimine izin verin.';
+  @override
+  String get deviceMediaManageAccess => 'Daha fazla fotoğraf ve video seçin';
+  @override
   String get torrentReceiveInBackground =>
       'Açılan torrentleri arka planda ekle';
   @override
@@ -836,6 +846,45 @@ class TurkishLocalizations implements AppLocalizations {
 
   @override
   String get columnResetLayout => 'Sütun sırasını ve genişliklerini sıfırla';
+
+  // Column chooser
+  @override
+  String get columnChooserSubtitle =>
+      'Gösterilecek sütunları işaretleyin. Sıralamak için gösterilen sütunları sürükleyin.';
+
+  @override
+  String get columnChooserSearchHint => 'Sütun ara';
+
+  @override
+  String get columnChooserAvailable => 'Kullanılabilir sütunlar';
+
+  @override
+  String columnChooserShown(int count) => 'Gösterilen ($count)';
+
+  @override
+  String get columnChooserBasicGroup => 'Temel';
+
+  @override
+  String get columnChooserCollectionGroup => 'Bu koleksiyon';
+
+  @override
+  String get columnChooserSystemGroup => 'Windows özellikleri';
+
+  @override
+  String get columnChooserSystemNote =>
+      'Temel sütunlardan sonra gösterilir; bunlara göre sıralama henüz desteklenmiyor.';
+
+  @override
+  String get columnChooserLoadingSystem => 'Windows özellikleri yükleniyor…';
+
+  @override
+  String get columnChooserNoMatch => 'Eşleşen sütun yok';
+
+  @override
+  String get columnChooserAlwaysShown => 'Her zaman gösterilir';
+
+  @override
+  String get columnChooserHide => 'Sütunu gizle';
 
   // Column visibility dialog
   @override
@@ -3906,6 +3955,46 @@ class TurkishLocalizations implements AppLocalizations {
   String get noProviderConfigured =>
       'Yapılandırılmış yapay zeka sağlayıcısı yok';
   @override
+  String get aiProviderSettings => 'Yapay zeka sağlayıcı ayarları';
+  @override
+  String get localModelGuideTitle =>
+      'Yapay zekayı kendi cihazınızda çalıştırın';
+  @override
+  String get localModelGuideIntro =>
+      'Bulut sağlayıcıları API anahtarı ister ve her isteği sınırlayabilir veya ücretlendirebilir. Yerel model doğrudan burada çalışır: ücretsiz, sınırsız ve dosyalarınız bu cihazdan çıkmaz.';
+  @override
+  String get localModelGuideStep1 =>
+      'Aşağıdaki düğmeyle Yerel Yapay Zeka ayarlarını açın. Model listesi hemen açılır.';
+  @override
+  String localModelGuideStep2(String installLabel) =>
+      'Bir model seçip "$installLabel" düğmesine tıklayın. Arka planda indirilir, sonra çevrimdışı çalışır.';
+  @override
+  String get localModelGuideStep3 =>
+      'Buraya dönün ve Gönder düğmesinin yanındaki model menüsünden seçin.';
+  @override
+  String get localModelGuideNote =>
+      'Küçük modeller daha az RAM kullanır ve daha hızlı yanıt verir. Hugging Face belirteci yalnızca erişimi kısıtlı modeller için gerekir.';
+  @override
+  String get localModelGuideOpenSettings => 'Yerel Yapay Zeka ayarlarını aç';
+  @override
+  String get localModelGuideLater => 'Daha sonra';
+  @override
+  String get localModelGuideLink => 'Ücretsiz yerel model kullan';
+  @override
+  String get installLocalModel => 'Model kur';
+  @override
+  String get localModelRecommended => 'Önerilen';
+  @override
+  String get localModelInstalledBadge => 'Kuruldu';
+  @override
+  String get localModelBackgroundHint =>
+      'İndirmeler arka planda sürer; bu pencereyi kapatabilirsiniz.';
+  @override
+  String localModelDownloading(String modelName) => '$modelName indiriliyor';
+  @override
+  String localModelReady(String modelName) =>
+      '$modelName kuruldu ve kullanıma hazır';
+  @override
   String get relevanceScore => 'İlgililik';
   @override
   String get aiExplanation => 'Yapay zeka açıklaması';
@@ -4907,6 +4996,22 @@ class TurkishLocalizations implements AppLocalizations {
   String get localAiTokensSuffix => 'belirteç';
   @override
   String get localAiInvalidTokenCount => 'Lütfen geçerli bir sayı girin';
+  @override
+  String get localAiModelStorage => 'Model depolama konumu';
+  @override
+  String get localAiModelStorageHint =>
+      'İndirilen modeller bu klasöre kaydedilir. Değiştirildiğinde yüklü modeller oraya taşınır.';
+  @override
+  String get localAiModelStorageReset => 'Varsayılan konumu kullan';
+  @override
+  String get localAiModelStorageNotWritable =>
+      'Modeller bu klasöre kaydedilemiyor';
+  @override
+  String get localAiMovingModels => 'Modeller taşınıyor';
+  @override
+  String get localAiModelsMoved => 'Modeller taşındı';
+  @override
+  String get localAiMoveModelsFailed => 'Modeller taşınamadı';
   @override
   String get aiReasoning => 'Düşünme';
 

@@ -34,8 +34,27 @@ class AgentWorkspace {
 
   const AgentWorkspace._(this.kind, this.browsingPath, this.workingDirectory);
 
-  static String get homeDirectory =>
-      Platform.environment['USERPROFILE'] ?? Platform.environment['HOME'] ?? '';
+  static final _appPrivate = RegExp(
+    r'[/\\]Android[/\\](?:data|obb)(?=[/\\:\s]|$)',
+  );
+
+  /// Whether [pathOrMessage] is, or mentions, Android's per-app storage
+  /// (`Android/data`, `Android/obb`). Android 11+ keeps it private to each
+  /// app even with all-files access, so walks skip it without a warning.
+  static bool isAppPrivate(String? pathOrMessage) =>
+      pathOrMessage != null && _appPrivate.hasMatch(pathOrMessage);
+
+  static String get homeDirectory {
+    // Android sets no usable HOME; shared storage is where the user's files are.
+    if (Platform.isAndroid) return '/storage/emulated/0';
+    final home =
+        Platform.environment['USERPROFILE'] ??
+        Platform.environment['HOME'] ??
+        '';
+    // iOS HOME is the app's sandbox; its Documents folder is what Files shows.
+    if (Platform.isIOS && home.isNotEmpty) return '$home/Documents';
+    return home;
+  }
 
   factory AgentWorkspace.resolve(String currentPath, {String? home}) {
     final fallback = home ?? homeDirectory;

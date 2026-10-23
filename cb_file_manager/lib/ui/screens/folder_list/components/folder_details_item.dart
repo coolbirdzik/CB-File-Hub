@@ -208,6 +208,10 @@ class _FolderDetailsItemState extends State<FolderDetailsItem> {
                       widget.columnVisibility,
                   // Collection columns describe files; folders leave them empty.
                   extraCellBuilder: (column) => SizedBox(width: column.width),
+                  systemCellBuilder: _tagName == null
+                      ? (column) =>
+                            systemPropertyCell(widget.folder.path, column)
+                      : null,
                   cellBuilder: (column) => _buildCell(context, column),
                 ),
               ),

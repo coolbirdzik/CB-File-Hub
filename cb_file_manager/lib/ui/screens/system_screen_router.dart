@@ -41,6 +41,8 @@ import 'backup_sync/backup_sync_screen.dart';
 import 'ai_chat/ai_chat_screen.dart';
 import 'cb_agent_cleaner/cb_agent_cleaner_screen.dart';
 import 'package:path/path.dart' as pathlib;
+import '../tab_manager/core/tab_paths.dart';
+import 'media_gallery/device_media_sources.dart';
 
 /// A router that handles system screens and special paths
 class SystemScreenRouter {
@@ -142,6 +144,14 @@ class SystemScreenRouter {
     }
 
     // 2. Handle dynamic paths
+    final deviceMedia = DeviceMediaPath.tryParse(path);
+    if (deviceMedia != null) {
+      return DeviceMediaAlbumScreen(
+        key: ValueKey('$tabId:$path'),
+        tabId: tabId,
+        location: deviceMedia,
+      );
+    }
     if (path.startsWith('#ssh/session/')) {
       return SshTerminalScreen(
         tabId: tabId,

@@ -27,6 +27,8 @@ class WindowsShellProperties {
   final Map<String, Set<String>> _queued = {};
   Future<SendPort>? _worker;
   Timer? _flush;
+  Future<List<SystemPropertyColumn>>? _systemColumns;
+  Map<String, String> _systemLabels = const {};
 
   /// The display text of [property] (a [ShellProperty] name) of [path];
   /// empty when the file has no such value.
@@ -59,6 +61,31 @@ class WindowsShellProperties {
 
   void invalidate(String path) =>
       _cache.removeWhere((key, _) => key.endsWith('\u0000$path'));
+
+  /// Every property Windows offers as a Details column (what Explorer's
+  /// "Choose Details" lists), sorted by label, without the ones a built-in
+  /// column already shows ([ShellProperty.builtIn]). Empty off Windows.
+  Future<List<SystemPropertyColumn>> systemColumns() {
+    if (!isSupported) return Future.value(const []);
+    return _systemColumns ??= () async {
+      try {
+        final columns = await Isolate.run(
+          _enumerateSystemColumns,
+          debugName: 'shell-property-catalog',
+        );
+        _systemLabels = {for (final c in columns) c.name: c.label};
+        return columns;
+      } catch (e) {
+        debugPrint('WindowsShellProperties.systemColumns: $e');
+        _systemColumns = null;
+        return const <SystemPropertyColumn>[];
+      }
+    }();
+  }
+
+  /// The Windows label of the system column [name], once [systemColumns]
+  /// has loaded.
+  String? systemLabel(String name) => _systemLabels[name];
 
   Future<void> _send() async {
     _flush = null;
@@ -99,6 +126,18 @@ class WindowsShellProperties {
     ready.close();
     return port;
   }
+}
+
+/// A property Windows can show as a Details column, by canonical name such as
+/// `System.Music.Composer`.
+@immutable
+class SystemPropertyColumn {
+  const SystemPropertyColumn(this.name, this.label);
+
+  final String name;
+
+  /// Display name, in the language of Windows.
+  final String label;
 }
 
 /// A Shell property key (`System.*` canonical name in the comment).
@@ -161,6 +200,45 @@ class ShellProperty {
     'productName': [ShellProperty(_version, 7)],
   };
 
+  /// The [WindowsShellProperties.get] name of the system property column
+  /// [canonicalName] (a [SystemPropertyColumn.name]).
+  static String system(String canonicalName) => 'sys:$canonicalName';
+
+  /// Canonical names of the properties the built-in Details columns show.
+  static const builtIn = {
+    'System.ItemNameDisplay',
+    'System.FileName',
+    'System.ItemPathDisplay',
+    'System.ItemFolderPathDisplay',
+    'System.ItemTypeText',
+    'System.Size',
+    'System.DateModified',
+    'System.DateCreated',
+    'System.DateAccessed',
+    'System.FileAttributes',
+    'System.FileExtension',
+    'System.FileOwner',
+    'System.Author',
+    'System.Title',
+    'System.Comment',
+    'System.Document.PageCount',
+    'System.Rating',
+    'System.Photo.DateTaken',
+    'System.Photo.CameraModel',
+    'System.Image.Dimensions',
+    'System.Media.Duration',
+    'System.Video.FrameRate',
+    'System.Audio.EncodingBitrate',
+    'System.Music.Artist',
+    'System.Music.AlbumTitle',
+    'System.Music.Genre',
+    'System.Media.Year',
+    'System.Company',
+    'System.FileDescription',
+    'System.FileVersion',
+    'System.Software.ProductName',
+  };
+
   // System.Video.FrameWidth / FrameHeight
   static const frameWidth = ShellProperty(_video, 3);
   static const frameHeight = ShellProperty(_video, 4);
@@ -183,20 +261,152 @@ typedef _FormatDart =
       Pointer<Pointer<Utf16>>,
     );
 
+typedef _KeyFromNameNative =
+    Int32 Function(Pointer<Utf16>, Pointer<win32.PROPERTYKEY>);
+typedef _KeyFromNameDart =
+    int Function(Pointer<Utf16>, Pointer<win32.PROPERTYKEY>);
+typedef _EnumNative =
+    Int32 Function(Int32, Pointer<win32.GUID>, Pointer<Pointer>);
+typedef _EnumDart = int Function(int, Pointer<win32.GUID>, Pointer<Pointer>);
+typedef _ReleaseNative = Uint32 Function(Pointer);
+typedef _GetCountNative = Int32 Function(Pointer, Pointer<Uint32>);
+typedef _GetAtNative =
+    Int32 Function(Pointer, Uint32, Pointer<win32.GUID>, Pointer<Pointer>);
+typedef _GetStringNative = Int32 Function(Pointer, Pointer<Pointer<Utf16>>);
+
+/// The function in vtable slot [slot] of the COM object [object].
+Pointer<NativeFunction<T>> _vtable<T extends Function>(
+  Pointer object,
+  int slot,
+) => object.cast<Pointer<Pointer<NativeFunction<T>>>>().value[slot];
+
+/// Lists the property descriptions Windows marks as columns, then the
+/// viewable ones, through `PSEnumeratePropertyDescriptions`. Runs on its own
+/// isolate; win32 has no `IPropertyDescription`, so this calls its vtable.
+List<SystemPropertyColumn> _enumerateSystemColumns() {
+  // PDEF_COLUMN, then PDEF_VIEWABLE.
+  const filters = [6, 3];
+  // IPropertyDescription::GetCanonicalName / GetDisplayName.
+  const canonicalNameSlot = 4, displayNameSlot = 6;
+  win32.CoInitializeEx(win32.COINIT(win32.COINIT_MULTITHREADED));
+  final enumerate = DynamicLibrary.open(
+    'propsys.dll',
+  ).lookupFunction<_EnumNative, _EnumDart>('PSEnumeratePropertyDescriptions');
+  final listIid = win32.IID_IPropertyDescriptionList.toNative();
+  final descriptionIid = win32
+      .GUID('6F79D558-3E96-4549-A1D1-7D75D2288814')
+      .toNative();
+  final out = calloc<Pointer>();
+  final text = calloc<Pointer<Utf16>>();
+  final count = calloc<Uint32>();
+  final columns = <String, SystemPropertyColumn>{};
+
+  void release(Pointer object) => _vtable<_ReleaseNative>(
+    object,
+    2,
+  ).asFunction<int Function(Pointer)>()(object);
+
+  String? string(Pointer description, int slot) {
+    final get = _vtable<_GetStringNative>(
+      description,
+      slot,
+    ).asFunction<int Function(Pointer, Pointer<Pointer<Utf16>>)>();
+    text.value = nullptr;
+    if (get(description, text) < 0 || text.value == nullptr) return null;
+    final result = text.value.toDartString().trim();
+    win32.CoTaskMemFree(text.value);
+    return result.isEmpty ? null : result;
+  }
+
+  try {
+    for (final filter in filters) {
+      out.value = nullptr;
+      if (enumerate(filter, listIid, out) < 0 || out.value == nullptr) {
+        continue;
+      }
+      final list = out.value;
+      try {
+        final getCount = _vtable<_GetCountNative>(
+          list,
+          3,
+        ).asFunction<int Function(Pointer, Pointer<Uint32>)>();
+        final getAt = _vtable<_GetAtNative>(list, 4)
+            .asFunction<
+              int Function(Pointer, int, Pointer<win32.GUID>, Pointer<Pointer>)
+            >();
+        if (getCount(list, count) < 0) continue;
+        for (var i = 0; i < count.value; i++) {
+          out.value = nullptr;
+          if (getAt(list, i, descriptionIid, out) < 0 || out.value == nullptr) {
+            continue;
+          }
+          final description = out.value;
+          try {
+            final name = string(description, canonicalNameSlot);
+            if (name == null ||
+                columns.containsKey(name) ||
+                ShellProperty.builtIn.contains(name)) {
+              continue;
+            }
+            // Properties without a label are not meant to be shown.
+            final label = string(description, displayNameSlot);
+            if (label != null) {
+              columns[name] = SystemPropertyColumn(name, label);
+            }
+          } finally {
+            release(description);
+          }
+        }
+      } finally {
+        release(list);
+      }
+    }
+  } finally {
+    calloc.free(out);
+    calloc.free(text);
+    calloc.free(count);
+    win32.free(listIid);
+    win32.free(descriptionIid);
+    win32.CoUninitialize();
+  }
+  return columns.values.toList()
+    ..sort((a, b) => a.label.toLowerCase().compareTo(b.label.toLowerCase()));
+}
+
 void _shellPropertyWorker(SendPort ready) {
   win32.CoInitializeEx(win32.COINIT(win32.COINIT_MULTITHREADED));
-  final format = DynamicLibrary.open(
-    'propsys.dll',
-  ).lookupFunction<_FormatNative, _FormatDart>('PSFormatForDisplayAlloc');
+  final propsys = DynamicLibrary.open('propsys.dll');
+  final format = propsys.lookupFunction<_FormatNative, _FormatDart>(
+    'PSFormatForDisplayAlloc',
+  );
+  final keyFromName = propsys
+      .lookupFunction<_KeyFromNameNative, _KeyFromNameDart>(
+        'PSGetPropertyKeyFromName',
+      );
   final key = calloc<win32.PROPERTYKEY>();
+  // Keys of system property columns by canonical name, null when Windows
+  // does not know the name. Bounded by the catalog, so never freed.
+  final systemKeys = <String, Pointer<win32.PROPERTYKEY>?>{};
 
   void setKey(ShellProperty property) {
     key.ref.fmtid.setGUID(property.fmtid);
     key.ref.pid = property.pid;
   }
 
-  String display(win32.IShellItem2 item, ShellProperty property) {
-    setKey(property);
+  Pointer<win32.PROPERTYKEY>? systemKey(String name) =>
+      systemKeys.putIfAbsent(name, () {
+        final native = name.toNativeUtf16();
+        final resolved = calloc<win32.PROPERTYKEY>();
+        try {
+          if (keyFromName(native, resolved) >= 0) return resolved;
+          calloc.free(resolved);
+          return null;
+        } finally {
+          calloc.free(native);
+        }
+      });
+
+  String displayKey(win32.IShellItem2 item, Pointer<win32.PROPERTYKEY> key) {
     final Pointer<win32.PROPVARIANT> value;
     try {
       value = item.getProperty(key);
@@ -218,6 +428,11 @@ void _shellPropertyWorker(SendPort ready) {
       win32.PropVariantClear(value);
       win32.free(value);
     }
+  }
+
+  String display(win32.IShellItem2 item, ShellProperty property) {
+    setKey(property);
+    return displayKey(item, key);
   }
 
   int? uint32(win32.IShellItem2 item, ShellProperty property) {
@@ -289,6 +504,13 @@ void _shellPropertyWorker(SendPort ready) {
           null,
         );
         for (final name in entry.value) {
+          if (name.startsWith('sys:')) {
+            final key = systemKey(name.substring(4));
+            results['$name\u0000${entry.key}'] = key == null
+                ? ''
+                : displayKey(item, key);
+            continue;
+          }
           if (name.startsWith('sort:')) {
             if (cloudOnly) continue;
             results['$name\u0000${entry.key}'] = sortKey(

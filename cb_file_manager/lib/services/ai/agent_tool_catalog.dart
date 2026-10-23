@@ -1,3 +1,7 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
+
 import 'disk_cleaner_skill.dart';
 
 /// One contract for tool discovery, argument validation and approval policy.
@@ -21,24 +25,6 @@ class AgentToolCatalog {
     'get_tool_guide': AgentToolSpec(
       'Read workflows and less common tools. Topics: files, tags, media, cleaner, app.',
       {'topic': 'string'},
-    ),
-    'select_cleaner_scan_items': AgentToolSpec(
-      'Select recommended exact paths in the current Cleaner scan for user review. No deletion. Read get_current_cleaner_scan first for scan_id and paths. replace defaults to true; false adds to selection.',
-      {'scan_id': 'string', 'paths': 'strings', 'replace': 'bool?'},
-    ),
-    'inspect_cleaner_scan_item': AgentToolSpec(
-      'Interact with an existing Cleaner scan: reveal and highlight one exact row, update its chart and show that CB Agent is inspecting it. No cleanup checkbox changes. Returns evidence and the latest scan_id.',
-      {'scan_id': 'string', 'path': 'string'},
-    ),
-    'set_cleaner_scan_item_analysis': AgentToolSpec(
-      'After inspecting that item, show its CLEAN/REVIEW/KEEP assessment and concrete reason on the scan UI. select:true checks CLEAN junk for later user review, never deletes. Use the latest scan_id returned by the previous interaction.',
-      {
-        'scan_id': 'string',
-        'path': 'string',
-        'decision': 'string',
-        'reason': 'string',
-        'select': 'bool?',
-      },
     ),
     'list_directory': AgentToolSpec(
       'List files/folders with exact size_bytes. Empty path lists drives. Follow next_cursor until null.',
@@ -136,6 +122,32 @@ class AgentToolCatalog {
       {'path': 'string', 'add': 'strings?', 'remove': 'strings?'},
       approval: true,
     ),
+  };
+
+  /// Desktop Disk Cleaner scan tools; the Cleaner does not exist on phones.
+  static const cleaner = <String, AgentToolSpec>{
+    'select_cleaner_scan_items': AgentToolSpec(
+      'Select recommended exact paths in the current Cleaner scan for user review. No deletion. Read get_current_cleaner_scan first for scan_id and paths. replace defaults to true; false adds to selection.',
+      {'scan_id': 'string', 'paths': 'strings', 'replace': 'bool?'},
+    ),
+    'inspect_cleaner_scan_item': AgentToolSpec(
+      'Interact with an existing Cleaner scan: reveal and highlight one exact row, update its chart and show that CB Agent is inspecting it. No cleanup checkbox changes. Returns evidence and the latest scan_id.',
+      {'scan_id': 'string', 'path': 'string'},
+    ),
+    'set_cleaner_scan_item_analysis': AgentToolSpec(
+      'After inspecting that item, show its CLEAN/REVIEW/KEEP assessment and concrete reason on the scan UI. select:true checks CLEAN junk for later user review, never deletes. Use the latest scan_id returned by the previous interaction.',
+      {
+        'scan_id': 'string',
+        'path': 'string',
+        'decision': 'string',
+        'reason': 'string',
+        'select': 'bool?',
+      },
+    ),
+  };
+
+  /// Desktop only: Android and iOS give the app no shell to run.
+  static const desktop = <String, AgentToolSpec>{
     'run_command': AgentToolSpec(
       'Fallback shell command after approval. Use common tools first. Windows shell is cmd; working_directory is explicit.',
       {'command': 'string', 'working_directory': 'string?'},
@@ -143,11 +155,68 @@ class AgentToolCatalog {
     ),
   };
 
-  static const additional = {
+  /// What the phone apps offer instead of a shell.
+  static const mobile = <String, AgentToolSpec>{
+    'list_storage': AgentToolSpec(
+      'Phone storage: internal storage, SD cards and USB drives with total/free bytes, and which standard folders (DCIM, Pictures, Download, Documents, Movies, Music) exist. Start here to find where files live.',
+      {},
+    ),
+    'folder_size': AgentToolSpec(
+      'Total size, file and folder count of a folder, with its largest direct children. Use it to see what fills the phone.',
+      {'path': 'string?'},
+    ),
+    'find_large_files': AgentToolSpec(
+      'Biggest files below path, largest first. min_size_mb and extension (e.g. mp4) filter. Paginated.',
+      {
+        'path': 'string?',
+        'min_size_mb': 'int?',
+        'extension': 'string?',
+        'cursor': 'string?',
+        'limit': 'int?',
+      },
+    ),
+    'find_recent_files': AgentToolSpec(
+      'Files modified in the last days (default 7) below path, newest first. Paginated.',
+      {
+        'path': 'string?',
+        'days': 'int?',
+        'extension': 'string?',
+        'cursor': 'string?',
+        'limit': 'int?',
+      },
+    ),
+    'open_file': AgentToolSpec(
+      'Open one file in the app the phone uses for its type. Only when the user asks to open or view it.',
+      {'path': 'string'},
+    ),
+    'share_files': AgentToolSpec(
+      'Open the system share sheet for these files; the user picks where they go. Only when the user asks to share or send them.',
+      {'paths': 'strings'},
+    ),
+  };
+
+  /// Overrides the platform in tests, so phone behaviour can be checked on a
+  /// desktop host.
+  @visibleForTesting
+  static bool? debugIsMobile;
+
+  static bool get isMobile =>
+      debugIsMobile ?? (Platform.isAndroid || Platform.isIOS);
+
+  /// Tools advertised in the prompt for this platform.
+  static Map<String, AgentToolSpec> get tools => {
+    ...common,
+    if (isMobile) ...mobile else ...{...cleaner, ...desktop},
+  };
+
+  static const _mediaTools = {
     'list_video_libraries',
     'get_video_library_files',
     'list_albums',
     'get_album_files',
+  };
+
+  static const _cleanerAdditional = {
     'list_disk_junk_categories',
     'get_drive_space',
     'scan_disk_junk',
@@ -158,14 +227,21 @@ class AgentToolCatalog {
     'search_cleaner_scan',
     'get_current_app_storage',
   };
-  static Set<String> get names => {...common.keys, ...additional};
-  static Set<String> get approvalTools => {
-    for (final entry in common.entries)
-      if (entry.value.approval) entry.key,
-    'clean_disk_junk',
+
+  /// Tools reached through get_tool_guide instead of the prompt.
+  static Set<String> get additional => {
+    ..._mediaTools,
+    if (!isMobile) ..._cleanerAdditional,
   };
 
-  static String get definitions => common.entries
+  static Set<String> get names => {...tools.keys, ...additional};
+  static Set<String> get approvalTools => {
+    for (final entry in tools.entries)
+      if (entry.value.approval) entry.key,
+    if (!isMobile) 'clean_disk_junk',
+  };
+
+  static String get definitions => tools.entries
       .map((entry) {
         final args = entry.value.arguments.entries
             .map((arg) => '${arg.key}:${arg.value}')
@@ -178,7 +254,7 @@ class AgentToolCatalog {
     if (!names.contains(name)) {
       return 'Unknown tool "$name". Use a tool from the catalog.';
     }
-    final spec = common[name];
+    final spec = tools[name];
     if (spec == null) return null;
     for (final key in args.keys) {
       if (!spec.arguments.containsKey(key)) {
@@ -289,10 +365,22 @@ WORKFLOWS:
 - Tags: list_all_tags to discover names, search_by_tag to find files, get_file_tags to inspect one file. Tags are app metadata, not filenames.
 - Organize: inspect source and destination, then create_directory/copy_file/move_file/update_file_tags. The app asks for approval.
 - Compare files: list_directory with exact sizes, then file_checksum only for equal-size candidates. Same name or size alone does not prove identical content. No dedicated duplicate-finder tool is needed.
-- For detailed workflows and existing album/video/cleaner tools, call get_tool_guide with topic files, tags, media, cleaner or app.
+${isMobile ? _mobileWorkflows : _desktopWorkflows}
 Reply in $language.
 ${cleanerScreenContext(browsingPath)}''';
   }
+
+  static const _desktopWorkflows =
+      '- For detailed workflows and existing album/video/cleaner tools, call get_tool_guide with topic files, tags, media, cleaner or app.';
+
+  static const _mobileWorkflows =
+      '''- For detailed workflows and album/video tools, call get_tool_guide with topic files, tags, media or app.
+PHONE: This device is a phone. There is no shell or terminal; never suggest commands. Use the phone tools instead:
+- Where things are: list_storage, then list_directory on a volume or one of its folders (DCIM holds camera photos, Download holds downloads).
+- What fills the phone: folder_size on a volume or folder, then find_large_files there. Report sizes in MB/GB.
+- Recent files or downloads: find_recent_files with days.
+- open_file and share_files hand files to other apps; use them only when the user asks to open, view, share or send.
+- Android/data and Android/obb belong to other apps and are skipped automatically; this is normal, not a permission problem. Do not mention them unless the user asks about those folders.''';
 
   /// On the Cleaner screen the cleaner workflow is the expected task, so its
   /// guide is supplied up front instead of waiting for get_tool_guide.

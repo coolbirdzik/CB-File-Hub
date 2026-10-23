@@ -312,6 +312,20 @@ abstract class AppLocalizations {
   String get columnPermissionsDescription;
   String get columnResetLayout;
 
+  // Column chooser
+  String get columnChooserSubtitle;
+  String get columnChooserSearchHint;
+  String get columnChooserAvailable;
+  String columnChooserShown(int count);
+  String get columnChooserBasicGroup;
+  String get columnChooserCollectionGroup;
+  String get columnChooserSystemGroup;
+  String get columnChooserSystemNote;
+  String get columnChooserLoadingSystem;
+  String get columnChooserNoMatch;
+  String get columnChooserAlwaysShown;
+  String get columnChooserHide;
+
   // Column visibility dialog
   String get columnVisibilityInstructions;
 
@@ -609,6 +623,10 @@ abstract class AppLocalizations {
 
   // Gallery
   String get imageGallery;
+  String get deviceMediaOnDevice;
+  String get deviceMediaLimited;
+  String get deviceMediaPermission;
+  String get deviceMediaManageAccess;
   String get videoGallery;
 
   // Gallery Hub
@@ -1621,6 +1639,22 @@ abstract class AppLocalizations {
   String get allProvidersFailed;
   String get setupAiProvider;
   String get noProviderConfigured;
+  String get aiProviderSettings;
+  String get localModelGuideTitle;
+  String get localModelGuideIntro;
+  String get localModelGuideStep1;
+  String localModelGuideStep2(String installLabel);
+  String get localModelGuideStep3;
+  String get localModelGuideNote;
+  String get localModelGuideOpenSettings;
+  String get localModelGuideLater;
+  String get localModelGuideLink;
+  String get installLocalModel;
+  String get localModelRecommended;
+  String get localModelInstalledBadge;
+  String get localModelBackgroundHint;
+  String localModelDownloading(String modelName);
+  String localModelReady(String modelName);
   String get relevanceScore;
   String get aiExplanation;
   String get aiSearchMode;
@@ -2038,6 +2072,13 @@ abstract class AppLocalizations {
   String get localAiContextWindowHint;
   String get localAiTokensSuffix;
   String get localAiInvalidTokenCount;
+  String get localAiModelStorage;
+  String get localAiModelStorageHint;
+  String get localAiModelStorageReset;
+  String get localAiModelStorageNotWritable;
+  String get localAiMovingModels;
+  String get localAiModelsMoved;
+  String get localAiMoveModelsFailed;
   String get aiReasoning;
 
   String get sshLocalConfig;

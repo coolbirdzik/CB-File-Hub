@@ -60,6 +60,14 @@
   },
   "rules": [
     {
+      "why": "Device media sources only run on Android and iOS",
+      "paths": [
+        "cb_file_manager/lib/services/device_media_library.dart",
+        "cb_file_manager/lib/ui/screens/media_gallery/device_media_sources.dart"
+      ],
+      "suites": []
+    },
+    {
       "why": "Release version bump only",
       "paths": ["cb_file_manager/pubspec.yaml"],
       "onlyIf": "version-line",

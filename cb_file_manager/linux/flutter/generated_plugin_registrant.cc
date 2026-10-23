@@ -7,7 +7,7 @@
 #include "generated_plugin_registrant.h"
 
 #include <desktop_drop/desktop_drop_plugin.h>
-#include <flutter_gemma/flutter_gemma_plugin.h>
+#include <flutter_edge_ai/flutter_edge_ai_plugin.h>
 #include <flutter_secure_storage_linux/flutter_secure_storage_linux_plugin.h>
 #include <media_kit_libs_linux/media_kit_libs_linux_plugin.h>
 #include <media_kit_video/media_kit_video_plugin.h>
@@ -20,9 +20,9 @@ void fl_register_plugins(FlPluginRegistry* registry) {
   g_autoptr(FlPluginRegistrar) desktop_drop_registrar =
       fl_plugin_registry_get_registrar_for_plugin(registry, "DesktopDropPlugin");
   desktop_drop_plugin_register_with_registrar(desktop_drop_registrar);
-  g_autoptr(FlPluginRegistrar) flutter_gemma_registrar =
-      fl_plugin_registry_get_registrar_for_plugin(registry, "FlutterGemmaPlugin");
-  flutter_gemma_plugin_register_with_registrar(flutter_gemma_registrar);
+  g_autoptr(FlPluginRegistrar) flutter_edge_ai_registrar =
+      fl_plugin_registry_get_registrar_for_plugin(registry, "FlutterEdgeAiPlugin");
+  flutter_edge_ai_plugin_register_with_registrar(flutter_edge_ai_registrar);
   g_autoptr(FlPluginRegistrar) flutter_secure_storage_linux_registrar =
       fl_plugin_registry_get_registrar_for_plugin(registry, "FlutterSecureStorageLinuxPlugin");
   flutter_secure_storage_linux_plugin_register_with_registrar(flutter_secure_storage_linux_registrar);

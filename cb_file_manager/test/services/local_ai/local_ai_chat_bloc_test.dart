@@ -86,6 +86,31 @@ void main() {
     },
   );
 
+  test('a reply with no answer text is asked for again, not shown', () async {
+    final runtime = _ConversationRuntime([
+      <String>[],
+      ['<think>The user wants photos.</think>'],
+      ['Your recent photos are in DCIM/Camera.'],
+    ]);
+    final bloc = await createBloc(runtime, _RecordingTools());
+    bloc.add(const SendMessage('Where are my photos?'));
+    await _waitUntil(
+      () => runtime.requests.length == 3 && !bloc.state.isLoading,
+    );
+    expect(runtime.requests[1].last['content'], contains('no answer'));
+    expect(runtime.requests[2].last['content'], contains('only reasoning'));
+    final answer = bloc.state.messages.lastWhere(
+      (m) => m.role == AiMessageRole.assistant,
+    );
+    expect(answer.content, 'Your recent photos are in DCIM/Camera.');
+    expect(
+      bloc.state.messages.where(
+        (m) => m.content.contains('returned an empty response'),
+      ),
+      isEmpty,
+    );
+  });
+
   test('reasoning-only tool suggestions never execute', () async {
     final runtime = _ConversationRuntime([
       [

@@ -19,6 +19,7 @@ import '../services/progress/desktop_app_icon_progress_service.dart';
 import '../services/ai/ai_provider_service.dart';
 import '../services/ai/ai_chat_history_service.dart';
 import '../services/local_ai/local_ai_advisor_service.dart';
+import '../services/local_ai/local_model_downloads.dart';
 import '../services/disk_cleaner/disk_cleaner_service.dart';
 import '../services/tab_activity/tab_activity_manager.dart';
 import '../services/tab_activity/tab_cache_release_helper.dart';
@@ -131,6 +132,10 @@ Future<void> setupServiceLocator() async {
   final sharedPreferences = await SharedPreferences.getInstance();
   locator.registerLazySingleton<LocalAiAdvisorService>(
     () => LocalAiAdvisorService(prefs: sharedPreferences),
+  );
+  // Model downloads outlive the Settings screen that starts them.
+  locator.registerLazySingleton<LocalModelDownloads>(
+    () => LocalModelDownloads(locator<LocalAiAdvisorService>()),
   );
 
   // File metadata service — provides cached image dimensions, video duration,

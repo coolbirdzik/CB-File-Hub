@@ -434,22 +434,22 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
-  flutter_gemma:
+  flutter_edge_ai:
     dependency: "direct main"
     description:
-      name: flutter_gemma
-      sha256: "71c96fc592b1ee785c17195ee8f9227383300c9c74ffaa9c5af41dd893530f7e"
+      name: flutter_edge_ai
+      sha256: "2eef7d40cdc0339c4c202e58851418f04673c0d75bf606cfd69e7e1fbea7bf9b"
       url: "https://pub.dev"
     source: hosted
-    version: "1.11.4"
-  flutter_gemma_litertlm:
+    version: "2.5.1"
+  flutter_edge_ai_litertlm:
     dependency: "direct main"
     description:
-      name: flutter_gemma_litertlm
-      sha256: "3692ac897ebc0508eff3a11f4589935548d73e8f4464d6963a1518caf565590b"
+      name: flutter_edge_ai_litertlm
+      sha256: "2b76ab41db0293b21719fe4656a41b268fe9a1dfc87c4c991960b3f6668a0309"
       url: "https://pub.dev"
     source: hosted
-    version: "1.8.6"
+    version: "1.17.0"
   flutter_lints:
     dependency: "direct dev"
     description:
@@ -1137,6 +1137,14 @@ packages:
       relative: true
     source: path
     version: "2.1.0"
+  photo_manager:
+    dependency: "direct main"
+    description:
+      name: photo_manager
+      sha256: "2d00a785b501bf1e5f6180bbef772846e767be11d45d11112b63092ef54a419e"
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.12.0"
   photo_view:
     dependency: transitive
     description:

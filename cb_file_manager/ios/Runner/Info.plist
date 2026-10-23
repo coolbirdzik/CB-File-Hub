@@ -41,6 +41,8 @@
 		</array>
 		<key>UIViewControllerBasedStatusBarAppearance</key>
 		<false />
+		<key>NSPhotoLibraryUsageDescription</key>
+		<string>Show your photos, videos, and existing albums in the image and video galleries.</string>
 		<key>NSAppTransportSecurity</key>
 		<dict>
 			<key>NSAllowsLocalNetworking</key>

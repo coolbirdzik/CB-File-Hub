@@ -12,15 +12,16 @@ import '../../../config/languages/app_localizations.dart';
 import '../../../models/ai/ai_message.dart';
 import 'components/approval_card.dart';
 import 'components/conversation_list_panel.dart';
-import '../../tab_manager/core/tab_data.dart';
 import '../../tab_manager/core/tab_manager.dart';
-import '../../tab_manager/core/tab_paths.dart';
+import '../settings/settings_navigation.dart';
 import 'components/agent_context_label.dart';
 import 'components/chat_input_bar.dart';
 import 'components/chat_message_bubble.dart';
 import 'components/raw_payload_dialog.dart';
 import 'components/tool_call_chip.dart';
 import 'components/file_result_card.dart';
+import 'components/local_model_guide_dialog.dart';
+import 'components/local_model_setup_link.dart';
 import 'components/model_selector_button.dart';
 import 'components/shimmer_thinking_text.dart';
 import 'package:cb_file_manager/config/translation_helper.dart';
@@ -93,6 +94,7 @@ class _AiSidePanelState extends State<AiSidePanel> {
       }
       // else: no path, no messages, no conversations → leave list hidden
       //       (user can open it via the header button).
+      LocalModelGuideDialog.maybeShowOnFirstUse(context);
     });
   }
 
@@ -504,6 +506,15 @@ class _AiSidePanelState extends State<AiSidePanel> {
               style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
             ),
           ),
+          _PanelHeaderIconButton(
+            key: const ValueKey('ai-panel-provider-settings'),
+            icon: PhosphorIconsLight.gearSix,
+            tooltip: l.aiProviderSettings,
+            isDark: isDark,
+            onPressed: () =>
+                openSettings(context, anchor: SettingsAnchor.aiProviders),
+          ),
+          const SizedBox(width: 2),
           // Always visible: starting over should not need the history list.
           _PanelHeaderIconButton(
             key: const ValueKey('ai-panel-new-conversation'),
@@ -583,7 +594,8 @@ class _AiSidePanelState extends State<AiSidePanel> {
             if (!state.isProviderConfigured) ...[
               const SizedBox(height: 12),
               InkWell(
-                onTap: () => _navigateToSettings(context),
+                onTap: () =>
+                    openSettings(context, anchor: SettingsAnchor.aiProviders),
                 borderRadius: BorderRadius.circular(8),
                 child: Container(
                   padding: const EdgeInsets.symmetric(
@@ -618,6 +630,12 @@ class _AiSidePanelState extends State<AiSidePanel> {
                   ),
                 ),
               ),
+            ],
+            if (!state.providerModelCatalogs.any(
+              (catalog) => catalog.providerId == AiAgentBloc.localAiProviderId,
+            )) ...[
+              const SizedBox(height: 8),
+              const LocalModelSetupLink(compact: true),
             ],
           ],
         ),
@@ -886,26 +904,6 @@ class _AiSidePanelState extends State<AiSidePanel> {
         Process.start('xdg-open', [filePath], mode: ProcessStartMode.detached);
       }
     } catch (_) {}
-  }
-
-  void _navigateToSettings(BuildContext context) {
-    final tabBloc = BlocProvider.of<TabManagerBloc>(context);
-    // Switch to existing settings tab if already open, otherwise add it
-    final existingTab = tabBloc.state.tabs.firstWhere(
-      (tab) => tab.path == kSettingsPath,
-      orElse: () => TabData(id: '', name: '', path: ''),
-    );
-    if (existingTab.id.isNotEmpty) {
-      tabBloc.add(SwitchToTab(existingTab.id));
-    } else {
-      tabBloc.add(
-        AddTab(
-          path: kSettingsPath,
-          name: AppLocalizations.of(context)!.settings,
-          switchToTab: true,
-        ),
-      );
-    }
   }
 }
 

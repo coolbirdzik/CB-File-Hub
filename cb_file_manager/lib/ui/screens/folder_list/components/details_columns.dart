@@ -173,6 +173,49 @@ class _ShellPropertyCellState extends State<ShellPropertyCell> {
       Text(_text ?? '...', maxLines: 1, overflow: TextOverflow.ellipsis);
 }
 
+/// The Windows label of the system property column [column], or the last
+/// part of its canonical name until the labels are loaded.
+String systemColumnLabel(String column) =>
+    WindowsShellProperties.instance.systemLabel(column) ??
+    column.split('.').last;
+
+/// [systemColumnLabel], rebuilt once the Windows labels are loaded.
+class SystemColumnLabel extends StatefulWidget {
+  final String column;
+  final TextStyle? style;
+
+  const SystemColumnLabel(this.column, {super.key, this.style});
+
+  @override
+  State<SystemColumnLabel> createState() => _SystemColumnLabelState();
+}
+
+class _SystemColumnLabelState extends State<SystemColumnLabel> {
+  @override
+  void initState() {
+    super.initState();
+    final properties = WindowsShellProperties.instance;
+    if (properties.systemLabel(widget.column) == null) {
+      properties.systemColumns().then((_) {
+        if (mounted) setState(() {});
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Text(
+    systemColumnLabel(widget.column),
+    style: widget.style,
+    maxLines: 1,
+    overflow: TextOverflow.ellipsis,
+  );
+}
+
+/// A system property column cell of [path].
+Widget systemPropertyCell(String path, String column) => DetailsCell(
+  child: ShellPropertyCell(path: path, property: ShellProperty.system(column)),
+);
+
 /// Date text of the Details view.
 String formatDetailsDate(DateTime time) => time.toString().split('.').first;
 
@@ -251,7 +294,11 @@ class _DetailsLayoutHostState extends State<DetailsLayoutHost> {
           0,
           (sum, column) => sum + columns.widthOf(column),
         ) +
-        extras.fold<double>(0, (sum, column) => sum + column.width);
+        extras.fold<double>(0, (sum, column) => sum + column.width) +
+        columns.visibleSystemColumns.fold<double>(
+          0,
+          (sum, column) => sum + columns.systemWidthOf(column),
+        );
     return FileDetailsViewport(
       minimumWidth: minimumWidth,
       child: DetailsColumnsScope(
@@ -266,17 +313,21 @@ class _DetailsLayoutHostState extends State<DetailsLayoutHost> {
 
 /// One Details row, header or item: Name fills the free width, extra
 /// collection columns follow it, then every other visible column at its own
-/// width.
+/// width, then the system property columns.
 class DetailsRowLayout extends StatelessWidget {
   final ColumnVisibility columns;
   final Widget Function(DetailsColumn column) cellBuilder;
   final Widget Function(FileDetailsColumn column) extraCellBuilder;
+
+  /// Builds a [ColumnVisibility.systemColumns] cell; empty without it.
+  final Widget Function(String column)? systemCellBuilder;
 
   const DetailsRowLayout({
     super.key,
     required this.columns,
     required this.cellBuilder,
     required this.extraCellBuilder,
+    this.systemCellBuilder,
   });
 
   @override
@@ -293,6 +344,11 @@ class DetailsRowLayout extends StatelessWidget {
               width: columns.widthOf(column),
               child: cellBuilder(column),
             ),
+        for (final column in columns.visibleSystemColumns)
+          SizedBox(
+            width: columns.systemWidthOf(column),
+            child: systemCellBuilder?.call(column),
+          ),
       ],
     );
   }
@@ -348,7 +404,8 @@ class DetailsColumnsHeader extends StatefulWidget {
 class _DetailsColumnsHeaderState extends State<DetailsColumnsHeader> {
   static final bool _touch = Platform.isAndroid || Platform.isIOS;
 
-  DetailsColumn? _resizing;
+  /// The [DetailsColumn] or system column name being resized.
+  Object? _resizing;
   double _resizeStartWidth = 0;
   double _resizeOriginX = 0;
 
@@ -380,6 +437,8 @@ class _DetailsColumnsHeaderState extends State<DetailsColumnsHeader> {
           columns: columns,
           cellBuilder: (column) =>
               _buildCell(context, column, columns, style, l10n),
+          systemCellBuilder: (column) =>
+              _buildSystemCell(column, columns, style),
           extraCellBuilder: (column) => SizedBox(
             width: column.width,
             child: CbTooltip(
@@ -519,6 +578,44 @@ class _DetailsColumnsHeaderState extends State<DetailsColumnsHeader> {
     );
   }
 
+  /// A system column header: not sortable or movable, only resizable.
+  Widget _buildSystemCell(
+    String column,
+    ColumnVisibility columns,
+    TextStyle style,
+  ) => Stack(
+    children: [
+      CbTooltip(
+        message: column,
+        child: DetailsCell(
+          key: ValueKey('details-header-$column'),
+          child: SystemColumnLabel(column, style: style),
+        ),
+      ),
+      if (_scope != null)
+        Positioned(
+          top: 0,
+          bottom: 0,
+          right: 0,
+          width: _touch ? 16 : 8,
+          child: _buildResizeHandle(column, columns),
+        ),
+    ],
+  );
+
+  static double _widthOf(ColumnVisibility columns, Object column) =>
+      column is DetailsColumn
+      ? columns.widthOf(column)
+      : columns.systemWidthOf(column as String);
+
+  static ColumnVisibility _withWidth(
+    ColumnVisibility columns,
+    Object column,
+    double? width,
+  ) => column is DetailsColumn
+      ? columns.withWidth(column, width)
+      : columns.withSystemWidth(column as String, width);
+
   Widget _buildDraggable(
     DetailsColumn column,
     ColumnVisibility columns,
@@ -553,12 +650,14 @@ class _DetailsColumnsHeaderState extends State<DetailsColumnsHeader> {
           );
   }
 
-  Widget _buildResizeHandle(DetailsColumn column, ColumnVisibility columns) {
+  /// [column] is a [DetailsColumn] or a system column name.
+  Widget _buildResizeHandle(Object column, ColumnVisibility columns) {
     final theme = Theme.of(context);
+    final id = column is DetailsColumn ? column.name : column;
     return MouseRegion(
       cursor: SystemMouseCursors.resizeColumn,
       child: GestureDetector(
-        key: ValueKey('details-resize-${column.name}'),
+        key: ValueKey('details-resize-$id'),
         behavior: HitTestBehavior.opaque,
         // Measure from the press, so the edge stays under the pointer.
         dragStartBehavior: DragStartBehavior.down,
@@ -570,13 +669,14 @@ class _DetailsColumnsHeaderState extends State<DetailsColumnsHeader> {
           // so resize from what is on screen.
           _resizeStartWidth = column == DetailsColumn.name && box != null
               ? _renderedNameWidth(box, columns)
-              : columns.widthOf(column);
+              : _widthOf(columns, column);
         },
         onHorizontalDragUpdate: (details) {
           final scope = _scope;
           if (_resizing != column || scope == null) return;
           final delta = details.globalPosition.dx - _resizeOriginX;
-          final resized = (_resized ?? scope.columns).withWidth(
+          final resized = _withWidth(
+            _resized ?? scope.columns,
             column,
             _resizeStartWidth + delta,
           );
@@ -587,7 +687,9 @@ class _DetailsColumnsHeaderState extends State<DetailsColumnsHeader> {
         onHorizontalDragCancel: _endResize,
         onDoubleTap: () {
           final scope = _scope;
-          scope?.commit(scope.columns.withWidth(column, null));
+          if (scope != null) {
+            scope.commit(_withWidth(scope.columns, column, null));
+          }
         },
         child: Center(
           child: Container(
@@ -608,8 +710,16 @@ class _DetailsColumnsHeaderState extends State<DetailsColumnsHeader> {
         .where((column) => column != DetailsColumn.name)
         .fold<double>(0, (sum, column) => sum + columns.widthOf(column));
     final extraWidth = extras.fold<double>(0, (sum, c) => sum + c.width);
+    final systemWidth = columns.visibleSystemColumns.fold<double>(
+      0,
+      (sum, column) => sum + columns.systemWidthOf(column),
+    );
     final free =
-        header.size.width - widget.horizontalPadding * 2 - others - extraWidth;
+        header.size.width -
+        widget.horizontalPadding * 2 -
+        others -
+        extraWidth -
+        systemWidth;
     final saved = columns.widthOf(DetailsColumn.name);
     return free > saved ? free : saved;
   }
@@ -668,6 +778,8 @@ class _DetailsColumnsHeaderState extends State<DetailsColumnsHeader> {
               column.isAvailable &&
               (!column.shell || columns.isVisible(column)))
             toggle(column.name, column.label(l10n), columns.isVisible(column)),
+        for (final column in columns.visibleSystemColumns)
+          toggle('sys:$column', systemColumnLabel(column), true),
         const PopupMenuDivider(),
         PopupMenuItem<String>(
           value: ':customize',
@@ -708,6 +820,10 @@ class _DetailsColumnsHeaderState extends State<DetailsColumnsHeader> {
     if (current == null) return;
     if (value.startsWith('extra:')) {
       extras?.onToggle(value.substring(6));
+    } else if (value.startsWith('sys:')) {
+      current.commit(
+        current.columns.withSystemColumn(value.substring(4), false),
+      );
     } else if (value == ':customize') {
       SharedActionBar.showColumnVisibilityDialog(
         context,

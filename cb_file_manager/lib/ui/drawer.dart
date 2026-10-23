@@ -1149,6 +1149,10 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
   bool _isFluentPathSelected(String? activePath, String targetPath) {
     if (activePath == null || activePath.isEmpty) return false;
     if (targetPath == kAiChatPath) return isAiChatPath(activePath);
+    final deviceMedia = DeviceMediaPath.tryParse(activePath);
+    if (deviceMedia != null && targetPath == deviceMedia.parentPath) {
+      return true;
+    }
     if (targetPath == '#torrents') {
       return activePath == '#torrents' || activePath.startsWith('#torrents?');
     }

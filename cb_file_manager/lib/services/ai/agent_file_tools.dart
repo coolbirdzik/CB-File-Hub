@@ -8,6 +8,8 @@ import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
 
 import '../../helpers/core/text_utils.dart';
+import 'agent_tool_catalog.dart';
+import 'agent_workspace.dart';
 import 'content_search.dart';
 import 'document_text.dart';
 
@@ -33,6 +35,10 @@ class AgentFileTools {
   int pageChars = defaultPageChars;
   static const defaultPageChars = 10000;
   int _sequence = 0;
+
+  /// Phones have no shell to fall back on.
+  static String get _commandHint =>
+      AgentToolCatalog.isMobile ? '' : ' or use an approved command';
 
   static String resolvePath(String input, String workingDirectory) {
     final value = input.trim();
@@ -116,7 +122,7 @@ class AgentFileTools {
           });
       if (bytes.length > 1024 * 1024) {
         throw ArgumentError(
-          'Text read limit is 1 MiB. Narrow the request or use an approved command.',
+          'Text read limit is 1 MiB. Narrow the request$_commandHint.',
         );
       }
       if (bytes.contains(0)) {
@@ -287,11 +293,18 @@ class AgentFileTools {
     final query = (args['query'] as String? ?? args['pattern'] as String? ?? '')
         .toLowerCase();
     final ext = (args['extension'] as String? ?? '').toLowerCase();
+    if (name == 'search_files' && recursive && query.isNotEmpty) {
+      final native = await _nativeSearch(path, query, ext, check);
+      if (native != null) {
+        return page(name, args, native.items, warnings: native.warnings);
+      }
+    }
     var visited = 0;
     var complete = true;
     final entities = directory
         .list(recursive: recursive, followLinks: false)
         .handleError((Object error) {
+          if (_appPrivateError(error)) return;
           complete = false;
           if (warnings.length < 5) warnings.add(error.toString());
         })
@@ -334,6 +347,66 @@ class AgentFileTools {
       (a, b) => (a['path'] as String).compareTo(b['path'] as String),
     );
     return page(name, args, results, complete: complete, warnings: warnings);
+  }
+
+  /// Android's per-app folders are expected to be unreadable; they are not
+  /// a gap worth reporting.
+  static bool _appPrivateError(Object error) =>
+      error is FileSystemException && AgentWorkspace.isAppPrivate(error.path);
+
+  /// Name search on Rust threads, like the folder search box: a whole phone
+  /// or drive in seconds, where the Dart walk below stops at 20,000 entries.
+  /// Null when cb_native is not built or the search ran out of time, so the
+  /// caller falls back to the Dart walk.
+  Future<({List<Map<String, dynamic>> items, List<String> warnings})?>
+  _nativeSearch(
+    String root,
+    String query,
+    String ext,
+    void Function() check,
+  ) async {
+    final search = NativeSearch.start(
+      root: root,
+      words: TextUtils.searchWords(query),
+    );
+    if (search == null) return null;
+    final deadline = DateTime.now().add(const Duration(seconds: 60));
+    Object? stopped;
+    final hits = await NativeSearch.collect(
+      search,
+      shouldContinue: () {
+        try {
+          check();
+        } catch (e) {
+          stopped = e;
+          return false;
+        }
+        return DateTime.now().isBefore(deadline);
+      },
+    );
+    if (stopped != null) throw stopped!;
+    if (hits == null) return null;
+    final suffix = ext.isEmpty || ext.startsWith('.') ? ext : '.$ext';
+    final items = <Map<String, dynamic>>[];
+    final warnings = <String>[];
+    for (final hit in hits) {
+      if (hit.kind != NativeEntryKind.file) continue;
+      if (suffix.isNotEmpty && !hit.path.toLowerCase().endsWith(suffix)) {
+        continue;
+      }
+      if (items.length >= 10000) {
+        warnings.add('More than 10000 matches. Narrow the folder or query.');
+        break;
+      }
+      check();
+      try {
+        items.add(_metadata(hit.path, await FileStat.stat(hit.path)));
+      } on FileSystemException {
+        // Removed since the search saw it.
+      }
+    }
+    items.sort((a, b) => (a['path'] as String).compareTo(b['path'] as String));
+    return (items: items, warnings: warnings);
   }
 
   Map<String, dynamic> page(
@@ -466,7 +539,8 @@ class AgentFileTools {
       if (chars + lines[index].length > pageChars) {
         if (selected.isEmpty) {
           throw ArgumentError(
-            'Line ${index + 1} exceeds the text page limit. Use an approved command to inspect it.',
+            'Line ${index + 1} exceeds the text page limit.'
+            '${AgentToolCatalog.isMobile ? '' : ' Use an approved command to inspect it.'}',
           );
         }
         break;

@@ -9,6 +9,7 @@ import 'package:path/path.dart' as p;
 import 'package:win32/win32.dart' as win32;
 
 import '../../helpers/core/text_utils.dart';
+import 'agent_workspace.dart';
 import 'document_text.dart';
 
 class ContentSearchRequest {
@@ -335,6 +336,7 @@ class ContentSearch {
     final pending = [request.root];
     while (pending.isNotEmpty && stopReason == null) {
       final directory = pending.removeLast();
+      if (AgentWorkspace.isAppPrivate(directory)) continue;
       List<FileSystemEntity> children;
       try {
         children = Directory(directory).listSync(followLinks: false)
@@ -525,6 +527,16 @@ class ContentSearch {
     void warn(String text) {
       if (!warnings.contains(text)) warnings.add(text);
     }
+
+    // Android's per-app folders are unreadable by design, not a gap.
+    problems = [
+      for (final problem in problems)
+        if (!AgentWorkspace.isAppPrivate(problem)) problem,
+    ];
+    skippedSystem = [
+      for (final path in skippedSystem)
+        if (!AgentWorkspace.isAppPrivate(path)) path,
+    ];
 
     if (stopReason != null) {
       warn('$stopReason. Narrow the folder, extension or query.');

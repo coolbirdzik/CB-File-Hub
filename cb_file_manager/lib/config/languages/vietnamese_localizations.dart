@@ -2,6 +2,16 @@ import 'app_localizations.dart';
 
 class VietnameseLocalizations implements AppLocalizations {
   @override
+  String get deviceMediaOnDevice => 'Trên thiết bị';
+  @override
+  String get deviceMediaLimited =>
+      'Chỉ hiển thị ảnh và video bạn đã cho phép truy cập.';
+  @override
+  String get deviceMediaPermission =>
+      'Cho phép truy cập ảnh và video để hiển thị album trên máy.';
+  @override
+  String get deviceMediaManageAccess => 'Chọn thêm ảnh và video';
+  @override
   String get torrentReceiveInBackground => 'Thêm torrent ngầm khi mở';
   @override
   String get torrentReceiveInBackgroundHint =>
@@ -826,6 +836,45 @@ class VietnameseLocalizations implements AppLocalizations {
 
   @override
   String get columnResetLayout => 'Đặt lại thứ tự và độ rộng cột';
+
+  // Column chooser
+  @override
+  String get columnChooserSubtitle =>
+      'Đánh dấu các cột muốn hiển thị. Kéo các cột đang hiển thị để đổi thứ tự.';
+
+  @override
+  String get columnChooserSearchHint => 'Tìm cột';
+
+  @override
+  String get columnChooserAvailable => 'Các cột có sẵn';
+
+  @override
+  String columnChooserShown(int count) => 'Đang hiển thị ($count)';
+
+  @override
+  String get columnChooserBasicGroup => 'Cơ bản';
+
+  @override
+  String get columnChooserCollectionGroup => 'Bộ sưu tập này';
+
+  @override
+  String get columnChooserSystemGroup => 'Thuộc tính Windows';
+
+  @override
+  String get columnChooserSystemNote =>
+      'Hiển thị sau các cột cơ bản, chưa hỗ trợ sắp xếp theo các cột này.';
+
+  @override
+  String get columnChooserLoadingSystem => 'Đang tải thuộc tính Windows…';
+
+  @override
+  String get columnChooserNoMatch => 'Không có cột phù hợp';
+
+  @override
+  String get columnChooserAlwaysShown => 'Luôn hiển thị';
+
+  @override
+  String get columnChooserHide => 'Ẩn cột';
 
   // Column visibility dialog
   @override
@@ -3866,6 +3915,45 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get noProviderConfigured => 'Chưa cấu hình nhà cung cấp AI';
   @override
+  String get aiProviderSettings => 'Cài đặt nhà cung cấp AI';
+  @override
+  String get localModelGuideTitle => 'Chạy AI ngay trên máy của bạn';
+  @override
+  String get localModelGuideIntro =>
+      'Nhà cung cấp đám mây cần API key và có thể giới hạn hoặc tính phí từng yêu cầu. Mô hình local chạy ngay trên máy: miễn phí, không giới hạn, và tệp của bạn không rời khỏi thiết bị.';
+  @override
+  String get localModelGuideStep1 =>
+      'Mở cài đặt AI nội bộ bằng nút bên dưới. Danh sách mô hình sẽ hiện ra ngay.';
+  @override
+  String localModelGuideStep2(String installLabel) =>
+      'Chọn một mô hình và bấm "$installLabel". Mô hình tải ngầm, sau đó dùng được cả khi offline.';
+  @override
+  String get localModelGuideStep3 =>
+      'Quay lại đây và chọn mô hình đó trong menu mô hình cạnh nút Gửi.';
+  @override
+  String get localModelGuideNote =>
+      'Mô hình nhỏ cần ít RAM hơn và trả lời nhanh hơn. Token Hugging Face chỉ cần cho các mô hình bị giới hạn truy cập.';
+  @override
+  String get localModelGuideOpenSettings => 'Mở cài đặt AI nội bộ';
+  @override
+  String get localModelGuideLater => 'Để sau';
+  @override
+  String get localModelGuideLink => 'Dùng mô hình local miễn phí';
+  @override
+  String get installLocalModel => 'Cài mô hình';
+  @override
+  String get localModelRecommended => 'Đề xuất';
+  @override
+  String get localModelInstalledBadge => 'Đã cài';
+  @override
+  String get localModelBackgroundHint =>
+      'Mô hình được tải ngầm, bạn có thể đóng cửa sổ này.';
+  @override
+  String localModelDownloading(String modelName) => 'Đang tải $modelName';
+  @override
+  String localModelReady(String modelName) =>
+      'Đã cài xong $modelName, sẵn sàng sử dụng';
+  @override
   String get relevanceScore => 'Độ phù hợp';
   @override
   String get aiExplanation => 'Giải thích AI';
@@ -4856,6 +4944,22 @@ class VietnameseLocalizations implements AppLocalizations {
   String get localAiTokensSuffix => 'token';
   @override
   String get localAiInvalidTokenCount => 'Vui lòng nhập số hợp lệ';
+  @override
+  String get localAiModelStorage => 'Nơi lưu model';
+  @override
+  String get localAiModelStorageHint =>
+      'Model tải về được lưu vào thư mục này. Khi đổi thư mục, các model đã cài sẽ được di chuyển sang.';
+  @override
+  String get localAiModelStorageReset => 'Dùng vị trí mặc định';
+  @override
+  String get localAiModelStorageNotWritable =>
+      'Không thể lưu model vào thư mục này';
+  @override
+  String get localAiMovingModels => 'Đang di chuyển model';
+  @override
+  String get localAiModelsMoved => 'Đã di chuyển model';
+  @override
+  String get localAiMoveModelsFailed => 'Không thể di chuyển model';
   @override
   String get aiReasoning => 'Suy nghĩ';
 

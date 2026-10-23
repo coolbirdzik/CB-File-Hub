@@ -15,9 +15,8 @@ import 'components/approval_card.dart';
 import '../../../services/ai/ai_chat_history_service.dart';
 import '../../../services/ai/ai_provider_service.dart';
 import '../../../services/local_ai/local_ai_advisor_service.dart';
-import '../../tab_manager/core/tab_data.dart';
 import '../../tab_manager/core/tab_manager.dart';
-import '../../tab_manager/core/tab_paths.dart';
+import '../settings/settings_navigation.dart';
 import 'components/agent_context_label.dart';
 import 'components/chat_input_bar.dart';
 import 'components/chat_message_bubble.dart';
@@ -25,6 +24,8 @@ import 'components/raw_payload_dialog.dart';
 import 'components/tool_call_chip.dart';
 import 'components/conversation_list_panel.dart';
 import 'components/file_result_card.dart';
+import 'components/local_model_guide_dialog.dart';
+import 'components/local_model_setup_link.dart';
 import 'components/model_selector_button.dart';
 import 'components/shimmer_thinking_text.dart';
 import 'package:cb_file_manager/config/translation_helper.dart';
@@ -108,6 +109,7 @@ class _AiChatBodyState extends State<_AiChatBody> {
         _lastConversationId = state.conversationId;
         _scrollToBottom(animated: false);
       }
+      LocalModelGuideDialog.maybeShowOnFirstUse(context);
     });
   }
 
@@ -336,6 +338,15 @@ class _AiChatBodyState extends State<_AiChatBody> {
               onPressed: _toggleConversations,
             ),
             const Spacer(),
+            _HeaderIconButton(
+              key: const ValueKey('ai-chat-provider-settings'),
+              icon: PhosphorIconsLight.gearSix,
+              tooltip: l.aiProviderSettings,
+              isDark: isDark,
+              onPressed: () =>
+                  openSettings(context, anchor: SettingsAnchor.aiProviders),
+            ),
+            const SizedBox(width: 2),
             // New conversation button
             _HeaderIconButton(
               icon: PhosphorIconsLight.plus,
@@ -438,7 +449,8 @@ class _AiChatBodyState extends State<_AiChatBody> {
                 color: Colors.transparent,
                 child: InkWell(
                   borderRadius: BorderRadius.circular(10),
-                  onTap: () => _navigateToSettings(context),
+                  onTap: () =>
+                      openSettings(context, anchor: SettingsAnchor.aiProviders),
                   child: Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 14,
@@ -503,11 +515,19 @@ class _AiChatBodyState extends State<_AiChatBody> {
                 ),
               ),
             ],
+            if (!_hasLocalModel(state)) ...[
+              const SizedBox(height: 10),
+              const LocalModelSetupLink(),
+            ],
           ],
         ),
       ),
     );
   }
+
+  bool _hasLocalModel(AiAgentState state) => state.providerModelCatalogs.any(
+    (catalog) => catalog.providerId == AiAgentBloc.localAiProviderId,
+  );
 
   Widget _buildErrorBanner(
     BuildContext context,
@@ -861,26 +881,6 @@ class _AiChatBodyState extends State<_AiChatBody> {
     );
   }
 
-  void _navigateToSettings(BuildContext context) {
-    final tabBloc = BlocProvider.of<TabManagerBloc>(context);
-    // Check if settings tab already exists
-    final existingTab = tabBloc.state.tabs.firstWhere(
-      (tab) => tab.path == kSettingsPath,
-      orElse: () => TabData(id: '', name: '', path: ''),
-    );
-    if (existingTab.id.isNotEmpty) {
-      tabBloc.add(SwitchToTab(existingTab.id));
-    } else {
-      tabBloc.add(
-        AddTab(
-          path: kSettingsPath,
-          name: AppLocalizations.of(context)!.settings,
-          switchToTab: true,
-        ),
-      );
-    }
-  }
-
   /// Opens the file's parent directory in a new tab with the file highlighted.
   void _openFileInTab(BuildContext context, String filePath) {
     final file = File(filePath);
@@ -942,6 +942,7 @@ class _HeaderIconButton extends StatefulWidget {
   final VoidCallback? onPressed;
 
   const _HeaderIconButton({
+    super.key,
     required this.icon,
     required this.isDark,
     this.label,

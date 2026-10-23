@@ -13,6 +13,8 @@ import 'package:cb_file_manager/ui/components/common/shared_action_bar.dart';
 import 'package:cb_file_manager/ui/utils/grid_zoom_constraints.dart';
 import 'package:cb_file_manager/ui/utils/view_mode_spectrum.dart';
 import 'package:flutter/material.dart';
+import 'package:photo_manager/photo_manager.dart';
+import '../media_gallery/device_media_sources.dart';
 import 'package:flutter/services.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/models/objectbox/album.dart';
@@ -831,95 +833,165 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
               ),
             ],
             actions: _buildToolbarActions(context, selection, l10n),
-            body: _isLoading
-                ? SkeletonHelper.responsive(
-                    isGridView: _view.mode == ViewMode.grid,
-                    isAlbum: true,
-                    crossAxisCount: 3,
-                    itemCount: 12,
-                  )
-                : albums.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          PhosphorIconsLight.imageSquare,
-                          size: 64,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          _searchQuery.trim().isNotEmpty
-                              ? context.tr.albumNoMatchingResults
-                              : widget.sourceGalleryMode
-                              ? context.tr.albumNoSourcesYet
-                              : context.tr.albumNoAlbumsYet,
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          widget.sourceGalleryMode
-                              ? context.tr.albumAddSourceHint
-                              : context.tr.albumCreateFirstHint,
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurfaceVariant,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                        if (_searchQuery.trim().isEmpty) ...[
-                          const SizedBox(height: 24),
-                          ElevatedButton.icon(
-                            onPressed: _showCreateAlbumDialog,
-                            icon: const Icon(PhosphorIconsLight.plus),
-                            label: Text(
-                              widget.sourceGalleryMode
-                                  ? context.tr.albumCreateImageSource
-                                  : context.tr.albumCreateAlbum,
+            body: DeviceMediaSources(
+              tabId: widget.tabId,
+              type: RequestType.image,
+              enabled: widget.sourceGalleryMode,
+              builder: (context, sources, loading, refresh) =>
+                  _buildMobileSources(albums, sources, loading, refresh),
+              child: _isLoading
+                  ? SkeletonHelper.responsive(
+                      isGridView: _view.mode == ViewMode.grid,
+                      isAlbum: true,
+                      crossAxisCount: 3,
+                      itemCount: 12,
+                    )
+                  : albums.isEmpty
+                  ? Center(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              PhosphorIconsLight.imageSquare,
+                              size: 64,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
                             ),
-                          ),
-                        ],
-                      ],
+                            const SizedBox(height: 16),
+                            Text(
+                              _searchQuery.trim().isNotEmpty
+                                  ? context.tr.albumNoMatchingResults
+                                  : widget.sourceGalleryMode
+                                  ? context.tr.albumNoSourcesYet
+                                  : context.tr.albumNoAlbumsYet,
+                              style: TextStyle(
+                                fontSize: 18,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              widget.sourceGalleryMode
+                                  ? context.tr.albumAddSourceHint
+                                  : context.tr.albumCreateFirstHint,
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            if (_searchQuery.trim().isEmpty) ...[
+                              const SizedBox(height: 24),
+                              ElevatedButton.icon(
+                                onPressed: _showCreateAlbumDialog,
+                                icon: const Icon(PhosphorIconsLight.plus),
+                                label: Text(
+                                  widget.sourceGalleryMode
+                                      ? context.tr.albumCreateImageSource
+                                      : context.tr.albumCreateAlbum,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    )
+                  : GridListCollection<Album>(
+                      mode: _view.mode,
+                      items: albums,
+                      isDesktop:
+                          Platform.isWindows ||
+                          Platform.isLinux ||
+                          Platform.isMacOS,
+                      identity: _albumPath,
+                      onRefresh: _loadAlbums,
+                      supportedModes: _supportedViewModes,
+                      gridZoomLevel: _gridZoomLevel,
+                      gridAspectRatio: 1.28,
+                      gridMinExtent: 132,
+                      gridMaxExtent: 260,
+                      detailsHeader: _buildDetailsHeader(context),
+                      dragSelectionController: _dragSelectionController,
+                      onBackgroundTap: selection.isSelectionMode
+                          ? _clearSelection
+                          : null,
+                      itemBuilder: (_, album, mode) => switch (mode) {
+                        ViewMode.grid => _buildAlbumGridTile(album),
+                        ViewMode.tiles => _buildAlbumTile(album),
+                        ViewMode.details => _buildAlbumDetailsRow(album),
+                        ViewMode.tree => _buildAlbumTreeItem(album),
+                        _ => _buildAlbumCard(album),
+                      },
                     ),
-                  )
-                : GridListCollection<Album>(
-                    mode: _view.mode,
-                    items: albums,
-                    isDesktop:
-                        Platform.isWindows ||
-                        Platform.isLinux ||
-                        Platform.isMacOS,
-                    identity: _albumPath,
-                    onRefresh: _loadAlbums,
-                    supportedModes: _supportedViewModes,
-                    gridZoomLevel: _gridZoomLevel,
-                    gridAspectRatio: 1.28,
-                    gridMinExtent: 132,
-                    gridMaxExtent: 260,
-                    detailsHeader: _buildDetailsHeader(context),
-                    dragSelectionController: _dragSelectionController,
-                    onBackgroundTap: selection.isSelectionMode
-                        ? _clearSelection
-                        : null,
-                    itemBuilder: (_, album, mode) => switch (mode) {
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildMobileSources(
+    List<Album> albums,
+    List<DeviceMediaSource> deviceSources,
+    bool loading,
+    Future<void> Function() refreshDevice,
+  ) {
+    final query = _searchQuery.trim().toLowerCase();
+    final items = <Object>[
+      ...albums,
+      ...deviceSources.where(
+        (source) => source.title(context).toLowerCase().contains(query),
+      ),
+    ];
+    return Column(
+      children: [
+        if (loading || _isLoading) const LinearProgressIndicator(),
+        Expanded(
+          child: items.isEmpty
+              ? Center(child: Text(context.tr.albumNoMatchingResults))
+              : GridListCollection<Object>(
+                  mode: _view.mode,
+                  items: items,
+                  isDesktop: false,
+                  identity: (item) => item is DeviceMediaSource
+                      ? item.id
+                      : _albumPath(item as Album),
+                  onRefresh: () async {
+                    await Future.wait([refreshDevice(), _loadAlbums()]);
+                  },
+                  supportedModes: _supportedViewModes,
+                  gridZoomLevel: _gridZoomLevel,
+                  gridAspectRatio: 1.28,
+                  gridMinExtent: 132,
+                  gridMaxExtent: 260,
+                  detailsHeader: _buildDetailsHeader(context),
+                  onBackgroundTap: _selectionBloc.state.isSelectionMode
+                      ? _clearSelection
+                      : null,
+                  itemBuilder: (context, item, mode) {
+                    if (item is DeviceMediaSource) {
+                      return item.buildTile(context, mode: mode);
+                    }
+                    final album = item as Album;
+                    return switch (mode) {
                       ViewMode.grid => _buildAlbumGridTile(album),
                       ViewMode.tiles => _buildAlbumTile(album),
                       ViewMode.details => _buildAlbumDetailsRow(album),
                       ViewMode.tree => _buildAlbumTreeItem(album),
                       _ => _buildAlbumCard(album),
-                    },
-                  ),
-          );
-        },
-      ),
+                    };
+                  },
+                ),
+        ),
+      ],
     );
   }
 
