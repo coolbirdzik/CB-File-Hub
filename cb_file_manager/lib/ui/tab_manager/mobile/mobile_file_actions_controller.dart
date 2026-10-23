@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
+import 'package:cb_file_manager/ui/screens/folder_list/components/details_columns.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_bloc.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_event.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
@@ -176,6 +177,25 @@ class MobileFileActionsController {
                       localizations.sortTypeDesc,
                       PhosphorIconsLight.file,
                     ),
+                    for (final column in DetailsColumn.values.where(
+                      (c) => c.isAvailable,
+                    ))
+                      if (column.sortOptions case final pair?)
+                        if (pair.$1.metadataColumn != null) ...[
+                          const Divider(),
+                          _buildSortOption(
+                            context,
+                            pair.$1,
+                            '${column.label(localizations)} ↑',
+                            column.icon,
+                          ),
+                          _buildSortOption(
+                            context,
+                            pair.$2,
+                            '${column.label(localizations)} ↓',
+                            column.icon,
+                          ),
+                        ],
                   ],
                 ),
 
@@ -223,28 +243,7 @@ class MobileFileActionsController {
   }
 
   bool _isAscendingSortOption(SortOption option) {
-    switch (option) {
-      case SortOption.nameAsc:
-      case SortOption.dateAsc:
-      case SortOption.sizeAsc:
-      case SortOption.typeAsc:
-      case SortOption.dateCreatedAsc:
-      case SortOption.extensionAsc:
-      case SortOption.attributesAsc:
-      case SortOption.dateAccessedAsc:
-      case SortOption.pathAsc:
-        return true;
-      case SortOption.nameDesc:
-      case SortOption.dateDesc:
-      case SortOption.sizeDesc:
-      case SortOption.typeDesc:
-      case SortOption.dateCreatedDesc:
-      case SortOption.extensionDesc:
-      case SortOption.attributesDesc:
-      case SortOption.dateAccessedDesc:
-      case SortOption.pathDesc:
-        return false;
-    }
+    return option.ascending;
   }
 
   /// Show view mode options dialog

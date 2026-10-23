@@ -6,7 +6,7 @@ import 'package:cb_file_manager/helpers/core/app_path_helper.dart';
 import 'package:cb_file_manager/utils/app_logger.dart';
 import 'package:crop_your_image/crop_your_image.dart';
 import 'package:flutter/material.dart';
-import 'package:image/image.dart' as img;
+import 'package:cb_file_manager/helpers/media/image_transcoder.dart';
 import 'package:path/path.dart' as p;
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
@@ -100,10 +100,9 @@ class _ImageCropDialogState extends State<_ImageCropDialog> {
       final outputPath = p.join(dir.path, 'thumb_crop_$timestamp.jpg');
 
       // Re-encode to JPEG for a consistent, compact thumbnail format.
-      final decoded = img.decodeImage(croppedBytes);
+      final jpeg = await transcodeJpeg(croppedBytes);
       final file = File(outputPath);
-      if (decoded != null) {
-        final jpeg = img.encodeJpg(decoded, quality: 95);
+      if (jpeg != null) {
         await file.writeAsBytes(jpeg);
       } else {
         await file.writeAsBytes(croppedBytes);

@@ -17,6 +17,7 @@ import 'aria2_engine.dart';
 import 'torrent_entry.dart';
 import 'torrent_metainfo.dart';
 import 'torrent_repository.dart';
+import 'torrent_preferences.dart';
 import 'magnet_link.dart';
 import 'torrent_import_confirmation.dart';
 import 'torrent_launch_request.dart';
@@ -49,7 +50,7 @@ Future<Uint8List> _readTorrentBytes(String path) async {
 }
 
 Future<TorrentMetainfo> _readTorrent(String path) async =>
-    TorrentMetainfo.parse(await _readTorrentBytes(path));
+    TorrentMetainfo.parseAsync(await _readTorrentBytes(path));
 
 Future<void> _writeQbittorrentBackup(String path, List<int> bytes) async {
   final archive = File(path);
@@ -106,6 +107,7 @@ class TorrentService extends ChangeNotifier {
   Timer? _scanTimer;
   TorrentScanProgress scan = const TorrentScanProgress();
   String? lastError;
+  Future<void> _backgroundImports = Future<void>.value();
   bool get ownsEngine => _engine.running;
 
   String? get libraryDirectory => _prefs.getString('torrent.libraryDirectory');
@@ -114,6 +116,8 @@ class TorrentService extends ChangeNotifier {
   bool get autoImport => _prefs.getBool('torrent.autoImport') ?? true;
   bool get showDownloadDialog =>
       _prefs.getBool('torrent.showDownloadDialog') ?? true;
+  bool get receiveInBackground =>
+      _prefs.getBool('torrent.receiveInBackground') ?? false;
   bool get startDownloadsImmediately =>
       _prefs.getBool('torrent.startImmediately') ?? true;
   String? get defaultDownloadDirectory =>
@@ -588,6 +592,87 @@ class TorrentService extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> setReceiveInBackground(bool enabled) async {
+    await _prefs.setBool('torrent.receiveInBackground', enabled);
+    notifyListeners();
+  }
+
+  Future<bool> shouldReceiveInBackground() async {
+    // File associations may target a different app window from Settings.
+    final prefs = _initialized ? _prefs : await SharedPreferences.getInstance();
+    await reloadTorrentPreferences(prefs);
+    return prefs.getBool('torrent.receiveInBackground') ?? false;
+  }
+
+  String? get backgroundDownloadDirectory {
+    final saved = defaultDownloadDirectory;
+    if (saved != null && saved.isNotEmpty) return saved;
+    final home =
+        Platform.environment['USERPROFILE'] ?? Platform.environment['HOME'];
+    return home == null ? null : p.join(home, 'Downloads');
+  }
+
+  Future<TorrentEntry> _backgroundAction(
+    Future<TorrentEntry> Function() action,
+  ) {
+    final result = Completer<TorrentEntry>();
+    _backgroundImports = _backgroundImports.then((_) async {
+      try {
+        await initialize();
+        // Settings can be saved in another app window/process. Refresh for
+        // each queued import so cached defaults cannot start an unwanted task
+        // or override the user's chosen payload folder.
+        await reloadTorrentPreferences(_prefs);
+        result.complete(await action());
+      } catch (e, stack) {
+        result.completeError(e, stack);
+      }
+    });
+    return result.future;
+  }
+
+  Future<TorrentEntry> openSourceInBackground(String source) =>
+      _backgroundAction(
+        () async => _downloadInBackground(await openSource(source)),
+      );
+
+  Future<TorrentEntry> downloadInBackground(TorrentEntry entry) =>
+      _backgroundAction(() => _downloadInBackground(entry));
+
+  Future<TorrentEntry> _downloadInBackground(TorrentEntry entry) async {
+    final current = await repository.get(entry.hash);
+    if (current == null) throw StateError('Torrent was removed');
+    // A repeated browser open must not resume, pause or restart existing tasks.
+    if (const [
+      'active',
+      'waiting',
+      'paused',
+      'complete',
+    ].contains(current.status)) {
+      return current;
+    }
+    try {
+      final destination = current.downloadDir ?? backgroundDownloadDirectory;
+      if (destination == null ||
+          !p.isAbsolute(destination) ||
+          destination.contains('\x00')) {
+        throw const FormatException(
+          'Choose a default torrent download folder in Settings',
+        );
+      }
+      await download(
+        current,
+        p.normalize(destination),
+        startImmediately: startDownloadsImmediately,
+      );
+      return (await repository.get(current.hash))!;
+    } catch (e) {
+      await repository.update(current.hash, {'status': 'error', 'error': '$e'});
+      notifyListeners();
+      rethrow;
+    }
+  }
+
   Future<void> setStartDownloadsImmediately(bool enabled) async {
     await _prefs.setBool('torrent.startImmediately', enabled);
     notifyListeners();
@@ -663,7 +748,7 @@ class TorrentService extends ChangeNotifier {
             final stat = await File(source).stat();
             final bytes = await _readTorrentBytes(source);
             return (
-              info: TorrentMetainfo.parse(bytes),
+              info: await TorrentMetainfo.parseAsync(bytes),
               bytes: bytes,
               stat: stat,
             );
@@ -1072,27 +1157,20 @@ class TorrentService extends ChangeNotifier {
       return importMagnet(source, onDuplicate: onDuplicate);
     }
     final normalized = p.normalize(p.absolute(source));
-    final temporaryRoot = p.normalize(p.absolute(Directory.systemTemp.path));
-    final isTemporary = Platform.isWindows
-        ? p.windows.isWithin(temporaryRoot, normalized)
-        : p.isWithin(temporaryRoot, normalized);
-    if (isTemporary) {
-      await _ensureImportSchema();
-      // Files opened by a browser belong to that browser. They may be read-only
-      // and may be removed as soon as its private session ends. Even Index mode
-      // needs a durable metainfo copy; Move must not try deleting this source.
-      await _importFile(
-        source,
-        mode: 'copy',
-        root: storageMode == 'index'
-            ? p.join(_stateDirectory, 'opened-torrents')
-            : libraryDirectory,
-        onDuplicate: onDuplicate,
-        captureSource: true,
-      );
-    } else {
-      await importFile(source, onDuplicate: onDuplicate);
-    }
+    await _ensureImportSchema();
+    // A browser can save private-session files anywhere, including Downloads.
+    // Opening a file must capture durable metainfo without deleting or relying
+    // on the browser-owned source. Explicit imports/scans retain the selected
+    // index/copy/move policy.
+    await _importFile(
+      source,
+      mode: 'copy',
+      root: storageMode == 'index' || libraryDirectory == null
+          ? p.join(_stateDirectory, 'opened-torrents')
+          : libraryDirectory,
+      onDuplicate: onDuplicate,
+      captureSource: true,
+    );
     final rows = await repository.db.query(
       'torrent_sources',
       columns: ['hash'],
@@ -1160,7 +1238,7 @@ class TorrentService extends ChangeNotifier {
       client.close(force: true);
     }
     final data = bytes.takeBytes();
-    final info = await Isolate.run(() => TorrentMetainfo.parse(data));
+    final info = await TorrentMetainfo.parseAsync(data);
     await _approveImport(info.hash, onDuplicate);
     final directory = Directory(p.join(_stateDirectory, 'link-imports'));
     await directory.create(recursive: true);
@@ -1175,7 +1253,11 @@ class TorrentService extends ChangeNotifier {
     } finally {
       if (await temporary.exists()) await temporary.delete();
     }
-    await importFile(target.path);
+    if (receiveInBackground) {
+      await openSource(target.path);
+    } else {
+      await importFile(target.path);
+    }
     await repository.recordSourceUri(info.hash, value);
     await repository.update(info.hash, {
       'modified_at': DateTime.now().millisecondsSinceEpoch,

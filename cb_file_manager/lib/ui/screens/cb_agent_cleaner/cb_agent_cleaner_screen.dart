@@ -45,6 +45,9 @@ import '../../../services/app_insights/app_storage_analyzer.dart';
 import '../../../services/app_insights/windows_app_inventory_service.dart';
 import '../../../services/disk_cleaner/cleaner_categories.dart';
 import '../../../services/disk_cleaner/cleaner_models.dart';
+import '../../../services/disk_cleaner/cleaner_paths.dart';
+import '../../../services/disk_cleaner/macos_cleaner_platform.dart';
+import '../../../services/disk_cleaner/cleaner_tree_cleanup.dart';
 import '../../../services/disk_cleaner/cleaner_growth_history_service.dart';
 import '../../../services/disk_cleaner/cleaner_last_scan_service.dart';
 import '../../../services/disk_cleaner/disk_cleaner_service.dart';
@@ -84,7 +87,7 @@ DiskTreeNode? findNearestDisplayedTreeNodeForPath(
   DiskTreeNode root,
   String path,
 ) {
-  final normalizedTarget = AppStorageAnalyzer.normalizeWindowsPath(path);
+  final normalizedTarget = CleanerPaths.key(path);
   if (normalizedTarget.isEmpty) return null;
 
   DiskTreeNode? nearest;
@@ -92,9 +95,7 @@ DiskTreeNode? findNearestDisplayedTreeNodeForPath(
   final stack = <DiskTreeNode>[root];
   while (stack.isNotEmpty) {
     final node = stack.removeLast();
-    final normalizedNodePath = AppStorageAnalyzer.normalizeWindowsPath(
-      node.fullPath,
-    );
+    final normalizedNodePath = CleanerPaths.key(node.fullPath);
     if (normalizedNodePath.isNotEmpty &&
         normalizedNodePath.length > nearestPathLength &&
         AppStorageAnalyzer.isSameOrDescendant(
@@ -211,6 +212,9 @@ AppStorageReport _analyzeAppInsightsInBackground(
 /// this form for both cache lookup and scan execution.
 @visibleForTesting
 String normalizeCleanerDriveRoot(String drivePath) {
+  if (drivePath.trim().startsWith('/')) {
+    return p.posix.normalize(drivePath.trim());
+  }
   final normalized = drivePath.trim().replaceAll('/', '\\');
   final rootMatch = RegExp(r'^([A-Za-z]):\\*$').firstMatch(normalized);
   if (rootMatch == null) return normalized;
@@ -336,6 +340,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
   static const int _largeFileThresholdBytes = 1024 * 1024 * 1024;
   static const int _installerThresholdBytes = 50 * 1024 * 1024;
   static const Set<String> _installerExtensions = <String>{
+    '.dmg',
+    '.pkg',
+    '.xip',
     '.msi',
     '.exe',
     '.iso',
@@ -378,7 +385,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     _growthByPath.clear();
     _growthVisiblePaths.clear();
     for (final growth in folders) {
-      final path = AppStorageAnalyzer.normalizeWindowsPath(growth.path);
+      final path = CleanerPaths.key(growth.path);
       _growthByPath.putIfAbsent(path, () => growth);
       _growthVisiblePaths.add(path);
       for (var i = 1; i < path.length; i++) {
@@ -1124,11 +1131,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
   }
 
   static String _normalizedDriveKey(String drivePath) {
-    var normalized = drivePath.trim().toUpperCase();
-    while (normalized.endsWith(r'\')) {
-      normalized = normalized.substring(0, normalized.length - 1);
-    }
-    return normalized;
+    return CleanerPaths.key(drivePath);
   }
 
   Future<void> _updateFolderGrowthHistory(
@@ -1335,12 +1338,8 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
   }
 
   bool _isSameDriveRoot(String left, String right) {
-    final normalizedLeft = AppStorageAnalyzer.normalizeWindowsPath(
-      left,
-    ).toUpperCase();
-    final normalizedRight = AppStorageAnalyzer.normalizeWindowsPath(
-      right,
-    ).toUpperCase();
+    final normalizedLeft = CleanerPaths.key(left);
+    final normalizedRight = CleanerPaths.key(right);
     return normalizedLeft == normalizedRight;
   }
 
@@ -1461,9 +1460,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
           node.junkCategoryId != candidate.categoryId) {
         continue;
       }
-      final normalizedPath = AppStorageAnalyzer.normalizeWindowsPath(
-        candidate.path,
-      );
+      final normalizedPath = CleanerPaths.key(candidate.path);
       if (acceptedPaths.any(
         (parent) =>
             AppStorageAnalyzer.isSameOrDescendant(normalizedPath, parent),
@@ -1526,11 +1523,11 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
   }
 
   DiskTreeNode? _findTreeNodeByExactPath(DiskTreeNode root, String path) {
-    final target = AppStorageAnalyzer.normalizeWindowsPath(path);
+    final target = CleanerPaths.key(path);
     final stack = <DiskTreeNode>[root];
     while (stack.isNotEmpty) {
       final node = stack.removeLast();
-      if (AppStorageAnalyzer.normalizeWindowsPath(node.fullPath) == target) {
+      if (CleanerPaths.key(node.fullPath) == target) {
         return node;
       }
       stack.addAll(node.children);
@@ -1668,7 +1665,10 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     if (tabId == null) return;
 
     _publishCleanerScanContext();
-    controller.open(path: '#cb-agent-cleaner', tabId: tabId);
+    // Scan reviews show progress and results in Cleaner itself.
+    if (!reviewEntireCleanerScan) {
+      controller.open(path: '#cb-agent-cleaner', tabId: tabId);
+    }
     final bloc = controller.blocForTab(
       tabId,
       initialPath: '#cb-agent-cleaner',
@@ -1718,9 +1718,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
 
   bool _passesTreeFilter(DiskTreeNode node) {
     if (_reviewMode) {
-      return _reviewVisibleTreePaths.contains(
-        AppStorageAnalyzer.normalizeWindowsPath(node.fullPath),
-      );
+      return _reviewVisibleTreePaths.contains(CleanerPaths.key(node.fullPath));
     }
     if (_showGrowthOnly) return _isGrowthNodeOrAncestor(node);
     if (_showCleanableOnly) return _isNodeCleanable(node);
@@ -1813,16 +1811,12 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
 
   CleanerFolderGrowth? _growthForNode(DiskTreeNode node) {
     if (_growthByPath.isEmpty || node.isFile) return null;
-    return _growthByPath[AppStorageAnalyzer.normalizeWindowsPath(
-      node.fullPath,
-    )];
+    return _growthByPath[CleanerPaths.key(node.fullPath)];
   }
 
   bool _isGrowthNodeOrAncestor(DiskTreeNode node) {
     if (node.isFile || _growthVisiblePaths.isEmpty) return false;
-    return _growthVisiblePaths.contains(
-      AppStorageAnalyzer.normalizeWindowsPath(node.fullPath),
-    );
+    return _growthVisiblePaths.contains(CleanerPaths.key(node.fullPath));
   }
 
   void _expandGrowthAncestors(DiskTreeNode node) {
@@ -1893,7 +1887,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     void walk(DiskTreeNode n) {
       if (!n.isExpanded) return;
       if (n.fullPath.isNotEmpty) {
-        paths.add(AppStorageAnalyzer.normalizeWindowsPath(n.fullPath));
+        paths.add(CleanerPaths.key(n.fullPath));
       }
       for (final child in n.children) {
         walk(child);
@@ -1907,23 +1901,12 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
   void _applyExpandedPaths(DiskTreeNode node, Set<String> paths) {
     final expandedPaths = paths
         .where((path) => path.isNotEmpty)
-        .map(AppStorageAnalyzer.normalizeWindowsPath)
+        .map(CleanerPaths.key)
         .toSet();
     final pathsWithAncestors = <String>{};
 
     void addPathAndAncestors(String path) {
-      var current = path;
-      pathsWithAncestors.add(current);
-      while (true) {
-        final separator = current.lastIndexOf('\\');
-        if (separator < 0) break;
-        if (separator <= 2) {
-          pathsWithAncestors.add(current.substring(0, 3));
-          break;
-        }
-        current = current.substring(0, separator);
-        pathsWithAncestors.add(current);
-      }
+      pathsWithAncestors.addAll(CleanerPaths.ancestors(path));
     }
 
     for (final path in expandedPaths) {
@@ -1933,12 +1916,12 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     final selectedDrive = _selectedDrive;
     final selectedDriveRoot = selectedDrive == null
         ? null
-        : AppStorageAnalyzer.normalizeWindowsPath(selectedDrive);
+        : CleanerPaths.key(selectedDrive);
 
     void apply(DiskTreeNode current) {
       final currentPath = current.fullPath.isEmpty
           ? ''
-          : AppStorageAnalyzer.normalizeWindowsPath(current.fullPath);
+          : CleanerPaths.key(current.fullPath);
       final shouldExpand =
           expandedPaths.contains(currentPath) ||
           (selectedDriveRoot != null && currentPath == selectedDriveRoot);
@@ -1951,7 +1934,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       for (final child in current.children) {
         final childPath = child.fullPath.isEmpty
             ? ''
-            : AppStorageAnalyzer.normalizeWindowsPath(child.fullPath);
+            : CleanerPaths.key(child.fullPath);
         if (pathsWithAncestors.contains(childPath) || child.isExpanded) {
           apply(child);
         } else {
@@ -1964,41 +1947,6 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     }
 
     apply(node);
-  }
-
-  /// Remove nodes whose path was successfully deleted from the in-memory tree,
-  /// and subtract their size/fileCount from all ancestors so the results view
-  /// reflects the cleanup without requiring a re-scan.
-  ///
-  /// Returns the number of bytes pruned from [node]'s subtree.
-  int _pruneDeletedPaths(DiskTreeNode node, Set<String> deletedUpper) {
-    int prunedBytes = 0;
-    int prunedFiles = 0;
-    final survivors = <DiskTreeNode>[];
-
-    for (final child in node.children) {
-      if (deletedUpper.contains(child.fullPath.toUpperCase())) {
-        // Whole subtree was deleted.
-        prunedBytes += child.sizeBytes;
-        prunedFiles += child.fileCount;
-        continue;
-      }
-      // Recurse: a descendant may have been deleted even if the child wasn't.
-      prunedBytes += _pruneDeletedPaths(child, deletedUpper);
-      survivors.add(child);
-    }
-
-    if (survivors.length != node.children.length) {
-      node.replaceChildren(survivors);
-    }
-
-    node.sizeBytes = (node.sizeBytes - prunedBytes).clamp(0, node.sizeBytes);
-    node.fileCount = (node.fileCount - prunedFiles).clamp(0, node.fileCount);
-
-    // Clear selection on whatever remains so stale row highlights do not linger.
-    node.isSelectedForDeletion = false;
-
-    return prunedBytes;
   }
 
   /// Drop pending-clean state and return to the results tree without re-scanning.
@@ -2030,13 +1978,14 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
               group: l.cleanerUtilitiesStorageGroup,
               icon: PhosphorIconsLight.hardDrive,
             ),
-            CleanerUtilityDestination(
-              id: _CleanerSubFeature.appInsights.name,
-              title: l.cleanerAppsTitle,
-              description: l.cleanerAppsUtilityDescription,
-              group: l.cleanerUtilitiesStorageGroup,
-              icon: PhosphorIconsLight.appWindow,
-            ),
+            if (defaultTargetPlatform != TargetPlatform.macOS)
+              CleanerUtilityDestination(
+                id: _CleanerSubFeature.appInsights.name,
+                title: l.cleanerAppsTitle,
+                description: l.cleanerAppsUtilityDescription,
+                group: l.cleanerUtilitiesStorageGroup,
+                icon: PhosphorIconsLight.appWindow,
+              ),
             CleanerUtilityDestination(
               id: _CleanerSubFeature.suggestions.name,
               title: l.cleanerSuggestionsTitle,
@@ -2074,7 +2023,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
                 ),
                 RepaintBoundary(
                   key: const ValueKey<String>('cleaner-apps-results-pane'),
-                  child: _buildAppsFeature(theme, l),
+                  child: defaultTargetPlatform == TargetPlatform.macOS
+                      ? const SizedBox.shrink()
+                      : _buildAppsFeature(theme, l),
                 ),
                 RepaintBoundary(
                   key: const ValueKey<String>('cleaner-suggestions-pane'),
@@ -2093,9 +2044,25 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       case _Phase.setup:
         return _buildSetup(theme, l);
       case _Phase.results:
-        return _buildResults(theme, l);
       case _Phase.cleaned:
-        return _buildCleaned(theme, l);
+        // Keep the tree and dashboard mounted while showing the cleanup result.
+        // Returning to them reuses their layout, filters and cached insights.
+        final cleaned = _phase == _Phase.cleaned;
+        if (cleaned && _rootNode == null) return _buildCleaned(theme, l);
+        return IndexedStack(
+          key: const ValueKey('cleaner-results-and-cleaned'),
+          index: cleaned ? 1 : 0,
+          children: [
+            ExcludeFocus(
+              excluding: cleaned,
+              child: TickerMode(
+                enabled: !cleaned,
+                child: _buildResults(theme, l),
+              ),
+            ),
+            if (cleaned) _buildCleaned(theme, l),
+          ],
+        );
     }
   }
 
@@ -2393,7 +2360,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: Text(l.diskCleanerMoveToRecycleBin),
+          title: Text(_trashAction(l)),
           content: Text(
             '${nodes.length == 1 ? nodes.first.name : '${nodes.length} items'}\n${_fmt(totalBytes)}',
           ),
@@ -2404,9 +2371,10 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
               child: Text(l.cancel),
             ),
             FilledButton(
+              autofocus: true,
               style: FilledButton.styleFrom(shape: _cleanerButtonShape),
               onPressed: () => Navigator.of(ctx).pop(true),
-              child: Text(l.diskCleanerMoveToRecycleBin),
+              child: Text(_trashAction(l)),
             ),
           ],
         ),
@@ -2460,15 +2428,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
   void _rebuildReviewVisibleTreePaths() {
     _reviewVisibleTreePaths.clear();
     for (final target in _selectedTreeTargets) {
-      var path = AppStorageAnalyzer.normalizeWindowsPath(target.fullPath);
-      while (path.isNotEmpty) {
-        _reviewVisibleTreePaths.add(path);
-        if (path.length <= 3) break;
-        final separator = path.lastIndexOf(r'\');
-        if (separator < 0) break;
-        path = path.substring(0, separator);
-        if (path.length == 2 && path.endsWith(':')) path = '$path\\';
-      }
+      _reviewVisibleTreePaths.addAll(CleanerPaths.ancestors(target.fullPath));
     }
   }
 
@@ -2762,8 +2722,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
   Set<DiskTreeNode> _canonicalTreeTargets(Iterable<DiskTreeNode> nodes) {
     final paths = {
       for (final node in nodes)
-        if (node.fullPath.isNotEmpty)
-          node: AppStorageAnalyzer.normalizeWindowsPath(node.fullPath),
+        if (node.fullPath.isNotEmpty) node: CleanerPaths.key(node.fullPath),
     };
     final sorted = paths.keys.toList()
       ..sort((a, b) => paths[a]!.length.compareTo(paths[b]!.length));
@@ -2771,16 +2730,12 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     final targetPaths = <String>{};
     for (final node in sorted) {
       final path = paths[node]!;
-      var ancestor = path;
       var covered = false;
-      while (ancestor.isNotEmpty) {
+      for (final ancestor in CleanerPaths.ancestors(path)) {
         if (targetPaths.contains(ancestor)) {
           covered = true;
           break;
         }
-        final slash = ancestor.lastIndexOf(r'\');
-        if (slash < 0) break;
-        ancestor = ancestor.substring(0, slash);
       }
       if (covered) {
         continue;
@@ -3215,7 +3170,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
         !_isScanningFullDisk;
     return Focus(
       focusNode: _resultsFocusNode,
-      autofocus: true,
+      autofocus: _phase == _Phase.results,
       onKeyEvent: _handleResultsKeyEvent,
       child: Column(
         key: const ValueKey('results'),
@@ -4123,16 +4078,16 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     final root = _rootNode;
     if (root == null || target.fullPath.isEmpty) return;
 
-    final targetUpper = target.fullPath.toUpperCase();
+    final targetUpper = CleanerPaths.key(target.fullPath);
     var structureChanged = false;
     bool expandTowards(DiskTreeNode node) {
       if (identical(node, target)) return true;
       for (final child in node.children) {
-        final childUpper = child.fullPath.toUpperCase();
+        final childUpper = CleanerPaths.key(child.fullPath);
         // Prune branches that cannot contain the target.
         if (!identical(child, target) &&
             targetUpper != childUpper &&
-            !targetUpper.startsWith('$childUpper\\')) {
+            !CleanerPaths.contains(childUpper, targetUpper)) {
           continue;
         }
         if (expandTowards(child)) {
@@ -4411,6 +4366,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       // rebuilt on every progress tick. This is what fixes the visible
       // stutter on the bar.
       return ValueListenableBuilder<_CleanProgressSnapshot>(
+        key: const ValueKey('cleaner-cleaning-progress'),
         valueListenable: _cleanProgress,
         builder: (context, snap, _) {
           final progress = snap.total > 0 ? snap.done / snap.total : null;
@@ -4494,7 +4450,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
                           : PhosphorIconsLight.recycle,
                       label: _selectedCleanMode == _CleanDeleteMode.permanent
                           ? l.diskCleanerPermanentDeleteLabel
-                          : l.diskCleanerRecycleBinLabel,
+                          : (Platform.isMacOS
+                                ? l.trashBin
+                                : l.diskCleanerRecycleBinLabel),
                     ),
                     _buildProgressStatChip(
                       theme: theme,
@@ -4595,7 +4553,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
           ButtonSegment<_CleanDeleteMode>(
             value: _CleanDeleteMode.recycleBin,
             icon: const Icon(PhosphorIconsLight.recycle, size: 14),
-            label: Text(l.diskCleanerMoveToRecycleBin),
+            label: Text(_trashAction(l)),
           ),
           ButtonSegment<_CleanDeleteMode>(
             value: _CleanDeleteMode.permanent,
@@ -4626,6 +4584,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
         showSelectedIcon: false,
       ),
       FilledButton.icon(
+        key: const ValueKey('cleaner-confirm-clean'),
         style: FilledButton.styleFrom(
           backgroundColor: _selectedCleanMode == _CleanDeleteMode.permanent
               ? Colors.red.shade700
@@ -4643,7 +4602,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
         label: Text(
           _selectedCleanMode == _CleanDeleteMode.permanent
               ? l.diskCleanerDeletePermanentlyButton(_fmt(selectedBytes))
-              : l.diskCleanerMoveToRecycleBinButton(_fmt(selectedBytes)),
+              : _trashActionWithSize(l, _fmt(selectedBytes)),
         ),
       ),
     ];
@@ -5027,11 +4986,10 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
             child: Text(l.cancel),
           ),
           FilledButton(
+            autofocus: true,
             style: FilledButton.styleFrom(shape: _cleanerButtonShape),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(
-              l.diskCleanerMoveToRecycleBinButton(_fmt(report.totalBytes)),
-            ),
+            child: Text(_trashActionWithSize(l, _fmt(report.totalBytes))),
           ),
         ],
       ),
@@ -5080,7 +5038,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     _cleanProgress.value = _CleanProgressSnapshot(
       status: permanent
           ? l.diskCleanerPermanentlyDeleting
-          : l.diskCleanerMovingToRecycleBin,
+          : (Platform.isMacOS
+                ? l.moveToTrash
+                : l.diskCleanerMovingToRecycleBin),
     );
 
     try {
@@ -5107,7 +5067,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
             currentPath: currentPath ?? '',
             status: permanent
                 ? l.diskCleanerPermanentlyDeleting
-                : l.diskCleanerMovingToRecycleBin,
+                : (Platform.isMacOS
+                      ? l.moveToTrash
+                      : l.diskCleanerMovingToRecycleBin),
           );
         },
       );
@@ -5118,7 +5080,8 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
           .where((i) => succeededSet.contains(i.path))
           .toList();
 
-      _pruneCleanedFromTree(succeededSet);
+      await _pruneCleanedFromTree(succeededSet);
+      if (!mounted) return;
 
       setState(() {
         _isCleaningJunk = false;
@@ -5178,29 +5141,33 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
 
   /// Prunes deleted paths from the in-memory tree so returning to the results
   /// view shows the freed space without a re-scan.
-  void _pruneCleanedFromTree(Set<String> succeededSet) {
-    if (_rootNode == null || succeededSet.isEmpty) return;
+  Future<void> _pruneCleanedFromTree(Set<String> succeededSet) async {
+    final root = _rootNode;
+    if (root == null || succeededSet.isEmpty) return;
     _agentInspectingNode = null;
     _agentReviewedItems.clear();
     _agentCheckedTargets.clear();
-    final deletedUpper = succeededSet.map((p) => p.toUpperCase()).toSet();
-    _pruneDeletedPaths(_rootNode!, deletedUpper);
-    _recalculateTreeStats(_rootNode!);
-    _rootNode!.invalidateJunkCache();
-    _aggregateCacheRoot = null;
+    final deletedUpper = succeededSet.map(CleanerPaths.key).toSet();
+    final totals = await pruneCleanedDiskTree(root, succeededSet);
+    if (!mounted || !identical(_rootNode, root)) return;
+    await CleanerDashboard.prepareInsights(root);
+    if (!mounted || !identical(_rootNode, root)) return;
+    _cachedJunkBytes = totals.junkBytes;
+    _cachedCleanableCount = totals.cleanableCount;
+    _aggregateCacheRoot = root;
     // If the currently-viewed pie node was deleted, fall back to root.
     if (_selectedNode != null &&
-        deletedUpper.contains(_selectedNode!.fullPath.toUpperCase())) {
+        deletedUpper.any(
+          (path) => CleanerPaths.contains(path, _selectedNode!.fullPath),
+        )) {
       _selectedNode = _rootNode;
       _chartNode = _rootNode;
     }
-    _selectedTreeTargets.removeWhere(
-      (target) => deletedUpper.contains(target.fullPath.toUpperCase()),
-    );
+    _selectedTreeTargets.clear();
     _rebuildReviewVisibleTreePaths();
     _publishTreeSelection();
     if (_selectionAnchorPath != null &&
-        deletedUpper.contains(_selectionAnchorPath!.toUpperCase())) {
+        deletedUpper.contains(CleanerPaths.key(_selectionAnchorPath!))) {
       _selectionAnchorPath = null;
     }
   }
@@ -5210,15 +5177,16 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
   // ---------------------------------------------------------------------------
 
   String get _suggestionsDrive =>
-      _selectedDrive ?? _defaultDrivePath(_drives) ?? r'C:\';
+      _selectedDrive ?? _defaultDrivePath(_drives) ?? CleanerPaths.defaultRoot;
 
   /// The Disk usage tree, when it is complete and belongs to the drive the
   /// suggestions are for.
   DiskTreeNode? get _suggestionsDiskTree {
     final root = _rootNode;
     if (root == null || _isScanningFullDisk) return null;
-    final drive = _suggestionsDrive.substring(0, 2).toUpperCase();
-    return root.fullPath.toUpperCase().startsWith(drive) ? root : null;
+    return CleanerPaths.contains(_suggestionsDrive, root.fullPath)
+        ? root
+        : null;
   }
 
   Future<CleanerSuggestionReport> _scanSuggestions(
@@ -5258,7 +5226,8 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
         onProgress: onProgress,
       );
       if (!mounted) return result;
-      _pruneCleanedFromTree(result.succeeded.toSet());
+      await _pruneCleanedFromTree(result.succeeded.toSet());
+      if (!mounted) return result;
       setState(() {
         _cachedFlatRoot = null;
         _flatRowsValid = false;
@@ -5442,11 +5411,11 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
         actions: [
           TextButton(
             style: TextButton.styleFrom(shape: _cleanerButtonShape),
-            autofocus: true,
             onPressed: () => Navigator.of(ctx).pop(false),
             child: Text(l.cancel),
           ),
           FilledButton(
+            autofocus: true,
             style: FilledButton.styleFrom(
               backgroundColor: Colors.red.shade700,
               foregroundColor: Colors.white,
@@ -5480,7 +5449,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     final fileName = _fileBasename(details.item.path);
     final actionLabel = details.permanent
         ? l.diskCleanerPermanentDeleteLabel
-        : l.diskCleanerRecycleBinLabel;
+        : (Platform.isMacOS ? l.trashBin : l.diskCleanerRecycleBinLabel);
     final reasonText = details.isInUse
         ? l.diskCleanerFileInUse
         : details.reason;
@@ -5579,7 +5548,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
         currentPath: prev.currentPath,
         status: details.permanent
             ? l.diskCleanerPermanentlyDeleting
-            : l.diskCleanerMovingToRecycleBin,
+            : (Platform.isMacOS
+                  ? l.moveToTrash
+                  : l.diskCleanerMovingToRecycleBin),
       );
     }
 
@@ -5802,6 +5773,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
               const Spacer(),
               if (_rootNode != null) ...[
                 FilledButton.tonalIcon(
+                  key: const ValueKey('cleaner-continue-results'),
                   style: FilledButton.styleFrom(shape: _cleanerButtonShape),
                   onPressed: _continueToResults,
                   icon: const Icon(PhosphorIconsLight.arrowLeft, size: 16),
@@ -6129,7 +6101,13 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
                   ),
                 ],
                 const Spacer(),
-                if (_cleanedItems.isNotEmpty)
+                if (_cleanedItems.isNotEmpty && Platform.isMacOS)
+                  OutlinedButton.icon(
+                    onPressed: MacosCleanerPlatform.openTrash,
+                    icon: const Icon(PhosphorIconsLight.trash, size: 16),
+                    label: Text('${l.open} ${l.trashBin}'),
+                  ),
+                if (_cleanedItems.isNotEmpty && !Platform.isMacOS)
                   FilledButton.icon(
                     style: FilledButton.styleFrom(
                       backgroundColor: Colors.red.shade700,
@@ -6158,6 +6136,14 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       ],
     );
   }
+
+  static String _trashAction(AppLocalizations l) =>
+      Platform.isMacOS ? l.moveToTrash : l.diskCleanerMoveToRecycleBin;
+
+  static String _trashActionWithSize(AppLocalizations l, String size) =>
+      Platform.isMacOS
+      ? '${l.moveToTrash} ($size)'
+      : l.diskCleanerMoveToRecycleBinButton(size);
 
   static String _fileBasename(String path) {
     final i = path.lastIndexOf(RegExp(r'[\\/]'));
@@ -6301,7 +6287,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
 
     void visit(DiskTreeNode current) {
       if (current.isSelectedForDeletion && current.fullPath.isNotEmpty) {
-        paths.add(current.fullPath.toUpperCase());
+        paths.add(CleanerPaths.key(current.fullPath));
       }
       for (final child in current.children) {
         visit(child);
@@ -6313,7 +6299,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
   }
 
   void _applySelectedPaths(DiskTreeNode node, Set<String> paths) {
-    node.isSelectedForDeletion = paths.contains(node.fullPath.toUpperCase());
+    node.isSelectedForDeletion = paths.contains(
+      CleanerPaths.key(node.fullPath),
+    );
     for (final child in node.children) {
       _applySelectedPaths(child, paths);
     }

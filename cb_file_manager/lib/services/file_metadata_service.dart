@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:ui' as ui;
+import 'package:cb_native/cb_native.dart';
 
 import 'package:flutter/material.dart';
 import 'package:cb_file_manager/helpers/media/fc_native_video_thumbnail.dart';
@@ -154,6 +155,8 @@ class FileMetadataService {
 
   Future<ImageDimensions?> _loadImageDimensions(String filePath) async {
     try {
+      final native = await NativeImage.dimensions(filePath);
+      if (native != null) return ImageDimensions(native.$1, native.$2);
       final file = File(filePath);
       if (!await file.exists()) return null;
 
@@ -185,6 +188,8 @@ class FileMetadataService {
 
   Future<int?> _loadFolderItemCount(String folderPath) async {
     try {
+      final native = await NativeUiJobs.countChildren([folderPath]);
+      if (native != null) return native.single;
       final dir = Directory(folderPath);
       if (!await dir.exists()) return null;
 

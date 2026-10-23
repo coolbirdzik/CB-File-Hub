@@ -89,7 +89,7 @@ extension DetailsColumnPresentation on DetailsColumn {
   };
 
   /// The ascending and descending sort a header click toggles between, or
-  /// null for columns whose values are loaded per row and cannot be sorted.
+  /// Metadata columns are loaded in bounded batches before changing order.
   (SortOption, SortOption)? get sortOptions => switch (this) {
     DetailsColumn.name => (SortOption.nameAsc, SortOption.nameDesc),
     DetailsColumn.type => (SortOption.typeAsc, SortOption.typeDesc),
@@ -113,13 +113,10 @@ extension DetailsColumnPresentation on DetailsColumn {
     ),
     DetailsColumn.path ||
     DetailsColumn.parentFolder => (SortOption.pathAsc, SortOption.pathDesc),
-    DetailsColumn.tags ||
-    DetailsColumn.dimensions ||
-    DetailsColumn.duration ||
-    DetailsColumn.itemCount ||
-    DetailsColumn.permissions => null,
-    // Shell properties are read per visible row.
-    _ => null,
+    _ => (
+      SortOption.values.byName('${name}Asc'),
+      SortOption.values.byName('${name}Desc'),
+    ),
   };
 }
 
@@ -329,6 +326,7 @@ class DetailsCell extends StatelessWidget {
 /// column to move it, drag its right edge to resize it (double-click the edge
 /// for the default width), right-click to choose columns.
 class DetailsColumnsHeader extends StatefulWidget {
+  final bool supportsMetadataSort;
   final SortOption? sortOption;
   final ValueChanged<SortOption>? onSortOptionSelected;
 
@@ -338,6 +336,7 @@ class DetailsColumnsHeader extends StatefulWidget {
   const DetailsColumnsHeader({
     super.key,
     required this.sortOption,
+    this.supportsMetadataSort = true,
     this.onSortOptionSelected,
     this.horizontalPadding = kDetailsRowPadding,
   });
@@ -385,7 +384,40 @@ class _DetailsColumnsHeaderState extends State<DetailsColumnsHeader> {
             width: column.width,
             child: CbTooltip(
               message: column.description ?? column.label,
-              child: DetailsCell.text(column.label, style: style),
+              child: Semantics(
+                button: column.onSort != null,
+                selected: column.sortAscending != null,
+                child: InkWell(
+                  key: ValueKey('details-header-${column.id}'),
+                  onTap: column.onSort,
+                  child: DetailsCell(
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            column.label,
+                            style: style,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (column.onSort != null) ...[
+                          const SizedBox(width: 4),
+                          Icon(
+                            column.sortAscending == false
+                                ? PhosphorIconsLight.arrowDown
+                                : PhosphorIconsLight.arrowUp,
+                            size: 16,
+                            color: column.sortAscending == null
+                                ? theme.colorScheme.onSurfaceVariant
+                                : theme.colorScheme.primary,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             ),
           ),
         ),
@@ -401,9 +433,19 @@ class _DetailsColumnsHeaderState extends State<DetailsColumnsHeader> {
     AppLocalizations l10n,
   ) {
     final theme = Theme.of(context);
-    final sort = column.sortOptions;
-    final ascending = sort != null && widget.sortOption == sort.$1;
-    final descending = sort != null && widget.sortOption == sort.$2;
+    final options = column.sortOptions;
+    final allowed = FileDetailsColumns.maybeOf(context)?.allowedBaseSortOptions;
+    final sort = allowed != null && !allowed.contains(options?.$1)
+        ? null
+        : !widget.supportsMetadataSort && options?.$1.metadataColumn != null
+        ? null
+        : options;
+    final customSort =
+        FileDetailsColumns.maybeOf(context)?.hasCustomSort ?? false;
+    final ascending =
+        !customSort && sort != null && widget.sortOption == sort.$1;
+    final descending =
+        !customSort && sort != null && widget.sortOption == sort.$2;
     final label = Row(
       children: [
         Flexible(

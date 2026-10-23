@@ -25,6 +25,7 @@ private:
     // Registers a Win32 message delegate that re-applies the DWM accent policy
     // whenever Windows resets it (WM_ACTIVATE, WM_NCACTIVATE, theme change, etc.)
     void EnsureWindowProcDelegateRegistered();
+    void RemoveTorrentNotification();
     void HandleMethodCall(
         const flutter::MethodCall<flutter::EncodableValue> &method_call,
         std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result);
@@ -35,6 +36,7 @@ private:
     IDropTarget *drop_target_ = nullptr;
     int window_proc_delegate_id_ = -1;
     HWND torrent_launch_hwnd_ = nullptr;
+    HWND torrent_notification_hwnd_ = nullptr;
     // Per-instance backdrop state (avoids cross-window pollution via shared globals).
     bool backdrop_active_ = false;
     bool backdrop_prefer_acrylic_ = true;

@@ -10,6 +10,7 @@ import '../album_service.dart';
 import '../disk_cleaner/cleaner_categories.dart';
 import '../disk_cleaner/cleaner_agent_review.dart';
 import '../disk_cleaner/cleaner_models.dart';
+import '../disk_cleaner/cleaner_paths.dart';
 import '../disk_cleaner/cleaner_space_insights.dart';
 import '../disk_cleaner/disk_cleaner_service.dart';
 import '../disk_cleaner/disk_tree_node.dart';
@@ -911,17 +912,19 @@ class ToolExecutor {
   }
 
   Future<ToolResult> _listDiskJunkCategories(Map<String, dynamic> args) async {
-    if (!Platform.isWindows) {
+    if (!(Platform.isWindows || Platform.isMacOS)) {
       return const ToolResult(
         toolName: 'list_disk_junk_categories',
-        output: 'Error: Disk Cleaner is only available on Windows.',
+        output: 'Error: Disk Cleaner is available on Windows and macOS.',
         success: false,
       );
     }
 
     final service = DiskCleanerService.instance;
     final categories = service.listCategories();
-    final buffer = StringBuffer('Available junk categories on Windows:\n');
+    final buffer = StringBuffer(
+      'Available junk categories on ${Platform.operatingSystem}:\n',
+    );
     for (final cat in categories) {
       final safetyStr = cat.safety.name;
       final defaultStr = cat.defaultEnabled ? 'default ON' : 'default OFF';
@@ -937,10 +940,10 @@ class ToolExecutor {
   }
 
   Future<ToolResult> _getDriveSpace(Map<String, dynamic> args) async {
-    if (!Platform.isWindows) {
+    if (!(Platform.isWindows || Platform.isMacOS)) {
       return const ToolResult(
         toolName: 'get_drive_space',
-        output: 'Error: Only available on Windows.',
+        output: 'Error: Available on Windows and macOS.',
         success: false,
       );
     }
@@ -969,10 +972,10 @@ class ToolExecutor {
   }
 
   Future<ToolResult> _scanDiskJunk(Map<String, dynamic> args) async {
-    if (!Platform.isWindows) {
+    if (!(Platform.isWindows || Platform.isMacOS)) {
       return const ToolResult(
         toolName: 'scan_disk_junk',
-        output: 'Error: Only available on Windows.',
+        output: 'Error: Available on Windows and macOS.',
         success: false,
       );
     }
@@ -997,7 +1000,9 @@ class ToolExecutor {
     if (drivesArg is List) {
       drives = drivesArg.map((e) => e.toString()).toList();
     } else {
-      drives = const ['C:\\'];
+      drives = Platform.isMacOS
+          ? const ['/System/Volumes/Data']
+          : const ['C:\\'];
     }
 
     final categoriesArg = normalizedArgs['categories'];
@@ -1140,10 +1145,10 @@ class ToolExecutor {
   }
 
   Future<ToolResult> _cleanDiskJunk(Map<String, dynamic> args) async {
-    if (!Platform.isWindows) {
+    if (!(Platform.isWindows || Platform.isMacOS)) {
       return const ToolResult(
         toolName: 'clean_disk_junk',
-        output: 'Error: Only available on Windows.',
+        output: 'Error: Available on Windows and macOS.',
         success: false,
       );
     }
@@ -1681,11 +1686,16 @@ class ToolExecutor {
   int _writeDriveUsage(StringBuffer buffer, CleanerScanContext context) {
     final root = context.root;
     if (context.isScanning ||
-        !RegExp(r'^[A-Za-z]:\\?$').hasMatch(root.fullPath)) {
+        (!CleanerPaths.isPosix(root.fullPath) &&
+            !RegExp(r'^[A-Za-z]:\\?$').hasMatch(root.fullPath))) {
       return 0;
     }
     final drive = DiskCleanerService.instance.readDriveSpace(root.fullPath);
-    if (drive == null || drive.totalBytes <= 0) return 0;
+    if (drive == null ||
+        drive.totalBytes <= 0 ||
+        CleanerPaths.key(drive.path) != CleanerPaths.key(root.fullPath)) {
+      return 0;
+    }
     final unaccounted = drive.usedBytes - root.sizeBytes;
     buffer.writeln(
       'Drive: ${_formatSize(drive.totalBytes)} total, '

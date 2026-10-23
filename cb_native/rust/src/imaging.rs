@@ -6,7 +6,7 @@
 //! is most of the win for camera photos. EXIF orientation is applied like
 //! `package:image` does, so thumbnails come out upright.
 
-use std::io::Cursor;
+use std::io::{BufReader, Cursor};
 use std::sync::Arc;
 
 use fast_image_resize::images::Image as FrImage;
@@ -466,6 +466,75 @@ pub fn start_encode(port: i64, config: Vec<u8>) -> Option<Arc<Job>> {
             height,
             alpha: true,
         };
+        let encoded = pixels.encode(format, quality, 1)?;
+        job.append(&encoded);
+        Ok(())
+    }))
+}
+
+/// Read dimensions without allocating or decoding the pixel buffer. Flutter's
+/// codec reports display dimensions, so honour EXIF rotations that swap axes.
+pub fn start_dimensions(port: i64, config: &[u8]) -> Option<Arc<Job>> {
+    let mut r = Reader::new(config);
+    let path = r.str()?;
+    if !r.is_empty() {
+        return None;
+    }
+    Some(Job::spawn(port, "cb_image_dimensions", move |job| {
+        let file = std::fs::File::open(path).map_err(decode_error)?;
+        let mut decoder = ImageReader::new(BufReader::new(file))
+            .with_guessed_format()
+            .map_err(decode_error)?
+            .into_decoder()
+            .map_err(decode_error)?;
+        let (mut width, mut height) = decoder.dimensions();
+        if matches!(
+            decoder.orientation().ok(),
+            Some(
+                Orientation::Rotate90
+                    | Orientation::Rotate270
+                    | Orientation::Rotate90FlipH
+                    | Orientation::Rotate270FlipH
+            )
+        ) {
+            std::mem::swap(&mut width, &mut height);
+        }
+        let mut out = Writer::default();
+        out.u32(width);
+        out.u32(height);
+        job.append(&out.into_bytes());
+        Ok(())
+    }))
+}
+
+/// Full-resolution conversion, without thumbnail resizing or colour changes.
+pub fn start_transcode(port: i64, config: Vec<u8>) -> Option<Arc<Job>> {
+    let mut r = Reader::new(&config);
+    let format = r.u8()?;
+    let quality = r.u8()?;
+    if format > FORMAT_TIFF {
+        return None;
+    }
+    Some(Job::spawn(port, "cb_image_transcode", move |job| {
+        let image = decode(&config[2..], None)?;
+        if job.cancelled() {
+            return Ok(());
+        }
+        let mut pixels = Pixels::of(image);
+        if format == FORMAT_JPEG && pixels.alpha {
+            // package:image flattens alpha onto white when writing JPEG.
+            // Dropping alpha would turn transparent crop edges into dark RGB.
+            pixels.data = pixels
+                .data
+                .chunks_exact(4)
+                .flat_map(|p| {
+                    let alpha = u32::from(p[3]);
+                    [p[0], p[1], p[2]]
+                        .map(|c| ((u32::from(c) * alpha + 255 * (255 - alpha) + 127) / 255) as u8)
+                })
+                .collect();
+            pixels.alpha = false;
+        }
         let encoded = pixels.encode(format, quality, 1)?;
         job.append(&encoded);
         Ok(())

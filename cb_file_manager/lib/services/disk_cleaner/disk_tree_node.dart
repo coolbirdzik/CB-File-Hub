@@ -163,10 +163,11 @@ class DiskTreeNode {
     return false;
   }
 
-  /// Invalidate the selection cache for this node and all ancestors.
-  /// Call this after modifying isSelectedForDeletion.
-  void invalidateSelectionCache() {
+  /// Invalidates cached selection in this subtree after changing its checks.
+  /// Postorder updates use `recursive: false` after visiting the children.
+  void invalidateSelectionCache({bool recursive = true}) {
     _hasSelectionInSubtree = null;
+    if (!recursive) return;
     for (final child in children) {
       child.invalidateSelectionCache();
     }

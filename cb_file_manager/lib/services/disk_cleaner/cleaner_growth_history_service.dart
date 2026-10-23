@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'disk_tree_node.dart';
+import 'cleaner_paths.dart';
 
 class CleanerFolderGrowth {
   final String path;
@@ -146,11 +147,7 @@ class CleanerGrowthHistoryService {
     String path,
     int increasedBytes,
   ) {
-    var ancestor = path;
-    while (true) {
-      final separator = ancestor.lastIndexOf(r'\');
-      if (separator < 0) return;
-      ancestor = ancestor.substring(0, separator);
+    for (final ancestor in CleanerPaths.ancestors(path).skip(1)) {
       final current = largestGrowthByAncestor[ancestor] ?? 0;
       if (increasedBytes > current) {
         largestGrowthByAncestor[ancestor] = increasedBytes;
@@ -256,6 +253,7 @@ class CleanerGrowthHistoryService {
   }
 
   static String _normalizePath(String path) {
+    if (CleanerPaths.isPosix(path)) return CleanerPaths.key(path);
     var normalized = path.replaceAll('/', r'\').trim();
     while (normalized.endsWith(r'\')) {
       normalized = normalized.substring(0, normalized.length - 1);
@@ -264,7 +262,7 @@ class CleanerGrowthHistoryService {
   }
 
   static int _pathDepth(String path) {
-    return _normalizePath(path).split(r'\').length;
+    return _normalizePath(path).split(RegExp(r'[\\/]')).length;
   }
 }
 
@@ -443,15 +441,11 @@ class _IncompletePathIndex {
     );
     if (folderPath.isEmpty) return false;
 
-    var ancestor = folderPath;
-    while (true) {
+    for (final ancestor in CleanerPaths.ancestors(folderPath)) {
       if (_paths.contains(ancestor)) return true;
-      final separator = ancestor.lastIndexOf(r'\');
-      if (separator < 0) break;
-      ancestor = ancestor.substring(0, separator);
     }
 
-    final descendantPrefix = '$folderPath\\';
+    final descendantPrefix = CleanerPaths.prefix(folderPath);
     final descendantIndex = _lowerBound(_sortedPaths, descendantPrefix);
     return descendantIndex < _sortedPaths.length &&
         _sortedPaths[descendantIndex].startsWith(descendantPrefix);

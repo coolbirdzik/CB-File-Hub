@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'file_property_sorter.dart';
 
 import 'package:cb_native/cb_native.dart';
 import 'package:cb_file_manager/helpers/files/file_attributes.dart';
@@ -31,6 +32,10 @@ class FileSystemSorter {
     Map<String, FileStat>? fileStatsCache,
   }) async {
     if (entities.isEmpty) return [];
+    if (sortOption.metadataColumn != null) {
+      final compare = await FilePropertySorter.prepare(entities, sortOption);
+      return List<FileSystemEntity>.of(entities)..sort(compare);
+    }
 
     final stopwatch = Stopwatch()..start();
 
@@ -193,6 +198,10 @@ class FileSystemSorter {
 
       case SortOption.pathDesc:
         return (a, b) => _compareByPath(a, b, ascending: false);
+      default:
+        throw ArgumentError(
+          'Metadata sorting requires asynchronous property loading',
+        );
     }
   }
 

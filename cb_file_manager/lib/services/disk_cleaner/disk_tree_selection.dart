@@ -1,4 +1,5 @@
 import 'disk_tree_node.dart';
+import 'cleaner_paths.dart';
 
 /// Selection helpers for the disk cleaner tree.
 class DiskTreeSelection {
@@ -92,17 +93,11 @@ class DiskTreeSelection {
   }
 
   static String _normalizePath(String path) {
-    var normalized = path.trim().replaceAll('/', r'\').toUpperCase();
-    while (normalized.length > 3 && normalized.endsWith(r'\')) {
-      normalized = normalized.substring(0, normalized.length - 1);
-    }
-    return normalized;
+    return CleanerPaths.key(path);
   }
 
   static bool _isSameOrDescendant(String path, String root) {
-    if (path == root) return true;
-    final prefix = root.endsWith(r'\') ? root : '$root\\';
-    return path.startsWith(prefix);
+    return CleanerPaths.contains(root, path);
   }
 
   /// Returns the exact top-level nodes that will be sent to cleanup.

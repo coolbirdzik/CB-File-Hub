@@ -5,6 +5,7 @@ import 'disk_tree_node.dart';
 import 'cleaner_categories.dart';
 import 'cleaner_models.dart';
 import 'cleaner_space_insights.dart';
+import 'cleaner_paths.dart';
 
 enum CleanerItemDecision { clean, review, keep }
 
@@ -93,11 +94,14 @@ List<_ReviewGroupPlan> _buildReviewPlans(List<_ReviewEntry> entries) {
         (entry.parent < 0 ? null : causes[entry.parent]);
     causes.add(cause);
     if (!entry.pending) continue;
-    final parts = entry.path.replaceAll('/', r'\').split(r'\');
+    final posix = CleanerPaths.isPosix(entry.path);
+    final parts = posix
+        ? CleanerPaths.key(entry.path).split('/')
+        : entry.path.replaceAll('/', r'\').split(r'\');
     final depth = parts.length > 2 && parts[1].toUpperCase() == 'USERS' ? 4 : 3;
     final scope = parts
         .take(entry.isFile ? (parts.length - 1).clamp(1, depth) : depth)
-        .join(r'\');
+        .join(posix ? '/' : r'\');
     final type = entry.isFile
         ? CleanerSpaceInsights.groupOfExtension(
                 CleanerSpaceInsights.extensionOf(entry.name),
@@ -106,7 +110,8 @@ List<_ReviewGroupPlan> _buildReviewPlans(List<_ReviewEntry> entries) {
         : entry.hasChildren
         ? 'folder'
         : 'empty_folder';
-    final key = '${scope.toUpperCase()}|${entry.categoryId}|${cause?.id}|$type';
+    final key =
+        '${CleanerPaths.isPosix(entry.path) ? scope : scope.toUpperCase()}|${entry.categoryId}|${cause?.id}|$type';
     final group = byKey.putIfAbsent(
       key,
       () => _ReviewGroupPlan(

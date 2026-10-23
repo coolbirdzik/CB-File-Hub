@@ -32,6 +32,7 @@ import 'package:cb_file_manager/services/torrent/magnet_link.dart';
 import 'package:cb_file_manager/services/torrent/torrent_launch_request.dart';
 import 'package:cb_file_manager/services/torrent/torrent_import_confirmation.dart';
 import 'package:cb_file_manager/services/torrent/torrent_repository.dart';
+import 'package:cb_file_manager/services/torrent/torrent_sort.dart';
 import 'package:cb_file_manager/services/torrent/torrent_service.dart';
 import 'package:cb_file_manager/ui/components/common/search_text_field.dart';
 import 'package:cb_file_manager/ui/screens/torrent/torrent_screen.dart';
@@ -127,10 +128,12 @@ class _Repository extends TorrentRepository {
   final queries = <String>[];
   final held = <String, Completer<TorrentPage>>{};
   SortOption? lastSort;
+  TorrentSort? lastDetailSort;
   bool? lastRegex;
   int? lastOffset;
   int? lastLimit;
   String taskStatus = 'library';
+  String? taskError;
   int completedBytes = 0;
   int count = 180;
   int? seeders;
@@ -147,11 +150,13 @@ class _Repository extends TorrentRepository {
     String? status,
     String? category,
     SortOption sort = SortOption.nameAsc,
+    TorrentSort? detailSort,
     bool useRegex = false,
     bool Function()? isCancelled,
   }) async {
     queries.add(query);
     lastSort = sort;
+    lastDetailSort = detailSort;
     lastRegex = useRegex;
     lastOffset = offset;
     lastLimit = limit;
@@ -168,6 +173,7 @@ class _Repository extends TorrentRepository {
                 'total_bytes': 100,
                 'file_count': 1,
                 'status': taskStatus,
+                'error': taskError,
                 'added_at': i,
                 'modified_at': i,
                 'completed_bytes': completedBytes,
@@ -265,6 +271,7 @@ class _Service extends TorrentService {
   Completer<void>? refreshGate;
   String openStatus = 'active';
   final downloads = <(String, String, bool)>[];
+  Object? downloadError;
   final paused = <String>[];
   final resumed = <String>[];
   bool duplicate = false;
@@ -343,9 +350,31 @@ class _Service extends TorrentService {
     bool startImmediately = true,
   }) async {
     downloads.add((entry.hash, destination, startImmediately));
+    if (downloadError case final error?) throw error;
     (repository as _Repository).taskStatus = startImmediately
         ? 'waiting'
         : 'paused';
+  }
+
+  @override
+  Future<TorrentEntry> openSourceInBackground(String source) async =>
+      downloadInBackground(await openSource(source));
+
+  @override
+  Future<TorrentEntry> downloadInBackground(TorrentEntry entry) async {
+    if (!const [
+      'active',
+      'waiting',
+      'paused',
+      'complete',
+    ].contains(entry.status)) {
+      await download(
+        entry,
+        defaultDownloadDirectory!,
+        startImmediately: startDownloadsImmediately,
+      );
+    }
+    return entry;
   }
 
   @override
@@ -432,6 +461,159 @@ void main() {
     );
     if (settle) await tester.pumpAndSettle();
   }
+
+  for (final fails in [false, true]) {
+    testWidgets(
+      'background opening sends notification without dialogs, failure=$fails',
+      (tester) async {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('torrent.receiveInBackground', true);
+        await prefs.setString(
+          'torrent.lastDownloadDirectory',
+          Directory.systemTemp.path,
+        );
+        final fake = service as _Service;
+        fake.createNewOnOpen = true;
+        if (fails) fake.downloadError = StateError('aria2 unavailable');
+        final notices = <MethodCall>[];
+        const native = MethodChannel('cb_file_manager/window_utils');
+        tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(native, (
+          call,
+        ) async {
+          if (call.method == 'notifyTorrent') notices.add(call);
+          return true;
+        });
+        addTearDown(
+          () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+            native,
+            null,
+          ),
+        );
+        await mount(tester, initialSource: '/background.torrent');
+        expect(find.byType(TorrentDownloadDialog), findsNothing);
+        expect(
+          find.byKey(const ValueKey('torrent-error-dialog')),
+          findsNothing,
+        );
+        expect(fake.downloads, hasLength(1));
+        expect(notices, hasLength(1));
+        expect(
+          (notices.single.arguments as Map)['body'],
+          contains(fails ? 'aria2 unavailable' : 'New torrent.iso'),
+        );
+        expect((notices.single.arguments as Map)['isError'], fails);
+        if (fails) {
+          repo.taskStatus = 'error';
+          repo.taskError = 'aria2 unavailable';
+          service.lastError = 'RPC unavailable';
+          fake.emitChange();
+          await tester.pump(const Duration(seconds: 2));
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const ValueKey('torrent-error-dialog')),
+            findsNothing,
+          );
+        }
+      },
+    );
+  }
+
+  testWidgets(
+    'download error stays in a modal and copies the full diagnostic',
+    (tester) async {
+      final fake = service as _Service;
+      fake.createNewOnOpen = true;
+      fake.downloadError = FileSystemException('Access denied', '/new.torrent');
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('torrent.showDownloadDialog', false);
+      await prefs.setString(
+        'torrent.lastDownloadDirectory',
+        Directory.systemTemp.path,
+      );
+      String? copied;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async {
+          if (call.method == 'Clipboard.setData') {
+            copied = (call.arguments as Map)['text'] as String;
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+      await mount(tester, initialSource: '/new.torrent');
+      final dialog = find.byKey(const ValueKey('torrent-error-dialog'));
+      expect(dialog, findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('torrent-error-report')),
+        findsOneWidget,
+      );
+      fake.emitChange();
+      await tester.pump(const Duration(seconds: 2));
+      await tester.pumpAndSettle();
+      await tester.tapAt(const Offset(5, 5));
+      await tester.pumpAndSettle();
+      expect(dialog, findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('torrent-error-copy')));
+      await tester.pumpAndSettle();
+      expect(copied, contains('Access denied'));
+      expect(copied, contains('Torrent file: /new.torrent'));
+      expect(copied, contains('Torrent: New torrent.iso'));
+      expect(copied, contains('_Service.download'));
+      expect(dialog, findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('torrent-error-close')));
+      await tester.pumpAndSettle();
+      expect(dialog, findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('service errors survive recovery and repeated notifications', (
+    tester,
+  ) async {
+    await mount(tester);
+    service.lastError = 'aria2 RPC connection failed';
+    (service as _Service).emitChange();
+    await tester.pumpAndSettle();
+    (service as _Service).emitChange();
+    service.lastError = null;
+    (service as _Service).emitChange();
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pumpAndSettle();
+    final dialog = find.byKey(const ValueKey('torrent-error-dialog'));
+    expect(dialog, findsOneWidget);
+    expect(find.textContaining('aria2 RPC connection failed'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('torrent-error-close')));
+    await tester.pumpAndSettle();
+    expect(dialog, findsNothing);
+    service.lastError = 'aria2 RPC connection failed';
+    (service as _Service).emitChange();
+    await tester.pumpAndSettle();
+    expect(dialog, findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('torrent-error-close')));
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('task errors show torrent details once across refreshes', (
+    tester,
+  ) async {
+    repo.count = 1;
+    repo.taskStatus = 'error';
+    repo.taskError = 'Cannot open torrent metainfo';
+    await mount(tester);
+    expect(find.textContaining('Info hash: ${'0' * 40}'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('torrent-error-close')));
+    await tester.pumpAndSettle();
+    (service as _Service).emitChange();
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('torrent-error-dialog')), findsNothing);
+  });
 
   for (final source in [
     '/silent.torrent',
@@ -683,6 +865,23 @@ void main() {
       }
 
       await openSettings();
+      final background = find.byKey(
+        const ValueKey('torrent-receive-in-background'),
+      );
+      if (Platform.isWindows) {
+        await tester.ensureVisible(background);
+        await tester.tap(background);
+        await tester.pumpAndSettle();
+        expect(service.receiveInBackground, isTrue);
+        final disabledShow = tester.widget<CheckboxListTile>(
+          find.byKey(const ValueKey('torrent-show-download-dialog')),
+        );
+        expect(disabledShow.value, isFalse);
+        expect(disabledShow.onChanged, isNull);
+        await tester.tap(background);
+        await tester.pumpAndSettle();
+        expect(service.receiveInBackground, isFalse);
+      }
       final show = find.byKey(const ValueKey('torrent-show-download-dialog'));
       await tester.ensureVisible(show);
       await tester.tap(show);
@@ -1859,6 +2058,46 @@ void main() {
       await tester.tap(find.text('Size'));
       await tester.pumpAndSettle();
       expect(repo.lastSort, SortOption.sizeDesc);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'torrent metadata headers sort, reset the page and restore preferences',
+    (tester) async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('torrent.viewMode', 'details');
+      await mount(tester);
+      await tester.tap(
+        find.byWidgetPredicate(
+          (w) => w is CbButton && w.tooltip == 'Next Page',
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(repo.lastOffset, 80);
+      final progress = find.byKey(const ValueKey('details-header-progress'));
+      await tester.ensureVisible(progress);
+      await tester.tap(progress);
+      await tester.pumpAndSettle();
+      expect(repo.lastDetailSort!.field, 'progress');
+      expect(repo.lastDetailSort!.ascending, isTrue);
+      expect(repo.lastOffset, 0);
+      await tester.tap(progress);
+      await tester.pumpAndSettle();
+      expect(repo.lastDetailSort!.ascending, isFalse);
+      expect(prefs.getString('torrent.detailSortField'), 'progress');
+      expect(prefs.getBool('torrent.detailSortAscending'), isFalse);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await mount(tester);
+      expect(repo.lastDetailSort!.field, 'progress');
+      expect(repo.lastDetailSort!.ascending, isFalse);
+      final name = find.byKey(const ValueKey('details-header-name'));
+      await tester.ensureVisible(name);
+      await tester.tap(name);
+      await tester.pumpAndSettle();
+      expect(repo.lastDetailSort, isNull);
+      expect(repo.lastSort, SortOption.nameAsc);
+      expect(prefs.getString('torrent.detailSortField'), isNull);
       expect(tester.takeException(), isNull);
     },
   );

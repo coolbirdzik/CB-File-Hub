@@ -60,8 +60,8 @@ void main() {
     await root.delete(recursive: true);
   });
 
-  // Every sort, so a new SortOption cannot ship without a native order.
-  for (final sort in SortOption.values) {
+  // Stat-based sorts run natively; content/Shell sorts use the async property reader.
+  for (final sort in SortOption.values.where((s) => s.metadataColumn == null)) {
     test('${sort.name} matches the Dart listing', () async {
       final dart = await dartScanDirectoryForTesting(root.path, sort);
       final native = await NativeFs.listDirectory(

@@ -51,6 +51,8 @@ dependencies:
       ref: ff055bc28bd0394d1d03c14ca2cd41d88bae79dd
   path: ^1.8.3
   shared_preferences: ^2.2.2
+  shared_preferences_platform_interface: ^2.4.2
+  shared_preferences_windows: ^2.4.1
   window_manager: ^0.5.2 # Added for desktop window management
   phosphor_flutter: ^2.1.0 # Phosphor Icons - soft, minimal line icons
   visibility_detector: ^0.4.0+2 # Added for detecting visible thumbnails

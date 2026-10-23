@@ -48,6 +48,10 @@ abstract class AppLocalizations {
   String get torrentDownload;
   String get torrentStartImmediately;
   String get torrentOpeningOptions;
+  String get torrentReceiveInBackground;
+  String get torrentReceiveInBackgroundHint;
+  String get torrentBackgroundAdded;
+  String get torrentBackgroundFailed;
   String get torrentShowDownloadDialog;
   String get torrentShowDownloadDialogHint;
   String get torrentDestinationRequired;

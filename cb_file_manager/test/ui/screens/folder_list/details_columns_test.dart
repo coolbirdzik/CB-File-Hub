@@ -130,13 +130,14 @@ void main() {
       WidgetTester tester, {
       SortOption sortOption = SortOption.nameAsc,
       List<SortOption>? sorts,
+      ColumnVisibility? initialColumns,
     }) async {
       tester.view.physicalSize = const Size(1200, 600);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
       final saved = <ColumnVisibility>[];
-      var columns = const ColumnVisibility();
+      var columns = initialColumns ?? const ColumnVisibility();
       await tester.pumpWidget(
         MaterialApp(
           localizationsDelegates: const [AppLocalizationsDelegate()],
@@ -190,6 +191,36 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('details-header-type')));
       expect(sorts, [SortOption.sizeDesc, SortOption.typeAsc]);
     });
+
+    testWidgets(
+      'all available metadata headers can toggle both sort directions',
+      (tester) async {
+        for (final column in DetailsColumn.values.where((c) => c.isAvailable)) {
+          final pair = column.sortOptions!;
+          if (pair.$1.metadataColumn == null) continue;
+          final columns = const ColumnVisibility(
+            type: false,
+            size: false,
+            dateModified: false,
+          ).withColumn(column, true);
+          final sorts = <SortOption>[];
+          await pumpTable(tester, sorts: sorts, initialColumns: columns);
+          final header = find.byKey(ValueKey('details-header-${column.name}'));
+          await tester.tap(header);
+          expect(sorts, [pair.$1], reason: column.name);
+          sorts.clear();
+          await pumpTable(
+            tester,
+            sorts: sorts,
+            initialColumns: columns,
+            sortOption: pair.$1,
+          );
+          await tester.tap(header);
+          expect(sorts, [pair.$2], reason: column.name);
+          expect(tester.takeException(), isNull);
+        }
+      },
+    );
 
     testWidgets('dragging a header onto another moves the column', (
       tester,

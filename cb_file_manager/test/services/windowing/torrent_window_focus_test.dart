@@ -7,6 +7,40 @@ import 'package:cb_file_manager/services/windowing/windows_native_tab_drag_drop_
 import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:cb_file_manager/services/torrent/torrent_service.dart';
+import 'package:cb_file_manager/services/torrent/torrent_repository.dart';
+import 'package:cb_file_manager/services/torrent/torrent_entry.dart';
+
+class _UnusedDb extends Fake implements Database {}
+
+class _BackgroundService extends TorrentService {
+  final received = <String>[];
+  _BackgroundService(SharedPreferences prefs)
+    : super.forTesting(
+        repository: TorrentRepository(_UnusedDb()),
+        preferences: prefs,
+        stateDirectory: '/unused',
+      );
+  @override
+  Future<TorrentEntry> openSourceInBackground(String source) async {
+    received.add(source);
+    return TorrentEntry.fromMap({
+      'hash': '1' * 40,
+      'name': 'Background torrent',
+      'torrent_path': source,
+      'category': 'other',
+      'group_name': '',
+      'total_bytes': 1,
+      'file_count': 1,
+      'status': 'waiting',
+      'completed_bytes': 0,
+      'download_speed': 0,
+      'added_at': 0,
+    });
+  }
+}
 
 class _AssociationService extends DesktopWindowingService {
   final List<DesktopWindowInfo> windows;
@@ -194,6 +228,71 @@ void main() {
       if (Platform.isWindows) 'forceActivateWindow',
     ]);
   });
+
+  test(
+    'background associations notify without switching tabs or activating the window',
+    () async {
+      SharedPreferences.setMockInitialValues({
+        'torrent.receiveInBackground': true,
+      });
+      final service = _BackgroundService(await SharedPreferences.getInstance());
+      final reservation = await ServerSocket.bind(
+        InternetAddress.loopbackIPv4,
+        0,
+      );
+      final port = reservation.port;
+      await reservation.close();
+      final notified = Completer<void>();
+      final receiver = DesktopWindowingService.forTesting(
+        registryPort: port,
+        torrentService: service,
+        torrentNotice:
+            ({required title, required body, required isError}) async {
+              expect(isError, isFalse);
+              if (!notified.isCompleted) notified.complete();
+            },
+      );
+      final tabs = TabManagerBloc();
+      addTearDown(() async {
+        await receiver.dispose();
+        await tabs.close();
+        service.dispose();
+      });
+      final ready = tabs.stream.first;
+      tabs.add(AddTab(path: '#home'));
+      await ready;
+      await receiver.attachTabBloc(tabs);
+      List<DesktopWindowInfo> windows = [];
+      for (var i = 0; i < 100 && windows.isEmpty; i++) {
+        windows = await receiver.listWindows();
+        if (windows.isEmpty) {
+          await Future<void>.delayed(const Duration(milliseconds: 5));
+        }
+      }
+      final sender = _AssociationService(windows);
+      final source = 'magnet:?xt=urn:btih:${'1' * 40}';
+      expect(await sender.openTorrentSourcesInExistingWindow([source]), isTrue);
+      await notified.future.timeout(const Duration(seconds: 3));
+      expect(service.received, [source]);
+      expect(tabs.state.activeTab!.path, '#home');
+      expect(tabs.state.tabs, hasLength(1));
+      expect(
+        calls.where(
+          (m) =>
+              ['show', 'focus', 'restore', 'forceActivateWindow'].contains(m),
+        ),
+        isEmpty,
+      );
+
+      await service.setReceiveInBackground(false);
+      final switched = tabs.stream.firstWhere(
+        (state) => state.activeTab!.path == '#torrents',
+      );
+      expect(await sender.openTorrentSourcesInExistingWindow([source]), isTrue);
+      await switched;
+      expect(tabs.state.tabs, hasLength(2));
+    },
+  );
 
   test('native activation still runs when plugin focus fails', () async {
     failingMethod = 'focus';

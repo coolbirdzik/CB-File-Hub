@@ -1,5 +1,6 @@
 #include "window_utils_plugin.h"
 #include "torrent_launch.h"
+#include "resource.h"
 
 #include <flutter/method_channel.h>
 #include <flutter/standard_method_codec.h>
@@ -18,6 +19,9 @@
 
 namespace
 {
+  constexpr UINT kTorrentNotificationMessage = WM_APP + 0x43;
+  constexpr UINT kTorrentNotificationIcon = 0xCBF1;
+  constexpr UINT_PTR kTorrentNotificationTimer = 0xCBA4;
 
   static bool g_is_fullscreen = false;
   static RECT g_frame_before_fullscreen = {0, 0, 0, 0};
@@ -1258,6 +1262,7 @@ WindowUtilsPlugin::WindowUtilsPlugin(flutter::PluginRegistrarWindows *registrar)
 
 WindowUtilsPlugin::~WindowUtilsPlugin()
 {
+  RemoveTorrentNotification();
   if (torrent_launch_hwnd_)
     ::RemovePropW(torrent_launch_hwnd_, kTorrentLaunchPriority);
   if (window_proc_delegate_id_ >= 0 && registrar_)
@@ -1275,6 +1280,19 @@ WindowUtilsPlugin::~WindowUtilsPlugin()
     drop_target_->Release();
     drop_target_ = nullptr;
   }
+}
+
+void WindowUtilsPlugin::RemoveTorrentNotification()
+{
+  const HWND hwnd = torrent_notification_hwnd_;
+  torrent_notification_hwnd_ = nullptr;
+  if (!hwnd) return;
+  ::KillTimer(hwnd, kTorrentNotificationTimer);
+  NOTIFYICONDATAW icon{};
+  icon.cbSize = sizeof(icon);
+  icon.hWnd = hwnd;
+  icon.uID = kTorrentNotificationIcon;
+  ::Shell_NotifyIconW(NIM_DELETE, &icon);
 }
 
 void WindowUtilsPlugin::EnsureDropTargetRegistered()
@@ -1343,6 +1361,23 @@ void WindowUtilsPlugin::EnsureWindowProcDelegateRegistered()
       [this](HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
           -> std::optional<LRESULT>
       {
+        if (message == kTorrentNotificationMessage && wparam == kTorrentNotificationIcon)
+        {
+          if (lparam == NIN_BALLOONUSERCLICK || lparam == WM_LBUTTONUP || lparam == NIN_SELECT)
+          {
+            RemoveTorrentNotification();
+            // Activation is reserved for an explicit click on the notification.
+            ::ShowWindow(hwnd, ::IsIconic(hwnd) ? SW_RESTORE : SW_SHOW);
+            ::SetForegroundWindow(hwnd);
+            channel_->InvokeMethod("onTorrentNotificationClicked", nullptr);
+          }
+          return 0;
+        }
+        if (message == WM_TIMER && wparam == kTorrentNotificationTimer)
+        {
+          RemoveTorrentNotification();
+          return 0;
+        }
         if (message == WM_COPYDATA && ::GetPropW(hwnd, kTorrentLaunchPriority))
         {
           std::vector<std::string> sources;
@@ -1449,6 +1484,57 @@ void WindowUtilsPlugin::HandleMethodCall(
     std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result)
 {
   const auto method = method_call.method_name();
+
+  if (method == "notifyTorrent")
+  {
+    const auto* args = std::get_if<flutter::EncodableMap>(method_call.arguments());
+    HWND hwnd = GetTopLevelWindow(registrar_);
+    if (!args || !hwnd) {
+      result->Error("INVALID_NOTIFICATION", "Notification arguments or window unavailable.");
+      return;
+    }
+    const auto title_it = args->find(flutter::EncodableValue("title"));
+    const auto body_it = args->find(flutter::EncodableValue("body"));
+    const auto error_it = args->find(flutter::EncodableValue("isError"));
+    const auto* title = title_it == args->end() ? nullptr : std::get_if<std::string>(&title_it->second);
+    const auto* body = body_it == args->end() ? nullptr : std::get_if<std::string>(&body_it->second);
+    const auto* is_error = error_it == args->end() ? nullptr : std::get_if<bool>(&error_it->second);
+    if (!title || !body) {
+      result->Error("INVALID_NOTIFICATION", "Notification text is required.");
+      return;
+    }
+    // A cold background launch stays minimized; never restore or take focus.
+    if (!::IsWindowVisible(hwnd)) ::ShowWindow(hwnd, SW_SHOWMINNOACTIVE);
+    if (::GetForegroundWindow() != hwnd) {
+      FLASHWINFO flash{sizeof(FLASHWINFO), hwnd, FLASHW_TRAY, 3, 0};
+      ::FlashWindowEx(&flash);
+    }
+    NOTIFYICONDATAW icon{};
+    icon.cbSize = sizeof(icon);
+    icon.hWnd = hwnd;
+    icon.uID = kTorrentNotificationIcon;
+    if (!torrent_notification_hwnd_) {
+      icon.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
+      icon.uCallbackMessage = kTorrentNotificationMessage;
+      icon.hIcon = ::LoadIconW(::GetModuleHandleW(nullptr), MAKEINTRESOURCEW(IDI_APP_ICON));
+      wcscpy_s(icon.szTip, L"CB File Hub");
+      if (!::Shell_NotifyIconW(NIM_ADD, &icon)) {
+        result->Success(flutter::EncodableValue(false));
+        return;
+      }
+      torrent_notification_hwnd_ = hwnd;
+    }
+    icon.uFlags = NIF_INFO;
+    wcsncpy_s(icon.szInfoTitle, Utf8ToWide(*title).c_str(), _TRUNCATE);
+    wcsncpy_s(icon.szInfo, Utf8ToWide(*body).c_str(), _TRUNCATE);
+    icon.dwInfoFlags = (is_error && *is_error ? NIIF_ERROR : NIIF_INFO) | NIIF_RESPECT_QUIET_TIME;
+    const bool shown = ::Shell_NotifyIconW(NIM_MODIFY, &icon) != FALSE;
+    // Keep one transient icon while Windows queues successive notifications.
+    // Clean up even when Focus Assist suppresses the balloon callbacks.
+    ::SetTimer(hwnd, kTorrentNotificationTimer, 120000, nullptr);
+    result->Success(flutter::EncodableValue(shown));
+    return;
+  }
 
   if (method == "setTorrentLaunchPriority")
   {

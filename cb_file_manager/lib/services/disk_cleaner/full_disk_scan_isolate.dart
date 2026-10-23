@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:collection';
 import 'dart:ffi';
-import 'dart:io' show Platform, sleep;
+import 'dart:io' show Platform, sleep, Directory, Link, FileSystemEntityType;
 import 'dart:isolate';
 import 'dart:math' as math;
 
@@ -10,6 +10,7 @@ import 'package:ffi/ffi.dart';
 import 'package:win32/win32.dart' as win32;
 
 import 'disk_tree_node.dart';
+import 'cleaner_paths.dart';
 import 'usn_journal.dart';
 
 /// Files smaller than this are folded into a roll-up row instead of being
@@ -241,6 +242,7 @@ Future<FullDiskScanHandle> spawnFullDiskScan({
   List<String> trackedDirtyDirectories = const <String>[],
   bool hasTrackedChanges = false,
   bool useNativeScanner = true,
+  bool usePortableScanner = false,
   void Function(FullDiskScanResult result)? onCompleted,
 }) async {
   final receivePort = ReceivePort();
@@ -258,6 +260,7 @@ Future<FullDiskScanHandle> spawnFullDiskScan({
     trackedDirtyDirectories: trackedDirtyDirectories,
     hasTrackedChanges: hasTrackedChanges,
     useNativeScanner: useNativeScanner,
+    usePortableScanner: usePortableScanner,
   );
 
   final isolate = await Isolate.spawn(_fullDiskScanWorker, args);
@@ -557,7 +560,7 @@ win32.HANDLE _findFirstFile(
   return win32.FindFirstFile(win32.PCWSTR(searchPath), findData).value;
 }
 
-void _fullDiskScanWorker(_FullScanArgs args) {
+Future<void> _fullDiskScanWorker(_FullScanArgs args) async {
   final sendPort = args.sendPort;
   final inaccessible = <String>[];
   final coverageIssues = <FullDiskScanCoverageIssue>[];
@@ -572,8 +575,8 @@ void _fullDiskScanWorker(_FullScanArgs args) {
       .where((rule) => rule.includeGlobs.isEmpty)
       .map(
         (rule) => _WorkerWholeDirRule(
-          path: rule.basePath.toUpperCase(),
-          prefix: '${rule.basePath.toUpperCase()}\\',
+          path: CleanerPaths.key(rule.basePath),
+          prefix: CleanerPaths.prefix(rule.basePath),
           categoryId: rule.categoryId,
         ),
       )
@@ -582,7 +585,7 @@ void _fullDiskScanWorker(_FullScanArgs args) {
       .where((rule) => rule.includeGlobs.isNotEmpty)
       .map(
         (rule) => _WorkerGlobRule(
-          basePath: rule.basePath.toUpperCase(),
+          basePath: CleanerPaths.key(rule.basePath),
           categoryId: rule.categoryId,
           globs: rule.includeGlobs.map(_globToRegex).toList(growable: false),
         ),
@@ -599,7 +602,7 @@ void _fullDiskScanWorker(_FullScanArgs args) {
   }
 
   final useNativeScanner =
-      args.useNativeScanner && Platform.isWindows && CbNative.isAvailable;
+      args.useNativeScanner && !args.usePortableScanner && CbNative.isAvailable;
   final nativeWholeDirRules = [
     for (final rule in wholeDirRules)
       NativeWholeDirRule(
@@ -611,7 +614,7 @@ void _fullDiskScanWorker(_FullScanArgs args) {
   final nativeGlobRules = [
     for (final rule in args.junkRules.where((r) => r.includeGlobs.isNotEmpty))
       NativeGlobRule(
-        upperBasePath: rule.basePath.toUpperCase(),
+        upperBasePath: CleanerPaths.key(rule.basePath),
         category: nativeCategory(rule.categoryId),
         // The Dart globs match case-insensitively against upper-cased names.
         upperGlobs: [for (final glob in rule.includeGlobs) glob.toUpperCase()],
@@ -637,7 +640,7 @@ void _fullDiskScanWorker(_FullScanArgs args) {
       args.baseRoot != null && args.journalCursor != null;
 
   String? wholeDirCategory(String path) {
-    final upperPath = path.toUpperCase();
+    final upperPath = CleanerPaths.key(path);
     for (final rule in wholeDirRules) {
       if (upperPath == rule.path || upperPath.startsWith(rule.prefix)) {
         return rule.categoryId;
@@ -648,11 +651,11 @@ void _fullDiskScanWorker(_FullScanArgs args) {
 
   List<_WorkerGlobRule>? globRulesForDirectory(String path) {
     if (globRules.isEmpty) return null;
-    final directoryPath = path.toUpperCase();
+    final directoryPath = CleanerPaths.key(path);
     List<_WorkerGlobRule>? matches;
     for (final rule in globRules) {
       if (directoryPath != rule.basePath &&
-          !directoryPath.startsWith('${rule.basePath}\\')) {
+          !directoryPath.startsWith(CleanerPaths.prefix(rule.basePath))) {
         continue;
       }
       (matches ??= <_WorkerGlobRule>[]).add(rule);
@@ -1079,7 +1082,8 @@ void _fullDiskScanWorker(_FullScanArgs args) {
       final dir = nodes[record.id]!;
       ownActivity[record.id] = record.newestActivityFileTime;
       final dirPath = dir.fullPath;
-      final separator = dirPath.endsWith('\\') ? '' : '\\';
+      final sep = CleanerPaths.isPosix(dirPath) ? '/' : '\\';
+      final separator = dirPath.endsWith(sep) ? '' : sep;
       switch (record.status) {
         case NativeDirStatus.inaccessible:
           inaccessible.add(dirPath);
@@ -1246,6 +1250,196 @@ void _fullDiskScanWorker(_FullScanArgs args) {
     return true;
   }
 
+  // Portable fallback runs in this scan isolate, never on Flutter's UI isolate.
+  void scanPortableInto(
+    DiskTreeNode node,
+    int depth,
+    String? inherited,
+    bool replace,
+  ) {
+    if (replace) {
+      node.replaceChildren(const []);
+      node.sizeBytes = 0;
+      node.fileCount = 0;
+    }
+    node.junkCategoryId = inherited ?? wholeDirCategory(node.fullPath);
+    totalDirs++;
+    maybeFlush(node.fullPath);
+    if (depth >= args.maxDepth) {
+      coverageIssues.add(
+        FullDiskScanCoverageIssue(
+          path: node.fullPath,
+          reason: FullDiskScanCoverageIssueReason.maxDepthReached,
+        ),
+      );
+      return;
+    }
+    final retained = <DiskTreeNode>[];
+    var foldedBytes = 0;
+    var foldedFiles = 0;
+    var foldedJunk = 0;
+    var newestTicks = 0;
+    void fold(DiskTreeNode file) {
+      foldedBytes += file.sizeBytes;
+      foldedFiles += file.fileCount;
+      foldedJunk += file.junkBytes;
+    }
+
+    final matchingGlobs = globRulesForDirectory(node.fullPath);
+    try {
+      for (final entity in Directory(
+        node.fullPath,
+      ).listSync(followLinks: false)) {
+        final path = entity.path;
+        final name = path.substring(
+          path.lastIndexOf(Platform.pathSeparator) + 1,
+        );
+        if (entity is Link) {
+          coverageIssues.add(
+            FullDiskScanCoverageIssue(
+              path: path,
+              reason: FullDiskScanCoverageIssueReason.reparsePoint,
+            ),
+          );
+          continue;
+        }
+        final key = CleanerPaths.key(path);
+        if (key == '/Volumes' || key == '/System/Volumes') {
+          coverageIssues.add(
+            FullDiskScanCoverageIssue(
+              path: path,
+              reason: FullDiskScanCoverageIssueReason.reparsePoint,
+              detail: 'Mounted volumes are scanned separately.',
+            ),
+          );
+          continue;
+        }
+        try {
+          final stat = entity.statSync();
+          final activity =
+              stat.type == FileSystemEntityType.directory ||
+                  stat.modified.isAfter(stat.accessed)
+              ? stat.modified
+              : stat.accessed;
+          final ticks =
+              activity.millisecondsSinceEpoch * 10000 + 116444736000000000;
+          newestTicks = math.max(newestTicks, ticks);
+          if (stat.type == FileSystemEntityType.directory) {
+            final child = DiskTreeNode(name: name, fullPath: path);
+            node.addChild(child);
+            scanPortableInto(child, depth + 1, node.junkCategoryId, false);
+            node.sizeBytes += child.sizeBytes;
+            node.fileCount += child.fileCount;
+            final childNewest = math.max(
+              ticks,
+              subtreeActivity.remove(child) ?? 0,
+            );
+            newestTicks = math.max(newestTicks, childNewest);
+            if (child.sizeBytes >= defaultOldLargeDirectoryBytes) {
+              retainOldLargeDiskInsight(
+                oldLargeDirectories,
+                FullDiskScanInsight(
+                  name: name,
+                  path: path,
+                  isFile: false,
+                  sizeBytes: child.sizeBytes,
+                  lastModified: _fileTimeFromTicks(childNewest),
+                ),
+                now: scanStartedAt,
+              );
+            }
+          } else if (stat.type == FileSystemEntityType.file) {
+            final category =
+                node.junkCategoryId ?? globCategory(name, matchingGlobs);
+            final file = DiskTreeNode(
+              name: name,
+              fullPath: path,
+              isFile: true,
+              sizeBytes: stat.size,
+              fileCount: 1,
+              junkCategoryId: category,
+            );
+            node.sizeBytes += stat.size;
+            node.fileCount++;
+            totalFiles++;
+            totalBytes += stat.size;
+            if (stat.size >= defaultOldLargeFileBytes) {
+              retainOldLargeDiskInsight(
+                oldLargeFiles,
+                FullDiskScanInsight(
+                  name: name,
+                  path: path,
+                  isFile: true,
+                  sizeBytes: stat.size,
+                  lastModified: stat.modified,
+                  lastAccessed: stat.accessed,
+                ),
+                now: scanStartedAt,
+              );
+            }
+            if (stat.size < args.minDisplayEntryBytes ||
+                args.maxChildrenPerDirectory <= 0) {
+              fold(file);
+            } else if (retained.length >= args.maxChildrenPerDirectory &&
+                stat.size <= retained.first.sizeBytes) {
+              fold(file);
+            } else {
+              if (retained.length >= args.maxChildrenPerDirectory) {
+                fold(retained.removeAt(0));
+              }
+              var index = 0;
+              while (index < retained.length &&
+                  retained[index].sizeBytes <= stat.size) {
+                index++;
+              }
+              retained.insert(index, file);
+            }
+          }
+        } catch (error) {
+          inaccessible.add(path);
+          coverageIssues.add(
+            FullDiskScanCoverageIssue(
+              path: path,
+              reason: FullDiskScanCoverageIssueReason.inaccessible,
+              detail: '$error',
+            ),
+          );
+        }
+        maybeFlush(path);
+      }
+    } catch (error) {
+      inaccessible.add(node.fullPath);
+      coverageIssues.add(
+        FullDiskScanCoverageIssue(
+          path: node.fullPath,
+          reason: FullDiskScanCoverageIssueReason.inaccessible,
+          detail: '$error',
+        ),
+      );
+    }
+    for (final file in retained) {
+      node.addChild(file);
+    }
+    if (foldedFiles > 0) {
+      final aggregate = DiskTreeNode(
+        name: '',
+        fullPath: '',
+        isFile: true,
+        sizeBytes: foldedBytes,
+        fileCount: foldedFiles,
+        aggregatedItemCount: foldedFiles,
+      );
+      aggregate.cacheJunkMetadata(
+        junkBytes: foldedJunk,
+        hasJunkChildren: foldedJunk > 0,
+      );
+      node.addChild(aggregate);
+    }
+    node.sortBySize(recursive: false);
+    cacheDirectJunkMetadata(node);
+    subtreeActivity[node] = newestTicks;
+  }
+
   void scanSubtree(
     DiskTreeNode node,
     int depth, [
@@ -1256,10 +1450,16 @@ void _fullDiskScanWorker(_FullScanArgs args) {
         nativeScanInto(node, depth, inheritedJunkCategory, replaceExisting)) {
       return;
     }
-    scanInto(node, depth, inheritedJunkCategory, replaceExisting);
+    if (!Platform.isWindows || args.usePortableScanner) {
+      scanPortableInto(node, depth, inheritedJunkCategory, replaceExisting);
+    } else {
+      scanInto(node, depth, inheritedJunkCategory, replaceExisting);
+    }
   }
 
-  final driveName = args.drivePath.endsWith('\\')
+  final driveName = CleanerPaths.isPosix(args.drivePath)
+      ? args.drivePath
+      : args.drivePath.endsWith('\\')
       ? args.drivePath
       : '${args.drivePath}\\';
   FullDiskScanMode scanMode = FullDiskScanMode.full;
@@ -1317,17 +1517,17 @@ void _fullDiskScanWorker(_FullScanArgs args) {
 
     final dirtyCandidates = <String>{};
     if (args.journalCursor != null && canReadJournalChanges) {
-      final journal = DiskUsnJournalReader.readChanges(
+      final journal = await DiskUsnJournalReader.readChangesAsync(
         drivePath: args.drivePath,
         previous: args.journalCursor!,
+        useNative: args.useNativeScanner,
       );
       if (!journal.isUsable || journal.cursor == null) {
         incrementalFallbackReason = journal.failureReason;
       } else {
         nextJournalCursor = journal.cursor;
-        for (final change in journal.changes) {
-          final parentPath =
-              directoryPathsById[change.parentFileReferenceNumber];
+        for (final parentId in journal.parentIds) {
+          final parentPath = directoryPathsById[parentId];
           if (parentPath == null) {
             incrementalFallbackReason =
                 'The cached tree has no file ID for a changed directory; '
@@ -1649,6 +1849,7 @@ void foldDirectoryForDisplay(
 // ---------------------------------------------------------------------------
 
 class _FullScanArgs {
+  final bool usePortableScanner;
   final SendPort sendPort;
   final String drivePath;
   final int maxDepth;
@@ -1666,6 +1867,7 @@ class _FullScanArgs {
   /// compare against the Dart walker.
   final bool useNativeScanner;
   const _FullScanArgs({
+    this.usePortableScanner = false,
     required this.sendPort,
     required this.drivePath,
     this.maxDepth = 20,

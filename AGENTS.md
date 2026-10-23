@@ -194,6 +194,30 @@ calling isolate:
   Dart return the same items and document text.
   Every caller keeps its Dart code as the fallback.
 
+- Additional background jobs read image display dimensions from headers,
+  transcode full-resolution images for crop/frame dialogs, validate batches of
+  cached video paths, create ZIP backups/read selected ZIP members, parse
+  torrent metainfo and hash its original `info` bytes, stream Recycle Bin
+  metadata through four bounded readers, and read/deduplicate USN parent IDs
+  before incremental refresh. `test/services/native_additional_jobs_test.dart`
+  and `test/services/torrent/native_torrent_metainfo_test.dart` check the FFI
+  paths against Dart. App storage attribution uses `PathRootSizeIndex` in Dart
+  to avoid pairwise root comparisons without transferring the scan tree over
+  FFI. Native jobs remain optional, and image/ZIP/torrent fallbacks run off the
+  UI isolate too.
+
+- Interactive jobs (`NativeUiJobs`, ABI 6) handle thumbnail cache eviction
+  plans, prefix-limited directory suggestions, direct child counts and streamed
+  Smart Album media scans. Regex album rules retain Dart's ECMAScript semantics
+  in a cancellable isolate. Global tag searches and imports use batched native
+  existence checks; imports commit bounded SQLite batches. Archive browsing
+  caches a directory index for two archives, invalidated by file metadata, and
+  returns only the requested children. Preview syntax is tokenized on Rust
+  threads with pure-Rust syntect or a Dart isolate for unsupported grammars;
+  bounded token caching lets theme changes reuse the result. Fallback/parity
+  coverage lives in `test/services/native_ui_jobs_test.dart` and
+  `test/models/database/tag_import_batch_test.dart`.
+
 - **Optional by design:** if cargo, the rustup target or the build is missing,
   the hook prints `cb_native: ...` and bundles nothing; `CbNative.isAvailable`
   is then false and the Dart code runs. All crates are pure Rust, so cross

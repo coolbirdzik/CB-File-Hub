@@ -565,6 +565,41 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
     }
   }
 
+  /// Preserve row order, last-write-wins normalization and per-row failures,
+  /// while committing a bounded import chunk in one SQLite transaction.
+  Future<List<bool>> addTagsToFiles(List<(String, String)> rows) async {
+    final result = [for (final row in rows) row.$2.trim().isEmpty];
+    final positions = <int>[];
+    try {
+      final database = await getDatabase();
+      await database.transaction((txn) async {
+        final batch = txn.batch();
+        final now = _now();
+        for (var i = 0; i < rows.length; i++) {
+          final (path, tag) = rows[i];
+          final trimmed = tag.trim();
+          if (trimmed.isEmpty) continue;
+          positions.add(i);
+          batch.insert('file_tags', <String, Object?>{
+            'file_path': path,
+            'tag': trimmed,
+            'normalized_tag': _normalizeTag(trimmed),
+            'created_at': now,
+          }, conflictAlgorithm: ConflictAlgorithm.replace);
+        }
+        final committed = await batch.commit(continueOnError: true);
+        for (var i = 0; i < committed.length; i++) {
+          result[positions[i]] = committed[i] is! DatabaseException;
+        }
+      });
+    } catch (_) {
+      for (final i in positions) {
+        result[i] = false;
+      }
+    }
+    return result;
+  }
+
   @override
   Future<bool> removeTagFromFile(String filePath, String tag) async {
     try {

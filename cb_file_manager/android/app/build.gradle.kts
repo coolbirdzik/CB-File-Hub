@@ -54,12 +54,38 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        externalNativeBuild {
+            cmake {
+                // Match the existing packaging exclusion without setting NDK
+                // filters, which conflict with Flutter's split-per-ABI builds.
+                abiFilters += listOf("arm64-v8a", "x86_64")
+                arguments += listOf(
+                    "-DANDROID_STL=c++_static",
+                    "-DCB_LLAMA_PACKAGE_ROOT=${layout.buildDirectory.dir("generated/llamaJniLibs").get().asFile.invariantSeparatorsPath}",
+                )
+                targets += "llama-server"
+            }
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
+    }
+    sourceSets {
+        getByName("debug").jniLibs.srcDir(layout.buildDirectory.dir("generated/llamaJniLibs/debug"))
+        getByName("profile").jniLibs.srcDir(layout.buildDirectory.dir("generated/llamaJniLibs/profile"))
+        getByName("release").jniLibs.srcDir(layout.buildDirectory.dir("generated/llamaJniLibs/release"))
     }
 
     packaging {
         jniLibs {
             excludes += "**/armeabi-v7a/**"
-            useLegacyPackaging = false
+            // Process.start needs the executable in nativeLibraryDir. Executing
+            // a binary copied into writable app storage is blocked on Android 10+.
+            useLegacyPackaging = true
         }
     }
 
@@ -82,6 +108,15 @@ android {
                 signingConfigs.getByName("debug")
             }
         }
+    }
+}
+
+// Executables are not collected as shared libraries by AGP. Build them before
+// AGP reads the generated jniLibs source directories for APK/AAB packaging.
+tasks.configureEach {
+    if (name.startsWith("merge") && name.endsWith("JniLibFolders")) {
+        val variant = name.removePrefix("merge").removeSuffix("JniLibFolders")
+        dependsOn("externalNativeBuild$variant")
     }
 }
 

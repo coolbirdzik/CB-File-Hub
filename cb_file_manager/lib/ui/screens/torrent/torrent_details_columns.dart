@@ -51,6 +51,9 @@ class TorrentDetailsColumns {
     required Map<String, TorrentEntry> entries,
     required Set<String> visible,
     required String Function(int) formatSize,
+    void Function(String field)? onSort,
+    String? sortField,
+    bool sortAscending = true,
   }) => [
     for (final column in _widths.entries)
       FileDetailsColumn(
@@ -58,6 +61,8 @@ class TorrentDetailsColumns {
         label: l.torrentColumn(column.key),
         width: column.value,
         visible: visible.contains(column.key),
+        onSort: onSort == null ? null : () => onSort(column.key),
+        sortAscending: sortField == column.key ? sortAscending : null,
         description: const {'seeds', 'peers'}.contains(column.key)
             ? l.torrentColumn('${column.key}Hint')
             : null,

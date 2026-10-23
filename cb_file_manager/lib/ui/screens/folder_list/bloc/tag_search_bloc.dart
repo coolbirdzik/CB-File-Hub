@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/helpers/core/batch_file_probe.dart';
 import 'package:path/path.dart' as path;
 import 'package:cb_file_manager/helpers/core/search_request_guard.dart';
 import 'package:cb_file_manager/helpers/core/search_query.dart';
@@ -379,12 +380,8 @@ class TagSearchBloc extends Bloc<TagSearchEvent, TagSearchState> {
     try {
       TagManager.clearCache();
       final results = await TagManager.findFilesByTagGlobally(event.tag);
-      final validPaths = <String>[];
-      for (final entity in results) {
-        if (entity is File && entity.existsSync()) {
-          validPaths.add(entity.path);
-        }
-      }
+      final validFiles = await existingTaggedFiles(results);
+      final validPaths = validFiles.map((f) => f.path).toList();
       if (!_searchRequests.isCurrent(request) || emit.isDone) return;
       emit(
         state.copyWith(
@@ -479,26 +476,22 @@ class TagSearchBloc extends Bloc<TagSearchEvent, TagSearchState> {
         return;
       }
 
-      var results = await TagManager.findFilesByTagGlobally(event.tags.first);
-
-      for (int i = 1; i < event.tags.length; i++) {
-        final filtered = <FileSystemEntity>[];
-        for (final entity in results) {
-          if (entity is File && entity.existsSync()) {
-            final tags = await TagManager.getTags(entity.path);
-            if (tags.any(
-              (tag) => TextUtils.matchesSearch(tag, event.tags[i]),
-            )) {
-              filtered.add(entity);
-            }
-          }
-        }
-        results = filtered;
-      }
-
-      final validPaths = results
-          .whereType<File>()
-          .where((f) => f.existsSync())
+      final results = await TagManager.findFilesByTagGlobally(event.tags.first);
+      final valid = await existingTaggedFiles(results);
+      if (!_searchRequests.isCurrent(request) || emit.isDone) return;
+      final tagsByPath = await TagManager.getTagsForFiles(
+        valid.map((f) => f.path).toList(),
+      );
+      final validPaths = valid
+          .where((file) {
+            final tags = tagsByPath[file.path] ?? const <String>[];
+            return event.tags
+                .skip(1)
+                .every(
+                  (query) =>
+                      tags.any((tag) => TextUtils.matchesSearch(tag, query)),
+                );
+          })
           .map((f) => f.path)
           .toList();
 

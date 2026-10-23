@@ -7,7 +7,7 @@
 //! `..`, drive letters) and links are skipped.
 
 use std::fs::{self, File};
-use std::io::{self, BufReader, Read};
+use std::io::{self, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, UNIX_EPOCH};
@@ -37,6 +37,91 @@ const CHUNK: usize = 256 * 1024;
 const DONE: usize = 0;
 const TOTAL: usize = 1;
 const ENTRIES: usize = 2;
+
+/// Stream a set of named files to ZIP. Only explicitly supplied files enter it.
+pub fn start_create_zip(port: i64, config: &[u8]) -> Option<Arc<Job>> {
+    let mut r = Reader::new(config);
+    let target = r.str()?;
+    let count = r.u32()?;
+    let mut files = Vec::new();
+    for _ in 0..count {
+        let path = r.str()?;
+        let name = r.str()?;
+        safe_relative(&name)?;
+        files.push((path, name));
+    }
+    if !r.is_empty() {
+        return None;
+    }
+    Some(Job::spawn(port, "cb_create_zip", move |job| {
+        let result = (|| {
+            let mut zip = zip::ZipWriter::new(File::create(&target).map_err(err)?);
+            let options = zip::write::SimpleFileOptions::default()
+                .compression_method(zip::CompressionMethod::Deflated);
+            let mut buffer = vec![0u8; CHUNK];
+            for (path, name) in files {
+                if job.cancelled() {
+                    return Ok(());
+                }
+                job.set_current(&path);
+                let mut file = open(&path)?;
+                zip.start_file(name, options).map_err(err)?;
+                loop {
+                    if job.cancelled() {
+                        return Ok(());
+                    }
+                    let n = file.read(&mut buffer).map_err(err)?;
+                    if n == 0 {
+                        break;
+                    }
+                    zip.write_all(&buffer[..n]).map_err(err)?;
+                    job.add_counter(DONE, n as u64);
+                }
+            }
+            zip.finish().map_err(err)?;
+            Ok(())
+        })();
+        if result.is_err() || job.cancelled() {
+            let _ = fs::remove_file(&target);
+        }
+        result
+    }))
+}
+
+/// Read one member by name, leaving the rest of a ZIP compressed/on disk.
+/// A missing member is a successful empty response; failures use job errors.
+pub fn start_read_zip_entry(port: i64, config: &[u8]) -> Option<Arc<Job>> {
+    let mut r = Reader::new(config);
+    let path = r.str()?;
+    let name = r.str()?;
+    if !r.is_empty() {
+        return None;
+    }
+    Some(Job::spawn(port, "cb_read_zip_entry", move |job| {
+        let mut zip = zip::ZipArchive::new(open(&path)?).map_err(err)?;
+        let mut entry = match zip.by_name(&name) {
+            Ok(entry) => entry,
+            Err(zip::result::ZipError::FileNotFound) => {
+                job.append(&[0]);
+                return Ok(());
+            }
+            Err(e) => return Err(err(e)),
+        };
+        job.append(&[1]);
+        let mut buffer = vec![0u8; CHUNK];
+        loop {
+            if job.cancelled() {
+                return Ok(());
+            }
+            let n = entry.read(&mut buffer).map_err(err)?;
+            if n == 0 {
+                break;
+            }
+            job.append(&buffer[..n]);
+        }
+        Ok(())
+    }))
+}
 
 fn err(e: impl std::fmt::Display) -> String {
     e.to_string()
@@ -257,13 +342,17 @@ fn list_seven_zip(path: &str) -> Result<Vec<EntryInfo>, String> {
         .collect())
 }
 
-fn list(job: &Job, path: &str, format: u8) -> Result<(), String> {
-    let entries = match format {
+fn read_entries(job: &Job, path: &str, format: u8) -> Result<Vec<EntryInfo>, String> {
+    Ok(match format {
         ZIP => list_zip(path)?,
         TAR | TAR_GZ | TAR_BZ2 | TAR_XZ => list_tar(job, path, format)?,
         SEVEN_ZIP => list_seven_zip(path)?,
         _ => return Err(format!("cannot list format {format}")),
-    };
+    })
+}
+
+fn list(job: &Job, path: &str, format: u8) -> Result<(), String> {
+    let entries = read_entries(job, path, format)?;
     let mut out = Writer::default();
     for entry in entries.iter().filter(|entry| !entry.name.is_empty()) {
         out.str(&entry.name);
@@ -275,6 +364,141 @@ fn list(job: &Job, path: &str, format: u8) -> Result<(), String> {
     }
     job.append(&out.into_bytes());
     Ok(())
+}
+
+type ChildNames = (Vec<String>, Vec<String>);
+struct DirectoryIndex {
+    path: String,
+    format: u8,
+    fingerprint: (
+        u64,
+        Option<std::time::SystemTime>,
+        Option<std::time::SystemTime>,
+    ),
+    directories: std::collections::HashMap<String, ChildNames>,
+}
+static DIRECTORY_CACHE: std::sync::OnceLock<
+    std::sync::Mutex<std::collections::VecDeque<Arc<DirectoryIndex>>>,
+> = std::sync::OnceLock::new();
+
+fn fingerprint(
+    path: &str,
+) -> Result<
+    (
+        u64,
+        Option<std::time::SystemTime>,
+        Option<std::time::SystemTime>,
+    ),
+    String,
+> {
+    let m = fs::metadata(path).map_err(err)?;
+    Ok((m.len(), m.modified().ok(), m.created().ok()))
+}
+
+/// Cached archive directory index: only names in the requested folder cross FFI.
+pub fn start_children(port: i64, config: &[u8]) -> Option<Arc<Job>> {
+    let mut r = Reader::new(config);
+    let path = r.str()?;
+    let format = r.u8()?;
+    let inner = r.str()?;
+    if !r.is_empty() || matches!(format, GZIP | BZIP2) {
+        return None;
+    }
+    Some(Job::spawn(port, "cb_archive_children", move |job| {
+        use crate::{
+            job::lock,
+            normalize::{dart_compare, dart_lower},
+        };
+        use std::collections::{BTreeSet, HashMap};
+        let key = fs::canonicalize(&path)
+            .map_err(err)?
+            .to_string_lossy()
+            .into_owned();
+        let before = fingerprint(&path)?;
+        let cache = DIRECTORY_CACHE.get_or_init(Default::default);
+        let cached = {
+            let mut entries = lock(cache);
+            let pos = entries
+                .iter()
+                .position(|e| e.path == key && e.format == format && e.fingerprint == before);
+            pos.and_then(|i| entries.remove(i))
+                .inspect(|e| entries.push_front(Arc::clone(e)))
+        };
+        let index = if let Some(index) = cached {
+            index
+        } else {
+            let entries = read_entries(job, &path, format)?;
+            let entry_count = entries.len();
+            let mut dirs: HashMap<String, (BTreeSet<String>, BTreeSet<String>)> = HashMap::new();
+            let mut cost = 0usize;
+            for entry in entries {
+                if job.cancelled() {
+                    return Ok(());
+                }
+                let parts: Vec<&str> = entry.name.split('/').filter(|s| !s.is_empty()).collect();
+                let mut parent = String::new();
+                for (i, part) in parts.iter().enumerate() {
+                    cost += parent.len() + part.len();
+                    let children = dirs.entry(parent.clone()).or_default();
+                    if i + 1 < parts.len() || entry.is_dir {
+                        children.0.insert((*part).to_string());
+                    } else {
+                        children.1.insert((*part).to_string());
+                    }
+                    if !parent.is_empty() {
+                        parent.push('/');
+                    }
+                    parent.push_str(part);
+                }
+            }
+            let mut directories = HashMap::new();
+            for (path, (folders, files)) in dirs {
+                let sorted = |set: BTreeSet<String>| {
+                    let mut names: Vec<_> = set.into_iter().map(|s| (dart_lower(&s), s)).collect();
+                    names.sort_by(|a, b| dart_compare(&a.0, &b.0));
+                    names.into_iter().map(|(_, s)| s).collect()
+                };
+                directories.insert(path, (sorted(folders), sorted(files)));
+            }
+            if fingerprint(&path)? != before {
+                return Err("archive changed while being indexed".into());
+            }
+            let index = Arc::new(DirectoryIndex {
+                path: key.clone(),
+                format,
+                fingerprint: before,
+                directories,
+            });
+            if entry_count <= 200_000 && cost <= 32 * 1024 * 1024 {
+                let mut entries = lock(cache);
+                entries.retain(|e| e.path != key || e.format != format);
+                entries.push_front(Arc::clone(&index));
+                entries.truncate(2);
+            }
+            index
+        };
+        let inner = normalize(&inner)
+            .split('/')
+            .filter(|s| !s.is_empty())
+            .collect::<Vec<_>>()
+            .join("/");
+        let mut out = Writer::default();
+        if let Some((folders, files)) = index.directories.get(&inner) {
+            out.u32(folders.len() as u32);
+            for name in folders {
+                out.str(name);
+            }
+            out.u32(files.len() as u32);
+            for name in files {
+                out.str(name);
+            }
+        } else {
+            out.u32(0);
+            out.u32(0);
+        }
+        job.append(&out.into_bytes());
+        Ok(())
+    }))
 }
 
 /// Where an entry goes: under its own path for a full extraction, or flat

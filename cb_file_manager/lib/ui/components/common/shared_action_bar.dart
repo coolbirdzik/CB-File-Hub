@@ -17,7 +17,7 @@ class SharedActionBar {
     SortOption option,
     String label,
     IconData icon,
-    SortOption currentOption,
+    SortOption? currentOption,
   ) {
     final theme = Theme.of(context);
     final isActive = option == currentOption;
@@ -55,34 +55,11 @@ class SharedActionBar {
     );
   }
 
-  static bool _isAscendingSortOption(SortOption option) {
-    switch (option) {
-      case SortOption.nameAsc:
-      case SortOption.dateAsc:
-      case SortOption.sizeAsc:
-      case SortOption.typeAsc:
-      case SortOption.dateCreatedAsc:
-      case SortOption.extensionAsc:
-      case SortOption.attributesAsc:
-      case SortOption.dateAccessedAsc:
-      case SortOption.pathAsc:
-        return true;
-      case SortOption.nameDesc:
-      case SortOption.dateDesc:
-      case SortOption.sizeDesc:
-      case SortOption.typeDesc:
-      case SortOption.dateCreatedDesc:
-      case SortOption.extensionDesc:
-      case SortOption.attributesDesc:
-      case SortOption.dateAccessedDesc:
-      case SortOption.pathDesc:
-        return false;
-    }
-  }
+  static bool _isAscendingSortOption(SortOption option) => option.ascending;
 
-  static List<PopupMenuEntry<SortOption>> _buildSortMenuItems(
+  static List<PopupMenuEntry<SortOption>> buildSortMenuItems(
     BuildContext context,
-    SortOption currentOption,
+    SortOption? currentOption,
     Set<SortOption> allowedOptions,
   ) {
     final l10n = AppLocalizations.of(context)!;
@@ -236,6 +213,26 @@ class SharedActionBar {
         currentOption,
       ),
     ]);
+    for (final column in DetailsColumn.values.where((c) => c.isAvailable)) {
+      final pair = column.sortOptions;
+      if (pair == null || pair.$1.metadataColumn == null) continue;
+      addGroup([
+        buildSortMenuItem(
+          context,
+          pair.$1,
+          '${column.label(l10n)} ↑',
+          column.icon,
+          currentOption,
+        ),
+        buildSortMenuItem(
+          context,
+          pair.$2,
+          '${column.label(l10n)} ↓',
+          column.icon,
+          currentOption,
+        ),
+      ]);
+    }
     return entries;
   }
 
@@ -659,6 +656,8 @@ class SharedActionBar {
     bool isPreviewPaneVisible = true,
     bool showDesktopViewModes = false,
     Set<SortOption>? allowedSortOptions,
+    bool allowMetadataSorting = false,
+    Widget? sortAction,
     Set<ViewMode>? allowedViewModes,
     bool showMoreOptions = true,
     List<PopupMenuEntry<String>>? additionalMoreOptions,
@@ -685,19 +684,27 @@ class SharedActionBar {
 
     // Add sort button
     actions.add(
-      PopupMenuButton<SortOption>(
-        key: const ValueKey('shared-sort-menu'),
-        icon: const Icon(PhosphorIconsLight.sortAscending),
-        tooltip: l10n.sortByTooltip,
-        offset: const Offset(0, 50),
-        initialValue: currentSortOption,
-        onSelected: onSortOptionSelected,
-        itemBuilder: (context) => _buildSortMenuItems(
-          context,
-          currentSortOption,
-          allowedSortOptions ?? SortOption.values.toSet(),
-        ),
-      ),
+      sortAction ??
+          PopupMenuButton<SortOption>(
+            key: const ValueKey('shared-sort-menu'),
+            icon: const Icon(PhosphorIconsLight.sortAscending),
+            tooltip: l10n.sortByTooltip,
+            offset: const Offset(0, 50),
+            initialValue: currentSortOption,
+            onSelected: onSortOptionSelected,
+            itemBuilder: (context) => buildSortMenuItems(
+              context,
+              currentSortOption,
+              allowedSortOptions ??
+                  SortOption.values
+                      .where(
+                        (option) =>
+                            allowMetadataSorting ||
+                            option.metadataColumn == null,
+                      )
+                      .toSet(),
+            ),
+          ),
     );
 
     // Add grid size popover if in grid mode

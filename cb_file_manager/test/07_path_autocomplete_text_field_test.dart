@@ -3,6 +3,43 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  testWidgets('IME commit refreshes suggestions even when text is unchanged', (
+    tester,
+  ) async {
+    final controller = TextEditingController();
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: PathAutocompleteTextField(
+            controller: controller,
+            onSubmitted: (_) {},
+            recentPathsLoader: () async => ['/recent/one', '/recent/two'],
+            decoration: const InputDecoration(),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.byType(TextField));
+    await tester.pumpAndSettle();
+    controller.value = const TextEditingValue(
+      text: 'two',
+      selection: TextSelection.collapsed(offset: 3),
+      composing: TextRange(start: 0, end: 3),
+    );
+    await tester.pump(const Duration(milliseconds: 250));
+    expect(find.text('/recent/two'), findsNothing);
+    controller.value = controller.value.copyWith(composing: TextRange.empty);
+    await tester.pump(const Duration(milliseconds: 250));
+    expect(find.text('/recent/two'), findsOneWidget);
+    expect(find.text('/recent/one'), findsNothing);
+    // A caret move must retain the current suggestions.
+    controller.selection = const TextSelection.collapsed(offset: 1);
+    await tester.pump(const Duration(milliseconds: 250));
+    expect(find.text('/recent/two'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets('07.01 shows recent paths on focus and filters on typing', (
     tester,
   ) async {

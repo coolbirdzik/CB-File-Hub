@@ -8,6 +8,23 @@ import 'package:flutter_test/flutter_test.dart';
 const _mb = 1024 * 1024;
 const _gb = 1024 * _mb;
 
+class _ObservedTree extends DiskTreeNode {
+  _ObservedTree({
+    required super.name,
+    required super.fullPath,
+    required super.sizeBytes,
+    required super.children,
+  });
+
+  int childrenReads = 0;
+
+  @override
+  List<DiskTreeNode> get children {
+    childrenReads++;
+    return super.children;
+  }
+}
+
 void main() {
   DiskTreeNode file(String dir, String name, int size) => DiskTreeNode(
     name: name,
@@ -28,7 +45,7 @@ void main() {
   final movie = file(r'C:\Videos', 'movie.mkv', 3 * _gb);
   final iso = file(r'C:\Images', 'win.iso', 5 * _gb);
   final small = file(r'C:\Images', 'note.txt', 200 * _mb);
-  final root = DiskTreeNode(
+  final root = _ObservedTree(
     name: r'C:\',
     fullPath: r'C:\',
     sizeBytes: movie.sizeBytes + iso.sizeBytes + small.sizeBytes,
@@ -160,5 +177,33 @@ void main() {
     await tester.tap(find.textContaining('Videos'));
     await tester.pumpAndSettle();
     expect(row(movie), findsOneWidget);
+  });
+
+  testWidgets('unchanged dashboard rebuilds reuse whole-tree searches', (
+    tester,
+  ) async {
+    await pump(tester);
+
+    Future<void> rebuildWithoutWalkingTree() async {
+      root.childrenReads = 0;
+      tester.element(find.byType(CleanerDashboard)).markNeedsBuild();
+      await tester.pumpAndSettle();
+      expect(root.childrenReads, 0);
+    }
+
+    await rebuildWithoutWalkingTree();
+    await tester.tap(
+      find.byKey(const ValueKey('cleaner-dashboard-card-largeFiles')),
+    );
+    await tester.pumpAndSettle();
+    await rebuildWithoutWalkingTree();
+    expect(row(iso), findsOneWidget);
+
+    await tester.tap(
+      find.byKey(const ValueKey('cleaner-dashboard-card-fileTypes')),
+    );
+    await tester.pumpAndSettle();
+    await rebuildWithoutWalkingTree();
+    expect(row(iso), findsOneWidget);
   });
 }

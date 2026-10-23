@@ -29,6 +29,8 @@ void main() {
     expect(results[1], isEmpty, reason: 'a text file has no album');
     expect(results[2], matches(RegExp(r'^\d+(\.\d+)*')));
     expect(results[3], isEmpty);
+    expect(await properties.getSortKey(file.path, 'duration'), isEmpty);
+    expect(await properties.getSortKey(file.path, 'pageCount'), isEmpty);
     // Cached afterwards.
     expect(properties.peek(file.path, 'owner'), results[0]);
   }, skip: skip);
@@ -48,5 +50,17 @@ void main() {
     );
     expect(await properties.get(sound, 'duration'), isNotEmpty);
     expect(await properties.get(sound, 'bitRate'), isNotEmpty);
+    expect(
+      await properties.getSortKey(image, 'dimensions'),
+      matches(RegExp(r'^\d+,\d+$')),
+    );
+    expect(
+      int.parse(await properties.getSortKey(sound, 'duration')),
+      greaterThan(0),
+    );
+    expect(
+      int.parse(await properties.getSortKey(sound, 'bitRate')),
+      greaterThan(0),
+    );
   }, skip: skip);
 }

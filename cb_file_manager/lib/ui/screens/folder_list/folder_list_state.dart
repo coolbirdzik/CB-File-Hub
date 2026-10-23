@@ -25,6 +25,60 @@ enum SortOption {
   dateAccessedDesc,
   pathAsc,
   pathDesc,
+  // Append only: stored folder preferences persist the enum index.
+  tagsAsc,
+  tagsDesc,
+  dimensionsAsc,
+  dimensionsDesc,
+  durationAsc,
+  durationDesc,
+  itemCountAsc,
+  itemCountDesc,
+  permissionsAsc,
+  permissionsDesc,
+  ownerAsc,
+  ownerDesc,
+  authorsAsc,
+  authorsDesc,
+  titleAsc,
+  titleDesc,
+  commentsAsc,
+  commentsDesc,
+  pageCountAsc,
+  pageCountDesc,
+  ratingAsc,
+  ratingDesc,
+  dateTakenAsc,
+  dateTakenDesc,
+  cameraModelAsc,
+  cameraModelDesc,
+  frameRateAsc,
+  frameRateDesc,
+  bitRateAsc,
+  bitRateDesc,
+  artistAsc,
+  artistDesc,
+  albumAsc,
+  albumDesc,
+  genreAsc,
+  genreDesc,
+  yearAsc,
+  yearDesc,
+  companyAsc,
+  companyDesc,
+  fileDescriptionAsc,
+  fileDescriptionDesc,
+  fileVersionAsc,
+  fileVersionDesc,
+  productNameAsc,
+  productNameDesc;
+
+  bool get ascending => name.endsWith('Asc');
+  DetailsColumn? get metadataColumn => index < tagsAsc.index
+      ? null
+      : DetailsColumn.values.byName(
+          name.substring(0, name.length - (ascending ? 3 : 4)),
+        );
 }
 
 /// Columns of the Details view. Declaration order is the default column

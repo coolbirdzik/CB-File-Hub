@@ -16,6 +16,7 @@ class MainFlutterWindow: NSWindow {
     self.setFrame(windowFrame, display: true)
 
     RegisterGeneratedPlugins(registry: flutterViewController)
+    LocalAiRuntimeChannel.register(with: flutterViewController.engine.binaryMessenger)
 
     let channel = FlutterMethodChannel(
       name: "cb_file_manager/macos_window",
@@ -26,6 +27,46 @@ class MainFlutterWindow: NSWindow {
         return
       }
       switch call.method {
+      case "openCleanerTrash":
+        let url = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".Trash", isDirectory: true)
+        result(NSWorkspace.shared.open(url))
+      case "getCleanerVolumes":
+        DispatchQueue.global(qos: .utility).async {
+          let manager = FileManager.default
+          let data = "/System/Volumes/Data"
+          let primary = URL(fileURLWithPath: manager.fileExists(atPath: data) ? data : "/", isDirectory: true)
+          let keys: Set<URLResourceKey> = [.volumeNameKey, .volumeTotalCapacityKey,
+            .volumeAvailableCapacityKey, .volumeIsLocalKey, .volumeIsReadOnlyKey]
+          let mounted = manager.mountedVolumeURLs(includingResourceValuesForKeys: Array(keys), options: [.skipHiddenVolumes]) ?? []
+          var seen = Set<String>()
+          let rows: [[String: Any]] = ([primary] + mounted.filter { $0.path.hasPrefix("/Volumes/") }).compactMap { url in
+            guard seen.insert(url.standardizedFileURL.path).inserted,
+              let values = try? url.resourceValues(forKeys: keys),
+              values.volumeIsLocal == true, values.volumeIsReadOnly != true else { return nil }
+            return ["path": url.standardizedFileURL.path, "label": values.volumeName ?? url.lastPathComponent,
+              "totalBytes": values.volumeTotalCapacity ?? 0,
+              "freeBytes": values.volumeAvailableCapacity ?? 0]
+          }
+          DispatchQueue.main.async { result(rows) }
+        }
+      case "trashCleanerItems":
+        let args = call.arguments as? [String: Any]
+        let paths = args?["paths"] as? [String] ?? []
+        DispatchQueue.global(qos: .utility).async {
+          let rows: [[String: Any]] = paths.map { path in
+            guard path.hasPrefix("/"), path != "/",
+              !path.split(separator: "/").contains("..") else {
+              return ["path": path, "error": "Invalid Trash target"]
+            }
+            do {
+              try FileManager.default.trashItem(at: URL(fileURLWithPath: path), resultingItemURL: nil)
+              return ["path": path]
+            } catch {
+              return ["path": path, "error": error.localizedDescription]
+            }
+          }
+          DispatchQueue.main.async { result(rows) }
+        }
       case "getSidebarUserFolders":
         result(self.sidebarUserFolders())
       case "setGlassBackground":

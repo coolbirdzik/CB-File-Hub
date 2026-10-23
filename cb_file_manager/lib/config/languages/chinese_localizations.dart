@@ -2,6 +2,15 @@ import 'app_localizations.dart';
 
 class ChineseLocalizations implements AppLocalizations {
   @override
+  String get torrentReceiveInBackground => '在后台添加打开的种子';
+  @override
+  String get torrentReceiveInBackgroundHint =>
+      '不显示对话框或切换到主窗口。闪烁任务栏并发送通知。使用已保存的下载目录（未设置时使用 Downloads）和立即开始选项；保留现有任务状态。';
+  @override
+  String get torrentBackgroundAdded => '已接收种子';
+  @override
+  String get torrentBackgroundFailed => '无法添加种子';
+  @override
   String get torrentOpeningOptions => '打开种子时';
   @override
   String get torrentShowDownloadDialog => '打开种子时显示下载选项';
@@ -3730,7 +3739,7 @@ class ChineseLocalizations implements AppLocalizations {
   @override
   String get cbAgentCleanerTitle => '磁盘清理 (CB Agent)';
   @override
-  String get diskCleanerNotAvailable => '磁盘清理仅在 Windows 上可用';
+  String get diskCleanerNotAvailable => '磁盘清理可在 Windows 和 macOS 上使用';
   @override
   String get diskCleanerScanTitle => '扫描垃圾文件';
   @override
@@ -4233,7 +4242,7 @@ class ChineseLocalizations implements AppLocalizations {
   String get cleanerSuggestionsUtilityDescription => '扫描此驱动器上值得清理的内容';
   @override
   String get cleanerSuggestionsIntro =>
-      '查找垃圾文件、遗留的安装程序、旧的大文件以及 Windows 可回收的空间，'
+      '查找垃圾文件、遗留的安装程序、旧的大文件以及系统可回收的空间，'
       '并说明为什么建议清理每一项。在您确认之前不会删除任何内容，'
       '文件会被移到回收站。';
   @override
@@ -4261,7 +4270,7 @@ class ChineseLocalizations implements AppLocalizations {
   @override
   String get cleanerSuggestionsTierClean => '可安全清理';
   @override
-  String get cleanerSuggestionsTierCleanHint => 'Windows 或应用会自动重新生成。';
+  String get cleanerSuggestionsTierCleanHint => '系统或应用会自动重新生成。';
   @override
   String get cleanerSuggestionsTierReview => '清理前请查看';
   @override

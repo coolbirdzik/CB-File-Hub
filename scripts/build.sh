@@ -942,6 +942,12 @@ sign_macos_app() {
         sign_args+=(--keychain "$MACOS_SIGNING_KEYCHAIN")
     fi
 
+    if [ -d "$app/Contents/Helpers/llama" ]; then
+        while IFS= read -r -d '' item; do
+            codesign "${sign_args[@]}" "$item"
+        done < <(find "$app/Contents/Helpers/llama" -type f \( -name '*.dylib' -o -name llama-server \) -print0)
+    fi
+
     while IFS= read -r -d '' item; do
         codesign "${sign_args[@]}" "$item"
     done < <(find "$app/Contents/Frameworks" -mindepth 1 -maxdepth 1 \( -name '*.framework' -o -name '*.dylib' \) -print0)

@@ -385,6 +385,7 @@ class VideoLibraryNavigationBloc
   /// Returns true if the given sort option requires calling stat() on files.
   /// Used to skip expensive per-batch filesystem I/O when not needed.
   static bool _needsStatsForSortOption(SortOption option) {
+    if (option.metadataColumn != null) return true;
     switch (option) {
       case SortOption.dateAsc:
       case SortOption.dateDesc:

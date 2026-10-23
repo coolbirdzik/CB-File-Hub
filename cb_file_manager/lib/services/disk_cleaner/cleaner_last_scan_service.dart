@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
+import 'cleaner_paths.dart';
 
 /// Summary of the most recent completed Cleaner scan for one drive.
 ///
@@ -71,6 +72,9 @@ class CleanerLastScanService {
   const CleanerLastScanService(this._preferences);
 
   static String _key(String drivePath) {
+    if (CleanerPaths.isPosix(drivePath)) {
+      return '$_keyPrefix${CleanerPaths.key(drivePath)}';
+    }
     var normalized = drivePath.trim().toUpperCase();
     while (normalized.endsWith(r'\')) {
       normalized = normalized.substring(0, normalized.length - 1);

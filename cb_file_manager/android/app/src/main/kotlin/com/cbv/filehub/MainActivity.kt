@@ -91,6 +91,20 @@ class MainActivity : FlutterActivity() {
         flutterEngine.plugins.add(MemoryManagementPlugin())
         flutterEngine.plugins.add(StorageVolumesPlugin())
 
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "cb_file_manager/local_ai")
+            .setMethodCallHandler { call, result ->
+                if (call.method == "getLlamaServerPath") {
+                    val server = File(applicationInfo.nativeLibraryDir, "libcb_llama_server.so")
+                    if (server.isFile && server.canExecute()) {
+                        result.success(server.absolutePath)
+                    } else {
+                        result.error("LLAMA_RUNTIME_MISSING", "Android llama runtime missing: $server", null)
+                    }
+                } else {
+                    result.notImplemented()
+                }
+            }
+
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
                 "getInstalledAppsForFile" -> {

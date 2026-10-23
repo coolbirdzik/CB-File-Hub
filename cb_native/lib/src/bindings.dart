@@ -4,7 +4,7 @@ library;
 
 import 'dart:ffi';
 
-const int expectedAbiVersion = 4;
+const int expectedAbiVersion = 6;
 
 const int statusOk = 0;
 const int statusInvalidArgument = 1;
@@ -135,6 +135,21 @@ const int jobArchiveExtract = 10;
 const int jobSortPaths = 11;
 const int jobContentSearch = 12;
 const int jobDocumentText = 13;
+const int jobImageDimensions = 14;
+const int jobImageTranscode = 15;
+const int jobExistsBatch = 16;
+const int jobCreateZip = 17;
+const int jobReadZipEntry = 18;
+const int jobUsnParents = 19;
+const int jobRecycleBin = 20;
+const int jobTorrentMetainfo = 21;
+const int jobCachePlan = 22;
+const int jobPathSuggestions = 23;
+const int jobChildCounts = 24;
+const int jobSmartAlbum = 25;
+const int jobArchiveChildren = 26;
+const int jobSyntax = 27;
+const int jobPermanentDelete = 28;
 
 // Job states (job.rs).
 const int jobRunning = 0;

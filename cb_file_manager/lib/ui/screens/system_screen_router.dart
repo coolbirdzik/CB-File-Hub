@@ -3,6 +3,7 @@ import 'torrent/torrent_screen.dart';
 import '../../services/torrent/torrent_launch_request.dart';
 import 'ssh/ssh_terminal_screen.dart';
 import 'dart:io';
+import '../../services/disk_cleaner/cleaner_paths.dart';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/ui/screens/tag_management/tag_management_tab.dart';
@@ -130,7 +131,7 @@ class SystemScreenRouter {
       case '#webdav':
         return WebDAVBrowserScreen(tabId: tabId);
       case '#cb-agent-cleaner':
-        if (!Platform.isWindows) {
+        if (!CleanerPaths.isSupported) {
           return _buildErrorWidget(
             context,
             AppLocalizations.of(context)!.diskCleanerNotAvailable,

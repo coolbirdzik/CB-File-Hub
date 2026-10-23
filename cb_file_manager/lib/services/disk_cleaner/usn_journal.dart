@@ -1,6 +1,7 @@
 import 'dart:ffi';
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:cb_native/cb_native.dart';
 
 import 'package:ffi/ffi.dart';
 import 'package:win32/win32.dart' as win32;
@@ -30,12 +31,18 @@ class DiskJournalReadResult {
   final DiskScanJournalCursor? cursor;
   final List<DiskJournalChange> changes;
   final String? failureReason;
+  final List<int>? changedParentIds;
+
+  Iterable<int> get parentIds =>
+      changedParentIds ??
+      changes.map((change) => change.parentFileReferenceNumber);
 
   const DiskJournalReadResult({
     required this.isUsable,
     this.cursor,
     this.changes = const <DiskJournalChange>[],
     this.failureReason,
+    this.changedParentIds,
   });
 }
 
@@ -45,6 +52,31 @@ class DiskJournalReadResult {
 /// isolate. A missing journal, a changed journal identity, or a retention gap
 /// is reported as unusable so the caller can fall back to a complete scan.
 class DiskUsnJournalReader {
+  static Future<DiskJournalReadResult> readChangesAsync({
+    required String drivePath,
+    required DiskScanJournalCursor previous,
+    bool useNative = true,
+  }) async {
+    if (useNative && Platform.isWindows) {
+      final native = await NativeJournalParents.read(
+        drivePath,
+        previous.journalId,
+        previous.nextUsn,
+      );
+      if (native != null) {
+        return DiskJournalReadResult(
+          isUsable: true,
+          cursor: DiskScanJournalCursor(
+            journalId: native.journalId,
+            nextUsn: native.nextUsn,
+          ),
+          changedParentIds: native.parentIds,
+        );
+      }
+    }
+    return readChanges(drivePath: drivePath, previous: previous);
+  }
+
   static const int _bufferBytes = 1024 * 1024;
   static const int _probeBufferBytes = 64 * 1024;
   static const int _maxChanges = 100000;

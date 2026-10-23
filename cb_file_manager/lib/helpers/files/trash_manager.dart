@@ -1,11 +1,13 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:cb_native/cb_native.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as pathlib;
 import 'package:path_provider/path_provider.dart';
 
 import '../../utils/app_logger.dart';
+import '../../services/disk_cleaner/macos_cleaner_platform.dart';
 import 'recycle_bin_reader.dart' as direct_reader;
 import 'windows_file_operations.dart';
 import 'windows_recycle_bin.dart';
@@ -579,6 +581,7 @@ class TrashManager {
     void Function(String currentPath, int done, int total)? onChunkStart,
     void Function(int done, int total)? onChunkDone,
     Duration? timeoutOverride,
+    void Function(String path, Object error)? onError,
   }) async {
     if (filePaths.isEmpty) return <String>{};
 
@@ -591,6 +594,32 @@ class TrashManager {
         onChunkDone: onChunkDone,
         timeoutOverride: timeoutOverride,
       );
+    }
+
+    if (Platform.isMacOS) {
+      final succeeded = <String>{};
+      final size = chunkSize.clamp(1, 200);
+      for (var start = 0; start < filePaths.length; start += size) {
+        final end = (start + size).clamp(0, filePaths.length);
+        final chunk = filePaths.sublist(start, end);
+        onChunkStart?.call(chunk.first, start, filePaths.length);
+        final results = await MacosCleanerPlatform.trash(chunk);
+        for (final entry in results.entries) {
+          if (entry.value == null) {
+            succeeded.add(entry.key);
+          } else {
+            onError?.call(
+              entry.key,
+              FileSystemException(entry.value!, entry.key),
+            );
+            AppLogger.warning(
+              '[TrashManager] macOS Trash failed: ${entry.key}: ${entry.value}',
+            );
+          }
+        }
+        onChunkDone?.call(end, filePaths.length);
+      }
+      return succeeded;
     }
 
     final succeeded = <String>{};
@@ -611,6 +640,7 @@ class TrashManager {
   /// Permanent deletion does not need Recycle Bin or Shell integration.
   /// Direct filesystem calls avoid the COM startup cost and long Shell
   /// timeouts that made Shift+Delete feel slow, especially for one small file.
+  /// Uses Rust worker threads when available and asynchronous Dart I/O otherwise.
   /// Returns the set of paths that were successfully deleted.
   Future<Set<String>> deleteMultiplePermanently(
     List<String> filePaths, {
@@ -619,6 +649,7 @@ class TrashManager {
     void Function(int done, int total)? onChunkDone,
     void Function(String path, Object error)? onError,
     Duration? timeoutOverride,
+    bool useNative = true,
   }) async {
     if (filePaths.isEmpty) return <String>{};
 
@@ -628,6 +659,35 @@ class TrashManager {
     final concurrency = chunkSize
         .clamp(1, defaultPermanentDeleteConcurrency)
         .toInt();
+
+    if (useNative) {
+      final native = await NativeDelete.permanently(
+        filePaths,
+        concurrency: concurrency,
+        onProgress: (progress) {
+          onChunkStart?.call(progress.currentPath, done, filePaths.length);
+        },
+        onResult: (result) {
+          onChunkStart?.call(result.path, done, filePaths.length);
+          if (result.succeeded) {
+            succeeded.add(result.path);
+          } else {
+            final error = FileSystemException(
+              result.error,
+              result.path,
+              OSError(result.error, result.errorCode),
+            );
+            onError?.call(result.path, error);
+            AppLogger.warning(
+              '[TrashManager] Native permanent delete failed: ${result.path}',
+              error: error,
+            );
+          }
+          onChunkDone?.call(++done, filePaths.length);
+        },
+      );
+      if (native != null) return succeeded;
+    }
 
     Future<void> worker() async {
       while (nextIndex < filePaths.length) {

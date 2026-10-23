@@ -11,6 +11,7 @@ import 'package:path/path.dart' as pathlib;
 import 'package:cb_file_manager/helpers/files/file_attributes.dart';
 import 'package:cb_file_manager/helpers/files/folder_sort_manager.dart';
 import 'package:cb_file_manager/helpers/core/filesystem_sorter.dart';
+import 'package:cb_file_manager/helpers/core/file_property_sorter.dart';
 import 'package:cb_file_manager/helpers/core/text_utils.dart';
 import 'package:cb_file_manager/helpers/media/video_thumbnail_helper.dart';
 import 'package:cb_file_manager/services/directory_watcher_service.dart';
@@ -320,6 +321,7 @@ class FileNavigationBloc
             sortOption,
             fileStatsCache: cacheResult.stats,
           );
+          if (isClosed || state.currentPath.path != event.path) return;
           emit(
             state.copyWith(
               isLoading: false,
@@ -348,7 +350,12 @@ class FileNavigationBloc
 
       // ── Offload scan + stat + sort off the UI isolate ───────────────────────
       // With 5000+ files, stat + sort on the main isolate causes UI jank.
-      final scanResult = await _scanDirectory(event.path, sortOption);
+      final scanResult = await _scanDirectory(
+        event.path,
+        sortOption,
+        isCancelled: () => isClosed || state.currentPath.path != event.path,
+      );
+      if (isClosed || state.currentPath.path != event.path) return;
 
       // Reconstruct typed objects from the isolate's plain path lists.
       final folders = scanResult.folderPaths.map(Directory.new).toList();
@@ -412,6 +419,7 @@ class FileNavigationBloc
       _prefetchThumbnails(sortedFiles, event.path);
 
       // Start directory watching
+      if (isClosed || state.currentPath.path != event.path) return;
       await _directoryWatcher.startWatching(event.path);
 
       AppLogger.perf('Complete total=${totalSw.elapsedMilliseconds}ms');
@@ -477,7 +485,12 @@ class FileNavigationBloc
       final sortOption = folderSortOption ?? state.sortOption;
 
       // Offload scan + stat + sort off the UI isolate (same as _onLoad).
-      final scanResult = await _scanDirectory(event.path, sortOption);
+      final scanResult = await _scanDirectory(
+        event.path,
+        sortOption,
+        isCancelled: () => isClosed || state.currentPath.path != event.path,
+      );
+      if (isClosed || state.currentPath.path != event.path) return;
 
       final sortedFolders = scanResult.folderPaths.map(Directory.new).toList();
       final sortedFiles = scanResult.filePaths.map(File.new).toList();
@@ -594,6 +607,54 @@ class FileNavigationBloc
       if (isStale()) return;
 
       final targetPath = state.currentPath.path;
+
+      if (event.sortOption.metadataColumn != null) {
+        emit(state.copyWith(isLoading: true));
+        while (!isStale() && state.currentPath.path == targetPath) {
+          final entities = <String, FileSystemEntity>{
+            for (final entity in [
+              ...state.folders,
+              ...state.files,
+              ...state.filteredFiles,
+              ...state.searchResults,
+            ])
+              entity.path: entity,
+          };
+          final compare = await FilePropertySorter.prepare(
+            entities.values,
+            event.sortOption,
+            isCancelled: () =>
+                isStale() || state.currentPath.path != targetPath,
+          );
+          if (isStale() || state.currentPath.path != targetPath) return;
+          if ([
+            ...state.folders,
+            ...state.files,
+            ...state.filteredFiles,
+            ...state.searchResults,
+          ].any((entity) => !entities.containsKey(entity.path))) {
+            continue;
+          }
+          List<FileSystemEntity> sorted(List<FileSystemEntity> items) =>
+              List.of(items)..sort(compare);
+          final files = sorted(state.files);
+          emit(
+            state.copyWith(
+              isLoading: false,
+              sortOption: event.sortOption,
+              folders: sorted(state.folders),
+              files: files,
+              filteredFiles: sorted(state.filteredFiles),
+              searchResults: sorted(state.searchResults),
+            ),
+          );
+          ThumbnailLoader.updateDisplayIndexMap(
+            files.map((f) => f.path).toList(),
+          );
+          return;
+        }
+        return;
+      }
 
       // A folder listing is re-sorted by listing the folder again on a Rust
       // thread, which reads the sizes, dates and attributes with the entries
@@ -792,6 +853,19 @@ class FileNavigationBloc
       }
 
       if (!_searchRequests.isCurrent(request) || emit.isDone) return;
+      if (state.sortOption.metadataColumn != null) {
+        final selectedSort = state.sortOption;
+        final compare = await FilePropertySorter.prepare(
+          results,
+          selectedSort,
+          isCancelled: () =>
+              !_searchRequests.isCurrent(request) ||
+              emit.isDone ||
+              state.sortOption != selectedSort,
+        );
+        if (!_searchRequests.isCurrent(request) || emit.isDone) return;
+        if (state.sortOption == selectedSort) results.sort(compare);
+      }
       final grouped = <FileSystemEntity>[
         ...results.whereType<Directory>(),
         ...results.where((e) => e is! Directory && e is! File),
@@ -917,6 +991,8 @@ class FileNavigationBloc
       case SortOption.pathAsc:
       case SortOption.pathDesc:
         return false;
+      default:
+        return false;
     }
   }
 
@@ -955,6 +1031,7 @@ class FileNavigationBloc
   /// native listing; null when the library is missing, the path is virtual
   /// or the folder cannot be listed.
   Future<Map<String, int>?> _nativeOrder(String path, SortOption sort) async {
+    if (sort.metadataColumn != null) return null;
     if (path.isEmpty || path.startsWith('#') || _isDrivesPath(path)) {
       return null;
     }
@@ -1060,6 +1137,8 @@ class FileNavigationBloc
         return comparePaths;
       case SortOption.pathDesc:
         return (a, b) => comparePaths(b, a);
+      default:
+        return comparePaths;
     }
   }
 
@@ -1231,8 +1310,29 @@ class _ScanArgs {
 /// precise [FileSystemException]). Natively there is no isolate to spawn per
 /// navigation, and on Windows the sizes and dates a date or size sort needs
 /// come with the directory entries instead of one `stat` per file.
-Future<_ScanResult> _scanDirectory(String path, SortOption sortOption) async {
-  // Both listings implement every SortOption (by the same names).
+Future<_ScanResult> _scanDirectory(
+  String path,
+  SortOption sortOption, {
+  bool Function()? isCancelled,
+}) async {
+  if (sortOption.metadataColumn != null) {
+    final result = await _scanDirectory(path, SortOption.nameAsc);
+    final folders = result.folderPaths.map(Directory.new).toList();
+    final files = result.filePaths.map(File.new).toList();
+    final compare = await FilePropertySorter.prepare(
+      [...folders, ...files],
+      sortOption,
+      isCancelled: isCancelled,
+    );
+    folders.sort(compare);
+    files.sort(compare);
+    return _ScanResult(
+      folderPaths: folders.map((e) => e.path).toList(),
+      filePaths: files.map((e) => e.path).toList(),
+      statRows: result.statRows,
+    );
+  }
+  // Basic sorts share their names with the native listing ABI.
   final native = await NativeFs.listDirectory(
     path,
     sort: NativeListSort.values.byName(sortOption.name),

@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'bindings.dart' as b;
 import 'buffers.dart';
 import 'native_job.dart';
@@ -13,6 +15,16 @@ enum NativeArchiveFormat {
   gzip,
   bzip2,
   sevenZip,
+}
+
+class NativeZipEntry {
+  const NativeZipEntry(this.bytes);
+  final Uint8List? bytes;
+}
+
+class NativeArchiveChildren {
+  const NativeArchiveChildren(this.folders, this.files);
+  final List<String> folders, files;
 }
 
 class NativeArchiveEntry {
@@ -38,6 +50,55 @@ class NativeArchiveEntry {
 
 /// Archive listing and extraction on a Rust thread.
 abstract final class NativeArchive {
+  static Future<NativeArchiveChildren?> children(
+    String path,
+    NativeArchiveFormat format,
+    String innerPath,
+  ) async {
+    final config = WireWriter()
+      ..str(path)
+      ..u8(format.index)
+      ..str(innerPath);
+    final job = NativeJob.start(b.jobArchiveChildren, config.takeBytes());
+    if (job == null) return null;
+    final out = await job.result();
+    if (out == null) return null;
+    final r = WireReader(out);
+    return NativeArchiveChildren(
+      List.generate(r.u32(), (_) => r.str()),
+      List.generate(r.u32(), (_) => r.str()),
+    );
+  }
+
+  /// Create a ZIP from source paths mapped to relative entry names.
+  static Future<bool> createZip(String path, Map<String, String> files) async {
+    final config = WireWriter()
+      ..str(path)
+      ..u32(files.length);
+    for (final entry in files.entries) {
+      config
+        ..str(entry.key)
+        ..str(entry.value);
+    }
+    final job = NativeJob.start(b.jobCreateZip, config.takeBytes());
+    if (job == null) return false;
+    return await job.result() != null;
+  }
+
+  /// Null means unavailable; a successful missing entry has [NativeZipEntry.bytes]
+  /// set to null. Only this member is decompressed.
+  static Future<NativeZipEntry?> readZipEntry(String path, String name) async {
+    final config = WireWriter()
+      ..str(path)
+      ..str(name);
+    final job = NativeJob.start(b.jobReadZipEntry, config.takeBytes());
+    if (job == null) return null;
+    final out = await job.result();
+    if (out == null) return null;
+    final r = WireReader(out);
+    return NativeZipEntry(r.boolean() ? r.rest() : null);
+  }
+
   /// Lists [path]. Returns null when the library is unavailable or the
   /// format is [NativeArchiveFormat.gzip] / [NativeArchiveFormat.bzip2]
   /// (single streams with nothing to list). Throws [NativeJobException] when

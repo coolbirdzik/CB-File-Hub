@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'disk_tree_node.dart';
+import 'cleaner_paths.dart';
 
 /// The scan row an agent tool call names, found even when the model copied
 /// the path slightly wrong.
@@ -22,11 +23,7 @@ class ScanTargetMatch {
 
 /// Upper-cased, `\`-separated, without trailing separators: the key both
 /// exact matching and correction compare.
-String scanPathKey(String path) => path
-    .trim()
-    .replaceAll('/', r'\')
-    .toUpperCase()
-    .replaceFirst(RegExp(r'\\+$'), '');
+String scanPathKey(String path) => CleanerPaths.key(path);
 
 /// Edits within which one unique sibling counts as the intended name. Small
 /// models routinely drop or repeat a character of long hex names.
@@ -45,12 +42,14 @@ const _minCorrectableLength = 6;
 ScanTargetMatch resolveScanTarget(DiskTreeNode root, String path) {
   final rootKey = scanPathKey(root.fullPath);
   final target = scanPathKey(path);
-  if (target.isEmpty || !target.startsWith('$rootKey\\')) {
+  final prefix = CleanerPaths.prefix(rootKey);
+  final posix = CleanerPaths.isPosix(rootKey);
+  if (target.isEmpty || target == rootKey || !target.startsWith(prefix)) {
     return const ScanTargetMatch();
   }
   final segments = target
-      .substring(rootKey.length + 1)
-      .split(r'\')
+      .substring(prefix.length)
+      .split(posix ? '/' : r'\')
       .where((segment) => segment.isNotEmpty)
       .toList();
   if (segments.isEmpty) return const ScanTargetMatch();
@@ -64,7 +63,7 @@ ScanTargetMatch resolveScanTarget(DiskTreeNode root, String path) {
     ];
     DiskTreeNode? next;
     for (final child in children) {
-      if (child.name.toUpperCase() == segment) {
+      if ((posix ? child.name : child.name.toUpperCase()) == segment) {
         next = child;
         break;
       }
@@ -76,7 +75,8 @@ ScanTargetMatch resolveScanTarget(DiskTreeNode root, String path) {
       ]..sort((a, b) => a.$2.compareTo(b.$2));
       final best = ranked.isEmpty ? null : ranked.first;
       final unique = ranked.length < 2 || ranked[1].$2 > best!.$2;
-      if (best != null &&
+      if (!posix &&
+          best != null &&
           segment.length >= _minCorrectableLength &&
           best.$2 <= _maxCorrection &&
           unique) {

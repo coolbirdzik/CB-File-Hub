@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
@@ -67,12 +68,83 @@ const int _gb = 1024 * _mb;
 const _sizeSteps = <int>[100 * _mb, _gb, 10 * _gb];
 const _ageStepsDays = <int>[180, 365, 730];
 
+// Weakly held per scan tree. Returned nodes contain display metadata only, so
+// preparing insights in an isolate never copies whole subtrees back to the UI.
+final _preparedInsights =
+    Expando<({int bytes, int files, _DashboardInsights data})>();
+
+class _DashboardInsights {
+  const _DashboardInsights(
+    this.hotspots,
+    this.causes,
+    this.types,
+    this.largeFiles,
+  );
+  final List<CleanerSpaceHotspot> hotspots;
+  final List<CleanerSpaceCauseMatch> causes;
+  final List<CleanerFileTypeTotal> types;
+  final List<DiskTreeNode> largeFiles;
+}
+
+_DashboardInsights _scanDashboardInsights(DiskTreeNode root) {
+  DiskTreeNode displayNode(DiskTreeNode node) => DiskTreeNode(
+    name: node.name,
+    fullPath: node.fullPath,
+    isFile: node.isFile,
+    sizeBytes: node.sizeBytes,
+    fileCount: node.fileCount,
+  );
+  return _DashboardInsights(
+    CleanerSpaceInsights.findHotspots(root, limit: 30)
+        .map(
+          (item) => CleanerSpaceHotspot(
+            node: displayNode(item.node),
+            spreadBytes: item.spreadBytes,
+            isResidual: item.isResidual,
+          ),
+        )
+        .toList(),
+    CleanerSpaceInsights.findCauses(root)
+        .map(
+          (item) =>
+              CleanerSpaceCauseMatch(item.cause)
+                ..nodes.addAll(item.nodes.map(displayNode)),
+        )
+        .toList(),
+    CleanerSpaceInsights.fileTypeTotals(root, largestPerGroup: 50)
+        .where((item) => item.group != 'other')
+        .map(
+          (item) => CleanerFileTypeTotal(item.group)
+            ..bytes = item.bytes
+            ..files = item.files
+            ..largest.addAll(item.largest.map(displayNode)),
+        )
+        .toList(),
+    CleanerSpaceInsights.search(
+      root,
+      kind: 'file',
+      minBytes: _sizeSteps.first,
+      limit: 1 << 30,
+    ).matches.map(displayNode).toList(),
+  );
+}
+
 /// A collapsed-by-default overview of where the space is: one card per
 /// question (heavy folders, large files, old & unused, known space hogs, file
 /// types). Picking a card opens its list with filter conditions; every row
 /// reveals itself in the tree or opens in a new tab. Read-only: nothing here
 /// selects or deletes.
 class CleanerDashboard extends StatefulWidget {
+  /// Refresh diagnosis off the UI isolate while cleanup progress is visible.
+  static Future<void> prepareInsights(DiskTreeNode root) async {
+    final bytes = root.sizeBytes;
+    final files = root.fileCount;
+    final data = await compute(_scanDashboardInsights, root);
+    if (root.sizeBytes == bytes && root.fileCount == files) {
+      _preparedInsights[root] = (bytes: bytes, files: files, data: data);
+    }
+  }
+
   const CleanerDashboard({
     super.key,
     required this.root,
@@ -129,31 +201,74 @@ class _CleanerDashboardState extends State<CleanerDashboard> {
   List<CleanerSpaceHotspot> _hotspots = const [];
   List<CleanerSpaceCauseMatch> _causes = const [];
   List<CleanerFileTypeTotal> _types = const [];
+  List<DiskTreeNode> _largeCandidates = const [];
+  Object? _largeFilesKey;
+  ({List<DiskTreeNode> matches, int count, int totalBytes})? _largeFilesResult;
+  Object? _typeFilesKey;
+  List<DiskTreeNode> _typeFilesResult = const [];
 
   void _ensureInsights() {
     final root = widget.root;
     final key = (root, root.sizeBytes, root.fileCount);
     if (key == _insightsKey) return;
     _insightsKey = key;
-    _hotspots = CleanerSpaceInsights.findHotspots(root, limit: 30);
-    _causes = CleanerSpaceInsights.findCauses(root);
-    _types = CleanerSpaceInsights.fileTypeTotals(
-      root,
-    ).where((total) => total.group != 'other').toList();
+    final prepared = _preparedInsights[root];
+    final data =
+        prepared?.bytes == root.sizeBytes && prepared?.files == root.fileCount
+        ? prepared!.data
+        : _scanDashboardInsights(root);
+    _hotspots = data.hotspots;
+    _causes = data.causes;
+    _types = data.types;
+    _largeCandidates = data.largeFiles;
     if (_typeGroup != null && !_types.any((t) => t.group == _typeGroup)) {
       _typeGroup = null;
     }
   }
 
-  ({List<DiskTreeNode> matches, int count, int totalBytes}) _largeFiles({
-    int limit = 50,
-  }) => CleanerSpaceInsights.search(
-    widget.root,
-    kind: 'file',
-    minBytes: _largeMinBytes,
-    typeGroup: _largeType,
-    limit: limit,
-  );
+  ({List<DiskTreeNode> matches, int count, int totalBytes}) _largeFiles() {
+    final root = widget.root;
+    final key = (
+      root,
+      root.sizeBytes,
+      root.fileCount,
+      _largeMinBytes,
+      _largeType,
+    );
+    if (key != _largeFilesKey) {
+      _largeFilesKey = key;
+      final matches = _largeCandidates
+          .where(
+            (node) =>
+                node.sizeBytes >= _largeMinBytes &&
+                (_largeType == null ||
+                    CleanerSpaceInsights.groupOfExtension(
+                          CleanerSpaceInsights.extensionOf(node.name),
+                        ) ==
+                        _largeType),
+          )
+          .toList();
+      _largeFilesResult = (
+        matches: matches.take(50).toList(),
+        count: matches.length,
+        totalBytes: matches.fold<int>(0, (sum, node) => sum + node.sizeBytes),
+      );
+    }
+    return _largeFilesResult!;
+  }
+
+  List<DiskTreeNode> _typeFiles(String group) {
+    final root = widget.root;
+    final key = (root, root.sizeBytes, root.fileCount, group);
+    if (key != _typeFilesKey) {
+      _typeFilesKey = key;
+      _typeFilesResult = _types
+          .where((item) => item.group == group)
+          .expand((item) => item.largest)
+          .toList();
+    }
+    return _typeFilesResult;
+  }
 
   List<FullDiskScanInsight> _oldItems() {
     final cutoff = DateTime.now().subtract(Duration(days: _oldMinDays));
@@ -195,7 +310,7 @@ class _CleanerDashboardState extends State<CleanerDashboard> {
     _ensureInsights();
     final theme = Theme.of(context);
     final l = AppLocalizations.of(context)!;
-    final large = _largeFiles(limit: 1);
+    final large = _largeFiles();
     final old = _oldItems();
 
     final cards = <(CleanerDashboardView, IconData, String, int, int)>[
@@ -512,12 +627,7 @@ class _CleanerDashboardState extends State<CleanerDashboard> {
         rows = group == null
             ? const []
             : [
-                for (final node in CleanerSpaceInsights.search(
-                  widget.root,
-                  kind: 'file',
-                  typeGroup: group,
-                  limit: 50,
-                ).matches)
+                for (final node in _typeFiles(group))
                   _DashboardRow(
                     path: node.fullPath,
                     name: node.name,

@@ -20,6 +20,22 @@ folder and immediate-start choice are remembered. Unchecking the box adds a
 paused task, which stays paused after restart until resumed. Cancelling starts no download. The same dialog is
 used when opening an indexed torrent or choosing **Download to…**.
 
+On desktop, download options open in an independent top-level window with its
+own taskbar entry and custom draggable title bar with minimize/close controls.
+Each request opens centered over the app window that requested it. Windows reads
+that parent's current position and monitor at display time, scales for its DPI
+and clamps the form to the monitor's work area. A reused form is repositioned
+for every request; it does not change native ownership or block the main window.
+The main file-manager window remains usable. The small form process is warmed
+after the main app's first frame and
+reused for later requests; it does not initialize the library database or a
+second download engine. Save returns the options to the owning app window.
+On Windows, this process registers only the window and screen plugins, skipping
+the main app's video, PDF, AI, network and shell plugin initialization.
+Cancel, Escape and the close button leave the download unchanged. The
+hidden form exits when its app connection closes. Mobile and automated test
+hosts retain the in-app dialog.
+
 In **Torrent → Settings → When opening torrents**, **Show download options when
 opening a torrent** is enabled by default. Turn it off to use the saved payload
 folder and immediate-start preference for file/magnet/URL imports and library-row
@@ -31,6 +47,24 @@ The explicit **Download to…** command always opens options, and duplicate-merg
 and source-cleanup confirmations remain required. These preferences survive
 restart (`torrent.showDownloadDialog`, `torrent.lastDownloadDirectory`,
 `torrent.startImmediately`).
+
+On Windows, **Torrent → Settings → When opening torrents → Add opened torrents
+in the background** bypasses opening, destination and duplicate dialogs. It
+imports into the library without selecting a tab or activating the app, flashes
+the taskbar, and sends a Windows notification. Clicking the notification opens
+the Torrent library. A cold file-association launch stays minimized too.
+New tasks use the saved download folder (Downloads when unset) and immediate-start
+choice; existing active, waiting, paused or complete tasks retain their state.
+An unset metainfo library folder uses the app's durable `opened-torrents` folder.
+Errors use notifications; download errors remain on the affected library entry,
+without automatic error modals. Turning this option off restores the previous opening
+options. Explicit **Download to…** still opens its form.
+
+Background receipt reloads the saved opening preferences for every queued
+import, including changes made in another app window. Turning off **Start
+downloading immediately** adds a paused task directly; it never starts the
+payload first and pauses afterward. Reopening an existing task preserves its
+current state.
 
 Opening a local `.torrent` from the file browser (including its shared Open
 action) routes directly to the queued Torrent dialog inside CB File Hub. It does
@@ -54,13 +88,14 @@ tab (preferring the active one) and focuses it. A tab is created only if none is
 open. Requests are queued per tab, including repeated links and startup batches;
 each destination/merge dialog finishes before the next request is handled.
 
-Opening a `.torrent` from the OS temporary directory (for example, a browser's
-private-session download) captures its validated metainfo before waiting for a
-merge dialog. It keeps a durable copy in the chosen torrent library, or in the
-app's `torrent/opened-torrents` folder in Index mode. The browser-managed original
-is retained even in Move mode, so read-only sources need no delete permission and
-browser cleanup does not break subsequent downloads. Normal folder scans and
-imports continue to use the selected index/copy/move mode.
+Opening any local `.torrent` captures its validated metainfo before waiting for
+a merge dialog. Browsers can save private-session downloads in Downloads or any
+chosen folder as well as the OS temporary directory. The app keeps a durable copy
+in the chosen torrent library, or in its `torrent/opened-torrents` folder in Index
+mode. Opening retains the original even in Move mode, so read-only sources need
+no delete permission and browser cleanup does not break subsequent downloads.
+Explicit file imports and folder scans continue to use the selected
+index/copy/move mode.
 
 The **Add torrent from link** button accepts HTTP/HTTPS metainfo URLs (including
 redirects and URLs without a `.torrent` extension) and v1/hybrid `urn:btih` magnet
@@ -225,6 +260,14 @@ Magnets use the index timestamp until metainfo is imported. Literal search uses
 the shared Unicode/accent folding, separator and word-order rules across name,
 group and hash. Regex searches each original field independently, preserving
 anchors and regex syntax; it scans bounded batches and discards cancelled queries.
+
+All 28 torrent metadata columns also sort through their headers or the sort
+menu, including progress, traffic, seeds/peers, ETA, share ratio, tracker data,
+payload destination and metainfo fields. Click the active property again to
+reverse direction. The choice persists independently of the normal file-browser
+sort. Numeric values use their raw units; unavailable values stay last in both
+directions. Tracker sort keys are backfilled from the index without rereading
+source files or requiring SQLite JSON extensions.
 
 Each view builds visible items lazily and queries 80 records per page with SQL
 search/filtering. Only one page and bounded regex batches are kept in memory.

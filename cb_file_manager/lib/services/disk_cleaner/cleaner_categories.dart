@@ -1,3 +1,4 @@
+import 'dart:io';
 import '../app_insights/app_insights_models.dart';
 import 'cleaner_models.dart';
 
@@ -7,20 +8,89 @@ import 'cleaner_models.dart';
 /// `CbAgentCleanerScreen` UI, and the safety check all read from this single
 /// list, so wiring stays minimal.
 ///
-/// All paths target Windows. The cleaner is currently Windows-only.
+/// Each platform supplies its own rules; personal application data is excluded.
 class CleanerCategories {
   CleanerCategories._();
 
   /// All known categories.
-  static List<CleanerCategory> all() => List.unmodifiable(_all);
+  static List<CleanerCategory> all({String? operatingSystem}) =>
+      List.unmodifiable(
+        (operatingSystem ?? Platform.operatingSystem) == 'macos'
+            ? _macos
+            : _all,
+      );
 
   /// Lookup by [CleanerCategory.id]. Returns null if missing.
   static CleanerCategory? byId(String id) {
-    for (final c in _all) {
+    for (final c in all()) {
       if (c.id == id) return c;
     }
     return null;
   }
+
+  static const _macos = <CleanerCategory>[
+    CleanerCategory(
+      id: 'browser_cache',
+      displayName: 'Browser cache',
+      description:
+          'Safari, Chrome, Firefox and Edge caches. Close browsers before cleaning.',
+      safety: CleanerSafety.safe,
+      defaultEnabled: true,
+      rules: [
+        CleanerPathRule(
+          source: PathSource.env('HOME', 'Library/Caches/com.apple.Safari'),
+        ),
+        CleanerPathRule(
+          source: PathSource.env('HOME', 'Library/Caches/Google/Chrome'),
+        ),
+        CleanerPathRule(
+          source: PathSource.env('HOME', 'Library/Caches/Firefox'),
+        ),
+        CleanerPathRule(
+          source: PathSource.env('HOME', 'Library/Caches/Microsoft Edge'),
+        ),
+      ],
+    ),
+    CleanerCategory(
+      id: 'app_cache',
+      displayName: 'App caches',
+      description:
+          'User application caches. Apps may need to download or rebuild cached data.',
+      safety: CleanerSafety.careful,
+      defaultEnabled: false,
+      rules: [
+        CleanerPathRule(source: PathSource.env('HOME', 'Library/Caches')),
+      ],
+    ),
+    CleanerCategory(
+      id: 'crash_dumps_logs',
+      displayName: 'Crash reports',
+      description:
+          'User diagnostic reports. Keep reports needed for troubleshooting.',
+      safety: CleanerSafety.safe,
+      defaultEnabled: true,
+      rules: [
+        CleanerPathRule(
+          source: PathSource.env('HOME', 'Library/Logs/DiagnosticReports'),
+        ),
+      ],
+    ),
+    CleanerCategory(
+      id: 'dev_cache',
+      displayName: 'Developer caches',
+      description:
+          'Xcode DerivedData, npm and pip caches. Builds may need to regenerate or download data.',
+      safety: CleanerSafety.risky,
+      defaultEnabled: false,
+      rules: [
+        CleanerPathRule(
+          source: PathSource.env('HOME', 'Library/Developer/Xcode/DerivedData'),
+        ),
+        CleanerPathRule(source: PathSource.env('HOME', '.npm/_cacache')),
+        CleanerPathRule(source: PathSource.env('HOME', 'Library/Caches/pip')),
+      ],
+    ),
+  ];
 
   static final List<CleanerCategory> _all = [
     // -----------------------------------------------------------------------

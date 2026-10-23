@@ -14,8 +14,10 @@
 #![allow(clippy::missing_safety_doc)]
 
 mod archive;
+mod batch_fs;
 mod content;
 mod dart_api;
+mod deletion;
 mod disk_scan;
 mod doctext;
 mod fold_table;
@@ -24,9 +26,14 @@ mod glob;
 mod hashing;
 mod imaging;
 mod job;
+mod journal;
 mod listing;
 mod normalize;
 mod search;
+mod smart_album;
+mod syntax;
+mod torrent;
+mod ui_fs;
 mod walk;
 #[cfg(windows)]
 mod win_dir;
@@ -41,7 +48,7 @@ use job::Job;
 use search::{Matcher, Search};
 
 /// Bumped whenever an exported signature changes; Dart refuses a mismatch.
-const ABI_VERSION: u32 = 4;
+const ABI_VERSION: u32 = 6;
 
 pub const STATUS_OK: i32 = 0;
 pub const STATUS_INVALID_ARGUMENT: i32 = 1;
@@ -61,6 +68,21 @@ const JOB_ARCHIVE_EXTRACT: u32 = 10;
 const JOB_SORT_PATHS: u32 = 11;
 const JOB_CONTENT_SEARCH: u32 = 12;
 const JOB_DOCUMENT_TEXT: u32 = 13;
+const JOB_IMAGE_DIMENSIONS: u32 = 14;
+const JOB_IMAGE_TRANSCODE: u32 = 15;
+const JOB_EXISTS_BATCH: u32 = 16;
+const JOB_CREATE_ZIP: u32 = 17;
+const JOB_READ_ZIP_ENTRY: u32 = 18;
+const JOB_USN_PARENTS: u32 = 19;
+const JOB_RECYCLE_BIN: u32 = 20;
+const JOB_TORRENT_METAINFO: u32 = 21;
+const JOB_CACHE_PLAN: u32 = 22;
+const JOB_PATH_SUGGESTIONS: u32 = 23;
+const JOB_CHILD_COUNTS: u32 = 24;
+const JOB_SMART_ALBUM: u32 = 25;
+const JOB_ARCHIVE_CHILDREN: u32 = 26;
+const JOB_SYNTAX: u32 = 27;
+const JOB_PERMANENT_DELETE: u32 = 28;
 
 unsafe fn str_arg<'a>(ptr: *const u8, len: usize) -> Option<&'a str> {
     if len == 0 {
@@ -334,6 +356,25 @@ pub unsafe extern "C" fn cb_job_start(
         JOB_SORT_PATHS => listing::start_sort_paths(port, &config),
         JOB_CONTENT_SEARCH => content::start_content_search(port, &config),
         JOB_DOCUMENT_TEXT => content::start_document_text(port, &config),
+        JOB_IMAGE_DIMENSIONS => imaging::start_dimensions(port, &config),
+        JOB_IMAGE_TRANSCODE => imaging::start_transcode(port, config),
+        JOB_EXISTS_BATCH => batch_fs::start_exists(port, &config),
+        JOB_CREATE_ZIP => archive::start_create_zip(port, &config),
+        JOB_READ_ZIP_ENTRY => archive::start_read_zip_entry(port, &config),
+        JOB_USN_PARENTS => journal::start(port, &config),
+        JOB_RECYCLE_BIN => batch_fs::start_recycle_bin(port, &config),
+        JOB_TORRENT_METAINFO => torrent::start(port, config),
+        JOB_CACHE_PLAN => ui_fs::start_cache_plan(port, &config),
+        JOB_PATH_SUGGESTIONS => ui_fs::start_suggestions(port, &config),
+        JOB_CHILD_COUNTS => ui_fs::start_child_counts(port, &config),
+        JOB_SMART_ALBUM => match smart_album::start(port, &config) {
+            walk::WalkStart::Started(job) => Some(job),
+            walk::WalkStart::InvalidRegex => return STATUS_INVALID_REGEX,
+            walk::WalkStart::InvalidConfig => None,
+        },
+        JOB_ARCHIVE_CHILDREN => archive::start_children(port, &config),
+        JOB_SYNTAX => syntax::start(port, &config),
+        JOB_PERMANENT_DELETE => deletion::start(port, &config),
         _ => None,
     };
     match job {

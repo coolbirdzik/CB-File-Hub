@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:path/path.dart' as p;
 
 import 'cleaner_models.dart';
 
@@ -11,6 +12,7 @@ class WindowsKnownFolders {
   WindowsKnownFolders._();
 
   static String? resolve(PathSource source) {
+    if (Platform.isMacOS) return resolvePosix(source, Platform.environment);
     switch (source.kind) {
       case PathSourceKind.absolute:
         final abs = source.absolutePath;
@@ -30,6 +32,22 @@ class WindowsKnownFolders {
         // Recycle Bin code path instead of plain directory walking.
         return null;
     }
+  }
+
+  static String? resolvePosix(
+    PathSource source,
+    Map<String, String> environment,
+  ) {
+    if (source.kind == PathSourceKind.recycleBin) return null;
+    if (source.kind == PathSourceKind.absolute) {
+      final value = source.absolutePath;
+      return value != null && p.posix.isAbsolute(value)
+          ? p.posix.normalize(value)
+          : null;
+    }
+    final base = environment[source.envVar];
+    if (base == null || !p.posix.isAbsolute(base)) return null;
+    return p.posix.normalize(p.posix.join(base, source.relative));
   }
 
   /// Common Windows environment variable names used by the cleaner. Exposed

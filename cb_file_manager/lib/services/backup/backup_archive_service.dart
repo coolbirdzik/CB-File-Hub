@@ -1,7 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
+import 'dart:typed_data';
 
 import 'package:archive/archive_io.dart';
+import 'package:cb_native/cb_native.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 
@@ -13,11 +16,13 @@ class BackupArchiveService {
   BackupArchiveService({
     DatabaseManager? databaseManager,
     UserPreferences? preferences,
+    this.useNative = true,
   }) : _databaseManager = databaseManager ?? DatabaseManager.getInstance(),
        _preferences = preferences ?? UserPreferences.instance;
 
   final DatabaseManager _databaseManager;
   final UserPreferences _preferences;
+  final bool useNative;
 
   Future<String?> exportZip({
     required String outputPath,
@@ -69,11 +74,23 @@ class BackupArchiveService {
         files.add(tagsPath);
       }
 
-      final encoder = ZipFileEncoder()..create(outputPath);
-      for (final file in files) {
-        encoder.addFileSync(File(file), path.basename(file));
+      final created =
+          useNative &&
+          await NativeArchive.createZip(outputPath, {
+            for (final file in files) file: path.basename(file),
+          });
+      if (!created) {
+        await Isolate.run(() {
+          final encoder = ZipFileEncoder()..create(outputPath);
+          try {
+            for (final file in files) {
+              encoder.addFileSync(File(file), path.basename(file));
+            }
+          } finally {
+            encoder.closeSync();
+          }
+        });
       }
-      encoder.closeSync();
       return outputPath;
     } finally {
       if (await workDir.exists()) await workDir.delete(recursive: true);
@@ -81,12 +98,9 @@ class BackupArchiveService {
   }
 
   Future<Map<String, dynamic>?> inspect(String archivePath) async {
-    final archive = ZipDecoder().decodeBytes(
-      await File(archivePath).readAsBytes(),
-    );
-    final manifestFile = archive.findFile('manifest.json');
-    if (manifestFile == null) return null;
-    final manifest = jsonDecode(utf8.decode(manifestFile.content as List<int>));
+    final bytes = await _readMember(archivePath, 'manifest.json');
+    if (bytes == null) return null;
+    final manifest = jsonDecode(utf8.decode(bytes));
     if (manifest is! Map) return null;
     return Map<String, dynamic>.from(manifest);
   }
@@ -98,16 +112,13 @@ class BackupArchiveService {
     required Future<void> Function(Map<String, Object?>) restoreSettings,
   }) async {
     if (!importSettings && !importTags) return null;
-    final archive = ZipDecoder().decodeBytes(
-      await File(archivePath).readAsBytes(),
-    );
     var settingsCount = 0;
     var importedTagCount = 0;
 
     if (importSettings) {
-      final file = archive.findFile('settings.json');
-      if (file != null) {
-        final decoded = jsonDecode(utf8.decode(file.content as List<int>));
+      final bytes = await _readMember(archivePath, 'settings.json');
+      if (bytes != null) {
+        final decoded = jsonDecode(utf8.decode(bytes));
         if (decoded is Map) {
           final settings = Map<String, Object?>.from(decoded);
           await restoreSettings(settings);
@@ -117,15 +128,15 @@ class BackupArchiveService {
     }
 
     if (importTags) {
-      final file = archive.findFile('tags.json');
-      if (file != null) {
+      final bytes = await _readMember(archivePath, 'tags.json');
+      if (bytes != null) {
         final tempRoot = await getTemporaryDirectory();
         final tagsPath = path.join(
           tempRoot.path,
           'cb_file_hub_import_${DateTime.now().microsecondsSinceEpoch}.json',
         );
         try {
-          await File(tagsPath).writeAsBytes(file.content as List<int>);
+          await File(tagsPath).writeAsBytes(bytes);
           final imported = await _databaseManager.importDatabase(
             tagsPath,
             skipFileExistenceCheck: true,
@@ -142,5 +153,22 @@ class BackupArchiveService {
       'settingsCount': settingsCount,
       'importedTagCount': importedTagCount,
     };
+  }
+
+  Future<Uint8List?> _readMember(String archivePath, String name) async {
+    if (useNative) {
+      final member = await NativeArchive.readZipEntry(archivePath, name);
+      if (member != null) return member.bytes;
+    }
+    return Isolate.run(() {
+      final input = InputFileStream(archivePath);
+      try {
+        final archive = ZipDecoder().decodeStream(input);
+        final member = archive.findFile(name);
+        return member == null ? null : Uint8List.fromList(member.content);
+      } finally {
+        input.closeSync();
+      }
+    });
   }
 }

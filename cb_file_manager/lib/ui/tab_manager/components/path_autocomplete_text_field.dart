@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/helpers/core/path_directory_suggestions.dart';
 import 'dart:async';
 import 'dart:io';
 
@@ -5,7 +6,6 @@ import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:flutter/material.dart';
 import 'package:cb_file_manager/helpers/core/text_utils.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
-import 'package:path/path.dart' as p;
 
 enum PathSuggestionType { recent, filesystem }
 
@@ -49,6 +49,8 @@ class _PathAutocompleteTextFieldState extends State<PathAutocompleteTextField> {
   OverlayEntry? _overlayEntry;
   Timer? _debounce;
   int _computeToken = 0;
+  late String _observedText;
+  bool _wasComposing = false;
 
   List<String> _recentPaths = <String>[];
   List<PathSuggestion> _suggestions = <PathSuggestion>[];
@@ -57,6 +59,8 @@ class _PathAutocompleteTextFieldState extends State<PathAutocompleteTextField> {
   @override
   void initState() {
     super.initState();
+    _observedText = widget.controller.text;
+    _wasComposing = !widget.controller.value.composing.isCollapsed;
     widget.controller.addListener(_onTextChanged);
     _focusNode.addListener(_onFocusChanged);
   }
@@ -101,8 +105,18 @@ class _PathAutocompleteTextFieldState extends State<PathAutocompleteTextField> {
   }
 
   void _onTextChanged() {
-    if (!_focusNode.hasFocus) return;
+    final text = widget.controller.text;
+    final composing = !widget.controller.value.composing.isCollapsed;
+    if (text == _observedText && composing == _wasComposing) return;
+    _observedText = text;
+    _wasComposing = composing;
+    ++_computeToken;
     _debounce?.cancel();
+    if (composing) {
+      _removeOverlay();
+      return;
+    }
+    if (!_focusNode.hasFocus) return;
     _debounce = Timer(const Duration(milliseconds: 120), () {
       if (!mounted || !_focusNode.hasFocus) return;
       _updateSuggestions();
@@ -132,52 +146,13 @@ class _PathAutocompleteTextFieldState extends State<PathAutocompleteTextField> {
     return query.contains(Platform.pathSeparator) || query.startsWith('/');
   }
 
-  List<String> _filesystemSuggestions(String query) {
-    if (!_shouldSuggestFromFileSystem(query)) return <String>[];
-
-    final sep = Platform.pathSeparator;
-    final normalized = Platform.isWindows ? query.replaceAll('/', '\\') : query;
-
-    String parent;
-    String prefix;
-    if (normalized.endsWith(sep)) {
-      parent = normalized;
-      prefix = '';
-    } else {
-      parent = p.dirname(normalized);
-      prefix = p.basename(normalized);
-    }
-
-    if (parent.isEmpty || parent == '.') return <String>[];
-
-    try {
-      final dir = Directory(parent);
-      if (!dir.existsSync()) return <String>[];
-
-      final prefixLower = Platform.isWindows ? prefix.toLowerCase() : prefix;
-      final entries = dir
-          .listSync(followLinks: false)
-          .whereType<Directory>()
-          .map((d) => d.path)
-          .toList(growable: false);
-
-      final List<String> matches = <String>[];
-      for (final candidate in entries) {
-        final name = p.basename(candidate);
-        final comparable = Platform.isWindows ? name.toLowerCase() : name;
-        if (prefixLower.isEmpty || comparable.startsWith(prefixLower)) {
-          matches.add(candidate);
-          if (matches.length >= widget.maxSuggestions) break;
-        }
-      }
-      return matches;
-    } catch (_) {
-      return <String>[];
-    }
+  Future<List<String>> _filesystemSuggestions(String query) async {
+    if (!_shouldSuggestFromFileSystem(query)) return [];
+    return suggestPathDirectories(query, limit: widget.maxSuggestions);
   }
 
   Future<void> _updateSuggestions({bool force = false}) async {
-    if (!mounted) return;
+    if (!mounted || !widget.controller.value.composing.isCollapsed) return;
     final query = widget.controller.text.trim();
 
     final int token = ++_computeToken;
@@ -190,10 +165,12 @@ class _PathAutocompleteTextFieldState extends State<PathAutocompleteTextField> {
         if (next.length >= widget.maxSuggestions) break;
       }
     } else {
-      final fs = await Future<List<String>>(
-        () => _filesystemSuggestions(query),
-      );
-      if (!mounted || token != _computeToken) return;
+      final fs = await _filesystemSuggestions(query);
+      if (!mounted ||
+          token != _computeToken ||
+          query != widget.controller.text.trim()) {
+        return;
+      }
 
       for (final v in fs) {
         next.add(PathSuggestion(value: v, type: PathSuggestionType.filesystem));

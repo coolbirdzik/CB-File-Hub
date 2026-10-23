@@ -20,6 +20,7 @@ class WindowsNativeTabDragDropService {
   static bool _initialized = false;
   static TabManagerBloc? _tabBloc;
   static void Function(List<String>)? onTorrentSources;
+  static void Function()? onTorrentNotificationClicked;
   static final ValueNotifier<bool> isDragHoveringWindow = ValueNotifier<bool>(
     false,
   );
@@ -30,6 +31,10 @@ class WindowsNativeTabDragDropService {
     _initialized = true;
 
     _channel.setMethodCallHandler((call) async {
+      if (call.method == 'onTorrentNotificationClicked') {
+        onTorrentNotificationClicked?.call();
+        return;
+      }
       if (call.method == 'onNativeTorrentSources') {
         final arguments = call.arguments;
         if (arguments is List &&

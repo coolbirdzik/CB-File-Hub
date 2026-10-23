@@ -4,6 +4,7 @@ import '../disk_cleaner/cleaner_categories.dart';
 import '../disk_cleaner/cleaner_models.dart';
 import '../disk_cleaner/disk_tree_node.dart';
 import 'app_insights_models.dart';
+import 'path_root_size_index.dart';
 
 /// Attributes already-measured nodes from a full-disk scan to installed apps.
 ///
@@ -183,6 +184,10 @@ class AppStorageAnalyzer {
     }
 
     final profiles = <AppStorageProfile>[];
+    final exclusionIndex = PathRootSizeIndex([
+      for (final root in [...acceptedConfirmed, ...sharedRoots])
+        (root.path, root.node.sizeBytes),
+    ]);
     for (final app in apps) {
       final appCandidates = candidatesByApp[app.id]!.values;
       final confirmedForApp = appCandidates
@@ -200,12 +205,7 @@ class AppStorageAnalyzer {
             }
             // A possible root already covered by any exact root is not useful and
             // would double-count bytes in the detail panel.
-            return !acceptedConfirmed.any(
-                  (root) => isSameOrDescendant(candidate.path, root.path),
-                ) &&
-                !sharedRoots.any(
-                  (root) => isSameOrDescendant(candidate.path, root.path),
-                );
+            return !exclusionIndex.hasAncestor(candidate.path);
           })
           .toList(growable: false);
 
@@ -218,8 +218,7 @@ class AppStorageAnalyzer {
           candidate,
           directoryIndex: directoryIndex,
           coverageIssues: coverageIssues,
-          confirmedRoots: acceptedConfirmed,
-          sharedRoots: sharedRoots,
+          exclusions: exclusionIndex,
         );
         if (entry != null) entries.add(entry);
       }
@@ -484,8 +483,7 @@ class AppStorageAnalyzer {
     _StorageCandidate candidate, {
     required Map<String, DiskTreeNode> directoryIndex,
     required List<FullDiskScanCoverageIssue> coverageIssues,
-    required List<_ResolvedRoot> confirmedRoots,
-    required List<_ResolvedRoot> sharedRoots,
+    required PathRootSizeIndex exclusions,
   }) {
     final node = directoryIndex[candidate.path];
     final overlappingIssues = coverageIssues
@@ -508,7 +506,6 @@ class AppStorageAnalyzer {
       );
     }
 
-    final exclusions = <_ResolvedRoot>[...confirmedRoots, ...sharedRoots];
     final size = candidate.confidence == AttributionConfidence.confirmed
         ? _exclusiveSize(node, candidate.path, exclusions)
         : node.sizeBytes;
@@ -552,11 +549,14 @@ class AppStorageAnalyzer {
   }) {
     final entriesByPath = <String, AppStorageEntry>{};
     final includedSharedRoots = <_ResolvedRoot>[];
+    final confirmedIndex = PathRootSizeIndex([
+      for (final root in acceptedConfirmed) (root.path, root.node.sizeBytes),
+    ]);
 
     for (final path in sharedExactPaths) {
       final node = directoryIndex[path];
       if (node == null) continue;
-      final size = _exclusiveSize(node, path, acceptedConfirmed);
+      final size = _exclusiveSize(node, path, confirmedIndex);
       if (size < minimumBytes) continue;
       final partial = coverageIssues.any(
         (issue) => _pathsOverlap(path, issue.path),
@@ -577,6 +577,10 @@ class AppStorageAnalyzer {
       includedSharedRoots.add(_ResolvedRoot(path, node));
     }
 
+    final remainingIndex = PathRootSizeIndex([
+      for (final root in [...acceptedConfirmed, ...includedSharedRoots])
+        (root.path, root.node.sizeBytes),
+    ]);
     final appDataBases = <String>{};
     for (final key in const <String>[
       'LOCALAPPDATA',
@@ -597,7 +601,7 @@ class AppStorageAnalyzer {
         final remaining = _remainingAfterRoots(
           child,
           childPath,
-          <_ResolvedRoot>[...acceptedConfirmed, ...includedSharedRoots],
+          remainingIndex,
         );
         if (remaining < minimumBytes) continue;
         final partial = coverageIssues.any(
@@ -630,24 +634,9 @@ class AppStorageAnalyzer {
   static int _exclusiveSize(
     DiskTreeNode node,
     String path,
-    List<_ResolvedRoot> roots,
+    PathRootSizeIndex roots,
   ) {
-    final descendants = roots
-        .where(
-          (root) => root.path != path && isSameOrDescendant(root.path, path),
-        )
-        .toList(growable: false);
-    final topLevel = descendants.where((candidate) {
-      return !descendants.any(
-        (other) =>
-            other.path != candidate.path &&
-            isSameOrDescendant(candidate.path, other.path),
-      );
-    });
-    final excluded = topLevel.fold<int>(
-      0,
-      (sum, root) => sum + root.node.sizeBytes,
-    );
+    final excluded = roots.coveredBytes(path, descendantsOnly: true);
     final remaining = node.sizeBytes - excluded;
     return remaining < 0 ? 0 : remaining;
   }
@@ -655,22 +644,9 @@ class AppStorageAnalyzer {
   static int _remainingAfterRoots(
     DiskTreeNode node,
     String path,
-    List<_ResolvedRoot> roots,
+    PathRootSizeIndex roots,
   ) {
-    final covered = roots
-        .where((root) => isSameOrDescendant(root.path, path))
-        .toList(growable: false);
-    final topLevel = covered.where((candidate) {
-      return !covered.any(
-        (other) =>
-            other.path != candidate.path &&
-            isSameOrDescendant(candidate.path, other.path),
-      );
-    });
-    final excluded = topLevel.fold<int>(
-      0,
-      (sum, root) => sum + root.node.sizeBytes,
-    );
+    final excluded = roots.coveredBytes(path);
     final remaining = node.sizeBytes - excluded;
     return remaining < 0 ? 0 : remaining;
   }

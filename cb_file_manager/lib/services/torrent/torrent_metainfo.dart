@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'dart:isolate';
 
 import 'package:crypto/crypto.dart';
+import 'package:cb_native/cb_native.dart';
 
 import 'bencode_reader.dart';
 
@@ -158,6 +160,35 @@ class TorrentMetainfo {
       pieceLength: info['piece length'] as int,
       pieceCount: pieces.length ~/ 20,
     );
+  }
+
+  /// Native parsing validates and hashes on a Rust thread. The fallback retains
+  /// the synchronous parser's exact errors and supports malformed UTF-8 too.
+  static Future<TorrentMetainfo> parseAsync(
+    Uint8List bytes, {
+    bool useNative = true,
+  }) async {
+    if (bytes.length > 16 * 1024 * 1024) {
+      throw const FormatException('Torrent exceeds 16 MiB');
+    }
+    final native = useNative ? await NativeTorrentMetainfo.parse(bytes) : null;
+    if (native != null) {
+      return TorrentMetainfo(
+        native.hash,
+        native.name,
+        native.totalBytes,
+        native.fileCount,
+        native.category,
+        trackers: List.unmodifiable(native.trackers),
+        comment: native.comment,
+        createdBy: native.createdBy,
+        creationDate: native.creationDate,
+        isPrivate: native.isPrivate,
+        pieceLength: native.pieceLength,
+        pieceCount: native.pieceCount,
+      );
+    }
+    return Isolate.run(() => parse(bytes));
   }
 
   static String? _optionalText(Object? value, {int limit = 4096}) {

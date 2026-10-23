@@ -13,7 +13,7 @@ enum LocalModelRuntimeKind {
   /// `.litertlm` bundles — run via flutter_gemma LiteRT-LM engine.
   liteRtLm,
 
-  /// `.gguf` quantised models — run via llamadart llama.cpp engine.
+  /// `.gguf` quantised models — run via the bundled llama.cpp server.
   llamaCpp,
 
   /// Unsupported format (e.g. raw `.safetensors`).

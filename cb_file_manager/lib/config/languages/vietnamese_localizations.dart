@@ -2,6 +2,15 @@ import 'app_localizations.dart';
 
 class VietnameseLocalizations implements AppLocalizations {
   @override
+  String get torrentReceiveInBackground => 'Thêm torrent ngầm khi mở';
+  @override
+  String get torrentReceiveInBackgroundHint =>
+      'Không bật hộp thoại hay đưa app lên trước. Nháy taskbar và gửi thông báo. Dùng thư mục tải đã lưu (Downloads nếu chưa chọn) và lựa chọn tải ngay; giữ nguyên trạng thái tác vụ đã có.';
+  @override
+  String get torrentBackgroundAdded => 'Đã nhận torrent';
+  @override
+  String get torrentBackgroundFailed => 'Không thể thêm torrent';
+  @override
   String get torrentOpeningOptions => 'Khi mở torrent';
   @override
   String get torrentShowDownloadDialog =>
@@ -3912,7 +3921,8 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get cbAgentCleanerTitle => 'Dọn rác (CB Agent)';
   @override
-  String get diskCleanerNotAvailable => 'Dọn rác chỉ khả dụng trên Windows';
+  String get diskCleanerNotAvailable =>
+      'Dọn rác khả dụng trên Windows và macOS';
   @override
   String get diskCleanerScanTitle => 'Quét tệp rác';
   @override
@@ -4468,7 +4478,7 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get cleanerSuggestionsIntro =>
       'Tìm file rác, bộ cài còn sót, file lớn lâu không dùng và dung lượng '
-      'Windows có thể thu hồi, kèm lý do cho từng mục. Không có gì bị xoá cho '
+      'hệ thống có thể thu hồi, kèm lý do cho từng mục. Không có gì bị xoá cho '
       'tới khi bạn xác nhận, và file sẽ được chuyển vào Thùng rác.';
   @override
   String get cleanerSuggestionsScan => 'Quét gợi ý';
@@ -4499,7 +4509,7 @@ class VietnameseLocalizations implements AppLocalizations {
   String get cleanerSuggestionsTierClean => 'Nên dọn - an toàn';
   @override
   String get cleanerSuggestionsTierCleanHint =>
-      'Windows hoặc ứng dụng sẽ tự tạo lại.';
+      'Hệ thống hoặc ứng dụng sẽ tự tạo lại.';
   @override
   String get cleanerSuggestionsTierReview => 'Xem lại trước khi dọn';
   @override

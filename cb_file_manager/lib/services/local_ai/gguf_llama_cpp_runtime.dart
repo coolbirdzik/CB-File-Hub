@@ -2,12 +2,15 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
+
 import '../../models/local_ai/local_ai_advisor_model.dart';
 import '../../utils/app_logger.dart';
 import 'windows_process_reaper.dart';
 import 'llama_cpp_chat_client.dart';
+import 'llama_cpp_server_launch.dart';
 
-/// Local chat runtime backed by the bundled `llama-server.exe` process.
+/// Local chat runtime backed by a bundled llama-server process.
 ///
 /// Instead of calling llama.cpp through FFI inside a Dart isolate (which
 /// crashes during GPU tensor upload because Vulkan is initialized on a
@@ -15,6 +18,8 @@ import 'llama_cpp_chat_client.dart';
 /// runtime launches the official `llama-server.exe` as a separate OS process
 /// and talks to it over HTTP. The server is the same binary that runs fine
 /// standalone, so GPU offload via the bundled Vulkan backend works reliably.
+/// Android launches the APK's native CPU executable from nativeLibraryDir.
+/// macOS resolves its signed, architecture-specific bundle helper via AppKit.
 ///
 /// The server process is started once for a given (model, context size) pair
 /// and reused across requests. It is only restarted when the selected model or
@@ -29,7 +34,7 @@ class GgufLlamaCppLocalAiChatRuntime
   /// fit. Set to 0 to force CPU-only inference.
   final int nGpuLayers;
 
-  /// Filename of the bundled server executable, resolved next to the app exe.
+  /// Windows server filename. Android and macOS resolve their native helpers.
   final String serverExecutableName;
 
   /// Maximum number of tokens the model may generate for a single response
@@ -175,27 +180,21 @@ class GgufLlamaCppLocalAiChatRuntime
     );
   }
 
-  /// Launches the bundled `llama-server.exe`, waits for the /health endpoint to
+  /// Launches the bundled server, waits for the /health endpoint to
   /// report ready, and yields `[STATUS]` progress messages while loading.
   Stream<String> _startServer({
     required String modelPath,
     required int maxTokens,
   }) async* {
-    // The server lives in a "llama" subfolder, not next to the app exe. The app
-    // ships Flutter's own vulkan-1.dll (ANGLE/media_kit) whose ABI differs from
-    // the system Vulkan loader; since Windows prefers a DLL next to the launched
-    // exe, launching from the app root would load that vulkan-1.dll and segfault
-    // inside ggml-vulkan. The subfolder has no vulkan-1.dll, so the loader falls
-    // back to the real System32 Vulkan loader and GPU offload works.
-    final exeDir = File(Platform.resolvedExecutable).parent.path;
-    final sep = Platform.pathSeparator;
-    final serverDir = '$exeDir${sep}llama';
-    final serverPath = '$serverDir$sep$serverExecutableName';
+    final launch = await LlamaCppServerLaunch.resolve(
+      platform: defaultTargetPlatform,
+      desktopExecutableName: serverExecutableName,
+    );
+    final serverPath = launch.executablePath;
     if (!File(serverPath).existsSync()) {
       throw StateError(
         'Bundled local AI server not found at $serverPath. '
-        'Ensure $serverExecutableName is shipped in the "llama" subfolder '
-        'next to the app executable.',
+        '${launch.isAndroid ? 'Rebuild and reinstall the APK with its native runtime.' : 'Ensure $serverExecutableName is shipped in the "llama" subfolder next to the app executable.'}',
       );
     }
     if (!File(modelPath).existsSync()) {
@@ -205,19 +204,17 @@ class GgufLlamaCppLocalAiChatRuntime
     yield '${_statusPrefix}Starting local AI server...';
 
     final port = await _findFreePort();
-    final process = await Process.start(serverPath, <String>[
-      '-m',
-      modelPath,
-      '--host',
-      '127.0.0.1',
-      '--port',
-      '$port',
-      '-c',
-      '$maxTokens',
-      '-ngl',
-      '$nGpuLayers',
-      '--no-ui',
-    ], workingDirectory: serverDir);
+    final process = await Process.start(
+      serverPath,
+      launch.arguments(
+        modelPath: modelPath,
+        port: port,
+        contextTokens: maxTokens,
+        gpuLayers: nGpuLayers,
+      ),
+      workingDirectory: launch.workingDirectory,
+      environment: launch.environment,
+    );
     _serverProcess = process;
     _serverPort = port;
 
@@ -228,9 +225,20 @@ class GgufLlamaCppLocalAiChatRuntime
       _killOnCloseJob.assignProcess(process.pid);
     }
 
-    // Drain stdout/stderr so the process does not block on a full pipe buffer.
+    // Drain output so the process does not block on a full pipe buffer.
     process.stdout.drain<void>();
-    process.stderr.drain<void>();
+    // Preserve a bounded tail: Android loader/model errors used to disappear
+    // into drain(), leaving only a generic readiness failure in the UI.
+    var stderrTail = '';
+    final stderrDone = process.stderr
+        .transform(const Utf8Decoder(allowMalformed: true))
+        .listen((chunk) {
+          stderrTail += chunk;
+          if (stderrTail.length > 8192) {
+            stderrTail = stderrTail.substring(stderrTail.length - 8192);
+          }
+        })
+        .asFuture<void>();
 
     // Surface early process death (e.g. bad model, port in use).
     unawaited(
@@ -254,9 +262,14 @@ class GgufLlamaCppLocalAiChatRuntime
     final ready = await _waitForHealth(port, process);
     if (!ready) {
       await _stopServer();
+      await stderrDone.timeout(const Duration(seconds: 2), onTimeout: () {});
+      final details = stderrTail.trim();
+      if (details.isNotEmpty) {
+        AppLogger.error('[LocalAI] llama-server startup failed:\n$details');
+      }
       throw StateError(
         'Local AI server failed to become ready (model load timed out or the '
-        'server exited).',
+        'server exited).${details.isEmpty ? '' : '\n$details'}',
       );
     }
 

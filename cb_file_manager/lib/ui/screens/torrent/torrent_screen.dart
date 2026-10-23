@@ -20,11 +20,14 @@ import '../../../helpers/core/search_request_guard.dart';
 import '../../../helpers/core/user_preferences.dart';
 import '../../../helpers/tags/tag_manager.dart';
 import '../../../services/torrent/torrent_repository.dart';
+import '../../../services/torrent/torrent_sort.dart';
 import '../../../services/torrent/torrent_entry.dart';
 import '../../../services/torrent/magnet_link.dart';
 import '../../../services/torrent/torrent_import_confirmation.dart';
 import '../../../services/torrent/torrent_service.dart';
+import '../../../services/torrent/torrent_background_receiver.dart';
 import '../../../services/torrent/torrent_source_discovery.dart';
+import '../../../services/windowing/torrent_options_window_service.dart';
 import '../../../helpers/files/windows_app_icon.dart';
 import '../../../helpers/files/file_icon_helper.dart';
 import '../../components/common/browser_like_file_surface.dart';
@@ -32,6 +35,7 @@ import '../../components/common/file_entry_presentation.dart';
 import '../../components/common/file_details_columns.dart';
 import 'torrent_details_columns.dart';
 import 'torrent_download_dialog.dart';
+import 'torrent_error_dialog.dart';
 import 'torrent_link_dialog.dart';
 import 'torrent_client_import_dialog.dart';
 import 'torrent_move_confirmation_dialog.dart';
@@ -102,6 +106,7 @@ class _TorrentScreenState extends State<TorrentScreen> {
   bool _showSearch = false, _useRegex = false;
   ViewMode _viewMode = ViewMode.list;
   SortOption _sort = SortOption.dateDesc;
+  TorrentSort? _detailSort;
   int _zoom = UserPreferences.defaultGridZoomLevel;
   static const _viewModes = {
     ViewMode.list,
@@ -113,6 +118,10 @@ class _TorrentScreenState extends State<TorrentScreen> {
   };
   TorrentPage _data = const TorrentPage([], 0);
   String? _error;
+  Future<void> _errorDialogs = Future<void>.value();
+  final _queuedErrors = <String>{};
+  final _taskErrors = <String, String>{};
+  String? _lastServiceError, _lastLoadError;
   TorrentEntry? _recentEntry;
   String _status = '', _category = '';
   bool _ready = false, _loading = true;
@@ -130,6 +139,9 @@ class _TorrentScreenState extends State<TorrentScreen> {
     _tabBloc = context.read<TabManagerBloc>();
     _tabChanges = _tabBloc.stream.listen((_) => _schedulePendingSources());
     _service.addListener(_changed);
+    if (TorrentOptionsWindowService.isSupported) {
+      unawaited(TorrentOptionsWindowService.instance.warmUpIfNeeded());
+    }
     _tagChanges = TagManager.onTagChanged.listen((_) {
       if (_showFileTags) _changed();
     });
@@ -155,6 +167,13 @@ class _TorrentScreenState extends State<TorrentScreen> {
       (s) => s.name == prefs.getString('torrent.browserSortOption'),
       orElse: () => SortOption.dateDesc,
     );
+    final sortField = prefs.getString('torrent.detailSortField');
+    _detailSort = TorrentSort.expressions.containsKey(sortField)
+        ? TorrentSort(
+            sortField!,
+            ascending: prefs.getBool('torrent.detailSortAscending') ?? true,
+          )
+        : null;
     _zoom = (prefs.getInt('torrent.gridZoom') ?? defaultZoom).clamp(
       UserPreferences.minGridZoomLevel,
       UserPreferences.maxGridZoomLevel,
@@ -173,6 +192,7 @@ class _TorrentScreenState extends State<TorrentScreen> {
     await _service.initialize();
     if (!mounted) return;
     setState(() => _ready = true);
+    _checkServiceError();
     // Opening an association must not wait for a large/filtered library page.
     unawaited(_load());
     _schedulePendingSources();
@@ -251,11 +271,63 @@ class _TorrentScreenState extends State<TorrentScreen> {
   void _setSort(SortOption sort) {
     setState(() {
       _sort = sort;
+      _detailSort = null;
       _offset = 0;
     });
     unawaited(_preferences?.setString('torrent.browserSortOption', sort.name));
+    unawaited(_preferences?.remove('torrent.detailSortField'));
     unawaited(_load());
   }
+
+  void _setDetailSort(String field) {
+    final sort = TorrentSort(
+      field,
+      ascending: _detailSort?.field == field ? !_detailSort!.ascending : true,
+    );
+    setState(() {
+      _detailSort = sort;
+      _offset = 0;
+    });
+    unawaited(_preferences?.setString('torrent.detailSortField', field));
+    unawaited(
+      _preferences?.setBool('torrent.detailSortAscending', sort.ascending),
+    );
+    unawaited(_load());
+  }
+
+  Widget _sortMenu() => PopupMenuButton<Object>(
+    key: const ValueKey('shared-sort-menu'),
+    icon: const Icon(PhosphorIconsLight.sortAscending),
+    tooltip: l.sortByTooltip,
+    offset: const Offset(0, 50),
+    onSelected: (value) =>
+        value is SortOption ? _setSort(value) : _setDetailSort(value as String),
+    itemBuilder: (context) => [
+      ...SharedActionBar.buildSortMenuItems(
+        context,
+        _detailSort == null ? _sort : null,
+        TorrentRepository.sortOptions,
+      ),
+      const PopupMenuDivider(),
+      for (final field in TorrentSort.expressions.keys)
+        PopupMenuItem<Object>(
+          key: ValueKey('torrent-sort-$field'),
+          value: field,
+          child: Row(
+            children: [
+              Expanded(child: Text(l.torrentColumn(field))),
+              if (_detailSort?.field == field)
+                Icon(
+                  _detailSort!.ascending
+                      ? PhosphorIconsLight.arrowUp
+                      : PhosphorIconsLight.arrowDown,
+                  size: 18,
+                ),
+            ],
+          ),
+        ),
+    ],
+  );
 
   void _setView(ViewMode mode) {
     if (!_viewModes.contains(mode)) return;
@@ -288,6 +360,7 @@ class _TorrentScreenState extends State<TorrentScreen> {
 
   void _changed() {
     if (!mounted || !_ready) return;
+    _checkServiceError();
     setState(() {});
     // Scan progress must not re-query/rebuild the library page every 700 ms.
     // F5 loads its page once after import; explicit scans refresh on completion.
@@ -300,18 +373,73 @@ class _TorrentScreenState extends State<TorrentScreen> {
     });
   }
 
-  Future<void> _run(Future<void> Function() action) async {
+  void _checkServiceError() {
+    final error = _service.lastError;
+    if (error != null &&
+        error != _lastServiceError &&
+        !_service.receiveInBackground) {
+      unawaited(_reportError(error));
+    }
+    _lastServiceError = error;
+  }
+
+  Future<void> _reportError(
+    Object error, {
+    StackTrace? stack,
+    String? source,
+    TorrentEntry? entry,
+  }) async {
+    final key = '${entry?.hash ?? source ?? ''}: $error';
+    if (!mounted || !_queuedErrors.add(key)) return;
+    final report = [
+      'CB File Hub - Torrent',
+      'Time: ${DateTime.now().toIso8601String()}',
+      'Platform: ${Platform.operatingSystem}',
+      if (source != null) 'Source: $source',
+      if (entry != null) ...[
+        'Torrent: ${entry.name}',
+        'Info hash: ${entry.hash}',
+        'Torrent file: ${entry.torrentPath}',
+        if (entry.downloadDir != null) 'Destination: ${entry.downloadDir}',
+      ],
+      '',
+      '$error',
+      if (stack != null) '\n$stack',
+    ].join('\n');
+    final previous = _errorDialogs;
+    final done = Completer<void>();
+    _errorDialogs = done.future;
+    try {
+      await previous;
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => TorrentErrorDialog(report: report),
+      );
+    } finally {
+      _queuedErrors.remove(key);
+      done.complete();
+    }
+  }
+
+  Future<void> _run(
+    Future<void> Function() action, {
+    String? source,
+    TorrentEntry? entry,
+  }) async {
     if (mounted) setState(() => _error = null);
     try {
       await action();
     } on TorrentImportCancelled {
       // Declining a duplicate merge leaves the library and download intent alone.
-    } catch (e) {
+    } catch (e, stack) {
       if (mounted) {
         setState(() {
           _error = e.toString();
           _loading = false;
         });
+        await _reportError(e, stack: stack, source: source, entry: entry);
       }
     }
   }
@@ -327,6 +455,7 @@ class _TorrentScreenState extends State<TorrentScreen> {
         limit: _pageSize,
         query: _query,
         sort: _sort,
+        detailSort: _detailSort,
         useRegex: _useRegex,
         isCancelled: () => !_requests.isCurrent(generation),
         status: _status.isEmpty ? null : _status,
@@ -342,6 +471,7 @@ class _TorrentScreenState extends State<TorrentScreen> {
           limit: _pageSize,
           query: _query,
           sort: _sort,
+          detailSort: _detailSort,
           useRegex: _useRegex,
           isCancelled: () => !_requests.isCurrent(generation),
           status: _status.isEmpty ? null : _status,
@@ -376,18 +506,36 @@ class _TorrentScreenState extends State<TorrentScreen> {
         _loading = false;
         _error = null;
       });
+      _lastLoadError = null;
+      for (final entry in result.entries) {
+        final error = entry.status == 'error' ? entry.error : null;
+        if (error == null || error.isEmpty) {
+          _taskErrors.remove(entry.hash);
+        } else if (_taskErrors[entry.hash] != error) {
+          _taskErrors[entry.hash] = error;
+          if (!_service.receiveInBackground) {
+            unawaited(_reportError(error, entry: entry));
+          }
+        }
+      }
       final visiblePaths = result.entries.map(_filePath).toSet();
       if (_selection.state.allSelectedPaths.any(
         (path) => !visiblePaths.contains(path),
       )) {
         _clearSelection();
       }
-    } catch (e) {
+    } catch (e, stack) {
       if (mounted && _requests.isCurrent(generation)) {
         setState(() {
           _error = '$e';
           _loading = false;
         });
+        if (_lastLoadError != '$e') {
+          _lastLoadError = '$e';
+          if (!_service.receiveInBackground) {
+            await _reportError(e, stack: stack);
+          }
+        }
       }
     }
   }
@@ -439,20 +587,31 @@ class _TorrentScreenState extends State<TorrentScreen> {
   });
 
   Future<void> _openSource(String source) => _run(() async {
+    if (_service.receiveInBackground) {
+      await TorrentBackgroundReceiver(_service).receiveSource(source);
+      await _load(background: true);
+      return;
+    }
     if (!source.toLowerCase().startsWith('magnet:') && !await _storageReady()) {
       return;
     }
     final entry = await _service.openSource(source, onDuplicate: _confirmMerge);
     await _showOpenedEntry(entry);
-  });
+  }, source: source);
 
   Future<void> _showOpenedEntry(TorrentEntry entry) async {
     if (!mounted) return;
+    if (_service.receiveInBackground) {
+      await TorrentBackgroundReceiver(_service).receiveEntry(entry);
+      await _load(background: true);
+      return;
+    }
     final showNewest =
         _query.isEmpty &&
         _status.isEmpty &&
         _category.isEmpty &&
-        _sort == SortOption.dateDesc;
+        _sort == SortOption.dateDesc &&
+        _detailSort == null;
     setState(() {
       _recentEntry = entry;
       if (showNewest) _offset = 0;
@@ -474,13 +633,17 @@ class _TorrentScreenState extends State<TorrentScreen> {
   }
 
   Future<void> _addLink() => _run(() async {
-    if (!await _storageReady() || !mounted) return;
+    if ((!_service.receiveInBackground && !await _storageReady()) || !mounted) {
+      return;
+    }
     final entry = await showDialog<TorrentEntry>(
       context: context,
       barrierDismissible: false,
       builder: (_) => TorrentLinkDialog(
-        onAdd: (source) =>
-            _service.openLink(source, onDuplicate: _confirmMerge),
+        onAdd: (source) => _service.openLink(
+          source,
+          onDuplicate: _service.receiveInBackground ? null : _confirmMerge,
+        ),
       ),
     );
     if (entry != null) await _showOpenedEntry(entry);
@@ -538,6 +701,7 @@ class _TorrentScreenState extends State<TorrentScreen> {
       _status = '';
       _category = '';
       _sort = SortOption.dateDesc;
+      _detailSort = null;
       _offset = rank ~/ _pageSize * _pageSize;
     });
     _clearSelection();
@@ -669,6 +833,11 @@ class _TorrentScreenState extends State<TorrentScreen> {
     TorrentEntry entry, {
     bool fromOpen = false,
   }) => _run(() async {
+    if (fromOpen && _service.receiveInBackground) {
+      await TorrentBackgroundReceiver(_service).receiveEntry(entry);
+      await _load(background: true);
+      return;
+    }
     final pending = const [
       'active',
       'waiting',
@@ -689,9 +858,8 @@ class _TorrentScreenState extends State<TorrentScreen> {
         );
       }
     }
-    options ??= await showDialog<TorrentDownloadOptions>(
-      context: context,
-      builder: (_) => TorrentDownloadDialog(
+    if (options == null) {
+      final request = TorrentDownloadRequest(
         name: entry.name,
         initialDestination:
             entry.downloadDir ??
@@ -704,13 +872,44 @@ class _TorrentScreenState extends State<TorrentScreen> {
             : entry.status == 'complete'
             ? false
             : _service.startDownloadsImmediately,
-      ),
-    );
+        language: Localizations.localeOf(context).languageCode,
+        dark: Theme.of(context).brightness == Brightness.dark,
+        accent: Theme.of(context).colorScheme.primary.toARGB32(),
+      );
+      options = TorrentOptionsWindowService.isSupported
+          ? await TorrentOptionsWindowService.instance.show(request)
+          : await showDialog<TorrentDownloadOptions>(
+              context: context,
+              builder: (_) => TorrentDownloadDialog(
+                name: request.name,
+                initialDestination: request.initialDestination,
+                destinationLocked: request.destinationLocked,
+                startImmediately: request.startImmediately,
+              ),
+            );
+    }
     if (options == null || !mounted) return;
+    if (TorrentOptionsWindowService.isSupported) {
+      // The shell stays usable while the standalone form is open. Re-read its
+      // task so changes/removal made in the meantime cannot restart stale work.
+      final current = await _service.repository.get(entry.hash);
+      if (current == null || !mounted) return;
+      entry = current;
+    }
+    final currentlyPending = const [
+      'active',
+      'waiting',
+      'paused',
+    ].contains(entry.status);
     final destinationChanged =
         entry.downloadDir == null ||
         !p.equals(p.normalize(entry.downloadDir!), options.destination);
-    if (pending && !(entry.status == 'paused' && destinationChanged)) {
+    if (currentlyPending && !(entry.status == 'paused' && destinationChanged)) {
+      if (destinationChanged && entry.status != 'paused') {
+        throw StateError(
+          'Stop this torrent before choosing a different destination',
+        );
+      }
       if (options.startImmediately && entry.status == 'paused') {
         await _service.resume(entry);
       } else if (!options.startImmediately && entry.status != 'paused') {
@@ -726,7 +925,7 @@ class _TorrentScreenState extends State<TorrentScreen> {
     await _service.setDefaultDownloadDirectory(options.destination);
     await _service.setStartDownloadsImmediately(options.startImmediately);
     await _load(background: true);
-  });
+  }, entry: entry);
 
   Future<void> _group(TorrentEntry entry) => _run(() async {
     final controller = TextEditingController(text: entry.group);
@@ -973,6 +1172,9 @@ class _TorrentScreenState extends State<TorrentScreen> {
     entries: {for (final e in _data.entries) _filePath(e): e},
     visible: _torrentColumns,
     formatSize: _size,
+    onSort: _setDetailSort,
+    sortField: _detailSort?.field,
+    sortAscending: _detailSort?.ascending ?? true,
   );
 
   void _setTorrentColumns(Set<String> columns) {
@@ -1449,6 +1651,7 @@ class _TorrentScreenState extends State<TorrentScreen> {
             currentSortOption: _sort,
             onSortOptionSelected: _setSort,
             allowedSortOptions: TorrentRepository.sortOptions,
+            sortAction: _sortMenu(),
             viewMode: _viewMode,
             onViewModeToggled: () {},
             onViewModeSelected: _setView,
@@ -1467,6 +1670,8 @@ class _TorrentScreenState extends State<TorrentScreen> {
           return FileDetailsColumns(
             columns: _detailsColumns,
             onToggle: _toggleTorrentColumn,
+            hasCustomSort: _detailSort != null,
+            allowedBaseSortOptions: TorrentRepository.sortOptions,
             child: FileEntryPresentation(
               virtualPaths: {
                 for (final entry in _data.entries)
@@ -2006,14 +2211,27 @@ class _TorrentSettingsState extends State<_TorrentSettings> {
           spacing: CbSpacing.md,
           children: [
             Text(l.torrentOpeningOptions, style: CbTypography.headingSm),
+            if (Platform.isWindows)
+              CheckboxListTile(
+                key: const ValueKey('torrent-receive-in-background'),
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+                title: Text(l.torrentReceiveInBackground),
+                subtitle: Text(l.torrentReceiveInBackgroundHint),
+                value: service.receiveInBackground,
+                onChanged: _busy
+                    ? null
+                    : (value) =>
+                          _run(() => service.setReceiveInBackground(value!)),
+              ),
             CheckboxListTile(
               key: const ValueKey('torrent-show-download-dialog'),
               contentPadding: EdgeInsets.zero,
               controlAffinity: ListTileControlAffinity.leading,
               title: Text(l.torrentShowDownloadDialog),
               subtitle: Text(l.torrentShowDownloadDialogHint),
-              value: service.showDownloadDialog,
-              onChanged: _busy
+              value: !service.receiveInBackground && service.showDownloadDialog,
+              onChanged: _busy || service.receiveInBackground
                   ? null
                   : (value) =>
                         _run(() => service.setShowDownloadDialog(value!)),

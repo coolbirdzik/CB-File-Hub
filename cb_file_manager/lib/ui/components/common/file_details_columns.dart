@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import '../../screens/folder_list/folder_list_state.dart';
 
 /// Additional metadata columns for an indexed collection, rendered by the
 /// normal file Details header and rows. Cell data stays bounded to the page.
@@ -11,6 +12,8 @@ class FileDetailsColumn {
   final double width;
   final bool visible;
   final String Function(String path) valueOf;
+  final VoidCallback? onSort;
+  final bool? sortAscending;
 
   const FileDetailsColumn({
     required this.id,
@@ -19,6 +22,8 @@ class FileDetailsColumn {
     this.description,
     this.width = 110,
     this.visible = true,
+    this.onSort,
+    this.sortAscending,
   });
 
   Widget cell(BuildContext context, String path) {
@@ -40,11 +45,15 @@ class FileDetailsColumn {
 class FileDetailsColumns extends InheritedWidget {
   final List<FileDetailsColumn> columns;
   final ValueChanged<String> onToggle;
+  final bool hasCustomSort;
+  final Set<SortOption>? allowedBaseSortOptions;
 
   const FileDetailsColumns({
     super.key,
     required this.columns,
     required this.onToggle,
+    this.hasCustomSort = false,
+    this.allowedBaseSortOptions,
     required super.child,
   });
 
@@ -55,7 +64,10 @@ class FileDetailsColumns extends InheritedWidget {
 
   @override
   bool updateShouldNotify(FileDetailsColumns oldWidget) =>
-      columns != oldWidget.columns || onToggle != oldWidget.onToggle;
+      columns != oldWidget.columns ||
+      onToggle != oldWidget.onToggle ||
+      hasCustomSort != oldWidget.hasCustomSort ||
+      allowedBaseSortOptions != oldWidget.allowedBaseSortOptions;
 }
 
 /// Header and lazy vertical list share one horizontal viewport, keeping every

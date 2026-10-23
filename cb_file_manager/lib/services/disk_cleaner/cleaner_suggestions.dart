@@ -5,6 +5,7 @@ import 'package:cb_native/cb_native.dart';
 import 'package:path/path.dart' as p;
 
 import 'cleaner_categories.dart';
+import 'cleaner_paths.dart';
 import 'cleaner_models.dart';
 import 'cleaner_space_insights.dart';
 import 'disk_tree_node.dart';
@@ -241,6 +242,9 @@ class CleanerSuggestionScanner {
     'BZ2',
     'CAB',
     'APK',
+    'DMG',
+    'PKG',
+    'XIP',
   };
 
   /// Space causes the view explains with a Windows or app action.
@@ -268,15 +272,25 @@ class CleanerSuggestionScanner {
     List<FullDiskScanInsight> oldLargeItems = const [],
     void Function(CleanerSuggestionProgress progress)? onProgress,
   }) async {
-    final drive = _driveLetter(drivePath);
+    final posix = CleanerPaths.isPosix(drivePath);
+    final drive = posix ? drivePath : _driveLetter(drivePath);
+    final scanRoot = posix ? drivePath : '$drive\\';
     final suggestions = <CleanerSuggestion>[];
     final warnings = <String>[];
     final errors = <CleanerSuggestionError>[];
-    final tree = diskTree != null && _driveLetter(diskTree.fullPath) == drive
+    final tree =
+        diskTree != null &&
+            (posix
+                ? CleanerPaths.contains(scanRoot, diskTree.fullPath)
+                : _driveLetter(diskTree.fullPath) == drive)
         ? diskTree
         : null;
-    final profile = environment['USERPROFILE'];
-    final checkDownloads = profile != null && _driveLetter(profile) == drive;
+    final profile = environment[posix ? 'HOME' : 'USERPROFILE'];
+    final checkDownloads =
+        profile != null &&
+        (posix
+            ? CleanerPaths.contains(scanRoot, profile)
+            : _driveLetter(profile) == drive);
     final categoryIds = CleanerCategories.all().map((c) => c.id).toList();
 
     // Weights reflect how long each phase usually takes.
@@ -285,13 +299,13 @@ class CleanerSuggestionScanner {
       [
         ...categoryIds,
         if (checkDownloads) CleanerSuggestionSource.downloads,
-        CleanerSuggestionSource.system,
+        if (!posix) CleanerSuggestionSource.system,
         if (tree != null) CleanerSuggestionSource.diskScan,
       ],
       _normalized({
         'junk': 0.7,
         if (checkDownloads) CleanerSuggestionSource.downloads: 0.15,
-        CleanerSuggestionSource.system: tree == null ? 0.15 : 0.05,
+        if (!posix) CleanerSuggestionSource.system: tree == null ? 0.15 : 0.05,
         if (tree != null) CleanerSuggestionSource.diskScan: 0.05,
       }),
     );
@@ -307,7 +321,7 @@ class CleanerSuggestionScanner {
     tracker.emit();
     var lastBytes = 0;
     try {
-      final report = await scanJunk(['$drive\\'], categoryIds, (progress) {
+      final report = await scanJunk([scanRoot], categoryIds, (progress) {
         // Bytes between two reports are credited to the category of the
         // later one; exact per-category totals replace this at the end.
         final delta = progress.bytesFound - lastBytes;
@@ -350,7 +364,7 @@ class CleanerSuggestionScanner {
     tracker.phase['junk'] = 1;
 
     if (checkDownloads) {
-      final downloads = '$profile\\Downloads';
+      final downloads = posix ? '$profile/Downloads' : '$profile\\Downloads';
       tracker
         ..step = CleanerSuggestionStep.downloads
         ..active = CleanerSuggestionSource.downloads
@@ -373,23 +387,25 @@ class CleanerSuggestionScanner {
       finish(CleanerSuggestionSource.downloads, [?found]);
     }
 
-    tracker
-      ..step = CleanerSuggestionStep.system
-      ..active = CleanerSuggestionSource.system
-      ..path = '$drive\\'
-      ..emit();
-    final system = <CleanerSuggestion>[];
-    final hibernation = await _hibernationSuggestion(drive);
-    if (hibernation != null) system.add(hibernation);
-    if (tree == null) {
+    if (!posix) {
       tracker
-        ..path = '$drive\\Windows.old'
+        ..step = CleanerSuggestionStep.system
+        ..active = CleanerSuggestionSource.system
+        ..path = '$drive\\'
         ..emit();
-      final previous = await _previousWindowsSuggestion(drive);
-      if (previous != null) system.add(previous);
+      final system = <CleanerSuggestion>[];
+      final hibernation = await _hibernationSuggestion(drive);
+      if (hibernation != null) system.add(hibernation);
+      if (tree == null) {
+        tracker
+          ..path = '$drive\\Windows.old'
+          ..emit();
+        final previous = await _previousWindowsSuggestion(drive);
+        if (previous != null) system.add(previous);
+      }
+      suggestions.addAll(system);
+      finish(CleanerSuggestionSource.system, system);
     }
-    suggestions.addAll(system);
-    finish(CleanerSuggestionSource.system, system);
 
     if (tree != null) {
       tracker
@@ -402,7 +418,7 @@ class CleanerSuggestionScanner {
         oldLargeItems,
         excludePaths: {
           for (final suggestion in suggestions)
-            for (final item in suggestion.items) item.path.toUpperCase(),
+            for (final item in suggestion.items) CleanerPaths.key(item.path),
         },
       );
       suggestions.addAll(fromTree);
@@ -411,7 +427,7 @@ class CleanerSuggestionScanner {
 
     suggestions.sort(_compare);
     return CleanerSuggestionReport(
-      drivePath: '$drive\\',
+      drivePath: scanRoot,
       suggestions: suggestions,
       usedDiskScan: tree != null,
       warnings: warnings,
@@ -517,14 +533,19 @@ class CleanerSuggestionScanner {
 
     final oldFiles = <JunkItem>[];
     for (final item in oldLargeItems) {
-      if (!item.isFile || excludePaths.contains(item.path.toUpperCase())) {
+      if (!item.isFile || excludePaths.contains(CleanerPaths.key(item.path))) {
         continue;
       }
       final upper = CleanerSpaceInsights.normalize(item.path);
       // Only a user's own files. App data, cloud-synced files (deleting them
       // deletes the cloud copy), mail stores and VM disks are excluded.
-      if (!RegExp(r'^[A-Z]:\\USERS\\[^\\]+\\').hasMatch(upper) ||
-          upper.contains(r'\APPDATA\')) {
+      final personal = CleanerPaths.isPosix(upper)
+          ? RegExp(
+              r'^/Users/[^/]+/(Downloads|Desktop|Documents|Pictures|Movies|Music)/',
+            ).hasMatch(upper)
+          : RegExp(r'^[A-Z]:\\USERS\\[^\\]+\\').hasMatch(upper) &&
+                !upper.contains(r'\APPDATA\');
+      if (!personal) {
         continue;
       }
       final cause = CleanerSpaceInsights.causeWithin(item.path, isFile: true);
@@ -555,7 +576,8 @@ class CleanerSuggestionScanner {
     DiskTreeNode largest,
   ) {
     final folder = largest.isFile
-        ? largest.fullPath.substring(0, largest.fullPath.lastIndexOf(r'\'))
+        ? (CleanerPaths.isPosix(largest.fullPath) ? p.posix : p.windows)
+              .dirname(largest.fullPath)
         : largest.fullPath;
     return CleanerSuggestion(
       id: causeId,

@@ -18,6 +18,8 @@ import 'cleaner_categories.dart';
 import 'cleaner_agent_review.dart';
 import 'cleaner_models.dart';
 import 'cleaner_safety.dart';
+import 'cleaner_paths.dart';
+import 'macos_cleaner_platform.dart';
 import 'disk_cleaner_isolate.dart';
 import 'disk_tree_node.dart';
 import 'full_disk_scan_isolate.dart';
@@ -409,11 +411,7 @@ class DiskCleanerService {
             'Return to ready, fresh Disk usage results before inspecting items.',
       );
     }
-    String normalize(String value) => value
-        .trim()
-        .replaceAll('/', r'\')
-        .toUpperCase()
-        .replaceFirst(RegExp(r'\\+$'), '');
+    String normalize(String value) => CleanerPaths.key(value);
     final target = normalize(path);
     DiskTreeNode? node = _fullCleanerReviews[ownerTabId]?.pendingNodeForPath(
       path,
@@ -423,7 +421,7 @@ class DiskCleanerService {
       final candidate = stack.removeLast();
       if (candidate.fullPath.isNotEmpty &&
           !identical(candidate, context.root) &&
-          !RegExp(r'^[A-Z]:$').hasMatch(target) &&
+          !RegExp(r'^[A-Z]:\\?$').hasMatch(target) &&
           normalize(candidate.fullPath) == target) {
         node = candidate;
         break;
@@ -534,11 +532,7 @@ class DiskCleanerService {
         error: 'Supply between 1 and 100 exact scanned paths.',
       );
     }
-    String normalize(String path) => path
-        .trim()
-        .replaceAll('/', r'\')
-        .toUpperCase()
-        .replaceFirst(RegExp(r'\\+$'), '');
+    String normalize(String path) => CleanerPaths.key(path);
     final wanted = paths.map(normalize).toSet();
     final found = <String, DiskTreeNode>{};
     final stack = <DiskTreeNode>[context.root];
@@ -548,7 +542,7 @@ class DiskCleanerService {
       if (wanted.contains(path) &&
           node.fullPath.isNotEmpty &&
           !identical(node, context.root) &&
-          !RegExp(r'^[A-Z]:$').hasMatch(path)) {
+          !RegExp(r'^[A-Z]:\\?$').hasMatch(path)) {
         found[path] = node;
       }
       stack.addAll(node.children);
@@ -704,15 +698,18 @@ class DiskCleanerService {
 
   /// Lists every category the cleaner knows about.
   ///
-  /// On non-Windows platforms returns an empty list — the cleaner is
-  /// Windows-only for now.
+  /// Uses the platform's own cleanup rules.
   List<CleanerCategory> listCategories({bool windowsOnly = true}) {
-    if (windowsOnly && !Platform.isWindows) return const [];
+    if (windowsOnly && !CleanerPaths.isSupported) return const [];
     return CleanerCategories.all();
   }
 
   /// Returns free / total / used info for every Windows fixed drive.
   Future<List<DriveSpace>> getDriveSpace() async {
+    if (Platform.isMacOS) {
+      _macosVolumes = await MacosCleanerPlatform.volumes();
+      return _macosVolumes;
+    }
     if (!Platform.isWindows) return const [];
 
     final drives = await getAllWindowsDrives();
@@ -750,6 +747,18 @@ class DiskCleanerService {
   /// Free / total space of the volume holding [drivePath], or null when it
   /// cannot be read (non-Windows, unmounted or invalid path).
   DriveSpace? readDriveSpace(String drivePath) {
+    if (Platform.isMacOS) {
+      final matches =
+          _macosVolumes
+              .where((drive) => CleanerPaths.contains(drive.path, drivePath))
+              .toList()
+            ..sort(
+              (a, b) => CleanerPaths.key(
+                b.path,
+              ).length.compareTo(CleanerPaths.key(a.path).length),
+            );
+      return matches.isEmpty ? null : matches.first;
+    }
     final match = RegExp(r'^[A-Za-z]:').firstMatch(drivePath.trim());
     if (match == null) return null;
     final drive = '${match.group(0)!.toUpperCase()}\\';
@@ -762,6 +771,8 @@ class DiskCleanerService {
       freeBytes: info.freeBytes,
     );
   }
+
+  List<DriveSpace> _macosVolumes = const [];
 
   /// Scans the requested categories, awaiting the final report.
   ///
@@ -1355,17 +1366,24 @@ class DiskCleanerService {
           final fastSkipTimeout = skipAllRemainingDeletes
               ? const Duration(milliseconds: 200)
               : null;
+          final deleteErrors = <String, Object>{};
           if (permanent) {
             ok = await trash.deleteMultiplePermanently(
               paths,
               chunkSize: paths.length,
               timeoutOverride: fastSkipTimeout,
+              onChunkStart: (path, completed, _) =>
+                  onProgress?.call(done + completed, total, path),
+              onError: (path, error) => deleteErrors[path] = error,
             );
           } else {
             ok = await trash.moveMultipleToTrashBatched(
               paths,
               chunkSize: paths.length,
               timeoutOverride: fastSkipTimeout,
+              onError: (path, error) => deleteErrors[path] = error,
+              onChunkStart: (path, completed, _) =>
+                  onProgress?.call(done + completed, total, path),
             );
           }
 
@@ -1392,7 +1410,10 @@ class DiskCleanerService {
               batchSuccessCount++;
               batchSuccessBytes += item.sizeBytes;
             } else {
-              await resolveFailedItem(item);
+              await resolveFailedItem(
+                item,
+                fallbackReason: deleteErrors[item.path]?.toString(),
+              );
             }
             done++;
             onProgress?.call(done, total, item.path);
@@ -1929,8 +1950,8 @@ class DiskCleanerService {
         'A full disk scan is already in progress; cancel it first.',
       );
     }
-    if (!Platform.isWindows) {
-      throw StateError('Full disk scan is only supported on Windows.');
+    if (!CleanerPaths.isSupported) {
+      throw StateError('Full disk scan is supported on Windows and macOS.');
     }
 
     final cacheEligible = _isWindowsDriveRoot(drivePath);
@@ -2091,12 +2112,12 @@ class DiskCleanerService {
 
         if (rule.includeGlobs == null || rule.includeGlobs!.isEmpty) {
           // No glob filter → entire directory is junk
-          wholeDirJunk[resolved.toUpperCase()] = cat.id;
+          wholeDirJunk[CleanerPaths.key(resolved)] = cat.id;
         } else {
           // Has glob filter → only matching files are junk
           globFilteredJunk.add(
             _GlobRule(
-              basePath: resolved.toUpperCase(),
+              basePath: CleanerPaths.key(resolved),
               categoryId: cat.id,
               globs: rule.includeGlobs!.map((g) => _globToRegex(g)).toList(),
             ),
@@ -2111,7 +2132,7 @@ class DiskCleanerService {
       for (final entry in wholeDirJunk.entries)
         _WholeDirRule(
           path: entry.key,
-          prefix: '${entry.key}\\',
+          prefix: CleanerPaths.prefix(entry.key),
           categoryId: entry.value,
         ),
     ];
@@ -2143,7 +2164,7 @@ class DiskCleanerService {
     List<_WholeDirRule> wholeDirJunk,
     List<_GlobRule> globFilteredJunk,
   ) {
-    final upperPath = node.fullPath.toUpperCase();
+    final upperPath = CleanerPaths.key(node.fullPath);
 
     // Check whole-directory rules: if this node IS the junk dir or inside it
     for (final rule in wholeDirJunk) {
@@ -2156,11 +2177,11 @@ class DiskCleanerService {
     // Check glob-filtered rules: only mark individual files, not directories
     if (node.isFile && globFilteredJunk.isNotEmpty) {
       final fileName = _nodeBasename(node.fullPath).toUpperCase();
-      final parentPath = _nodeParentDir(node.fullPath).toUpperCase();
+      final parentPath = CleanerPaths.key(_nodeParentDir(node.fullPath));
       for (final rule in globFilteredJunk) {
         // File must be inside (or recursively under) the rule's base path
         if (parentPath == rule.basePath ||
-            parentPath.startsWith('${rule.basePath}\\')) {
+            parentPath.startsWith(CleanerPaths.prefix(rule.basePath))) {
           // Check if filename matches any of the globs
           for (final glob in rule.globs) {
             if (glob.hasMatch(fileName)) {
@@ -2252,8 +2273,8 @@ class DiskCleanerService {
     List<String> categoryIds,
   ) async {
     if (_activeScan != null) throw CleanerScanBusyError();
-    if (!Platform.isWindows) {
-      throw StateError('DiskCleanerService is only supported on Windows.');
+    if (!CleanerPaths.isSupported) {
+      throw StateError('DiskCleanerService is supported on Windows and macOS.');
     }
 
     final selected = _resolveCategories(categoryIds);
@@ -2278,7 +2299,9 @@ class DiskCleanerService {
     }
 
     final handle = await spawnScanWithResolvedRules(
-      drivesScanned: drivePaths.isEmpty ? const ['C:\\'] : drivePaths,
+      drivesScanned: drivePaths.isEmpty
+          ? [CleanerPaths.defaultRoot]
+          : drivePaths,
       rules: resolvedRules,
     );
     _activeScan = handle;
@@ -2556,14 +2579,21 @@ void _cleanWorkerEntry(_CleanWorkerArgs args) async {
   // keep the bottom progress bar smooth without per-file message storms.
   var lastProgressSentAt = DateTime.fromMillisecondsSinceEpoch(0);
   const progressInterval = Duration(milliseconds: 80);
+  var progressTotal = 0;
+  var furthestDone = 0;
 
   void sendProgress(int done, int total, String? currentPath) {
+    // Native batch I/O can finish before its outcomes are classified below.
+    // Do not replay a lower count while that bookkeeping catches up.
+    if (total != progressTotal) {
+      progressTotal = total;
+      furthestDone = 0;
+    }
+    if (done < furthestDone) return;
+    furthestDone = done;
     final now = DateTime.now();
     final isFinal = total > 0 && done >= total;
-    final isPreparing = total == 0;
-    if (!isFinal &&
-        !isPreparing &&
-        now.difference(lastProgressSentAt) < progressInterval) {
+    if (!isFinal && now.difference(lastProgressSentAt) < progressInterval) {
       return;
     }
     lastProgressSentAt = now;

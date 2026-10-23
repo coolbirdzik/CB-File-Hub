@@ -1,10 +1,99 @@
+import 'dart:isolate';
+import 'package:cb_native/cb_native.dart';
 import 'package:flutter/material.dart';
 import 'package:highlight/highlight.dart' show highlight, Node, Result;
 import 'package:path/path.dart' as p;
 
+typedef PreviewSyntaxToken = NativeSyntaxToken;
+
 /// Syntax highlighting for the file preview pane (highlight.js via [highlight]).
 class PreviewSyntaxHighlighter {
   PreviewSyntaxHighlighter._();
+
+  static final _tokenCache =
+      <(String?, String, bool), Future<List<PreviewSyntaxToken>>>{};
+  static int _cachedChars = 0;
+
+  /// Tokenize once, off the UI isolate. Theme changes reuse token ranges.
+  static Future<List<PreviewSyntaxToken>> tokenize(
+    String source,
+    String filePath, {
+    bool useNative = true,
+  }) {
+    final language = languageForPath(filePath);
+    final key = (language, source, useNative);
+    final cached = _tokenCache.remove(key);
+    if (cached != null) {
+      _tokenCache[key] = cached;
+      return cached;
+    }
+    final result = _tokenize(source, language, useNative);
+    if (source.length <= 128 * 1024) {
+      while (_tokenCache.isNotEmpty &&
+          (_tokenCache.length >= 8 ||
+              _cachedChars + source.length > 512 * 1024)) {
+        final oldest = _tokenCache.keys.first;
+        _cachedChars -= oldest.$2.length;
+        _tokenCache.remove(oldest);
+      }
+      _tokenCache[key] = result;
+      _cachedChars += source.length;
+    }
+    return result;
+  }
+
+  static Future<List<PreviewSyntaxToken>> _tokenize(
+    String source,
+    String? language,
+    bool native,
+  ) async {
+    if (source.isEmpty) return [];
+    if (native && language != null) {
+      final tokens = await NativeUiJobs.tokenize(language, source);
+      if (tokens != null) {
+        var offset = 0;
+        for (final token in tokens) {
+          if (token.start != offset || token.length <= 0) {
+            offset = -1;
+            break;
+          }
+          offset += token.length;
+        }
+        if (offset == source.length) return tokens;
+      }
+    }
+    return Isolate.run(() => _dartTokens(source, language));
+  }
+
+  static List<PreviewSyntaxToken> _dartTokens(String source, String? language) {
+    final parsed = language == null
+        ? highlight.parse(source, autoDetection: true)
+        : highlight.parse(source, language: language);
+    final tokens = <PreviewSyntaxToken>[];
+    var offset = 0;
+    final knownClasses = _darkStyles(const TextStyle()).keys.toSet();
+    void collect(Node node, String parent) {
+      final style = knownClasses.contains(node.className)
+          ? node.className!
+          : parent;
+      if (node.value != null) {
+        if (node.value!.isEmpty) return;
+        tokens.add(PreviewSyntaxToken(offset, node.value!.length, style));
+        offset += node.value!.length;
+      } else {
+        for (final child in node.children ?? <Node>[]) {
+          collect(child, style);
+        }
+      }
+    }
+
+    for (final node in parsed.nodes ?? <Node>[]) {
+      collect(node, '');
+    }
+    return offset == source.length
+        ? tokens
+        : [PreviewSyntaxToken(0, source.length, '')];
+  }
 
   static const Map<String, String> _extensionToLanguage = {
     'dart': 'dart',
@@ -101,9 +190,26 @@ class PreviewSyntaxHighlighter {
     required String filePath,
     required TextStyle baseStyle,
     required Brightness brightness,
+    List<PreviewSyntaxToken>? tokens,
   }) {
     if (source.isEmpty) {
       return TextSpan(text: '', style: baseStyle);
+    }
+
+    if (tokens != null) {
+      final styles = brightness == Brightness.dark
+          ? _darkStyles(baseStyle)
+          : _lightStyles(baseStyle);
+      return TextSpan(
+        style: baseStyle,
+        children: [
+          for (final token in tokens)
+            TextSpan(
+              text: source.substring(token.start, token.start + token.length),
+              style: styles[token.className] ?? baseStyle,
+            ),
+        ],
+      );
     }
 
     final language = languageForPath(filePath);

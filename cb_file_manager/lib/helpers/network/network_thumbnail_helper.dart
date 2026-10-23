@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/services/thumbnail_cache_cleaner.dart';
 import 'dart:io';
 import 'dart:async';
 import 'dart:isolate';
@@ -348,103 +349,16 @@ class NetworkThumbnailHelper {
 
       debugPrint('Starting cache cleanup...');
 
-      final files = await _cacheDirectory!.list().toList();
-      final thumbnailFiles = files.whereType<File>().cast<File>().toList();
-
-      if (thumbnailFiles.isEmpty) {
-        debugPrint('No files to cleanup');
-        return;
-      }
-
-      // Sort files by last modified time (oldest first)
-      thumbnailFiles.sort((a, b) {
-        final aTime = a.lastModifiedSync();
-        final bTime = b.lastModifiedSync();
-        return aTime.compareTo(bTime);
-      });
-
-      int deletedCount = 0;
-      int totalSize = 0;
-
-      // Step 1: Delete files older than maxCacheAge
-      for (final file in thumbnailFiles) {
-        try {
-          final fileTime = file.lastModifiedSync();
-          if (now.difference(fileTime) > _maxCacheAge) {
-            await file.delete();
-            deletedCount++;
-            debugPrint('Deleted old file: ${p.basename(file.path)}');
-          } else {
-            final size = await file.length();
-            totalSize += size;
-          }
-        } catch (e) {
-          debugPrint('Error checking file age: $e');
-        }
-      }
-
-      // Step 2: Check remaining files after age-based cleanup
-      final remainingFiles = await _cacheDirectory!
-          .list()
-          .where((f) => f is File)
-          .cast<File>()
-          .toList();
-
-      // Step 3: Delete files if count exceeds limit
-      if (remainingFiles.length > _maxCacheFiles) {
-        final filesToDelete = remainingFiles.length - _maxCacheFiles;
-        for (int i = 0; i < filesToDelete; i++) {
-          try {
-            await remainingFiles[i].delete();
-            deletedCount++;
-            debugPrint(
-              'Deleted excess file: ${p.basename(remainingFiles[i].path)}',
-            );
-          } catch (e) {
-            debugPrint('Error deleting excess file: $e');
-          }
-        }
-      }
-
-      // Step 4: Check total size and delete oldest files if needed
-      if (totalSize > _maxCacheSizeMB * 1024 * 1024) {
-        final finalFiles = await _cacheDirectory!
-            .list()
-            .where((f) => f is File)
-            .cast<File>()
-            .toList();
-
-        finalFiles.sort((a, b) {
-          final aTime = a.lastModifiedSync();
-          final bTime = b.lastModifiedSync();
-          return aTime.compareTo(bTime);
-        });
-
-        int currentSize = 0;
-        for (final file in finalFiles) {
-          try {
-            final size = await file.length();
-            currentSize += size;
-          } catch (e) {
-            // debugPrint('Error getting file size: $e');
-          }
-        }
-
-        const targetSize = _maxCacheSizeMB * 1024 * 1024;
-        for (final file in finalFiles) {
-          if (currentSize <= targetSize) break;
-
-          try {
-            final size = await file.length();
-            await file.delete();
-            currentSize -= size;
-            deletedCount++;
-            debugPrint('Deleted oversized file: ${p.basename(file.path)}');
-          } catch (e) {
-            debugPrint('Error deleting oversized file: $e');
-          }
-        }
-      }
+      final plan = await ThumbnailCacheCleaner.plan(
+        _cacheDirectory!.path,
+        cutoff: now.subtract(_maxCacheAge),
+        maxCount: _maxCacheFiles,
+        maxBytes: _maxCacheSizeMB * 1024 * 1024,
+      );
+      final deletedCount = await ThumbnailCacheCleaner.apply(
+        _cacheDirectory!.path,
+        plan,
+      );
 
       debugPrint('Cache cleanup completed. Deleted $deletedCount files');
     } catch (e) {

@@ -1179,6 +1179,7 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
       detailsHeader: _viewMode == ViewMode.details
           ? folder_list_components.DetailsColumnsHeader(
               sortOption: _sortOption,
+              supportsMetadataSort: false,
               onSortOptionSelected: _applySortOption,
               // Matches the list padding.
               horizontalPadding: 8.0,

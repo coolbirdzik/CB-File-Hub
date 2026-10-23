@@ -1,3 +1,5 @@
+import 'dart:isolate';
+import 'package:cb_file_manager/helpers/core/batch_file_probe.dart';
 import 'package:cb_file_manager/models/database/database_provider.dart';
 import 'package:cb_file_manager/models/database/sqlite_database_provider.dart';
 import 'dart:async'; // Thêm import này để sử dụng Completer
@@ -422,154 +424,78 @@ class DatabaseManager implements IDatabaseProvider {
     bool skipFileExistenceCheck = false,
   }) async {
     try {
-      debugPrint('ImportDatabase: Starting import from $filePath');
-
-      // Ensure database is initialized first
-      if (!_isInitialized) {
-        debugPrint(
-          'ImportDatabase: Database not initialized, initializing now...',
+      await _ensureInitialized();
+      final data = await _readTagBackupJson(filePath);
+      if (data.containsKey('tags')) {
+        final counts = await _importTagRows(
+          _tagRows(data['tags'] as Map<String, dynamic>),
+          skipFileExistenceCheck: skipFileExistenceCheck,
         );
-        await initialize();
+        return counts.imported > 0;
       }
-
-      debugPrint(
-        'ImportDatabase: Database is initialized, isInitialized=$_isInitialized',
-      );
-
-      // Read from file
-      final exportFile = File(filePath);
-      if (!await exportFile.exists()) {
-        debugPrint('ImportDatabase: Export file not found at $filePath');
-        return false;
-      }
-
-      final jsonString = await exportFile.readAsString();
-      debugPrint(
-        'ImportDatabase: Read ${jsonString.length} characters from file',
-      );
-
-      // Parse JSON
-      final Map<String, dynamic> importData = jsonDecode(jsonString);
-      debugPrint(
-        'ImportDatabase: Parsed JSON, keys: ${importData.keys.toList()}',
-      );
-
-      int importedTagCount = 0;
-      int skippedFileCount = 0;
-      int failedCount = 0;
-
-      // Import tags
-      if (importData.containsKey('tags')) {
-        final Map<String, dynamic> tagsData = importData['tags'];
-        debugPrint('ImportDatabase: Found ${tagsData.length} tags to import');
-
-        // Process each tag
-        for (final tag in tagsData.keys) {
-          final List<dynamic> files = tagsData[tag];
-          debugPrint(
-            'ImportDatabase: Processing tag "$tag" with ${files.length} files',
-          );
-
-          // Add the tag to each file
-          for (final filePathEntry in files) {
-            if (filePathEntry is String) {
-              try {
-                if (skipFileExistenceCheck) {
-                  // Skip file existence check - import tags regardless of file presence
-                  // This is useful for network drives or files that will be added later
-                  final success = await addTagToFile(filePathEntry, tag);
-                  if (success) {
-                    importedTagCount++;
-                  } else {
-                    failedCount++;
-                  }
-                } else {
-                  // Check if file exists before adding tag
-                  final fileExists = File(filePathEntry).existsSync();
-                  if (fileExists) {
-                    final success = await addTagToFile(filePathEntry, tag);
-                    if (success) {
-                      importedTagCount++;
-                    } else {
-                      failedCount++;
-                    }
-                  } else {
-                    skippedFileCount++;
-                    debugPrint(
-                      'ImportDatabase: Skipping file (not exists): $filePathEntry',
-                    );
-                  }
-                }
-              } catch (e) {
-                debugPrint(
-                  'ImportDatabase: Error adding tag "$tag" to file "$filePathEntry": $e',
-                );
-                failedCount++;
-              }
-            }
-          }
-        }
-
-        debugPrint(
-          'ImportDatabase: Summary - imported: $importedTagCount, skipped: $skippedFileCount, failed: $failedCount',
-        );
-      } else {
-        debugPrint('ImportDatabase: No "tags" key found in import file');
-        // Try to import as the old format where key is file path and value is list of tags
-        debugPrint(
-          'ImportDatabase: Checking for old format (file path -> tags list)...',
-        );
-
-        for (final key in importData.keys) {
-          if (key == 'tags' || key == 'exportDate' || key == 'version') {
+      // Legacy path -> tags exports deliberately import missing/network paths.
+      Iterable<(String, String)> oldRows() sync* {
+        for (final entry in data.entries) {
+          if (const ['tags', 'exportDate', 'version'].contains(entry.key)) {
             continue;
           }
-
-          final value = importData[key];
-          if (value is List) {
-            final filePath = key;
-            final tags = value.cast<String>();
-            debugPrint(
-              'ImportDatabase: Old format - file: $filePath, tags: $tags',
-            );
-
-            for (final tag in tags) {
-              try {
-                final success = await addTagToFile(filePath, tag);
-                if (success) {
-                  importedTagCount++;
-                }
-              } catch (e) {
-                debugPrint(
-                  'ImportDatabase: Error adding tag "$tag" to file "$filePath": $e',
-                );
-              }
+          if (entry.value is List) {
+            for (final tag in (entry.value as List).cast<String>()) {
+              yield (entry.key, tag);
             }
           }
         }
-
-        debugPrint(
-          'ImportDatabase: Old format import complete, imported: $importedTagCount',
-        );
       }
 
-      // Note: TagManager cache clearing should be handled by the caller after successful import
-      // to ensure UI properly refreshes with new data
-      if (importedTagCount > 0) {
-        debugPrint(
-          'ImportDatabase: Import completed successfully with $importedTagCount tags',
-        );
-        debugPrint(
-          'ImportDatabase: Caller should clear TagManager cache to refresh UI',
-        );
-      }
-
-      return importedTagCount > 0;
+      return (await _importTagRows(
+            oldRows(),
+            skipFileExistenceCheck: true,
+          )).imported >
+          0;
     } catch (e, stackTrace) {
-      debugPrint('ImportDatabase error: $e');
-      debugPrint('Stack trace: $stackTrace');
+      debugPrint('ImportDatabase error: $e\n$stackTrace');
       return false;
     }
+  }
+
+  Iterable<(String, String)> _tagRows(Map<String, dynamic> tags) sync* {
+    for (final entry in tags.entries) {
+      for (final file in (entry.value as List).whereType<String>()) {
+        yield (file, entry.key);
+      }
+    }
+  }
+
+  Future<({int imported, int skipped, int failed})> _importTagRows(
+    Iterable<(String, String)> rows, {
+    required bool skipFileExistenceCheck,
+  }) async {
+    var imported = 0, skipped = 0, failed = 0;
+    final iterator = rows.iterator;
+    while (true) {
+      final chunk = <(String, String)>[];
+      while (chunk.length < 512 && iterator.moveNext()) {
+        chunk.add(iterator.current);
+      }
+      if (chunk.isEmpty) break;
+      final paths = chunk.map((r) => r.$1).toSet().toList();
+      final flags = skipFileExistenceCheck
+          ? List.filled(paths.length, true)
+          : await probeFiles(paths);
+      final exists = {
+        for (var i = 0; i < paths.length; i++) paths[i]: flags[i],
+      };
+      final accepted = chunk.where((r) => exists[r.$1]!).toList();
+      skipped += chunk.length - accepted.length;
+      if (accepted.isEmpty) continue;
+      final provider = _provider;
+      final results = provider is SqliteDatabaseProvider
+          ? await provider.addTagsToFiles(accepted)
+          : await Future.wait(accepted.map((r) => addTagToFile(r.$1, r.$2)));
+      imported += results.where((ok) => ok).length;
+      failed += results.where((ok) => !ok).length;
+    }
+    return (imported: imported, skipped: skipped, failed: failed);
   }
 
   @override
@@ -862,26 +788,14 @@ class DatabaseManager implements IDatabaseProvider {
       // Restore tags from file_tags table
       try {
         final tagRows = await importedDb.query('file_tags');
-        for (final row in tagRows) {
-          final filePathEntry = row['file_path'] as String?;
-          final tag = row['tag'] as String?;
-          if (filePathEntry == null || tag == null) continue;
-
-          try {
-            if (skipFileExistenceCheck || File(filePathEntry).existsSync()) {
-              final success = await addTagToFile(filePathEntry, tag);
-              if (success) {
-                importedTagCount++;
-              } else {
-                failedCount++;
-              }
-            } else {
-              skippedFileCount++;
-            }
-          } catch (_) {
-            failedCount++;
-          }
-        }
+        final counts = await _importTagRows([
+          for (final row in tagRows)
+            if (row['file_path'] is String && row['tag'] is String)
+              (row['file_path'] as String, row['tag'] as String),
+        ], skipFileExistenceCheck: skipFileExistenceCheck);
+        importedTagCount = counts.imported;
+        skippedFileCount = counts.skipped;
+        failedCount = counts.failed;
       } catch (_) {}
 
       await importedDb.close();
@@ -910,40 +824,14 @@ class DatabaseManager implements IDatabaseProvider {
       final exportFile = File(filePath);
       if (!await exportFile.exists()) return null;
 
-      final jsonString = await exportFile.readAsString();
-      final Map<String, dynamic> data = jsonDecode(jsonString);
-
-      int importedTagCount = 0;
-      int skippedFileCount = 0;
-      int failedCount = 0;
-
-      // Restore tags
-      if (data.containsKey('database')) {
-        final Map<String, dynamic> dbSection = data['database'];
-        if (dbSection.containsKey('tags')) {
-          final Map<String, dynamic> tagsData = dbSection['tags'];
-          for (final tag in tagsData.keys) {
-            final List<dynamic> files = tagsData[tag];
-            for (final filePathEntry in files) {
-              if (filePathEntry is String) {
-                try {
-                  if (skipFileExistenceCheck ||
-                      File(filePathEntry).existsSync()) {
-                    final success = await addTagToFile(filePathEntry, tag);
-                    if (success) {
-                      importedTagCount++;
-                    } else {
-                      failedCount++;
-                    }
-                  } else {
-                    skippedFileCount++;
-                  }
-                } catch (_) {
-                  failedCount++;
-                }
-              }
-            }
-          }
+      final data = await _readTagBackupJson(filePath);
+      var counts = (imported: 0, skipped: 0, failed: 0);
+      if (data['database'] case final Map<String, dynamic> section) {
+        if (section['tags'] case final Map<String, dynamic> tags) {
+          counts = await _importTagRows(
+            _tagRows(tags),
+            skipFileExistenceCheck: skipFileExistenceCheck,
+          );
         }
       }
 
@@ -956,9 +844,9 @@ class DatabaseManager implements IDatabaseProvider {
       }
 
       return {
-        'importedTagCount': importedTagCount,
-        'skippedFileCount': skippedFileCount,
-        'failedCount': failedCount,
+        'importedTagCount': counts.imported,
+        'skippedFileCount': counts.skipped,
+        'failedCount': counts.failed,
         'preferencesCount': restoredPrefs.length,
         'format': 'json',
       };
@@ -999,3 +887,7 @@ class _AsyncSemaphore {
     }
   }
 }
+
+Future<Map<String, dynamic>> _readTagBackupJson(String path) => Isolate.run(
+  () => jsonDecode(File(path).readAsStringSync()) as Map<String, dynamic>,
+);

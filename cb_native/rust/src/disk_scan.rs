@@ -8,8 +8,8 @@
 //! that Dart turns into `DiskTreeNode`s; a parent's record is always queued
 //! before any of its children's records, so Dart can attach nodes as they come.
 //!
-//! Only meaningful on Windows (attributes and FILETIMEs come from the
-//! FindFirstFileExW data that `DirEntry::metadata` exposes for free there).
+//! Windows uses cached directory metadata; POSIX uses symlink metadata and
+//! converts timestamps to the same wire format, with case-sensitive paths.
 
 use std::fs;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
@@ -20,6 +20,21 @@ use std::time::Instant;
 use crate::glob::glob_matches;
 use crate::normalize::dart_upper;
 use crate::wire::{Reader, Writer};
+
+fn path_key(path: &str) -> String {
+    if path.starts_with('/') {
+        if path == "/System/Volumes/Data" || path == "/" {
+            return "/".to_owned();
+        }
+        let path = path
+            .strip_prefix("/System/Volumes/Data/")
+            .map(|suffix| format!("/{suffix}"))
+            .unwrap_or_else(|| path.to_owned());
+        path.trim_end_matches('/').to_owned()
+    } else {
+        dart_upper(path)
+    }
+}
 
 const FILE_ATTRIBUTE_DIRECTORY: u32 = 0x10;
 const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x400;
@@ -121,7 +136,7 @@ impl Config {
         if self.whole_dir_rules.is_empty() {
             return -1;
         }
-        let upper = dart_upper(full_path);
+        let upper = path_key(full_path);
         self.whole_dir_rules
             .iter()
             .find(|rule| upper == rule.path || upper.starts_with(&rule.prefix))
@@ -133,14 +148,15 @@ impl Config {
         if self.glob_rules.is_empty() {
             return Vec::new();
         }
-        let upper = dart_upper(dir_path);
+        let upper = path_key(dir_path);
         self.glob_rules
             .iter()
             .filter(|rule| {
                 upper == rule.base_path
                     || (upper.len() > rule.base_path.len()
                         && upper.starts_with(&rule.base_path)
-                        && upper[rule.base_path.len()..].starts_with('\\'))
+                        && (upper[rule.base_path.len()..].starts_with('\\')
+                            || upper[rule.base_path.len()..].starts_with('/')))
             })
             .collect()
     }
@@ -350,7 +366,17 @@ impl DiskScan {
         } else {
             Vec::new()
         };
-        let separator = if task.path.ends_with('\\') { "" } else { "\\" };
+        let separator = if task.path.starts_with('/') {
+            if task.path.ends_with('/') {
+                ""
+            } else {
+                "/"
+            }
+        } else if task.path.ends_with('\\') {
+            ""
+        } else {
+            "\\"
+        };
         let mut record = DirectoryRecord::default();
         let mut children = Vec::new();
 
@@ -369,6 +395,11 @@ impl DiskScan {
                     continue;
                 }
                 let full_path = format!("{}{}{}", task.path, separator, name);
+                let key = path_key(&full_path);
+                if key == "/Volumes" || key == "/System/Volumes" {
+                    record.reparse_names.push(name);
+                    continue;
+                }
                 let category = if task.category >= 0 {
                     task.category
                 } else {
@@ -462,6 +493,8 @@ fn read_entries(path: &str, with_ids: bool) -> Option<Vec<(String, EntryInfo, u6
     let mut out = Vec::new();
     for entry in fs::read_dir(path).ok()? {
         let Ok(entry) = entry else { break };
+        // DirEntry metadata never follows symlinks and retains Windows' cached
+        // FindFirstFile metadata, avoiding an extra stat for every entry.
         let Ok(metadata) = entry.metadata() else {
             continue;
         };
@@ -499,7 +532,7 @@ impl EntryInfo {
         }
     }
 
-    /// Non-Windows builds only need to compile; Dart never starts a scan there.
+    /// Keep the existing FILETIME wire format on POSIX too.
     #[cfg(not(windows))]
     fn of(metadata: &fs::Metadata) -> EntryInfo {
         EntryInfo {
@@ -513,10 +546,22 @@ impl EntryInfo {
                 0
             },
             size: metadata.len(),
-            last_write: 0,
-            last_access: 0,
+            last_write: filetime(metadata.modified()),
+            last_access: filetime(metadata.accessed()),
         }
     }
+}
+
+#[cfg(not(windows))]
+fn filetime(time: std::io::Result<std::time::SystemTime>) -> u64 {
+    time.ok()
+        .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
+        .map_or(0, |age| {
+            age.as_secs()
+                .saturating_mul(10_000_000)
+                .saturating_add(u64::from(age.subsec_nanos()) / 100)
+                .saturating_add(116_444_736_000_000_000)
+        })
 }
 
 struct SubdirEntry {
@@ -620,6 +665,19 @@ impl DirectoryRecord {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn posix_paths_keep_case_and_data_mount_aliases() {
+        assert_eq!(
+            super::path_key("/System/Volumes/Data/Users/me/Cache"),
+            "/Users/me/Cache"
+        );
+        assert_ne!(
+            super::path_key("/Users/me/Cache"),
+            super::path_key("/Users/me/cache")
+        );
+        assert_eq!(super::path_key("/System/Volumes/Data"), "/");
+        assert_eq!(super::path_key("c:\\Users\\Me"), "C:\\USERS\\ME");
+    }
     use super::*;
 
     #[test]

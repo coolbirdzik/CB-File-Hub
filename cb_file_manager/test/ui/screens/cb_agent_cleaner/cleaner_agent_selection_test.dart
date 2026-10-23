@@ -232,14 +232,12 @@ void main() {
       await tester.tap(
         find.byKey(const ValueKey('cleaner-agent-select-recommendations')),
       );
-      // Open the chat synchronously, before review processing or a new frame.
-      expect(panel.openCalls, 1);
-      expect(panel.isOpen, isTrue);
-      expect(panel.ownerTabId, tabId);
-      expect(panel.currentPath, '#cb-agent-cleaner');
+      // Review runs in Cleaner without opening the conversation panel.
+      expect(panel.openCalls, 0);
+      expect(panel.isOpen, isFalse);
       await tester.pumpAndSettle();
-      expect(panel.openCalls, 1);
-      expect(panel.isOpen, isTrue);
+      expect(panel.openCalls, 0);
+      expect(panel.isOpen, isFalse);
       expect(reviewBloc.reviewRequests, hasLength(1));
       expect(reviewBloc.reviewRequests.single.reviewEntireCleanerScan, isTrue);
 
@@ -597,6 +595,8 @@ void _toolbarTests() {
       final request = reviewBloc.reviewRequests.single;
       expect(request.reviewEntireCleanerScan, isTrue);
       expect(request.cleanerReviewAllGroups, isTrue);
+      expect(panel.openCalls, 0);
+      expect(panel.isOpen, isFalse);
 
       // While it runs, the main half shows progress and the menu offers Stop.
       reviewBloc.beginReview();

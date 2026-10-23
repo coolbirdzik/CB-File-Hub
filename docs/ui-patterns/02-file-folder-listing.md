@@ -56,6 +56,17 @@ Always handle errors and update loading state. Provide retry button with error m
 
 ## Performance Tips
 
+All available Details columns support ascending and descending sorting. Basic
+file-stat fields retain the native sorter; tags, image dimensions, duration,
+folder child counts, permissions and Windows Shell properties use the shared
+`FilePropertySorter`. Load only the requested property, with bounded concurrency,
+then compare cached raw values. Dimensions, duration, dates, ratings and bitrates
+must not sort their localized display strings. Unknown values stay last in both
+directions, with folders first and deterministic name/path ties. A newer sort or
+navigation invalidates an in-flight metadata request. The selected sort remains
+part of the existing per-folder preference; new enum values append to preserve
+previously saved indexes. Cloud-only files are not hydrated to obtain sort keys.
+
 - Implement scroll throttling for large lists
 - Use `cacheExtent: 500` for GridView/ListView
 - Show placeholders during fast scrolling

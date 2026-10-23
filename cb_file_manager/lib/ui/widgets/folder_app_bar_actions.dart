@@ -34,6 +34,7 @@ class FolderAppBarActions {
       isSearchActive: isSearchActive,
       onSortOptionSelected: onSortOptionSelected,
       currentSortOption: folderListState.sortOption,
+      allowMetadataSorting: !isNetworkPath,
       viewMode: folderListState.viewMode,
       onViewModeToggled: onViewModeToggled,
       onViewModeSelected: onViewModeSelected,

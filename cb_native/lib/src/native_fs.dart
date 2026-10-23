@@ -21,6 +21,19 @@ class NativeSizeResult {
   final int unreadable;
 }
 
+class NativeRecycleEntry {
+  const NativeRecycleEntry(
+    this.path,
+    this.originalPath,
+    this.size,
+    this.deletedMs,
+    this.isDirectory,
+  );
+  final String path, originalPath;
+  final int size, deletedMs;
+  final bool isDirectory;
+}
+
 /// One entry of [NativeFs.listDirectory].
 class NativeListEntry {
   const NativeListEntry({
@@ -156,6 +169,44 @@ class NativeJunkResult {
 /// native library is unavailable (or the call was cancelled), so callers
 /// keep their Dart code as the fallback.
 abstract final class NativeFs {
+  /// File.exists for a batch, preserving input order, with bounded workers.
+  static Future<List<bool>?> filesExist(List<String> paths) async {
+    final config = WireWriter()..strs(paths);
+    final job = NativeJob.start(b.jobExistsBatch, config.takeBytes());
+    if (job == null) return null;
+    final Uint8List? out;
+    try {
+      out = await job.result();
+    } on NativeJobException {
+      return null;
+    }
+    if (out == null) return null;
+    return out.map((v) => v != 0).toList(growable: false);
+  }
+
+  /// Stream $I metadata beneath explicitly supplied Recycle Bin roots.
+  static Future<bool> recycleBin({
+    required List<String> roots,
+    required void Function(List<NativeRecycleEntry>) onEntries,
+  }) async {
+    final config = WireWriter()..strs(roots);
+    final job = NativeJob.start(b.jobRecycleBin, config.takeBytes());
+    if (job == null) return false;
+    final out = await job.result(
+      onOutput: (chunk) {
+        final r = WireReader(chunk);
+        final entries = <NativeRecycleEntry>[];
+        while (!r.isDone) {
+          entries.add(
+            NativeRecycleEntry(r.str(), r.str(), r.i64(), r.i64(), r.boolean()),
+          );
+        }
+        onEntries(entries);
+      },
+    );
+    return out != null;
+  }
+
   /// Sizes of [files] (links followed) plus everything below [directories]
   /// (links not followed), like `LazyPathSizeCalculator`.
   static Future<NativeSizeResult?> directorySize({

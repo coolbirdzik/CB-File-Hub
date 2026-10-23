@@ -2,6 +2,16 @@ import 'app_localizations.dart';
 
 class TurkishLocalizations implements AppLocalizations {
   @override
+  String get torrentReceiveInBackground =>
+      'Açılan torrentleri arka planda ekle';
+  @override
+  String get torrentReceiveInBackgroundHint =>
+      'İletişim kutusu göstermez ve pencereyi öne getirmez. Görev çubuğunu yanıp söndürür ve bildirim gönderir. Kayıtlı indirme klasörünü (ayarlanmamışsa Downloads) ve hemen başlat tercihini kullanır; mevcut görevleri değiştirmez.';
+  @override
+  String get torrentBackgroundAdded => 'Torrent alındı';
+  @override
+  String get torrentBackgroundFailed => 'Torrent eklenemedi';
+  @override
   String get torrentOpeningOptions => 'Torrent açarken';
   @override
   String get torrentShowDownloadDialog =>
@@ -3951,7 +3961,7 @@ class TurkishLocalizations implements AppLocalizations {
   String get cbAgentCleanerTitle => 'Disk Temizleyici (CB Agent)';
   @override
   String get diskCleanerNotAvailable =>
-      'Disk Temizleyici yalnızca Windows\'ta kullanılabilir';
+      'Disk Temizleyici Windows ve macOS\'ta kullanılabilir';
   @override
   String get diskCleanerScanTitle => 'Gereksiz dosyaları tara';
   @override
@@ -4513,7 +4523,7 @@ class TurkishLocalizations implements AppLocalizations {
   @override
   String get cleanerSuggestionsIntro =>
       'Gereksiz dosyaları, artakalan yükleyicileri, eski büyük dosyaları ve '
-      'Windows\'un geri kazanabileceği alanı bulur ve her birinin neden '
+      'sistemin geri kazanabileceği alanı bulur ve her birinin neden '
       'önerildiğini açıklar. Siz onaylamadan hiçbir şey silinmez ve '
       'dosyalar Geri Dönüşüm Kutusu\'na gider.';
   @override
@@ -4546,7 +4556,7 @@ class TurkishLocalizations implements AppLocalizations {
   String get cleanerSuggestionsTierClean => 'Temizlemesi güvenli';
   @override
   String get cleanerSuggestionsTierCleanHint =>
-      'Windows veya uygulamalar tarafından otomatik olarak yeniden oluşturulur.';
+      'Sistem veya uygulamalar tarafından otomatik olarak yeniden oluşturulur.';
   @override
   String get cleanerSuggestionsTierReview => 'Temizlemeden önce gözden geçir';
   @override

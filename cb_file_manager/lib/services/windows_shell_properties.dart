@@ -39,11 +39,22 @@ class WindowsShellProperties {
     if (pending != null) return pending.future;
     final completer = _pending[key] = Completer<String>();
     (_queued[path] ??= {}).add(property);
-    _flush ??= Timer(const Duration(milliseconds: 16), _send);
+    _flush ??= Timer(
+      property.startsWith('sort:')
+          ? Duration.zero
+          : const Duration(milliseconds: 16),
+      _send,
+    );
     return completer.future;
   }
 
   /// Cached text, without starting a read.
+  ///
+  /// Sort requests use canonical numeric/time values from the same worker.
+  Future<String> getSortKey(String path, String property) =>
+      get(path, 'sort:$property');
+
+  /// Cached display text, without starting a read.
   String? peek(String path, String property) => _cache['$property\u0000$path'];
 
   void invalidate(String path) =>
@@ -153,6 +164,8 @@ class ShellProperty {
   // System.Video.FrameWidth / FrameHeight
   static const frameWidth = ShellProperty(_video, 3);
   static const frameHeight = ShellProperty(_video, 4);
+  static const imageWidth = ShellProperty(_image, 3);
+  static const imageHeight = ShellProperty(_image, 4);
 }
 
 typedef _FormatNative =
@@ -218,6 +231,42 @@ void _shellPropertyWorker(SendPort ready) {
   }
 
   final port = ReceivePort();
+  String sortKey(win32.IShellItem2 item, String name) {
+    if (name == 'dimensions') {
+      final width =
+          uint32(item, ShellProperty.frameWidth) ??
+          uint32(item, ShellProperty.imageWidth);
+      final height =
+          uint32(item, ShellProperty.frameHeight) ??
+          uint32(item, ShellProperty.imageHeight);
+      return width == null || height == null ? '' : '$width,$height';
+    }
+    for (final property
+        in ShellProperty.byName[name] ?? const <ShellProperty>[]) {
+      setKey(property);
+      try {
+        if (name == 'duration') return '${item.getUInt64(key)}';
+        if (name == 'pageCount') return '${item.getInt32(key)}';
+        if (name == 'dateTaken') {
+          final value = item.getFileTime(key);
+          try {
+            return '${(value.ref.dwHighDateTime << 32) | value.ref.dwLowDateTime}';
+          } finally {
+            win32.free(value);
+          }
+        }
+        if (const {'rating', 'frameRate', 'bitRate', 'year'}.contains(name)) {
+          return '${item.getUInt32(key)}';
+        }
+        final text = display(item, property);
+        if (text.isNotEmpty) return text;
+      } on win32.WindowsException {
+        /* Try the next canonical property. */
+      }
+    }
+    return '';
+  }
+
   ready.send(port.sendPort);
   port.listen((message) {
     final (batch, reply) = message as (Map<String, List<String>>, SendPort);
@@ -226,11 +275,28 @@ void _shellPropertyWorker(SendPort ready) {
       final pathPtr = entry.key.toNativeUtf16();
       win32.IShellItem2? item;
       try {
+        final attributes = win32.GetFileAttributes(win32.PCWSTR(pathPtr)).value;
+        final cloudOnly =
+            attributes != 0xFFFFFFFF &&
+            attributes & (0x1000 | 0x40000 | 0x400000) != 0;
+        // Sorting a folder must not hydrate cloud-only file contents.
+        if (cloudOnly &&
+            entry.value.every((name) => name.startsWith('sort:'))) {
+          continue;
+        }
         item = win32.SHCreateItemFromParsingName<win32.IShellItem2>(
           win32.PCWSTR(pathPtr),
           null,
         );
         for (final name in entry.value) {
+          if (name.startsWith('sort:')) {
+            if (cloudOnly) continue;
+            results['$name\u0000${entry.key}'] = sortKey(
+              item,
+              name.substring(5),
+            );
+            continue;
+          }
           var text = '';
           for (final property in ShellProperty.byName[name] ?? const []) {
             text = display(item, property);

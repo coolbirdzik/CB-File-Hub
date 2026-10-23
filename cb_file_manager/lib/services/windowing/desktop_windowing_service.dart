@@ -14,6 +14,7 @@ import 'window_startup_payload.dart';
 import 'windows_native_tab_drag_drop_service.dart';
 import '../torrent/torrent_launch_request.dart';
 import '../torrent/torrent_service.dart';
+import '../torrent/torrent_background_receiver.dart';
 import '../../core/service_locator.dart';
 
 const double kDefaultTabTearOffAnchorX = 140.0;
@@ -65,12 +66,20 @@ class DesktopWindowingService {
 
   DesktopWindowingService()
     : _registryPort = _defaultRegistryPort,
-      _allowE2EPeers = false;
+      _allowE2EPeers = false,
+      torrentService = null,
+      torrentNotice = null;
 
   /// Real peer/registry sockets on a test-owned port, with no spare processes.
   @visibleForTesting
-  DesktopWindowingService.forTesting({required this._registryPort})
-    : _allowE2EPeers = true;
+  DesktopWindowingService.forTesting({
+    required this._registryPort,
+    this.torrentService,
+    this.torrentNotice,
+  }) : _allowE2EPeers = true;
+  final TorrentService? torrentService;
+  final TorrentBackgroundNotice? torrentNotice;
+  Future<void> _torrentLaunches = Future<void>.value();
   static const Duration _heartbeatInterval = Duration(seconds: 10);
   static const Duration _registryTtl = Duration(seconds: 30);
 
@@ -131,6 +140,8 @@ class DesktopWindowingService {
         !_allowE2EPeers &&
         !const bool.fromEnvironment('CB_E2E')) {
       WindowsNativeTabDragDropService.onTorrentSources = _openTorrentSources;
+      WindowsNativeTabDragDropService.onTorrentNotificationClicked =
+          _showTorrentLibrary;
       locator<TorrentService>().addListener(_updateTorrentLaunchRouting);
       _updateTorrentLaunchRouting();
     }
@@ -150,6 +161,7 @@ class DesktopWindowingService {
     if (_torrentLaunchPriority != null) {
       locator<TorrentService>().removeListener(_updateTorrentLaunchRouting);
       WindowsNativeTabDragDropService.onTorrentSources = null;
+      WindowsNativeTabDragDropService.onTorrentNotificationClicked = null;
       await WindowsNativeTabDragDropService.setTorrentLaunchPriority(0);
       _torrentLaunchPriority = null;
     }
@@ -257,6 +269,45 @@ class DesktopWindowingService {
   }
 
   void _openTorrentSources(List<String> sources) {
+    _torrentLaunches = _torrentLaunches
+        .then((_) async {
+          final service =
+              torrentService ??
+              (locator.isRegistered<TorrentService>()
+                  ? locator<TorrentService>()
+                  : null);
+          if (service != null && await service.shouldReceiveInBackground()) {
+            final notice = torrentNotice;
+            final receiver = notice == null
+                ? TorrentBackgroundReceiver(service)
+                : TorrentBackgroundReceiver(service, notify: notice);
+            for (final source in sources) {
+              await receiver.receiveSource(source);
+            }
+            return;
+          }
+          _openTorrentSourcesInTabs(sources);
+        })
+        .catchError((Object e, StackTrace stack) {
+          AppLogger.warning(
+            'Torrent launch failed',
+            error: e,
+            stackTrace: stack,
+          );
+        });
+  }
+
+  void _showTorrentLibrary() {
+    final bloc = _tabBloc;
+    if (bloc == null || bloc.isClosed) return;
+    final tab = bloc.state.tabs
+        .where((t) => TorrentLaunchRequest.isPath(t.path))
+        .firstOrNull;
+    bloc.add(tab == null ? AddTab(path: '#torrents') : SwitchToTab(tab.id));
+    unawaited(focusTorrentWindow());
+  }
+
+  void _openTorrentSourcesInTabs(List<String> sources) {
     final bloc = _tabBloc;
     if (bloc == null || bloc.isClosed) return;
     for (final source in sources) {

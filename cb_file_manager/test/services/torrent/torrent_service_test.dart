@@ -12,6 +12,7 @@ import 'package:cb_file_manager/services/torrent/torrent_metainfo.dart';
 import 'package:cb_file_manager/services/torrent/torrent_import_confirmation.dart';
 import 'torrent_fixtures.dart';
 import 'package:cb_file_manager/services/torrent/torrent_entry.dart';
+import 'package:cb_file_manager/services/torrent/torrent_background_receiver.dart';
 
 // Override widget-test networking only for temporary loopback test servers.
 class _LoopbackHttpOverrides extends HttpOverrides {}
@@ -206,6 +207,7 @@ void main() {
       expect(service.defaultDownloadDirectory, isNull);
       final directory = p.join(root.path, 'future', 'downloads');
       await service.setShowDownloadDialog(false);
+      await service.setReceiveInBackground(true);
       await service.setStartDownloadsImmediately(false);
       await service.setDefaultDownloadDirectory(directory);
       expect(await Directory(directory).exists(), isFalse);
@@ -221,6 +223,7 @@ void main() {
         engine: FakeEngine(),
       );
       expect(restored.showDownloadDialog, isFalse);
+      expect(restored.receiveInBackground, isTrue);
       expect(restored.startDownloadsImmediately, isFalse);
       expect(restored.defaultDownloadDirectory, directory);
       expect(restored.ownsEngine, isFalse);
@@ -228,6 +231,140 @@ void main() {
       await service.setDefaultDownloadDirectory('');
       expect(service.defaultDownloadDirectory, isNull);
       expect(engine.addedDirectories, isEmpty);
+    },
+  );
+
+  for (final start in [false, true]) {
+    test(
+      'background open archives and starts according to saved preference $start',
+      () async {
+        final source = await create('Downloads/silent.torrent');
+        final destination = p.join(root.path, 'payload');
+        await service.setDefaultDownloadDirectory(destination);
+        await service.setStartDownloadsImmediately(start);
+        // An unset library folder must not cause a chooser in background mode.
+        await (await SharedPreferences.getInstance()).setString(
+          'torrent.storageMode',
+          'move',
+        );
+        final entry = await service.openSourceInBackground(source.path);
+        expect(entry.status, start ? 'waiting' : 'paused');
+        expect(entry.downloadDir, destination);
+        expect(await source.exists(), isTrue);
+        expect(
+          p.isWithin(p.join(root.path, 'opened-torrents'), entry.torrentPath),
+          isTrue,
+        );
+        expect(engine.addedDirectories, [destination]);
+        await source.delete();
+        expect(await File(entry.torrentPath).readAsBytes(), torrentBytes());
+      },
+    );
+  }
+
+  for (final start in [false, true]) {
+    for (final sourceType in ['file', 'magnet', 'entry']) {
+      test(
+        'background $sourceType reloads saved start preference $start',
+        () async {
+          final source = await create('Downloads/preferences.torrent');
+          final existing = sourceType == 'entry'
+              ? await service.openSource(source.path)
+              : null;
+          await service.setStartDownloadsImmediately(!start);
+          await service.setDefaultDownloadDirectory(p.join(root.path, 'old'));
+          final destination = p.join(root.path, 'user-configured');
+          // A different app window saves preferences while this service retains
+          // its old SharedPreferences instance/cache.
+          SharedPreferences.setMockInitialValues({
+            'torrent.autoImport': false,
+            'torrent.scanRoots': <String>[],
+            'torrent.receiveInBackground': true,
+            'torrent.startImmediately': start,
+            'torrent.lastDownloadDirectory': destination,
+          });
+          expect(service.startDownloadsImmediately, !start);
+          final entry = existing != null
+              ? await service.downloadInBackground(existing)
+              : await service.openSourceInBackground(
+                  sourceType == 'magnet'
+                      ? 'magnet:?xt=urn:btih:${'1' * 40}'
+                      : source.path,
+                );
+          expect(entry.status, start ? 'waiting' : 'paused');
+          expect(entry.downloadDir, destination);
+          expect(
+            engine.tasks[entry.gid]!['status'],
+            start ? 'waiting' : 'paused',
+          );
+          await service.sync();
+          expect(
+            (await repo.get(entry.hash))!.status,
+            start ? 'waiting' : 'paused',
+          );
+          expect(service.startDownloadsImmediately, start);
+        },
+      );
+    }
+  }
+
+  test('repeated background opens preserve an existing paused task', () async {
+    final source = await create('Downloads/repeated.torrent');
+    await service.setDefaultDownloadDirectory(p.join(root.path, 'payload'));
+    await service.setStartDownloadsImmediately(false);
+    final paused = await service.openSourceInBackground(source.path);
+    await service.setStartDownloadsImmediately(true);
+    final repeated = await service.openSourceInBackground(source.path);
+    expect(repeated.status, 'paused');
+    expect(repeated.gid, paused.gid);
+    expect(engine.addedDirectories, hasLength(1));
+    expect((await repo.page()).total, 1);
+  });
+
+  test(
+    'background failure is indexed and notified without blocking the next import',
+    () async {
+      final source = await create('Downloads/first.torrent');
+      final second = await create(
+        'Downloads/second.torrent',
+        name: 'Second.mp4',
+      );
+      await service.setDefaultDownloadDirectory(p.join(root.path, 'payload'));
+      engine.startError = StateError('aria2 unavailable');
+      final notices = <({String title, String body, bool isError})>[];
+      final receiver = TorrentBackgroundReceiver(
+        service,
+        notify: ({required title, required body, required isError}) async {
+          notices.add((title: title, body: body, isError: isError));
+        },
+      );
+      expect(await receiver.receiveSource(source.path), isNull);
+      final failed = (await repo.page()).entries.single;
+      expect(failed.status, 'error');
+      expect(failed.error, contains('aria2 unavailable'));
+      expect(notices.single.isError, isTrue);
+      engine.startError = null;
+      expect(await receiver.receiveSource(second.path), isNotNull);
+      expect(notices.last.isError, isFalse);
+      expect(notices.last.body, contains('Second.mp4'));
+      expect((await repo.page()).total, 2);
+    },
+  );
+
+  test(
+    'unavailable notifications never replay a committed background import',
+    () async {
+      final source = await create('Downloads/notify.torrent');
+      await service.setDefaultDownloadDirectory(p.join(root.path, 'payload'));
+      final receiver = TorrentBackgroundReceiver(
+        service,
+        notify: ({required title, required body, required isError}) async {
+          throw StateError('notifications disabled');
+        },
+      );
+      expect(await receiver.receiveSource(source.path), isNotNull);
+      expect(engine.addedDirectories, hasLength(1));
+      expect((await repo.page()).total, 1);
     },
   );
 
@@ -322,55 +459,74 @@ void main() {
   });
 
   for (final mode in ['index', 'copy', 'move']) {
-    test(
-      'temporary browser file remains usable after cleanup in $mode mode',
-      () async {
-        final source = await create('browser-temp/download.torrent');
-        final prefs = await SharedPreferences.getInstance();
-        final library = p.join(root.path, 'library');
-        await prefs.setString('torrent.storageMode', mode);
-        if (mode != 'index') {
-          await prefs.setString('torrent.libraryDirectory', library);
-        }
-        if (Platform.isWindows) {
-          final result = await Process.run('attrib', ['+R', source.path]);
-          expect(result.exitCode, 0);
-        }
-        try {
-          final entry = await service.openSource(source.path);
-          expect(entry.torrentPath, isNot(source.path));
-          expect(await source.exists(), isTrue);
-          expect(await File(entry.torrentPath).readAsBytes(), torrentBytes());
-          expect(service.storageMode, mode);
-          expect(engine.running, isFalse);
-          expect(engine.addedDirectories, isEmpty);
-          expect(
-            p.isWithin(
-              mode == 'index' ? p.join(root.path, 'opened-torrents') : library,
-              entry.torrentPath,
-            ),
-            isTrue,
-          );
+    for (final location in ['temporary', 'Downloads']) {
+      test(
+        '$location browser file remains usable after cleanup in $mode mode',
+        () async {
+          final source = await create('$location/download.torrent');
+          final prefs = await SharedPreferences.getInstance();
+          final library = p.join(root.path, 'library');
+          await prefs.setString('torrent.storageMode', mode);
+          if (mode != 'index') {
+            await prefs.setString('torrent.libraryDirectory', library);
+          }
           if (Platform.isWindows) {
-            await Process.run('attrib', ['-R', source.path]);
+            final result = await Process.run('attrib', ['+R', source.path]);
+            expect(result.exitCode, 0);
           }
-          await source.delete();
-          // The download reads the durable archive after the browser temp file
-          // is gone, without contacting any real tracker or engine.
-          await service.download(
-            entry,
-            p.join(root.path, 'payload'),
-            startImmediately: false,
-          );
-          expect((await repo.get(entry.hash))!.status, 'paused');
-          expect(await File(entry.torrentPath).readAsBytes(), torrentBytes());
-        } finally {
-          if (Platform.isWindows && await source.exists()) {
-            await Process.run('attrib', ['-R', source.path]);
+          try {
+            final entry = await IOOverrides.runZoned(
+              () {
+                expect(
+                  p.isWithin(Directory.systemTemp.path, source.path),
+                  location == 'temporary',
+                );
+                return service.openSource(source.path);
+              },
+              // All fixtures stay in our disposable test root. Downloads must
+              // reproduce a browser source outside the OS temporary directory.
+              getSystemTempDirectory: () => Directory(
+                location == 'temporary'
+                    ? root.path
+                    : p.join(root.path, 'system-temp'),
+              ),
+            );
+            expect(entry.torrentPath, isNot(source.path));
+            expect(await source.exists(), isTrue);
+            expect(await File(entry.torrentPath).readAsBytes(), torrentBytes());
+            expect(service.storageMode, mode);
+            expect(engine.running, isFalse);
+            expect(engine.addedDirectories, isEmpty);
+            expect(
+              p.isWithin(
+                mode == 'index'
+                    ? p.join(root.path, 'opened-torrents')
+                    : library,
+                entry.torrentPath,
+              ),
+              isTrue,
+            );
+            if (Platform.isWindows) {
+              await Process.run('attrib', ['-R', source.path]);
+            }
+            await source.delete();
+            // The download reads the durable archive after the browser temp file
+            // is gone, without contacting any real tracker or engine.
+            await service.download(
+              entry,
+              p.join(root.path, 'payload'),
+              startImmediately: false,
+            );
+            expect((await repo.get(entry.hash))!.status, 'paused');
+            expect(await File(entry.torrentPath).readAsBytes(), torrentBytes());
+          } finally {
+            if (Platform.isWindows && await source.exists()) {
+              await Process.run('attrib', ['-R', source.path]);
+            }
           }
-        }
-      },
-    );
+        },
+      );
+    }
   }
 
   test(
@@ -392,14 +548,18 @@ void main() {
         p.join(root.path, 'archive'),
       );
       var prompts = 0;
-      final merged = await service.openSource(
-        source.path,
-        onDuplicate: (entry) async {
-          prompts++;
-          expect(entry.hash, previous.hash);
-          await source.delete();
-          return true;
-        },
+      final merged = await IOOverrides.runZoned(
+        () => service.openSource(
+          source.path,
+          onDuplicate: (entry) async {
+            prompts++;
+            expect(entry.hash, previous.hash);
+            await source.delete();
+            return true;
+          },
+        ),
+        getSystemTempDirectory: () =>
+            Directory(p.join(root.path, 'system-temp')),
       );
       expect(prompts, 1);
       expect((await repo.page()).total, 1);

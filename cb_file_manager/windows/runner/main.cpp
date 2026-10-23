@@ -156,11 +156,13 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   // spawned from it inherits) is a fresh process, so engine startup sits
   // between the user's click and the first video frame. Impeller's GLES
   // backend takes ~1.1s to initialize here versus ~0.2s for Skia, and the
-  // player's video-plus-controls UI gains nothing from it.
+  // player's video-plus-controls UI gains nothing from it. The small torrent
+  // options form uses the same lightweight renderer startup path.
   {
     wchar_t role[32];
     DWORD role_len = GetEnvironmentVariableW(L"CB_WINDOW_ROLE", role, 32);
-    if (role_len > 0 && role_len < 32 && wcscmp(role, L"video") == 0)
+    if (role_len > 0 && role_len < 32 &&
+        (wcscmp(role, L"video") == 0 || wcscmp(role, L"torrent-options") == 0))
     {
       project.set_impeller_switch(flutter::ImpellerSwitch::Disabled);
     }
@@ -196,6 +198,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   {
     progress_mode = true;
   }
+  const bool torrent_options_mode =
+      roleLen > 0 && roleLen < 32 && wcscmp(roleBuf, L"torrent-options") == 0;
 
   // Prepare origin and size
   Win32Window::Point origin(0, 0);
@@ -211,6 +215,11 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
     // Progress window: exact final size, no resize needed.
     // Must match the Dart-side WindowOptions size to avoid flicker.
     size = Win32Window::Size(420, 88);
+  }
+  else if (torrent_options_mode)
+  {
+    // Match Dart's final form size before creating the Flutter render surface.
+    size = Win32Window::Size(720, 420);
   }
   else if (secondary_window)
   {

@@ -472,16 +472,6 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
                         ),
                       ),
 
-                      DrawerNavigationItem(
-                        icon: PhosphorIconsLight.downloadSimple,
-                        title: context.tr.torrents,
-                        onTap: () => _navigateTo(
-                          context,
-                          '#torrents',
-                          context.tr.torrents,
-                        ),
-                      ),
-
                       const SizedBox(height: 8),
 
                       // Tags section
@@ -512,12 +502,22 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
                       ),
 
                       DrawerNavigationItem(
+                        icon: PhosphorIconsLight.downloadSimple,
+                        title: context.tr.torrents,
+                        onTap: () => _navigateTo(
+                          context,
+                          '#torrents',
+                          context.tr.torrents,
+                        ),
+                      ),
+
+                      DrawerNavigationItem(
                         icon: PhosphorIconsLight.sparkle,
                         title: context.tr.cbAgent,
                         onTap: () => _navigateToAiChat(context),
                       ),
 
-                      if (Platform.isWindows)
+                      if (Platform.isWindows || Platform.isMacOS)
                         DrawerNavigationItem(
                           icon: PhosphorIconsLight.broom,
                           title: context.tr.cbAgentCleanerTitle,
@@ -736,21 +736,6 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
                             context.tr.videoHubTitle,
                           ),
                         ),
-                        _fluentNavigationItem(
-                          context,
-                          icon: PhosphorIconsLight.downloadSimple,
-                          title: context.tr.torrents,
-                          semanticLabel: context.tr.torrents,
-                          selected: _isFluentPathSelected(
-                            activePath,
-                            '#torrents',
-                          ),
-                          onPressed: () => _navigateTo(
-                            context,
-                            '#torrents',
-                            context.tr.torrents,
-                          ),
-                        ),
                         const SizedBox(height: _FluentDrawerTokens.groupGap),
                         _fluentNavigationItem(
                           context,
@@ -790,6 +775,21 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
                         ),
                         _fluentNavigationItem(
                           context,
+                          icon: PhosphorIconsLight.downloadSimple,
+                          title: context.tr.torrents,
+                          semanticLabel: context.tr.torrents,
+                          selected: _isFluentPathSelected(
+                            activePath,
+                            '#torrents',
+                          ),
+                          onPressed: () => _navigateTo(
+                            context,
+                            '#torrents',
+                            context.tr.torrents,
+                          ),
+                        ),
+                        _fluentNavigationItem(
+                          context,
                           icon: PhosphorIconsLight.sparkle,
                           title: context.tr.cbAgent,
                           semanticLabel: context.tr.cbAgent,
@@ -799,7 +799,7 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
                           ),
                           onPressed: () => _navigateToAiChat(context),
                         ),
-                        if (Platform.isWindows)
+                        if (Platform.isWindows || Platform.isMacOS)
                           _fluentNavigationItem(
                             context,
                             icon: PhosphorIconsLight.broom,

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'cleaner_categories.dart';
 import 'cleaner_models.dart';
 import 'windows_known_folders.dart';
+import 'cleaner_paths.dart';
 
 /// Defense-in-depth path safety checker.
 ///
@@ -39,6 +40,20 @@ class CleanerPathSafety {
     String absolutePath, {
     bool recycleBinItem = false,
   }) {
+    if (Platform.isMacOS) {
+      if (recycleBinItem) return false;
+      if (!isMacosPathSafeToDelete(absolutePath, Platform.environment)) {
+        return false;
+      }
+      try {
+        return isMacosPathSafeToDelete(
+          File(absolutePath).resolveSymbolicLinksSync(),
+          Platform.environment,
+        );
+      } catch (_) {
+        return false;
+      }
+    }
     if (!Platform.isWindows) return false;
     if (absolutePath.isEmpty) return false;
 
@@ -71,6 +86,25 @@ class CleanerPathSafety {
       }
     }
 
+    return false;
+  }
+
+  static bool isMacosPathSafeToDelete(
+    String path,
+    Map<String, String> environment,
+  ) {
+    if (!path.startsWith('/') ||
+        path.split('/').contains('..') ||
+        path.contains('*') ||
+        path.contains('?')) {
+      return false;
+    }
+    for (final category in CleanerCategories.all(operatingSystem: 'macos')) {
+      for (final rule in category.rules) {
+        final base = WindowsKnownFolders.resolvePosix(rule.source, environment);
+        if (base != null && CleanerPaths.contains(base, path)) return true;
+      }
+    }
     return false;
   }
 

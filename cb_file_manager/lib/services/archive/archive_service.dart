@@ -562,44 +562,65 @@ class ArchiveService {
     buildVirtualPath,
   }) async {
     final normalizedInner = _normalizeInnerPrefix(innerPath);
-    final entries = await listEntries(archiveFilePath);
-    final folderNames = <String>{};
-    final fileNames = <String>{};
-
-    for (final entry in entries) {
-      final entryPath = _normalizeEntryName(entry.name);
-      if (normalizedInner.isNotEmpty &&
-          !entryPath.startsWith(normalizedInner)) {
-        continue;
-      }
-
-      var relative = normalizedInner.isEmpty
-          ? entryPath
-          : entryPath.substring(normalizedInner.length);
-      relative = relative.replaceAll(RegExp(r'^/+'), '');
-      if (relative.isEmpty) continue;
-
-      final parts = relative
-          .split('/')
-          .where((part) => part.isNotEmpty)
-          .toList();
-      if (parts.isEmpty) continue;
-
-      if (parts.length == 1) {
-        if (entry.isDirectory || entryPath.endsWith('/')) {
-          folderNames.add(parts.first);
-        } else {
-          fileNames.add(parts.first);
-        }
-      } else {
-        folderNames.add(parts.first);
+    final nativeFormat = useNative
+        ? _nativeFormat(detectArchiveFormat(archiveFilePath))
+        : null;
+    NativeArchiveChildren? native;
+    if (nativeFormat != null) {
+      try {
+        native = await NativeArchive.children(
+          archiveFilePath,
+          nativeFormat,
+          normalizedInner,
+        );
+      } on NativeJobException {
+        /* Use the existing archive reader's diagnostics. */
       }
     }
+    late List<String> sortedFolderNames, sortedFileNames;
+    if (native != null) {
+      sortedFolderNames = native.folders;
+      sortedFileNames = native.files;
+    } else {
+      final entries = await listEntries(archiveFilePath);
+      final folderNames = <String>{};
+      final fileNames = <String>{};
 
-    final sortedFolderNames = folderNames.toList()
-      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
-    final sortedFileNames = fileNames.toList()
-      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+      for (final entry in entries) {
+        final entryPath = _normalizeEntryName(entry.name);
+        if (normalizedInner.isNotEmpty &&
+            !entryPath.startsWith(normalizedInner)) {
+          continue;
+        }
+
+        var relative = normalizedInner.isEmpty
+            ? entryPath
+            : entryPath.substring(normalizedInner.length);
+        relative = relative.replaceAll(RegExp(r'^/+'), '');
+        if (relative.isEmpty) continue;
+
+        final parts = relative
+            .split('/')
+            .where((part) => part.isNotEmpty)
+            .toList();
+        if (parts.isEmpty) continue;
+
+        if (parts.length == 1) {
+          if (entry.isDirectory || entryPath.endsWith('/')) {
+            folderNames.add(parts.first);
+          } else {
+            fileNames.add(parts.first);
+          }
+        } else {
+          folderNames.add(parts.first);
+        }
+      }
+
+      sortedFolderNames = folderNames.toList()
+        ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+      sortedFileNames = fileNames.toList()
+        ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    }
 
     // [normalizedInner] carries a trailing slash for prefix matching; strip it
     // so joined child paths do not end up with a doubled separator.

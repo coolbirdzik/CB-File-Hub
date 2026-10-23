@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/services/smart_album_scanner.dart';
 // ignore_for_file: deprecated_member_use
 
 import 'dart:io';
@@ -100,6 +101,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
   // ── Smart album state ──────────────────────────────────────────────────────
   bool _isSmartAlbum = false;
   bool _cancelSmartScan = false;
+  int _smartScanGeneration = 0;
   // Tracks whether cached files were loaded so we skip redundant scans on revisit.
   // Since SmartAlbumService now has an in-memory scan cache, re-entering the
   // screen can populate files from cache without any disk I/O.
@@ -494,10 +496,14 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
   }
 
   Future<void> _scanSmartAlbumImages() async {
+    final generation = ++_smartScanGeneration;
+    bool current() =>
+        mounted && !_cancelSmartScan && generation == _smartScanGeneration;
     final allRules = await AlbumAutoRuleService.instance.loadRules();
     final rules = allRules
         .where((r) => r.albumId == widget.album.id && r.isActive)
         .toList();
+    if (!mounted || generation != _smartScanGeneration) return;
     if (mounted) {
       if (rules.isNotEmpty && _originalImageFiles.isNotEmpty) {
         _originalImageFiles = _originalImageFiles.where((f) {
@@ -516,78 +522,52 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
       });
     }
 
-    final roots = await SmartAlbumService.instance.getScanRoots(
-      widget.album.id,
-    );
-    if (roots.isEmpty) {
-      if (mounted) {
-        setState(() {
-          _isBackgroundProcessing = false;
-          _progressStatus = context.tr.albumNoScanLocations;
-        });
+    try {
+      final roots = await SmartAlbumService.instance.getScanRoots(
+        widget.album.id,
+      );
+      if (!current()) return;
+      if (roots.isEmpty) {
+        setState(() => _progressStatus = context.tr.albumNoScanLocations);
+        return;
       }
-      return;
-    }
-
-    int matched = 0;
-    int processed = 0;
-
-    Future<void> scanDir(Directory dir) async {
-      try {
-        await for (final entity in dir.list(
-          recursive: false,
-          followLinks: false,
-        )) {
-          if (_cancelSmartScan) return;
-          if (entity is File) {
-            processed++;
-            if (FileTypeUtils.isMediaFile(entity.path)) {
-              final name = pathlib.basename(entity.path);
-              if (rules.isEmpty || rules.any((r) => r.matches(name))) {
-                matched++;
-                if (mounted) {
-                  if (!_originalImageFiles.any((f) => f.path == entity.path)) {
-                    _originalImageFiles.add(entity);
-                  }
-                  if (matched % 10 == 0 || processed % 100 == 0) {
-                    setState(() {
-                      _applyFiltersAndOrder();
-                      _progressStatus = context.tr.albumScanningFound(matched);
-                    });
-                  }
-                }
-              }
-            }
-          } else if (entity is Directory) {
-            await scanDir(entity);
+      var matched = 0;
+      final known = _originalImageFiles.map((f) => f.path).toSet();
+      await SmartAlbumScanner.scan(
+        roots: roots,
+        rules: rules,
+        shouldContinue: current,
+        onBatch: (paths) {
+          if (!current()) return;
+          matched += paths.length;
+          for (final path in paths) {
+            if (known.add(path)) _originalImageFiles.add(File(path));
           }
-        }
-      } catch (_) {}
-    }
-
-    for (final rootPath in roots) {
-      if (_cancelSmartScan) break;
-      await scanDir(Directory(rootPath));
-    }
-
-    if (mounted) {
+          setState(() {
+            _applyFiltersAndOrder();
+            _progressStatus = context.tr.albumScanningFound(matched);
+          });
+        },
+      );
+      if (!current()) return;
       setState(() {
         _applyFiltersAndOrder();
         _isLoading = false;
-        _isBackgroundProcessing = false;
         _progressStatus = context.tr.albumCompletedFound(matched);
       });
       _updateThumbnailPriorityMap();
-      // Open the gate: scan done, thumbnails can start generating.
-      ThumbnailLoader.setListingReady(true);
+      try {
+        await SmartAlbumService.instance.setCachedFiles(
+          widget.album.id,
+          _originalImageFiles.map((f) => f.path).toList(),
+        );
+      } catch (_) {}
+    } finally {
+      if (mounted && generation == _smartScanGeneration) {
+        setState(() => _isBackgroundProcessing = false);
+        ThumbnailLoader.setListingReady(true);
+      }
     }
-
-    try {
-      await SmartAlbumService.instance.setCachedFiles(
-        widget.album.id,
-        _originalImageFiles.map((f) => f.path).toList(),
-      );
-    } catch (_) {}
   }
 
   Future<void> _loadCachedSmartImages() async {
@@ -842,6 +822,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
       case SortOption.attributesAsc:
       case SortOption.attributesDesc:
       case SortOption.nameAsc:
+      default:
         result = aName.compareTo(bName);
         break;
     }

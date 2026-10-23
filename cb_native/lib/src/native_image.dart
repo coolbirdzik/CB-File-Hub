@@ -36,6 +36,28 @@ class NativeThumbnail {
 /// library is unavailable or cannot handle the input (an unsupported format,
 /// say), so the caller can run its `package:image` code instead.
 abstract final class NativeImage {
+  /// Display dimensions from the image header, without decoding its pixels.
+  static Future<(int, int)?> dimensions(String path) async {
+    final config = WireWriter()..str(path);
+    final out = await _run(b.jobImageDimensions, config.takeBytes());
+    if (out == null) return null;
+    final r = WireReader(out);
+    return (r.u32(), r.u32());
+  }
+
+  /// Convert an encoded image at its original resolution on a Rust thread.
+  static Future<Uint8List?> transcode(
+    Uint8List bytes, {
+    NativeImageFormat format = NativeImageFormat.jpeg,
+    int quality = 95,
+  }) {
+    final config = WireWriter()
+      ..u8(format.index)
+      ..u8(quality.clamp(1, 100))
+      ..raw(bytes);
+    return _run(b.jobImageTranscode, config.takeBytes());
+  }
+
   /// Decodes [path] or [bytes] (EXIF orientation applied), resizes it into a
   /// [width] x [height] box and encodes it as [format]. [enhance] applies the
   /// network thumbnails' `adjustColor(contrast: 1.05, saturation: 1.1,

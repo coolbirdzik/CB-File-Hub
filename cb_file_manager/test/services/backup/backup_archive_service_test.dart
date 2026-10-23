@@ -100,4 +100,29 @@ void main() {
 
     expect(await BackupArchiveService().inspect(archivePath), isNull);
   });
+
+  test('Dart fallback ZIP and native ZIP are mutually readable', () async {
+    final native = BackupArchiveService();
+    final fallback = BackupArchiveService(useNative: false);
+    for (final (writer, reader) in [(native, fallback), (fallback, native)]) {
+      final archivePath = path.join(tempDir.path, 'cross-backup.zip');
+      await writer.exportZip(
+        outputPath: archivePath,
+        includeSettings: true,
+        includeTags: false,
+      );
+      expect(
+        (await reader.inspect(archivePath))?['format'],
+        'cb_file_hub_backup',
+      );
+      Map<String, Object?>? restored;
+      await reader.importZip(
+        archivePath: archivePath,
+        importSettings: true,
+        importTags: false,
+        restoreSettings: (settings) async => restored = settings,
+      );
+      expect(restored, containsPair('theme', 'dark'));
+    }
+  });
 }

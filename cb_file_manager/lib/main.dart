@@ -23,6 +23,7 @@ import 'helpers/tags/batch_tag_manager.dart';
 import 'models/database/database_manager.dart';
 import 'services/network_credentials_service.dart';
 import 'services/torrent/torrent_service.dart';
+import 'services/torrent/torrent_background_receiver.dart';
 import 'services/torrent/torrent_launch_request.dart';
 import 'services/windowing/desktop_windowing_service.dart';
 import 'providers/theme_provider.dart';
@@ -58,6 +59,8 @@ import 'services/windowing/video_window_service.dart';
 import 'services/windowing/windows_native_tab_drag_drop_service.dart';
 import 'services/windowing/window_acrylic_service.dart';
 import 'ui/screens/progress_window/progress_window_screen.dart';
+import 'ui/screens/torrent/torrent_options_window_app.dart';
+import 'services/windowing/torrent_options_window_service.dart';
 import 'dev/dev_overlay.dart';
 
 // Permission explainer is pushed from TabMainScreen; no direct import needed here
@@ -234,6 +237,11 @@ Future<void> runCbFileApp() async {
     navigatorKey = GlobalKey<NavigatorState>();
   }
   final env = Platform.environment;
+  if (env[WindowStartupPayload.envWindowRoleKey] ==
+      TorrentOptionsWindowService.role) {
+    await runTorrentOptionsWindow(env);
+    return;
+  }
   final torrentSources = Platform.isWindows
       ? TorrentLaunchRequest.takeArguments(_launchPaths)
       : <String>[];
@@ -250,6 +258,13 @@ Future<void> runCbFileApp() async {
   }
   final isDesktopPlatform =
       Platform.isWindows || Platform.isLinux || Platform.isMacOS;
+  final backgroundTorrentLaunch =
+      !kCbE2E &&
+      torrentSources.isNotEmpty &&
+      (await SharedPreferences.getInstance()).getBool(
+            'torrent.receiveInBackground',
+          ) ==
+          true;
   final environmentVideoPath = VideoWindowService.startupVideoPath();
   final commandLineVideoPath = environmentVideoPath == null
       ? _takeDesktopLaunchVideoPath()
@@ -455,10 +470,13 @@ Future<void> runCbFileApp() async {
           }
         } else {
           try {
-            if (!kCbE2E) {
+            if (!kCbE2E && !backgroundTorrentLaunch) {
               await windowManager.maximize();
             }
-            if (torrentSources.isNotEmpty) {
+            if (backgroundTorrentLaunch) {
+              // The native notification exposes only a minimized taskbar button.
+              await windowManager.hide();
+            } else if (torrentSources.isNotEmpty) {
               await DesktopWindowingService.focusTorrentWindow();
             } else {
               await windowManager.show();
@@ -692,11 +710,12 @@ Future<void> runCbFileApp() async {
     return;
   }
 
-  if (!isSecondaryWindow && !kCbE2E) {
+  if (!isSecondaryWindow && !kCbE2E && !backgroundTorrentLaunch) {
     AppUpdateService.instance.scheduleStartupCheck(_announceAppUpdate);
   }
 
-  final WindowStartupPayload? startupPayload = torrentSources.isNotEmpty
+  final WindowStartupPayload? startupPayload =
+      torrentSources.isNotEmpty && !backgroundTorrentLaunch
       ? WindowStartupPayload(
           tabs: [
             for (final source in torrentSources)
@@ -720,6 +739,22 @@ Future<void> runCbFileApp() async {
   );
 
   debugPrint('Startup: runApp after ${startupStopwatch.elapsedMilliseconds}ms');
+  if (TorrentOptionsWindowService.isSupported &&
+      !isSecondaryWindow &&
+      !isPip &&
+      !isDedicatedVideoWindow) {
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      unawaited(TorrentOptionsWindowService.instance.warmUpIfNeeded());
+    });
+  }
+  if (backgroundTorrentLaunch) {
+    final receiver = TorrentBackgroundReceiver(locator<TorrentService>());
+    unawaited(() async {
+      for (final source in torrentSources) {
+        await receiver.receiveSource(source);
+      }
+    }());
+  }
 
   if (deferHeavyServicesToFirstFrame) {
     SchedulerBinding.instance.addPostFrameCallback((_) {

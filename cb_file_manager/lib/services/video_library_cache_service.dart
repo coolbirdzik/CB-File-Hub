@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:cb_native/cb_native.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -58,6 +59,14 @@ class VideoLibraryCacheService {
       final paths = (data['files'] as List?)?.cast<String>() ?? [];
 
       if (paths.isEmpty) return <String>[];
+
+      final native = await NativeFs.filesExist(paths);
+      if (native != null) {
+        return [
+          for (var i = 0; i < paths.length; i++)
+            if (native[i]) paths[i],
+        ];
+      }
 
       // Validate file existence in parallel batches for performance.
       // Sequential checks on 5000+ files are extremely slow, especially

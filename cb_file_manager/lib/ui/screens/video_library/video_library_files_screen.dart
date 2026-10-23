@@ -815,6 +815,7 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
                   searchBar: _buildSearchBar(l10n),
                   pathNavigationBar: _buildPathNavigationBar(l10n),
                   actions: SharedActionBar.buildCommonActions(
+                    allowMetadataSorting: true,
                     context: context,
                     onSearchPressed: _toggleSearchBar,
                     isSearchActive: _showSearchBar,

@@ -495,22 +495,32 @@ class _TextFilePreview extends StatefulWidget {
 
 class _TextFilePreviewState extends State<_TextFilePreview> {
   static final ContentReader _reader = ContentReader();
-  late Future<FileContent> _contentFuture;
+  late Future<(FileContent, List<PreviewSyntaxToken>?)> _contentFuture;
   final ScrollController _verticalController = ScrollController();
   final ScrollController _horizontalController = ScrollController();
 
   @override
   void initState() {
     super.initState();
-    _contentFuture = _reader.readForPreview(widget.file.path);
+    _contentFuture = _readPreview(widget.file.path);
   }
 
   @override
   void didUpdateWidget(covariant _TextFilePreview oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.file.path != widget.file.path) {
-      _contentFuture = _reader.readForPreview(widget.file.path);
+      _contentFuture = _readPreview(widget.file.path);
     }
+  }
+
+  Future<(FileContent, List<PreviewSyntaxToken>?)> _readPreview(
+    String path,
+  ) async {
+    final content = await _reader.readForPreview(path);
+    final tokens = _shouldSyntaxHighlight(path)
+        ? await PreviewSyntaxHighlighter.tokenize(content.text, path)
+        : null;
+    return (content, tokens);
   }
 
   @override
@@ -529,7 +539,7 @@ class _TextFilePreviewState extends State<_TextFilePreview> {
         ? Colors.black.withValues(alpha: 0.14)
         : theme.colorScheme.onSurface.withValues(alpha: 0.03);
 
-    return FutureBuilder<FileContent>(
+    return FutureBuilder<(FileContent, List<PreviewSyntaxToken>?)>(
       future: _contentFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
@@ -550,7 +560,7 @@ class _TextFilePreviewState extends State<_TextFilePreview> {
           );
         }
 
-        final content = snapshot.data ?? FileContent.empty;
+        final content = snapshot.data?.$1 ?? FileContent.empty;
         if (content.text.isEmpty) {
           if (content.totalLength > ContentReader.previewMaxFileSize) {
             return _PreviewPlaceholder(
@@ -594,6 +604,7 @@ class _TextFilePreviewState extends State<_TextFilePreview> {
                 filePath: widget.file.path,
                 baseStyle: textStyle!,
                 brightness: theme.brightness,
+                tokens: snapshot.data?.$2,
               )
             : TextSpan(text: content.text, style: textStyle);
 

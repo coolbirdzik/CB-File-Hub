@@ -78,6 +78,27 @@ void main() {
     },
   );
 
+  test(
+    'persists metadata sort options without changing existing enum indexes',
+    () async {
+      final manager = FolderSortManager();
+      final folder = path.join(testRoot.path, 'property-sort');
+      expect(
+        await manager.saveFolderSortOption(folder, SortOption.durationDesc),
+        isTrue,
+      );
+      expect(
+        await manager.getFolderSortOption(folder),
+        SortOption.durationDesc,
+      );
+      expect(
+        manager.cachedOverrides(folder)!.sortOption,
+        SortOption.durationDesc,
+      );
+      expect(SortOption.pathDesc.index, 17);
+    },
+  );
+
   test('03.02 persists virtual paths in SQLite', () async {
     const virtualPath = '#network/server/share';
     final manager = FolderSortManager();

@@ -206,7 +206,7 @@ class Aria2Engine {
     } finally {
       await file.close();
     }
-    final info = TorrentMetainfo.parse(Uint8List.fromList(bytes));
+    final info = await TorrentMetainfo.parseAsync(Uint8List.fromList(bytes));
     if (expectedHash != null && info.hash != expectedHash) {
       throw const FormatException('Torrent changed before download');
     }

@@ -8,7 +8,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/helpers/core/app_path_helper.dart';
 import 'package:cb_file_manager/helpers/media/fc_native_video_thumbnail.dart';
 import 'package:cb_file_manager/utils/app_logger.dart';
-import 'package:image/image.dart' as img;
+import 'package:cb_file_manager/helpers/media/image_transcoder.dart';
 import 'package:cb_file_manager/config/translation_helper.dart';
 
 /// A dialog that lets the user seek through a video and pick a specific frame
@@ -167,9 +167,8 @@ class _VideoFramePickerDialogState extends State<VideoFramePickerDialog> {
       final bytes = await _player.screenshot();
       if (bytes != null && bytes.isNotEmpty) {
         // Decode and re-encode as JPEG for consistent file format
-        final decoded = img.decodeImage(bytes);
-        if (decoded != null) {
-          final jpeg = img.encodeJpg(decoded, quality: 95);
+        final jpeg = await transcodeJpeg(bytes);
+        if (jpeg != null) {
           final file = File(outputPath);
           await file.writeAsBytes(jpeg);
           if (await file.exists() && await file.length() > 0) {

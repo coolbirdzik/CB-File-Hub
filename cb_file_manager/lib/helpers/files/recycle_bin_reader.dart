@@ -31,6 +31,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:isolate';
 import 'dart:typed_data';
+import 'package:cb_native/cb_native.dart';
 
 import 'package:path/path.dart' as pathlib;
 import 'package:flutter/foundation.dart' show visibleForTesting;
@@ -96,7 +97,14 @@ Stream<SystemTrashItem> streamRecycleBinEntries() async* {
     errorPort.close();
   });
 
-  yield* controller.stream;
+  try {
+    yield* controller.stream;
+  } finally {
+    receivePort.close();
+    exitPort.close();
+    errorPort.close();
+    isolate.kill(priority: Isolate.immediate);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -109,6 +117,21 @@ void _readerIsolateMain(SendPort sendPort) async {
     const flushAt = 64;
 
     final driveLetters = await _enumerateFixedDrives();
+    final native = await NativeFs.recycleBin(
+      roots: [for (final drive in driveLetters) '$drive\\\$Recycle.Bin'],
+      onEntries: (entries) => sendPort.send([
+        for (final entry in entries)
+          [
+            pathlib.basename(entry.originalPath),
+            entry.path,
+            entry.originalPath,
+            entry.size,
+            entry.deletedMs,
+            entry.isDirectory,
+          ],
+      ]),
+    );
+    if (native) return;
     for (final drive in driveLetters) {
       final binDir = Directory('$drive\\\$Recycle.Bin');
       if (!binDir.existsSync()) continue;

@@ -6,6 +6,7 @@ import '../../helpers/core/text_utils.dart';
 import '../../ui/screens/folder_list/folder_list_state.dart';
 
 import 'torrent_entry.dart';
+import 'torrent_sort.dart';
 import 'torrent_metainfo.dart';
 import 'magnet_link.dart';
 import 'qbittorrent_resume.dart';
@@ -13,7 +14,7 @@ import 'qbittorrent_resume.dart';
 /// The index lives in the app database; metainfo and payloads may live on any
 /// user-selected volume. Queries never materialize the whole library.
 class TorrentRepository {
-  static const schemaVersion = 3;
+  static const schemaVersion = 4;
   static const maxPageSize = 1000;
   static const sortOptions = {
     SortOption.nameAsc,
@@ -58,11 +59,39 @@ class TorrentRepository {
         'qbittorrent_resume_path': 'TEXT',
         'qbittorrent_resume_digest': 'TEXT',
         'source_uris': 'TEXT',
+        'sort_tracker': 'TEXT',
+        'sort_tracker_count': 'INTEGER',
       }.entries) {
         if (!columns.any((column) => column['name'] == definition.key)) {
           await txn.execute(
             'ALTER TABLE torrents ADD COLUMN ${definition.key} ${definition.value}',
           );
+        }
+      }
+      if (!columns.any((column) => column['name'] == 'sort_tracker') ||
+          !columns.any((column) => column['name'] == 'sort_tracker_count')) {
+        var after = '';
+        while (true) {
+          final rows = await txn.query(
+            'torrents',
+            columns: ['hash', 'trackers'],
+            where: 'hash > ?',
+            whereArgs: [after],
+            orderBy: 'hash',
+            limit: 256,
+          );
+          if (rows.isEmpty) break;
+          final batch = txn.batch();
+          for (final row in rows) {
+            after = row['hash'] as String;
+            batch.update(
+              'torrents',
+              _trackerSort(row['trackers'] as String?),
+              where: 'hash = ?',
+              whereArgs: [after],
+            );
+          }
+          await batch.commit(noResult: true);
         }
       }
       if (!columns.any((column) => column['name'] == 'source_uri')) {
@@ -280,6 +309,7 @@ class TorrentRepository {
               {...?previous?.sourceUris, link.uri}.toList(),
             ),
             'trackers': jsonEncode(trackers.toList()),
+            ..._trackerSort(jsonEncode(trackers.toList())),
             'name': name,
             'search_name': TextUtils.searchKey(name),
             'sort_name': name.toLowerCase(),
@@ -409,6 +439,9 @@ class TorrentRepository {
         'trackers': jsonEncode(
           {...?previous?.trackers, ...info.trackers}.toList(),
         ),
+        ..._trackerSort(
+          jsonEncode({...?previous?.trackers, ...info.trackers}.toList()),
+        ),
         'comment': info.comment,
         'created_by': info.createdBy,
         'torrent_created_at': info.creationDate,
@@ -458,6 +491,7 @@ class TorrentRepository {
     String? status,
     String? category,
     SortOption sort = SortOption.dateDesc,
+    TorrentSort? detailSort,
     bool useRegex = false,
     bool Function()? isCancelled,
   }) async {
@@ -489,18 +523,20 @@ class TorrentRepository {
     // SQLite NOCASE only folds ASCII. Match the file browser's Dart lowercase
     // comparison for non-ASCII names too, while sorting before pagination.
     const nameOrder = 'COALESCE(sort_name, lower(name))';
-    final order = switch (sort) {
-      SortOption.nameDesc => '$nameOrder DESC',
-      SortOption.sizeAsc => 'total_bytes ASC',
-      SortOption.sizeDesc => 'total_bytes DESC',
-      SortOption.dateAsc => 'COALESCE(modified_at, added_at) ASC',
-      SortOption.dateDesc => 'COALESCE(modified_at, added_at) DESC',
-      SortOption.dateCreatedAsc => 'added_at ASC',
-      SortOption.dateCreatedDesc => 'added_at DESC',
-      SortOption.typeAsc => 'category ASC, $nameOrder ASC',
-      SortOption.typeDesc => 'category DESC, $nameOrder ASC',
-      _ => '$nameOrder ASC',
-    };
+    final order =
+        detailSort?.orderBy ??
+        switch (sort) {
+          SortOption.nameDesc => '$nameOrder DESC',
+          SortOption.sizeAsc => 'total_bytes ASC',
+          SortOption.sizeDesc => 'total_bytes DESC',
+          SortOption.dateAsc => 'COALESCE(modified_at, added_at) ASC',
+          SortOption.dateDesc => 'COALESCE(modified_at, added_at) DESC',
+          SortOption.dateCreatedAsc => 'added_at ASC',
+          SortOption.dateCreatedDesc => 'added_at DESC',
+          SortOption.typeAsc => 'category ASC, $nameOrder ASC',
+          SortOption.typeDesc => 'category DESC, $nameOrder ASC',
+          _ => '$nameOrder ASC',
+        };
     final start = offset < 0 ? 0 : offset;
     final take = limit.clamp(1, maxPageSize);
     // A transaction keeps count/page consistent while scanning imports rows.
@@ -561,6 +597,8 @@ class TorrentRepository {
       'torrents',
       {
         ...values,
+        if (values.containsKey('trackers'))
+          ..._trackerSort(values['trackers'] as String?),
         if (values['name'] is String)
           'search_name': TextUtils.searchKey(values['name'] as String),
         if (values['name'] is String)
@@ -571,6 +609,16 @@ class TorrentRepository {
       where: 'hash = ?',
       whereArgs: [hash],
     );
+  }
+
+  static Map<String, Object?> _trackerSort(String? encoded) {
+    final trackers = encoded == null ? const [] : jsonDecode(encoded) as List;
+    return {
+      'sort_tracker': trackers.isEmpty
+          ? null
+          : (trackers.first as String).toLowerCase(),
+      'sort_tracker_count': trackers.length,
+    };
   }
 
   Future<List<TorrentEntry>> pending({

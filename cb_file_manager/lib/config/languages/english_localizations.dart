@@ -2,6 +2,16 @@ import 'app_localizations.dart';
 
 class EnglishLocalizations implements AppLocalizations {
   @override
+  String get torrentReceiveInBackground =>
+      'Add opened torrents in the background';
+  @override
+  String get torrentReceiveInBackgroundHint =>
+      'Skip dialogs and keep the current window in the background. Flash the taskbar and send a notification. Use the saved download folder (Downloads if unset) and immediate-start preference; existing tasks keep their state.';
+  @override
+  String get torrentBackgroundAdded => 'Torrent received';
+  @override
+  String get torrentBackgroundFailed => 'Could not add torrent';
+  @override
   String get torrentOpeningOptions => 'When opening torrents';
   @override
   String get torrentShowDownloadDialog =>
@@ -3920,7 +3930,7 @@ class EnglishLocalizations implements AppLocalizations {
   String get cbAgentCleanerTitle => 'Disk Cleaner (CB Agent)';
   @override
   String get diskCleanerNotAvailable =>
-      'Disk Cleaner is only available on Windows';
+      'Disk Cleaner is available on Windows and macOS';
   @override
   String get diskCleanerScanTitle => 'Scan for junk files';
   @override
@@ -4479,8 +4489,8 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get cleanerSuggestionsIntro =>
       'Finds junk files, leftover installers, old large files and space that '
-      'Windows can reclaim, and explains why each one is suggested. Nothing '
-      'is deleted until you confirm, and files go to the Recycle Bin.';
+      'the system can reclaim, and explains why each one is suggested. Nothing '
+      'is deleted until you confirm, and files go to Trash.';
   @override
   String get cleanerSuggestionsScan => 'Scan for suggestions';
   @override
@@ -4510,7 +4520,7 @@ class EnglishLocalizations implements AppLocalizations {
   String get cleanerSuggestionsTierClean => 'Safe to clean';
   @override
   String get cleanerSuggestionsTierCleanHint =>
-      'Recreated automatically by Windows or apps.';
+      'Recreated automatically by the system or apps.';
   @override
   String get cleanerSuggestionsTierReview => 'Review before cleaning';
   @override
