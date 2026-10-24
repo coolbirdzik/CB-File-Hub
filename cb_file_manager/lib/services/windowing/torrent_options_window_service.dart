@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+
+import 'windows_engine_host.dart';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
@@ -93,7 +95,7 @@ class TorrentOptionsWindowService {
     try {
       _server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
       _server!.listen(_accept);
-      final env = Map<String, String>.from(Platform.environment)
+      final env = WindowsEngineHost.newWindowEnvironment()
         ..remove('CB_STARTUP_TABS')
         ..remove('CB_PIP_MODE')
         ..remove('CB_PIP_ARGS')
@@ -253,6 +255,12 @@ class TorrentOptionsWindowService {
     required Map<String, String> environment,
     required String workingDirectory,
   }) async {
+    if (Platform.isWindows) {
+      if (!await WindowsEngineHost.open(environment)) {
+        throw StateError('Failed to create window engine');
+      }
+      return;
+    }
     await Process.start(
       executable,
       arguments,

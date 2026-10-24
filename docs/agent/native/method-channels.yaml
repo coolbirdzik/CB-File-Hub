@@ -9,6 +9,29 @@ registration:
   rule: "A new Windows plugin must be compiled, registered, wrapped in Dart, and tested."
 
 channels:
+  cb_file_manager/engine_windows:
+    dart:
+      - cb_file_manager/lib/services/windowing/windows_engine_host.dart
+    windows:
+      - cb_file_manager/windows/runner/engine_window_host.cpp
+      - cb_file_manager/windows/runner/engine_window_host.h
+      - cb_file_manager/windows/runner/flutter_window.cpp
+    methods:
+      - startup
+      - create
+      - close
+      - setRole
+      - retain
+    callbacks:
+      - closeRequested
+    invariants:
+      - "Each Windows window owns a separate engine in the existing app process."
+      - "Startup options are engine-local; process environment is never mutated."
+      - "Closing a child window must not call exit or end the host process."
+      - "The primary coordinator survives until the last user window closes."
+      - "retain {reason, busy, keepsProcess}: keepsProcess work (file operations, model downloads) keeps the process alive after the last window closes; torrent ownership does not."
+      - "Close handlers that throw still close the window; child windows never call windowManager.destroy (it posts WM_QUIT for every window)."
+
   cb_file_manager/app_insights:
     dart:
       - cb_file_manager/lib/services/app_insights/windows_app_insights_platform.dart
@@ -116,7 +139,10 @@ channels:
     methods:
       - allowForegroundWindow
       - forceActivateWindow
+      - showWindowInactive
       - startWindowDragIfMouseDown
+      - startTabWindowDrag
+      - setTabStripBounds
       - startNativeTabDrag
       - startNativeFileDrag
       - setNativeFullScreen
@@ -129,6 +155,9 @@ channels:
       - onNativeTabDragHover
       - onNativeTabDrop
       - onNativeFileDrop
+      - onTabMergeHover
+      - onTabMergeDrop
+      - onTabWindowMerged
 
   fc_native_video_thumbnail:
     dart:

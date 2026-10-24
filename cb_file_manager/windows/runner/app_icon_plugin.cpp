@@ -7,6 +7,9 @@
 #include <shlobj.h>
 #include <shellapi.h>
 #include <shobjidl.h>
+#include <algorithm>
+#include <cmath>
+#include <cstdint>
 #include <map>
 #include <memory>
 #include <sstream>
@@ -59,6 +62,115 @@ static void ClearTaskbarProgressImpl(HWND hwnd) {
   g_taskbar->SetProgressState(hwnd, TBPF_NOPROGRESS);
 }
 
+// Renders |label| in white on an anti-aliased red disc. GDI text carries no
+// alpha, so it is drawn white-on-black first and its grey level used as
+// coverage when the disc is composited.
+static HICON CreateBadgeIcon(int size, const std::wstring& label) {
+  BITMAPINFO bmi = {};
+  bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+  bmi.bmiHeader.biWidth = size;
+  bmi.bmiHeader.biHeight = -size;
+  bmi.bmiHeader.biPlanes = 1;
+  bmi.bmiHeader.biBitCount = 32;
+  bmi.bmiHeader.biCompression = BI_RGB;
+
+  HDC dc = CreateCompatibleDC(nullptr);
+  if (!dc) return nullptr;
+  void* bits = nullptr;
+  HBITMAP color =
+      CreateDIBSection(dc, &bmi, DIB_RGB_COLORS, &bits, nullptr, 0);
+  if (!color || !bits) {
+    if (color) DeleteObject(color);
+    DeleteDC(dc);
+    return nullptr;
+  }
+  auto* pixels = static_cast<uint32_t*>(bits);
+  std::fill(pixels, pixels + size * size, 0u);
+  HGDIOBJ old_bitmap = SelectObject(dc, color);
+
+  // Shrink the font until the label fits inside the disc.
+  HFONT font = nullptr;
+  HGDIOBJ old_font = nullptr;
+  for (int height = size * 3 / 4; height >= 6; --height) {
+    font = CreateFontW(-height, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
+                       DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+                       ANTIALIASED_QUALITY, DEFAULT_PITCH | FF_SWISS,
+                       L"Segoe UI");
+    if (!font) break;
+    old_font = SelectObject(dc, font);
+    SIZE extent = {};
+    GetTextExtentPoint32W(dc, label.c_str(), static_cast<int>(label.size()),
+                          &extent);
+    if (extent.cx <= size - 2 || height == 6) break;
+    SelectObject(dc, old_font);
+    DeleteObject(font);
+    font = nullptr;
+  }
+  SetBkMode(dc, TRANSPARENT);
+  SetTextColor(dc, RGB(255, 255, 255));
+  RECT rect = {0, 0, size, size};
+  DrawTextW(dc, label.c_str(), -1, &rect,
+            DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+  GdiFlush();
+
+  const float radius = size / 2.0f;
+  for (int y = 0; y < size; ++y) {
+    for (int x = 0; x < size; ++x) {
+      uint32_t& px = pixels[y * size + x];
+      const float dx = x + 0.5f - radius;
+      const float dy = y + 0.5f - radius;
+      const float disc = (std::min)(
+          1.0f, (std::max)(0.0f, radius - std::sqrt(dx * dx + dy * dy)));
+      const float text = (px & 0xFF) / 255.0f;
+      const auto mix = [text](int base) {
+        return static_cast<uint32_t>(base + (255 - base) * text + 0.5f);
+      };
+      const uint32_t alpha = static_cast<uint32_t>(disc * 255.0f + 0.5f);
+      px = (alpha << 24) | (mix(0xD1) << 16) | (mix(0x34) << 8) | mix(0x38);
+    }
+  }
+
+  if (font) {
+    SelectObject(dc, old_font);
+    DeleteObject(font);
+  }
+  SelectObject(dc, old_bitmap);
+  DeleteDC(dc);
+
+  std::vector<uint8_t> mask_bits(((size + 15) / 16) * 2 * size, 0);
+  HBITMAP mask = CreateBitmap(size, size, 1, 1, mask_bits.data());
+  ICONINFO info = {};
+  info.fIcon = TRUE;
+  info.hbmMask = mask;
+  info.hbmColor = color;
+  HICON icon = mask ? CreateIconIndirect(&info) : nullptr;
+  if (mask) DeleteObject(mask);
+  DeleteObject(color);
+  return icon;
+}
+
+// Shows |count| as an overlay on the taskbar button; 0 removes it.
+static void SetTaskbarBadgeImpl(HWND hwnd, int count) {
+  EnsureTaskbar();
+  if (!g_taskbar || !hwnd) return;
+  HWND root = GetAncestor(hwnd, GA_ROOT);
+  if (!root) root = hwnd;
+  if (count <= 0) {
+    g_taskbar->SetOverlayIcon(root, nullptr, nullptr);
+    return;
+  }
+
+  const std::wstring label = count > 99 ? L"99+" : std::to_wstring(count);
+  const int size = GetSystemMetricsForDpi(SM_CXSMICON, GetDpiForWindow(root));
+  HICON icon = CreateBadgeIcon(size > 0 ? size : 16, label);
+  if (!icon) return;
+  const std::wstring description =
+      label + (count == 1 ? L" notification" : L" notifications");
+  // The taskbar keeps its own copy of the icon.
+  g_taskbar->SetOverlayIcon(root, icon, description.c_str());
+  DestroyIcon(icon);
+}
+
 #pragma comment(lib, "shell32.lib")
 #pragma comment(lib, "comctl32.lib")
 #pragma comment(lib, "shlwapi.lib")
@@ -93,9 +205,25 @@ void AppIconPlugin::RegisterWithRegistrar(flutter::PluginRegistrarWindows* regis
 }
 
 AppIconPlugin::AppIconPlugin(flutter::PluginRegistrarWindows* registrar) 
-    : registrar_(registrar) {}
+    : registrar_(registrar) {
+  // A window started hidden, or an Explorer restart, gets a fresh taskbar
+  // button without the overlay, so the last badge is re-applied to it.
+  static const UINT taskbar_button_created =
+      RegisterWindowMessageW(L"TaskbarButtonCreated");
+  window_proc_delegate_id_ = registrar_->RegisterTopLevelWindowProcDelegate(
+      [this](HWND hwnd, UINT message, WPARAM, LPARAM) -> std::optional<LRESULT> {
+        if (message == taskbar_button_created && badge_count_ > 0) {
+          SetTaskbarBadgeImpl(hwnd, badge_count_);
+        }
+        return std::nullopt;
+      });
+}
 
-AppIconPlugin::~AppIconPlugin() {}
+AppIconPlugin::~AppIconPlugin() {
+  if (window_proc_delegate_id_ != 0) {
+    registrar_->UnregisterTopLevelWindowProcDelegate(window_proc_delegate_id_);
+  }
+}
 
 void AppIconPlugin::HandleMethodCall(
     const flutter::MethodCall<flutter::EncodableValue>& method_call,
@@ -285,6 +413,19 @@ void AppIconPlugin::HandleMethodCall(
   } else if (method_call.method_name().compare("clearTaskbarProgress") == 0) {
     HWND hwnd = registrar_->GetView()->GetNativeWindow();
     ClearTaskbarProgressImpl(hwnd);
+    result->Success(flutter::EncodableValue(true));
+    return;
+  } else if (method_call.method_name().compare("setTaskbarBadge") == 0) {
+    const auto* arguments = std::get_if<flutter::EncodableMap>(method_call.arguments());
+    int count = 0;
+    if (arguments) {
+      auto it = arguments->find(flutter::EncodableValue("count"));
+      if (it != arguments->end() && std::holds_alternative<int>(it->second))
+        count = std::get<int>(it->second);
+    }
+    badge_count_ = count;
+    HWND hwnd = registrar_->GetView()->GetNativeWindow();
+    SetTaskbarBadgeImpl(hwnd, count);
     result->Success(flutter::EncodableValue(true));
     return;
   } else {

@@ -379,6 +379,13 @@ class DrawerCubit extends Cubit<DrawerState> {
     );
   }
 
+  // Loads that were awaiting a closed window's preferences finish after it:
+  // their result has no one to show it to.
+  @override
+  void emit(DrawerState state) {
+    if (!isClosed) super.emit(state);
+  }
+
   @override
   Future<void> close() async {
     _syncTimer?.cancel();

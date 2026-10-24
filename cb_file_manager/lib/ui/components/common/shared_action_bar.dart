@@ -1,6 +1,7 @@
 import 'dart:io' show Platform;
 import 'dart:math' as math;
 
+import 'package:cb_file_manager/design_system/primitives/cb_slider.dart';
 import 'package:flutter/material.dart';
 import '../../screens/folder_list/components/details_columns.dart';
 import '../../screens/folder_list/folder_list_state.dart';
@@ -1037,7 +1038,7 @@ class _GridSizeSliderMenuState extends State<GridSizeSliderMenu> {
                           overlayRadius: 14,
                         ),
                       ),
-                      child: Slider(
+                      child: CbSlider(
                         value: displayVal.toDouble(),
                         min: widget.minValue.toDouble(),
                         max: widget.maxValue.toDouble(),

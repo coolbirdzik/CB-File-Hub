@@ -64,6 +64,11 @@ class UserPreferences {
   static const String _videoPlayerVolumeKey = 'video_player_volume';
   static const String _videoPlayerMuteKey = 'video_player_mute';
   static const String _videoSeekSpeedKey = 'video_seek_speed';
+  static const String _videoSeekAccelerationKey = 'video_seek_acceleration';
+  static const String _videoKeyboardSeekSecondsKey =
+      'video_keyboard_seek_seconds';
+  static const int defaultVideoKeyboardSeekSeconds = 1;
+  static const int maxVideoKeyboardSeekSeconds = 30;
   static const String _videoWheelActionKey = 'video_wheel_action';
   static const String _drawerPinnedKey = 'drawer_pinned';
   static const String _themePreferenceKey = 'theme_preference';
@@ -1032,6 +1037,26 @@ class UserPreferences {
     return await _savePreference<bool>(_videoPlayerMuteKey, isMuted);
   }
 
+  /// Get the step for a single Left/Right key press (default: one second).
+  Future<int> getVideoKeyboardSeekSeconds() async {
+    final seconds = await _getPreference<int>(
+      _videoKeyboardSeekSecondsKey,
+      defaultValue: defaultVideoKeyboardSeekSeconds,
+    );
+    return (seconds ?? defaultVideoKeyboardSeekSeconds).clamp(
+      1,
+      maxVideoKeyboardSeekSeconds,
+    );
+  }
+
+  /// Save the step for a single Left/Right key press, in seconds.
+  Future<bool> setVideoKeyboardSeekSeconds(int seconds) async {
+    return _savePreference<int>(
+      _videoKeyboardSeekSecondsKey,
+      seconds.clamp(1, maxVideoKeyboardSeekSeconds),
+    );
+  }
+
   /// Get video seek speed preference: 0=slow, 1=medium, 2=fast
   Future<int> getVideoSeekSpeed() async {
     return await _getPreference<int>(
@@ -1044,6 +1069,21 @@ class UserPreferences {
   /// Save video seek speed preference
   Future<bool> setVideoSeekSpeed(int speed) async {
     return await _savePreference<int>(_videoSeekSpeedKey, speed.clamp(0, 2));
+  }
+
+  /// Whether a held seek grows its step over time (default: off, so holding
+  /// keeps seeking by the same step).
+  Future<bool> getVideoSeekAcceleration() async {
+    return await _getPreference<bool>(
+          _videoSeekAccelerationKey,
+          defaultValue: false,
+        ) ??
+        false;
+  }
+
+  /// Save whether a held seek accelerates.
+  Future<bool> setVideoSeekAcceleration(bool enabled) async {
+    return _savePreference<bool>(_videoSeekAccelerationKey, enabled);
   }
 
   /// Get the mouse wheel action over the video player (default: volume)

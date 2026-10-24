@@ -12,6 +12,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 class TabbedFolderKeyboardController {
+  TabbedFolderKeyboardController({double initialScrollOffset = 0})
+    : scrollController = ScrollController(
+        initialScrollOffset: initialScrollOffset,
+      );
+
   final FocusNode focusNode = FocusNode(
     debugLabel: 'tabbed-folder-list-keyboard',
   );
@@ -24,7 +29,7 @@ class TabbedFolderKeyboardController {
 
   /// Scroll controller attached to the active list/grid view.
   /// The screen creates this and passes it to [FileListViewBuilder].
-  final ScrollController scrollController = ScrollController();
+  final ScrollController scrollController;
   final Map<String, GlobalKey> _itemKeys = <String, GlobalKey>{};
 
   String? focusedPath;

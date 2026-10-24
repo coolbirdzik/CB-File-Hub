@@ -2,6 +2,10 @@ import 'app_localizations.dart';
 
 class EnglishLocalizations implements AppLocalizations {
   @override
+  String get aiProviderKind => 'Provider type';
+  @override
+  String get aiProviderCustom => 'Custom';
+  @override
   String get deviceMediaOnDevice => 'On this device';
   @override
   String get deviceMediaLimited =>
@@ -1753,6 +1757,18 @@ class EnglishLocalizations implements AppLocalizations {
       'Videos will open in the in-app player';
   @override
   String get seekSpeed => 'Seek speed';
+  @override
+  String get videoSeekAcceleration => 'Speed up while holding';
+  @override
+  String get videoSeekAccelerationDescription =>
+      'The longer you hold a seek key or press, the bigger each jump gets. Off: every jump uses the same step.';
+  @override
+  String get videoKeyboardSeekStep => 'Keyboard seek step';
+  @override
+  String get videoKeyboardSeekStepDescription =>
+      'Time skipped per Left/Right key press. Hold the key to seek continuously.';
+  @override
+  String videoSeekSeconds(int seconds) => '$seconds s';
   @override
   String get seekSpeedDescription =>
       'How fast the video skips when holding the seek key or long-pressing on mobile';
@@ -4230,6 +4246,11 @@ class EnglishLocalizations implements AppLocalizations {
   String get diskCleanerSkip => 'Skip';
   @override
   String get diskCleanerTryAgain => 'Try again';
+  @override
+  String get diskCleanerProtectedLabel => 'Cannot delete';
+  @override
+  String get diskCleanerProtectedReason =>
+      'This item contains or belongs to essential system data. CB Cleaner keeps it protected, including when using administrator access. You can still inspect its disk usage.';
   @override
   String get diskCleanerPermanentDeleteConfirmTitle => 'Permanent delete?';
   @override

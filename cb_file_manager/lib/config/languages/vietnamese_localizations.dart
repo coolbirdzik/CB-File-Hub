@@ -2,6 +2,10 @@ import 'app_localizations.dart';
 
 class VietnameseLocalizations implements AppLocalizations {
   @override
+  String get aiProviderKind => 'Loại nhà cung cấp';
+  @override
+  String get aiProviderCustom => 'Tùy chỉnh';
+  @override
   String get deviceMediaOnDevice => 'Trên thiết bị';
   @override
   String get deviceMediaLimited =>
@@ -1770,6 +1774,18 @@ class VietnameseLocalizations implements AppLocalizations {
       'Video sẽ mở bằng trình phát trong app';
   @override
   String get seekSpeed => 'Tốc độ tua video';
+  @override
+  String get videoSeekAcceleration => 'Giữ lâu thì tua nhanh hơn';
+  @override
+  String get videoSeekAccelerationDescription =>
+      'Giữ phím hoặc nhấn giữ càng lâu thì mỗi bước tua càng dài. Tắt: luôn tua đều theo cùng một bước.';
+  @override
+  String get videoKeyboardSeekStep => 'Bước tua bằng phím';
+  @override
+  String get videoKeyboardSeekStepDescription =>
+      'Thời gian tua mỗi lần bấm phím trái/phải. Giữ phím để tua liên tục.';
+  @override
+  String videoSeekSeconds(int seconds) => '$seconds giây';
   @override
   String get seekSpeedDescription =>
       'Tốc độ nhảy video khi giữ phím tua hoặc nhấn giữ trên thiết bị di động';
@@ -4217,6 +4233,11 @@ class VietnameseLocalizations implements AppLocalizations {
   String get diskCleanerSkip => 'Bỏ qua';
   @override
   String get diskCleanerTryAgain => 'Thử lại';
+  @override
+  String get diskCleanerProtectedLabel => 'Không được xoá';
+  @override
+  String get diskCleanerProtectedReason =>
+      'Mục này chứa hoặc thuộc dữ liệu cần thiết của hệ thống. CB Cleaner bảo vệ mục này, kể cả khi có quyền quản trị. Bạn vẫn có thể xem dung lượng và nội dung trong cây thư mục.';
   @override
   String get diskCleanerPermanentDeleteConfirmTitle => 'Xóa vĩnh viễn?';
   @override

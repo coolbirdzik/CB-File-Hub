@@ -4,6 +4,7 @@ import 'cleaner_categories.dart';
 import 'cleaner_models.dart';
 import 'windows_known_folders.dart';
 import 'cleaner_paths.dart';
+import 'cleaner_system_protection.dart';
 
 /// Defense-in-depth path safety checker.
 ///
@@ -40,6 +41,7 @@ class CleanerPathSafety {
     String absolutePath, {
     bool recycleBinItem = false,
   }) {
+    if (CleanerSystemProtection.isProtected(absolutePath)) return false;
     if (Platform.isMacOS) {
       if (recycleBinItem) return false;
       if (!isMacosPathSafeToDelete(absolutePath, Platform.environment)) {

@@ -1,7 +1,9 @@
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/services.dart'; // Added import for HapticFeedback
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 // Import app theme
@@ -9,7 +11,18 @@ import 'package:window_manager/window_manager.dart'; // Import window_manager
 import 'dart:io'; // Import dart:io for Platform check
 import '../../components/common/window_caption_buttons.dart';
 import 'desktop_tab_drag_data.dart';
+import 'external_tab_drop_controller.dart';
 import 'package:cb_file_manager/config/translation_helper.dart';
+
+/// Asks to move a dragged tab to its own window. [geometry] says where the
+/// tab is and where the pointer should sit in the new window, so the tab stays
+/// under the pointer, as in Chrome.
+typedef NativeTabDetachCallback =
+    Future<void> Function(
+      DesktopTabDragData data,
+      Offset globalPosition,
+      TabDetachGeometry geometry,
+    );
 
 /// A custom TabBar wrapper that translates vertical mouse wheel scrolling
 /// to horizontal scrolling of the tab bar, with modern styling.
@@ -35,11 +48,24 @@ class ScrollableTabBar extends StatefulWidget {
   final Set<String> selectedTabIds;
   final ValueChanged<DesktopTabDragData>? onTabDragStarted;
   final VoidCallback? onTabDragEnded;
-  final Future<void> Function(DesktopTabDragData data, Offset globalPosition)?
-  onNativeTabDragRequested;
+  final NativeTabDetachCallback? onNativeTabDragRequested;
   final void Function(int fromIndex, int toIndex)? onTabReorder;
   final void Function(int index, bool shiftPressed)? onTabPrimaryClick;
   final List<Widget> leadingCaptionActions;
+
+  /// Accepts tabs dragged in from other windows: the bar reports its strip
+  /// bounds here and shows where hovering tabs would land.
+  final ExternalTabDropController? externalTabDrop;
+
+  /// The active tab. The caller's [controller] may only catch up with a new
+  /// tab count a frame later, which would flash the highlight on the wrong
+  /// tab; when null, [controller]'s index is used.
+  final int? activeTabIndex;
+
+  /// Whether the bar stands in for the window's title bar (caption buttons,
+  /// drag-to-move, double-click to maximize). Off in a window that keeps its
+  /// native frame.
+  final bool showWindowControls;
 
   const ScrollableTabBar({
     super.key,
@@ -68,6 +94,9 @@ class ScrollableTabBar extends StatefulWidget {
     this.onTabReorder,
     this.onTabPrimaryClick,
     this.leadingCaptionActions = const <Widget>[],
+    this.externalTabDrop,
+    this.activeTabIndex,
+    this.showWindowControls = true,
   });
 
   @override
@@ -77,11 +106,28 @@ class ScrollableTabBar extends StatefulWidget {
 class _ScrollableTabBarState extends State<ScrollableTabBar> {
   // Create a scroll controller for the horizontal scroll view
   final ScrollController _scrollController = ScrollController();
+  final GlobalKey _stripAreaKey = GlobalKey();
+  bool _stripBoundsReportScheduled = false;
 
   @override
   void dispose() {
     _scrollController.dispose();
     super.dispose();
+  }
+
+  /// Reports the strip area after layout. Deduplicated by the controller, so
+  /// only real changes (a resize) reach the platform.
+  void _scheduleStripBoundsReport() {
+    if (widget.externalTabDrop == null || _stripBoundsReportScheduled) return;
+    _stripBoundsReportScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _stripBoundsReportScheduled = false;
+      final controller = widget.externalTabDrop;
+      if (!mounted || controller == null) return;
+      final box = _stripAreaKey.currentContext?.findRenderObject();
+      if (box is! RenderBox || !box.attached || !box.hasSize) return;
+      controller.reportStripBounds(box.localToGlobal(Offset.zero) & box.size);
+    });
   }
 
   @override
@@ -96,7 +142,8 @@ class _ScrollableTabBarState extends State<ScrollableTabBar> {
         widget.activeTabBackgroundColor ?? tabBackgroundColor;
     final hoverColor = theme.colorScheme.surfaceContainerHigh;
 
-    Widget windowCaptionButtons = Platform.isWindows
+    final customTitleBar = Platform.isWindows && widget.showWindowControls;
+    Widget windowCaptionButtons = customTitleBar
         ? WindowCaptionButtons(theme: theme)
         : const SizedBox.shrink();
 
@@ -113,15 +160,19 @@ class _ScrollableTabBarState extends State<ScrollableTabBar> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          if (Platform.isWindows)
+          if (customTitleBar)
             const DragToMoveArea(
               child: SizedBox(width: 12, height: double.infinity),
-            ),
+            )
+          else if (Platform.isWindows)
+            const SizedBox(width: 12),
           // Tab strip area (not draggable) so tab drag gestures can win.
           Expanded(
             child: LayoutBuilder(
               builder: (context, constraints) {
+                _scheduleStripBoundsReport();
                 return Listener(
+                  key: _stripAreaKey,
                   onPointerSignal: (PointerSignalEvent event) {
                     if (event is PointerScrollEvent) {
                       // Support both horizontal trackpad gestures and the
@@ -185,6 +236,11 @@ class _ScrollableTabBarState extends State<ScrollableTabBar> {
                             widget.onNativeTabDragRequested,
                         onTabReorder: widget.onTabReorder,
                         onTabPrimaryClick: widget.onTabPrimaryClick,
+                        externalTabDrop: widget.externalTabDrop,
+                        activeTabIndex: widget.activeTabIndex,
+                        hasCustomTitleBar:
+                            widget.showWindowControls &&
+                            (Platform.isWindows || Platform.isMacOS),
                         theme: theme,
                       ),
                     ),
@@ -193,11 +249,11 @@ class _ScrollableTabBarState extends State<ScrollableTabBar> {
               },
             ),
           ),
-          if (Platform.isWindows && widget.leadingCaptionActions.isEmpty)
+          if (customTitleBar && widget.leadingCaptionActions.isEmpty)
             const DragToMoveArea(
               child: SizedBox(width: 84, height: double.infinity),
             ),
-          if (Platform.isWindows && widget.leadingCaptionActions.isNotEmpty)
+          if (customTitleBar && widget.leadingCaptionActions.isNotEmpty)
             const DragToMoveArea(
               child: SizedBox(width: 24, height: double.infinity),
             ),
@@ -250,10 +306,12 @@ class _ModernTabBar extends StatefulWidget {
   final Set<String> selectedTabIds;
   final ValueChanged<DesktopTabDragData>? onTabDragStarted;
   final VoidCallback? onTabDragEnded;
-  final Future<void> Function(DesktopTabDragData data, Offset globalPosition)?
-  onNativeTabDragRequested;
+  final NativeTabDetachCallback? onNativeTabDragRequested;
   final void Function(int fromIndex, int toIndex)? onTabReorder;
   final void Function(int index, bool shiftPressed)? onTabPrimaryClick;
+  final ExternalTabDropController? externalTabDrop;
+  final int? activeTabIndex;
+  final bool hasCustomTitleBar;
   final ThemeData theme;
 
   const _ModernTabBar({
@@ -278,6 +336,9 @@ class _ModernTabBar extends StatefulWidget {
     this.onNativeTabDragRequested,
     this.onTabReorder,
     this.onTabPrimaryClick,
+    this.externalTabDrop,
+    this.activeTabIndex,
+    this.hasCustomTitleBar = false,
     required this.theme,
   });
 
@@ -299,13 +360,40 @@ class _ModernTabBarState extends State<_ModernTabBar> {
   bool _blankDragEligible = false;
   bool _blankDragStarted = false;
 
+  // Native drag: the dragged tab follows the pointer. A copy of it is painted
+  // above the row (so neighbours slide underneath) at its slot plus this.
+  final ValueNotifier<double> _dragDx = ValueNotifier<double>(0);
+  bool _followPointer = false;
+  double _dragGrabDx = 0;
+  double _dragTabLeft = 0;
+  Widget? _draggedTabCopy;
+  // Tabs fading out while they move to a new window.
+  final Set<String> _leavingTabIds = <String>{};
+  // Gap opened for tabs dragged in from another window.
+  int? _externalGap;
+  String _externalLabel = '';
+  // New tabs animate in, except the ones present on the first frame.
+  bool _animateEntries = false;
+  // A strip that had no tabs (a fresh window) shows its first tabs at once,
+  // and tabs dropped into an open gap simply take the ghost's place.
+  int _lastBuiltTabCount = 0;
+  bool _gapOpenLastBuild = false;
+
   static const double _blankDragThreshold = 5.0;
+  // A tab detaches only this far outside the strip, while another window's tab
+  // attaches anywhere inside it: the gap keeps a torn-off tab from snapping
+  // straight back into the strip it left.
+  static const double _detachBandMargin = 10.0;
+
+  /// Horizontal space one tab takes in the row, margins included.
+  static double get _tabSlotWidth =>
+      FluentSurfaceTokens.tabWidth + (FluentSurfaceTokens.isMacOS ? 6 : 4);
   static const Duration _doubleClickTimeout = Duration(milliseconds: 350);
   static const double _doubleClickSlop = 22.0;
 
   // Windows and macOS hide the native title bar, so the blank strip stands in
   // for it: drag to move the window, double-click to maximize/zoom.
-  bool get _hasCustomTitleBar => Platform.isWindows || Platform.isMacOS;
+  bool get _hasCustomTitleBar => widget.hasCustomTitleBar;
 
   Future<void> _toggleMaximizeRestore() async {
     if (!_hasCustomTitleBar) return;
@@ -355,58 +443,9 @@ class _ModernTabBarState extends State<_ModernTabBar> {
     return items.indexWhere((e) => e.tabId == activeTabId);
   }
 
-  bool _isDraggedTabAt(int index) {
-    final activeTabId = _activeDragTabId;
-    final items = widget.draggableTabs;
-    if (activeTabId == null || items == null || index >= items.length) {
-      return false;
-    }
-    return items[index].tabId == activeTabId;
-  }
-
-  double _slideOffsetForIndex(int index) {
-    final fromIndex = _activeDragIndex();
-    final toIndex = _previewTargetIndex;
-    if (fromIndex < 0 || toIndex == null) return 0;
-    if (index == fromIndex) return 0;
-
-    if (fromIndex < toIndex && index > fromIndex && index <= toIndex) {
-      return -0.10;
-    }
-    if (fromIndex > toIndex && index >= toIndex && index < fromIndex) {
-      return 0.10;
-    }
-    return 0;
-  }
-
-  Widget _wrapTabReorderEffect({required int index, required Widget child}) {
-    final slideX = _slideOffsetForIndex(index);
-    final isAnyDragActive = _activeDragTabId != null;
-    final isDraggedTab = _isDraggedTabAt(index);
-    final shouldDimDraggedTab =
-        Platform.isWindows &&
-        widget.onNativeTabDragRequested != null &&
-        isAnyDragActive &&
-        isDraggedTab;
-    final scale = isDraggedTab
-        ? 0.97
-        : (isAnyDragActive && slideX != 0 ? 1.01 : 1.0);
-
-    return AnimatedSlide(
-      duration: const Duration(milliseconds: 120),
-      curve: Curves.easeOutCubic,
-      offset: Offset(slideX, 0),
-      child: AnimatedScale(
-        duration: const Duration(milliseconds: 120),
-        curve: Curves.easeOutCubic,
-        scale: scale,
-        child: AnimatedOpacity(
-          duration: const Duration(milliseconds: 120),
-          opacity: shouldDimDraggedTab ? 0.62 : 1,
-          child: child,
-        ),
-      ),
-    );
+  RenderBox? _rowBox() {
+    final box = _tabRowKey.currentContext?.findRenderObject();
+    return box is RenderBox && box.hasSize ? box : null;
   }
 
   int _indexOfDragData(DesktopTabDragData data) {
@@ -422,14 +461,61 @@ class _ModernTabBarState extends State<_ModernTabBar> {
     if (box == null || widget.tabs.isEmpty) return -1;
 
     final local = box.globalToLocal(globalPosition);
-    const tabSlotWidth = 216.0;
-    final raw = (local.dx / tabSlotWidth).floor();
+    final raw = (local.dx / _tabSlotWidth).floor();
     return raw.clamp(0, widget.tabs.length - 1);
   }
 
-  void _beginDrag(DesktopTabDragData data) {
+  /// The gap nearest [globalPosition], as the index a dropped tab takes.
+  /// While a gap is open its ghost tab counts as that index, and tabs after it
+  /// are measured where they would sit without it, so the gap stays put until
+  /// the pointer is clearly past a neighbour's middle.
+  int _externalInsertIndexAt(Offset globalPosition) {
+    final box = _rowBox();
+    if (box == null) return widget.tabs.length;
+    var slots = box.globalToLocal(globalPosition).dx / _tabSlotWidth;
+    final gap = _externalGap;
+    if (gap != null) {
+      if (slots >= gap && slots < gap + 1) return gap;
+      if (slots >= gap + 1) slots -= 1;
+    }
+    return slots.round().clamp(0, widget.tabs.length);
+  }
+
+  void _onExternalHoverChanged() {
+    final hover = widget.externalTabDrop?.hover.value;
+    final gap = hover == null ? null : _externalInsertIndexAt(hover.position);
+    final label = hover?.label ?? '';
+    if (gap == _externalGap && label == _externalLabel) return;
+    setState(() {
+      _externalGap = gap;
+      _externalLabel = label;
+    });
+  }
+
+  bool _isOutsideDetachBand(Offset globalPosition) {
+    final box = _tabStripKey.currentContext?.findRenderObject();
+    if (box is! RenderBox || !box.hasSize) return true;
+    final top = box.localToGlobal(Offset.zero).dy;
+    return globalPosition.dy < top - _detachBandMargin ||
+        globalPosition.dy > top + box.size.height + _detachBandMargin;
+  }
+
+  /// Where the first tab sits when the strip is not scrolled, which is where a
+  /// torn-off window shows the dragged tab.
+  Offset _restingFirstTabOrigin() {
+    final box = _tabRowKey.currentContext?.findRenderObject();
+    if (box is! RenderBox || !box.hasSize) return const Offset(12, 4);
+    final scrolled = Scrollable.maybeOf(context)?.position.pixels ?? 0;
+    return box.localToGlobal(Offset.zero) + Offset(scrolled, 0);
+  }
+
+  void _beginDrag(DesktopTabDragData data, {Offset? grabOffset}) {
     _activeDragTabId = data.tabId;
     _previewTargetIndex = _indexOfDragData(data);
+    _followPointer = grabOffset != null;
+    _dragGrabDx = grabOffset?.dx ?? 0;
+    _dragTabLeft = _previewTargetIndex! * _tabSlotWidth;
+    _dragDx.value = 0;
     _lastReorderFromIndex = null;
     _lastReorderToIndex = null;
     widget.onTabDragStarted?.call(data);
@@ -440,6 +526,8 @@ class _ModernTabBarState extends State<_ModernTabBar> {
 
   void _endDrag({bool rebuild = true}) {
     if (_activeDragTabId == null) return;
+    // _dragDx keeps its value: the released tab settles from there.
+    _followPointer = false;
     _activeDragTabId = null;
     _previewTargetIndex = null;
     _lastReorderFromIndex = null;
@@ -467,27 +555,87 @@ class _ModernTabBarState extends State<_ModernTabBar> {
     widget.onTabReorder?.call(fromIndex, toIndex);
   }
 
+  /// Moves the dragged tab with the pointer, and reorders once its middle
+  /// crosses into a neighbour's slot.
   void _handleNativeReorderMove(
     DesktopTabDragData data,
     Offset globalPosition,
   ) {
-    final toIndex = _resolveTargetIndex(globalPosition);
-    if (toIndex < 0) return;
+    final box = _rowBox();
+    final from = _indexOfDragData(data);
+    if (box == null || from < 0) return;
+    final slot = _tabSlotWidth;
+    final maxLeft = math.max(0.0, (widget.tabs.length - 1) * slot);
+    final left = (box.globalToLocal(globalPosition).dx - _dragGrabDx).clamp(
+      0.0,
+      maxLeft,
+    );
+    _dragTabLeft = left;
+    _dragDx.value = left - from * slot;
+    final toIndex = ((left + slot / 2) / slot).floor().clamp(
+      0,
+      widget.tabs.length - 1,
+    );
     _notifyReorder(data, toIndex);
   }
 
   void _handleDragUpdate(DesktopTabDragData data, DragUpdateDetails details) {
-    _handleNativeReorderMove(data, details.globalPosition);
+    final toIndex = _resolveTargetIndex(details.globalPosition);
+    if (toIndex < 0) return;
+    _notifyReorder(data, toIndex);
   }
 
   Future<void> _handleNativeDetachRequest(
     DesktopTabDragData data,
     Offset globalPosition,
+    Offset grabOffset,
   ) async {
+    // The only tab drags its window instead, so it stays visible.
+    final leaving = widget.tabs.length > 1
+        ? (widget.selectedTabIds.length > 1 &&
+                  widget.selectedTabIds.contains(data.tabId)
+              ? widget.selectedTabIds.toSet()
+              : <String>{data.tabId})
+        : const <String>{};
+    final firstTab = _restingFirstTabOrigin();
+    final row = _rowBox();
+    final rowOrigin = row?.localToGlobal(Offset.zero) ?? Offset.zero;
+    final strip = _tabStripKey.currentContext?.findRenderObject();
+    final stripBottom = strip is RenderBox && strip.hasSize
+        ? strip.localToGlobal(Offset(0, strip.size.height)).dy
+        : rowOrigin.dy + (row?.size.height ?? 46);
+    final geometry = TabDetachGeometry(
+      windowAnchor: firstTab + grabOffset,
+      tabRect: Rect.fromLTWH(
+        rowOrigin.dx + _dragTabLeft,
+        rowOrigin.dy,
+        _tabSlotWidth,
+        row?.size.height ?? 46,
+      ),
+      firstTabOrigin: firstTab,
+      stripBottom: stripBottom,
+    );
     try {
-      await widget.onNativeTabDragRequested?.call(data, globalPosition);
+      // Started before the fade below is drawn: the drag preview captures
+      // the tab from the screen.
+      final request = widget.onNativeTabDragRequested?.call(
+        data,
+        globalPosition,
+        geometry,
+      );
+      if (leaving.isNotEmpty) {
+        setState(() => _leavingTabIds.addAll(leaving));
+      }
+      await request;
     } finally {
       _endDrag();
+      if (leaving.isNotEmpty) {
+        // Moved tabs are closed by then; a failed tear-off fades back in.
+        Future<void>.delayed(const Duration(milliseconds: 400), () {
+          if (!mounted) return;
+          setState(() => _leavingTabIds.removeAll(leaving));
+        });
+      }
     }
   }
 
@@ -570,6 +718,11 @@ class _ModernTabBarState extends State<_ModernTabBar> {
   void initState() {
     super.initState();
     widget.controller.addListener(_onTabControllerChange);
+    widget.externalTabDrop?.attach(_externalInsertIndexAt);
+    widget.externalTabDrop?.hover.addListener(_onExternalHoverChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _animateEntries = true;
+    });
   }
 
   @override
@@ -579,15 +732,30 @@ class _ModernTabBarState extends State<_ModernTabBar> {
       oldWidget.controller.removeListener(_onTabControllerChange);
       widget.controller.addListener(_onTabControllerChange);
     }
+    if (widget.externalTabDrop != oldWidget.externalTabDrop) {
+      oldWidget.externalTabDrop?.hover.removeListener(_onExternalHoverChanged);
+      oldWidget.externalTabDrop?.detach(_externalInsertIndexAt);
+      widget.externalTabDrop?.attach(_externalInsertIndexAt);
+      widget.externalTabDrop?.hover.addListener(_onExternalHoverChanged);
+      _externalGap = null;
+    }
     if (_activeDragTabId != null && _activeDragIndex() < 0) {
-      _endDrag();
+      _endDrag(rebuild: false);
+    }
+    if (_followPointer) {
+      // A reorder moved the dragged tab's slot; keep it under the pointer.
+      final index = _activeDragIndex();
+      if (index >= 0) _dragDx.value = _dragTabLeft - index * _tabSlotWidth;
     }
   }
 
   @override
   void dispose() {
     widget.controller.removeListener(_onTabControllerChange);
+    widget.externalTabDrop?.hover.removeListener(_onExternalHoverChanged);
+    widget.externalTabDrop?.detach(_externalInsertIndexAt);
     _endDrag(rebuild: false);
+    _dragDx.dispose();
     super.dispose();
   }
 
@@ -673,175 +841,400 @@ class _ModernTabBarState extends State<_ModernTabBar> {
           constraints: BoxConstraints(minWidth: widget.viewportWidth),
           child: Align(
             alignment: Alignment.centerLeft,
-            child: Row(
-              key: _tabRowKey,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ...List.generate(widget.tabs.length, (index) {
-                  final isActive = widget.controller.index == index;
-                  final showRightDivider =
-                      isDesktop && index < widget.tabs.length - 1;
+            child: _buildTabRow(context, isDesktop),
+          ),
+        ),
+      ),
+    );
+  }
 
-                  final dragData =
-                      (widget.draggableTabs != null &&
-                          index < (widget.draggableTabs?.length ?? 0))
-                      ? widget.draggableTabs![index]
-                      : null;
+  Widget _buildTabRow(BuildContext context, bool isDesktop) {
+    final slot = _tabSlotWidth;
+    final gap = _externalGap;
+    final shouldUseNativeDrag =
+        Platform.isWindows && widget.onNativeTabDragRequested != null;
+    final children = <Widget>[];
+    int? draggedVisualIndex;
+    _draggedTabCopy = null;
+    final activeIndex = widget.activeTabIndex ?? widget.controller.index;
+    final animateEntry =
+        _animateEntries && _lastBuiltTabCount > 0 && !_gapOpenLastBuild;
+    _lastBuiltTabCount = widget.tabs.length;
+    _gapOpenLastBuild = gap != null;
 
-                  final isSelected =
-                      dragData != null &&
-                      widget.selectedTabIds.contains(dragData.tabId);
+    for (int index = 0; index < widget.tabs.length; index++) {
+      if (gap == index) children.add(_buildExternalGhost(gap!));
+      final visualIndex = gap != null && index >= gap ? index + 1 : index;
+      final isActive = activeIndex == index;
+      final showRightDivider = isDesktop && index < widget.tabs.length - 1;
 
-                  final tabWidget = _ModernTab(
-                    isActive: isActive,
-                    isSelected: isSelected,
-                    showRightDivider: showRightDivider,
-                    onPrimaryPressed: () {
-                      final keys = HardwareKeyboard.instance.logicalKeysPressed;
-                      final shiftPressed =
-                          HardwareKeyboard.instance.isShiftPressed ||
-                          keys.contains(LogicalKeyboardKey.shiftLeft) ||
-                          keys.contains(LogicalKeyboardKey.shiftRight);
-                      final handler = widget.onTabPrimaryClick;
-                      if (handler != null) {
-                        handler(index, shiftPressed);
-                        return;
-                      }
-                      widget.onTap?.call(index);
-                    },
-                    onSecondaryClick: widget.onTabContextMenu == null
-                        ? null
-                        : (pos) => widget.onTabContextMenu!.call(index, pos),
-                    activeTabColor: widget.activeTabColor,
-                    hoverColor: widget.hoverColor,
-                    tabBackgroundColor: widget.tabBackgroundColor,
-                    labelColor: isActive
-                        ? widget.labelColor
-                        : widget.unselectedLabelColor,
-                    labelStyle: isActive
-                        ? widget.labelStyle
-                        : widget.unselectedLabelStyle,
-                    onClose: () => widget.onTabClose?.call(index),
-                    theme: widget.theme,
-                    child: widget.tabs[index],
-                  );
-                  final tabKey = ValueKey<String>(
-                    dragData != null
-                        ? 'desktop_tab_${dragData.tabId}'
-                        : 'desktop_tab_index_$index',
-                  );
+      final dragData =
+          (widget.draggableTabs != null &&
+              index < (widget.draggableTabs?.length ?? 0))
+          ? widget.draggableTabs![index]
+          : null;
 
-                  if (dragData == null) {
-                    return _wrapTabReorderEffect(
-                      index: index,
-                      child: KeyedSubtree(key: tabKey, child: tabWidget),
-                    );
-                  }
+      final isSelected =
+          dragData != null && widget.selectedTabIds.contains(dragData.tabId);
 
-                  final shouldUseNativeDrag =
-                      Platform.isWindows &&
-                      widget.onNativeTabDragRequested != null;
-                  if (shouldUseNativeDrag) {
-                    return _wrapTabReorderEffect(
-                      index: index,
-                      child: KeyedSubtree(
-                        key: tabKey,
-                        child: _buildReorderTarget(
-                          targetIndex: index,
-                          child: _NativeTabDragHandle(
-                            data: dragData,
-                            onDragStarted: _beginDrag,
-                            onDragMove: _handleNativeReorderMove,
-                            onDragFinished: (_) => _endDrag(),
-                            onDetachRequested: _handleNativeDetachRequest,
-                            child: tabWidget,
-                          ),
-                        ),
-                      ),
-                    );
-                  }
+      _ModernTab buildTab({bool hovered = false}) => _ModernTab(
+        isActive: isActive,
+        isSelected: isSelected,
+        forceHovered: hovered,
+        showRightDivider: showRightDivider,
+        onPrimaryPressed: () {
+          final keys = HardwareKeyboard.instance.logicalKeysPressed;
+          final shiftPressed =
+              HardwareKeyboard.instance.isShiftPressed ||
+              keys.contains(LogicalKeyboardKey.shiftLeft) ||
+              keys.contains(LogicalKeyboardKey.shiftRight);
+          final handler = widget.onTabPrimaryClick;
+          if (handler != null) {
+            handler(index, shiftPressed);
+            return;
+          }
+          widget.onTap?.call(index);
+        },
+        onSecondaryClick: widget.onTabContextMenu == null
+            ? null
+            : (pos) => widget.onTabContextMenu!.call(index, pos),
+        activeTabColor: widget.activeTabColor,
+        hoverColor: widget.hoverColor,
+        tabBackgroundColor: widget.tabBackgroundColor,
+        labelColor: isActive ? widget.labelColor : widget.unselectedLabelColor,
+        labelStyle: isActive ? widget.labelStyle : widget.unselectedLabelStyle,
+        onClose: () => widget.onTabClose?.call(index),
+        theme: widget.theme,
+        child: widget.tabs[index],
+      );
 
-                  return _wrapTabReorderEffect(
-                    index: index,
-                    child: KeyedSubtree(
-                      key: tabKey,
-                      child: _buildReorderTarget(
-                        targetIndex: index,
-                        child: Draggable<DesktopTabDragData>(
-                          data: dragData,
-                          allowedButtonsFilter: (buttons) =>
-                              buttons == kPrimaryMouseButton,
-                          onDragStarted: () => _beginDrag(dragData),
-                          onDragUpdate: (details) =>
-                              _handleDragUpdate(dragData, details),
-                          onDragEnd: (_) => _endDrag(),
-                          childWhenDragging: Opacity(
-                            opacity: 0.35,
-                            child: tabWidget,
-                          ),
-                          feedback: Material(
-                            color: Colors.transparent,
-                            child: Opacity(
-                              opacity: 0.95,
-                              child: Transform.scale(
-                                scale: 1.02,
-                                child: ConstrainedBox(
-                                  constraints: const BoxConstraints.tightFor(
-                                    width: 210,
-                                    height: 38,
-                                  ),
-                                  child: DecoratedBox(
-                                    // A dragged tab floats: shadow, no outline.
-                                    decoration: CbDecorations.floating(
-                                      context,
-                                      radius: 16.0,
-                                      color: widget.activeTabColor,
-                                    ),
-                                    child: Center(
-                                      child: DefaultTextStyle.merge(
-                                        style: TextStyle(
-                                          color: widget.labelColor,
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                        child: widget.tabs[index],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          child: tabWidget,
-                        ),
-                      ),
+      final tabWidget = buildTab();
+      final tabKey = ValueKey<String>(
+        dragData != null
+            ? 'desktop_tab_${dragData.tabId}'
+            : 'desktop_tab_index_$index',
+      );
+
+      final Widget content;
+      if (dragData == null) {
+        content = tabWidget;
+      } else if (shouldUseNativeDrag) {
+        content = _NativeTabDragHandle(
+          data: dragData,
+          onDragStarted: (data, grabOffset) =>
+              _beginDrag(data, grabOffset: grabOffset),
+          onDragMove: _handleNativeReorderMove,
+          onDragFinished: (_) => _endDrag(),
+          onDetachRequested: _handleNativeDetachRequest,
+          canDetachAt: _isOutsideDetachBand,
+          child: tabWidget,
+        );
+      } else {
+        content = _buildReorderTarget(
+          targetIndex: index,
+          child: Draggable<DesktopTabDragData>(
+            data: dragData,
+            allowedButtonsFilter: (buttons) => buttons == kPrimaryMouseButton,
+            onDragStarted: () => _beginDrag(dragData),
+            onDragUpdate: (details) => _handleDragUpdate(dragData, details),
+            onDragEnd: (_) => _endDrag(),
+            childWhenDragging: Opacity(opacity: 0.35, child: tabWidget),
+            feedback: Material(
+              color: Colors.transparent,
+              child: Opacity(
+                opacity: 0.95,
+                child: Transform.scale(
+                  scale: 1.02,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints.tightFor(
+                      width: 210,
+                      height: 38,
                     ),
-                  );
-                }),
-                if (widget.onAddTabPressed != null)
-                  KeyedSubtree(
-                    key: _addTabButtonKey,
-                    child: Material(
-                      color: Colors.transparent,
-                      child: CbTooltip(
-                        message: context.tr.addNewTab,
-                        child: Container(
-                          margin: const EdgeInsets.only(left: 4, right: 4),
-                          child: MouseRegion(
-                            cursor: SystemMouseCursors.click,
-                            child: _CaptionStyleAddTabButton(
-                              theme: widget.theme,
-                              onPressed: widget.onAddTabPressed,
-                            ),
+                    child: DecoratedBox(
+                      // A dragged tab floats: shadow, no outline.
+                      decoration: CbDecorations.floating(
+                        context,
+                        radius: 16.0,
+                        color: widget.activeTabColor,
+                      ),
+                      child: Center(
+                        child: DefaultTextStyle.merge(
+                          style: TextStyle(
+                            color: widget.labelColor,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
                           ),
+                          child: widget.tabs[index],
                         ),
                       ),
                     ),
                   ),
-              ],
+                ),
+              ),
+            ),
+            child: tabWidget,
+          ),
+        );
+      }
+
+      final tabId = dragData?.tabId;
+      final followsPointer =
+          _followPointer && tabId != null && tabId == _activeDragTabId;
+      final leaving = tabId != null && _leavingTabIds.contains(tabId);
+      if (followsPointer) {
+        draggedVisualIndex = visualIndex;
+        // Looks exactly like the pressed tab it stands in for, which is
+        // under the pointer and so hovered.
+        _draggedTabCopy = _fadeWhenLeaving(leaving, buildTab(hovered: true));
+      }
+
+      children.add(
+        _TabSlotMotion(
+          key: tabKey,
+          visualIndex: visualIndex,
+          slotWidth: slot,
+          dragOffset: followsPointer ? _dragDx : null,
+          animateEntry: animateEntry,
+          // The copy above the row stands in while the tab follows the pointer.
+          child: Opacity(
+            opacity: followsPointer ? 0 : 1,
+            child: _fadeWhenLeaving(leaving, content),
+          ),
+        ),
+      );
+    }
+    if (gap != null && gap >= widget.tabs.length) {
+      children.add(_buildExternalGhost(widget.tabs.length));
+    }
+
+    if (widget.onAddTabPressed != null) {
+      children.add(
+        _TabSlotMotion(
+          key: const ValueKey<String>('desktop_tab_add_button'),
+          visualIndex: widget.tabs.length + (gap != null ? 1 : 0),
+          slotWidth: slot,
+          animateEntry: false,
+          child: KeyedSubtree(
+            key: _addTabButtonKey,
+            child: Material(
+              color: Colors.transparent,
+              child: CbTooltip(
+                message: context.tr.addNewTab,
+                child: Container(
+                  margin: const EdgeInsets.only(left: 4, right: 4),
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: _CaptionStyleAddTabButton(
+                      theme: widget.theme,
+                      onPressed: widget.onAddTabPressed,
+                    ),
+                  ),
+                ),
+              ),
             ),
           ),
         ),
+      );
+    }
+
+    final copy = _draggedTabCopy;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Row(
+          key: _tabRowKey,
+          mainAxisSize: MainAxisSize.min,
+          children: children,
+        ),
+        if (copy != null && draggedVisualIndex != null)
+          Positioned(
+            left: draggedVisualIndex * slot,
+            top: 0,
+            bottom: 0,
+            child: IgnorePointer(
+              child: ValueListenableBuilder<double>(
+                valueListenable: _dragDx,
+                builder: (context, dx, child) =>
+                    Transform.translate(offset: Offset(dx, 0), child: child),
+                child: copy,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _fadeWhenLeaving(bool leaving, Widget child) {
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 120),
+      curve: Curves.easeOutCubic,
+      opacity: leaving ? 0 : 1,
+      child: child,
+    );
+  }
+
+  Widget _buildExternalGhost(int visualIndex) {
+    return _TabSlotMotion(
+      key: const ValueKey<String>('desktop_tab_external_drop'),
+      visualIndex: visualIndex,
+      slotWidth: _tabSlotWidth,
+      animateEntry: true,
+      child: IgnorePointer(
+        child: _ExternalTabGhost(label: _externalLabel, theme: widget.theme),
+      ),
+    );
+  }
+}
+
+/// Animates a tab between slots: when its slot changes (reorder, close, a gap
+/// opening for an incoming tab) it slides from where it was drawn, and a new
+/// tab scales and fades in. While [dragOffset] is set it follows that offset
+/// instead, and settles into its slot once released.
+///
+/// Only a transform changes during the animation, so neighbours never relayout.
+class _TabSlotMotion extends StatefulWidget {
+  final int visualIndex;
+  final double slotWidth;
+  final ValueListenable<double>? dragOffset;
+  final bool animateEntry;
+  final Widget child;
+
+  const _TabSlotMotion({
+    super.key,
+    required this.visualIndex,
+    required this.slotWidth,
+    this.dragOffset,
+    required this.animateEntry,
+    required this.child,
+  });
+
+  @override
+  State<_TabSlotMotion> createState() => _TabSlotMotionState();
+}
+
+class _TabSlotMotionState extends State<_TabSlotMotion>
+    with SingleTickerProviderStateMixin {
+  static const Duration _duration = Duration(milliseconds: 180);
+  static const Curve _curve = Curves.easeOutCubic;
+
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: _duration,
+    value: 1,
+  );
+  double _startDx = 0;
+  bool _entering = false;
+
+  double get _settlingDx =>
+      _startDx * (1 - _curve.transform(_controller.value));
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.animateEntry) {
+      _entering = true;
+      _controller.forward(from: 0);
+    }
+  }
+
+  @override
+  void didUpdateWidget(_TabSlotMotion oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.dragOffset != null) return;
+    final slotShift =
+        (oldWidget.visualIndex - widget.visualIndex) * widget.slotWidth;
+    final released = oldWidget.dragOffset;
+    final double from;
+    if (released != null) {
+      from = released.value + slotShift;
+    } else if (slotShift != 0) {
+      from = _settlingDx + slotShift;
+    } else {
+      return;
+    }
+    _entering = false;
+    _startDx = from;
+    _controller.forward(from: 0);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final drag = widget.dragOffset;
+    return AnimatedBuilder(
+      animation: drag == null
+          ? _controller
+          : Listenable.merge([_controller, drag]),
+      builder: (context, child) {
+        final t = _curve.transform(_controller.value);
+        final dx = drag?.value ?? _startDx * (1 - t);
+        final scale = _entering ? 0.92 + 0.08 * t : 1.0;
+        // Fixed structure: swapping wrappers would remount the tab.
+        return Opacity(
+          opacity: _entering ? t : 1,
+          child: Transform(
+            alignment: Alignment.center,
+            transform: Matrix4.translationValues(dx, 0, 0)
+              ..scaleByDouble(scale, scale, 1, 1),
+            child: child,
+          ),
+        );
+      },
+      child: widget.child,
+    );
+  }
+}
+
+/// Placeholder tab where tabs dragged in from another window will land.
+class _ExternalTabGhost extends StatelessWidget {
+  final String label;
+  final ThemeData theme;
+
+  const _ExternalTabGhost({required this.label, required this.theme});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = theme.colorScheme;
+    final isMacOS = FluentSurfaceTokens.isMacOS;
+    final isDark = theme.brightness == Brightness.dark;
+    return Container(
+      width: FluentSurfaceTokens.tabWidth,
+      height: 40,
+      margin: isMacOS
+          ? const EdgeInsets.symmetric(horizontal: 3, vertical: 6)
+          : const EdgeInsets.only(left: 2, right: 2, top: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: cs.primary.withValues(alpha: isDark ? 0.22 : 0.12),
+        borderRadius: isMacOS
+            ? BorderRadius.circular(10)
+            : const BorderRadius.only(
+                topLeft: Radius.circular(10),
+                topRight: Radius.circular(10),
+              ),
+      ),
+      child: Row(
+        children: [
+          Icon(PhosphorIconsLight.arrowSquareIn, size: 16, color: cs.primary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: cs.onSurface,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -903,6 +1296,8 @@ class _CaptionStyleAddTabButtonState extends State<_CaptionStyleAddTabButton> {
 class _ModernTab extends StatefulWidget {
   final bool isActive;
   final bool isSelected;
+  // Draw as hovered regardless of the pointer (the dragged tab's copy).
+  final bool forceHovered;
   final bool showRightDivider;
   final VoidCallback onPrimaryPressed;
   final ValueChanged<Offset>? onSecondaryClick;
@@ -918,6 +1313,7 @@ class _ModernTab extends StatefulWidget {
   const _ModernTab({
     required this.isActive,
     required this.isSelected,
+    this.forceHovered = false,
     required this.showRightDivider,
     required this.onPrimaryPressed,
     this.onSecondaryClick,
@@ -1029,7 +1425,8 @@ class _ModernTabState extends State<_ModernTab>
                         ? selectedFillColor
                         : (widget.isActive
                               ? activeFillColor
-                              : (_isHovered && !_isCloseButtonHovered
+                              : ((_isHovered || widget.forceHovered) &&
+                                        !_isCloseButtonHovered
                                     ? hoverColor
                                     : inactiveFillColor)),
                     borderRadius: isMacOS
@@ -1096,7 +1493,10 @@ class _ModernTabState extends State<_ModernTab>
                     top: 6 + (tabHeight - 22) / 2,
                     right: 12, // Position from right edge
                     child: AnimatedOpacity(
-                      opacity: (_isHovered || widget.isActive) ? 1.0 : 0.5,
+                      opacity:
+                          (_isHovered || widget.forceHovered || widget.isActive)
+                          ? 1.0
+                          : 0.5,
                       duration: const Duration(milliseconds: 150),
                       child: Material(
                         color: Colors.transparent,
@@ -1204,12 +1604,18 @@ class _OptimizedTabInteractionState extends State<_OptimizedTabInteraction> {
 
 class _NativeTabDragHandle extends StatefulWidget {
   final DesktopTabDragData data;
-  final ValueChanged<DesktopTabDragData>? onDragStarted;
+  final void Function(DesktopTabDragData data, Offset grabOffset)?
+  onDragStarted;
   final void Function(DesktopTabDragData data, Offset globalPosition)?
   onDragMove;
   final ValueChanged<DesktopTabDragData>? onDragFinished;
-  final Future<void> Function(DesktopTabDragData data, Offset globalPosition)
+  final Future<void> Function(
+    DesktopTabDragData data,
+    Offset globalPosition,
+    Offset grabOffset,
+  )
   onDetachRequested;
+  final bool Function(Offset globalPosition) canDetachAt;
   final Widget child;
 
   const _NativeTabDragHandle({
@@ -1218,6 +1624,7 @@ class _NativeTabDragHandle extends StatefulWidget {
     this.onDragMove,
     this.onDragFinished,
     required this.onDetachRequested,
+    required this.canDetachAt,
     required this.child,
   });
 
@@ -1227,6 +1634,8 @@ class _NativeTabDragHandle extends StatefulWidget {
 
 class _NativeTabDragHandleState extends State<_NativeTabDragHandle> {
   Offset? _downPosition;
+  // Pointer position inside the tab at press time.
+  Offset _grabOffset = Offset.zero;
   bool _dragging = false;
   bool _detaching = false;
 
@@ -1246,6 +1655,7 @@ class _NativeTabDragHandleState extends State<_NativeTabDragHandle> {
         if (e.kind == PointerDeviceKind.mouse &&
             e.buttons == kPrimaryMouseButton) {
           _downPosition = e.position;
+          _grabOffset = e.localPosition;
         }
       },
       onPointerMove: (e) {
@@ -1255,16 +1665,17 @@ class _NativeTabDragHandleState extends State<_NativeTabDragHandle> {
         final delta = e.position - _downPosition!;
         if (!_dragging && delta.distance >= _startDistance) {
           _dragging = true;
-          widget.onDragStarted?.call(widget.data);
+          widget.onDragStarted?.call(widget.data, _grabOffset);
         }
 
         if (!_dragging || _detaching) return;
 
-        if (delta.dy.abs() >= _detachDistance) {
+        if (delta.dy.abs() >= _detachDistance &&
+            widget.canDetachAt(e.position)) {
           _detaching = true;
           unawaited(
             widget
-                .onDetachRequested(widget.data, e.position)
+                .onDetachRequested(widget.data, e.position, _grabOffset)
                 .whenComplete(_reset),
           );
           return;

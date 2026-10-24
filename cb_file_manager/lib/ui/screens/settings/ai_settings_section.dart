@@ -355,6 +355,8 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
 // Provider form dialog
 // =============================================================================
 
+enum _ProviderKind { codex, claude, custom }
+
 class _ProviderFormDialog extends StatefulWidget {
   final AiProviderConfig? existing;
   final AiProviderService providerService;
@@ -384,98 +386,8 @@ class _ProviderFormDialogState extends State<_ProviderFormDialog> {
   bool _isFetchingModels = false;
   List<String> _availableModels = [];
   String? _fetchModelsError;
-  String? _selectedPresetName;
-
-  static const List<_AiProviderPreset> _providerPresets = [
-    _AiProviderPreset(
-      name: 'OpenAI',
-      endpoint: 'https://api.openai.com/v1',
-      modelName: 'gpt-4o',
-    ),
-    _AiProviderPreset(
-      name: 'Azure OpenAI',
-      endpoint: 'https://your-resource-name.openai.azure.com/openai/v1',
-      modelName: 'gpt-4o',
-    ),
-    _AiProviderPreset(
-      name: 'Ollama',
-      endpoint: 'http://localhost:11434/v1',
-      modelName: 'gpt-oss:20b',
-      apiKeyPlaceholder: 'ollama',
-    ),
-    _AiProviderPreset(
-      name: 'LM Studio',
-      endpoint: 'http://localhost:1234/v1',
-      modelName: 'openai/gpt-oss-20b',
-      apiKeyPlaceholder: 'lm-studio',
-    ),
-    _AiProviderPreset(
-      name: 'OpenRouter',
-      endpoint: 'https://openrouter.ai/api/v1',
-      modelName: 'openai/gpt-4o-mini',
-    ),
-    _AiProviderPreset(
-      name: 'Kimi',
-      endpoint: 'https://api.moonshot.ai/v1',
-      modelName: 'kimi-k2.6',
-    ),
-    _AiProviderPreset(
-      name: 'Kimi for Coding',
-      endpoint: 'https://api.kimi.com/coding/v1',
-      modelName: 'kimi-for-coding',
-    ),
-    _AiProviderPreset(
-      name: 'Groq',
-      endpoint: 'https://api.groq.com/openai/v1',
-      modelName: 'llama-3.3-70b-versatile',
-    ),
-    _AiProviderPreset(
-      name: 'Cerebras',
-      endpoint: 'https://api.cerebras.ai/v1',
-      modelName: 'zai-glm-4.7',
-    ),
-    _AiProviderPreset(
-      name: 'Chutes',
-      endpoint: 'https://llm.chutes.ai/v1',
-      modelName: 'zai-org/GLM-4.7-TEE',
-    ),
-    _AiProviderPreset(
-      name: 'Together AI',
-      endpoint: 'https://api.together.xyz/v1',
-      modelName: 'meta-llama/Llama-3.3-70B-Instruct-Turbo',
-    ),
-    _AiProviderPreset(
-      name: 'DeepSeek',
-      endpoint: 'https://api.deepseek.com/v1',
-      modelName: 'deepseek-chat',
-    ),
-    _AiProviderPreset(
-      name: 'Mistral',
-      endpoint: 'https://api.mistral.ai/v1',
-      modelName: 'mistral-large-latest',
-    ),
-    _AiProviderPreset(
-      name: 'xAI',
-      endpoint: 'https://api.x.ai/v1',
-      modelName: 'grok-4',
-    ),
-    _AiProviderPreset(
-      name: 'Fireworks AI',
-      endpoint: 'https://api.fireworks.ai/inference/v1',
-      modelName: 'accounts/fireworks/models/llama-v3p3-70b-instruct',
-    ),
-    _AiProviderPreset(
-      name: 'Perplexity',
-      endpoint: 'https://api.perplexity.ai',
-      modelName: 'sonar-pro',
-    ),
-    _AiProviderPreset(
-      name: 'Anthropic',
-      apiType: AiApiType.anthropic,
-      endpoint: 'https://api.anthropic.com/v1',
-      modelName: 'claude-sonnet-4-20250514',
-    ),
-  ];
+  _ProviderKind _kind = _ProviderKind.custom;
+  int _modelsRequest = 0;
 
   @override
   void initState() {
@@ -483,14 +395,19 @@ class _ProviderFormDialogState extends State<_ProviderFormDialog> {
     final e = widget.existing;
     _nameController = TextEditingController(text: e?.name ?? '');
     _apiKeyController = TextEditingController(text: e?.apiKey ?? '');
-    _endpointController = TextEditingController(
-      text: e?.endpoint ?? AiProviderConfig.defaultEndpoint(_apiType),
-    );
+    _endpointController = TextEditingController(text: e?.endpoint ?? '');
     _modelController = TextEditingController(text: e?.modelName ?? '');
     _systemPromptController = TextEditingController(
       text: e?.systemPrompt ?? '',
     );
     if (e != null) {
+      _kind = e.authMode == AiProviderAuthMode.codexOAuth
+          ? _ProviderKind.codex
+          : e.apiType == AiApiType.anthropic &&
+                e.endpoint.replaceFirst(RegExp(r'/$'), '') ==
+                    AiProviderConfig.defaultEndpoint(AiApiType.anthropic)
+          ? _ProviderKind.claude
+          : _ProviderKind.custom;
       _apiType = e.apiType;
       _authMode = e.authMode;
       _temperature = e.temperature;
@@ -498,16 +415,16 @@ class _ProviderFormDialogState extends State<_ProviderFormDialog> {
       _timeoutSeconds = e.timeoutSeconds;
       _maxRetries = e.maxRetries;
     }
+    if (_usesCodexOauth) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _usesCodexOauth) _fetchAvailableModels();
+      });
+    }
   }
 
   bool get _usesCodexOauth =>
       _apiType == AiApiType.openaiCompatible &&
       _authMode == AiProviderAuthMode.codexOAuth;
-
-  List<_AiProviderPreset> get _sortedProviderPresets {
-    return List<_AiProviderPreset>.of(_providerPresets)
-      ..sort((a, b) => a.name.compareTo(b.name));
-  }
 
   @override
   void dispose() {
@@ -523,7 +440,6 @@ class _ProviderFormDialogState extends State<_ProviderFormDialog> {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
     final isEdit = widget.existing != null;
-    final sortedProviderPresets = _sortedProviderPresets;
 
     return AlertDialog(
       title: Text(isEdit ? l.editProvider : l.addProvider),
@@ -536,32 +452,32 @@ class _ProviderFormDialogState extends State<_ProviderFormDialog> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (!isEdit) ...[
-                  CbSelect<String>(
-                    label: l.providerPreset,
-                    placeholder: l.selectProviderPreset,
-                    expand: true,
-                    value: _selectedPresetName,
-                    items: [
-                      for (final preset in sortedProviderPresets)
-                        CbSelectItem<String>(
-                          value: preset.name,
-                          label: preset.name,
-                          icon: PhosphorIconsLight.robot,
-                        ),
-                    ],
-                    onChanged: (value) {
-                      final preset = sortedProviderPresets.firstWhere(
-                        (preset) => preset.name == value,
-                      );
-                      _applyPreset(preset);
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                ],
+                CbSelect<_ProviderKind>(
+                  key: const ValueKey('ai-provider-kind'),
+                  label: l.aiProviderKind,
+                  expand: true,
+                  value: _kind,
+                  items: [
+                    const CbSelectItem(
+                      value: _ProviderKind.codex,
+                      label: 'Codex',
+                    ),
+                    const CbSelectItem(
+                      value: _ProviderKind.claude,
+                      label: 'Claude',
+                    ),
+                    CbSelectItem(
+                      value: _ProviderKind.custom,
+                      label: l.aiProviderCustom,
+                    ),
+                  ],
+                  onChanged: _selectKind,
+                ),
+                const SizedBox(height: 16),
 
                 // Provider name
                 TextFormField(
+                  key: const ValueKey('ai-provider-name'),
                   controller: _nameController,
                   decoration: InputDecoration(
                     labelText: l.providerName,
@@ -572,83 +488,41 @@ class _ProviderFormDialogState extends State<_ProviderFormDialog> {
                 ),
                 const SizedBox(height: 16),
 
-                // API Type
-                Text(
-                  l.apiType,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                SegmentedButton<AiApiType>(
-                  segments: [
-                    ButtonSegment(
-                      value: AiApiType.openaiCompatible,
-                      label: Text(
-                        l.openAiCompatible,
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                    ),
-                    ButtonSegment(
-                      value: AiApiType.anthropic,
-                      label: Text(
-                        l.anthropic,
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                    ),
-                  ],
-                  selected: {_apiType},
-                  onSelectionChanged: (values) {
-                    setState(() {
-                      _apiType = values.first;
-                      _selectedPresetName = null;
-                      if (_apiType == AiApiType.anthropic) {
-                        _authMode = AiProviderAuthMode.apiKey;
-                      }
-                      _endpointController.text =
-                          AiProviderConfig.defaultEndpoint(_apiType);
-                    });
-                  },
-                ),
-                const SizedBox(height: 16),
-
-                if (_apiType == AiApiType.openaiCompatible) ...[
+                // Custom providers choose their API protocol explicitly.
+                if (_kind == _ProviderKind.custom) ...[
                   Text(
-                    l.authMode,
+                    l.apiType,
                     style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
                   const SizedBox(height: 8),
-                  SegmentedButton<AiProviderAuthMode>(
+                  SegmentedButton<AiApiType>(
                     segments: [
                       ButtonSegment(
-                        value: AiProviderAuthMode.apiKey,
+                        value: AiApiType.openaiCompatible,
                         label: Text(
-                          l.apiKey,
+                          l.openAiCompatible,
                           style: const TextStyle(fontSize: 12),
                         ),
                       ),
                       ButtonSegment(
-                        value: AiProviderAuthMode.codexOAuth,
+                        value: AiApiType.anthropic,
                         label: Text(
-                          l.codexOauth,
+                          l.anthropic,
                           style: const TextStyle(fontSize: 12),
                         ),
                       ),
                     ],
-                    selected: {_authMode},
+                    selected: {_apiType},
                     onSelectionChanged: (values) {
                       setState(() {
-                        _authMode = values.first;
-                        if (_usesCodexOauth) {
-                          _endpointController.text =
-                              AiProviderConfig.defaultEndpoint(
-                                AiApiType.openaiCompatible,
-                              );
-                        }
+                        _apiType = values.first;
+                        _resetModelDiscovery();
+                        _authMode = AiProviderAuthMode.apiKey;
+                        _endpointController.text =
+                            AiProviderConfig.defaultEndpoint(_apiType);
                       });
                     },
                   ),
@@ -713,6 +587,7 @@ class _ProviderFormDialogState extends State<_ProviderFormDialog> {
                   const SizedBox(height: 16),
                 ] else ...[
                   TextFormField(
+                    key: const ValueKey('ai-provider-api-key'),
                     controller: _apiKeyController,
                     decoration: InputDecoration(
                       labelText: l.apiKey,
@@ -720,28 +595,35 @@ class _ProviderFormDialogState extends State<_ProviderFormDialog> {
                     ),
                     obscureText: true,
                     validator: (v) =>
-                        v == null || v.trim().isEmpty ? 'Required' : null,
+                        _authMode == AiProviderAuthMode.apiKey &&
+                            (v == null || v.trim().isEmpty)
+                        ? 'Required'
+                        : null,
                   ),
                   const SizedBox(height: 16),
                 ],
 
-                // Endpoint URL
-                TextFormField(
-                  controller: _endpointController,
-                  decoration: InputDecoration(labelText: l.endpointUrl),
-                  enabled: !_usesCodexOauth,
-                  validator: (v) =>
-                      v == null || v.trim().isEmpty ? 'Required' : null,
-                ),
-                const SizedBox(height: 16),
+                // Built-in types own their endpoint and authentication.
+                if (_kind == _ProviderKind.custom) ...[
+                  TextFormField(
+                    key: const ValueKey('ai-provider-endpoint'),
+                    controller: _endpointController,
+                    decoration: InputDecoration(labelText: l.endpointUrl),
+                    enabled: !_usesCodexOauth,
+                    validator: (v) =>
+                        v == null || v.trim().isEmpty ? 'Required' : null,
+                  ),
+                  const SizedBox(height: 16),
+                ],
 
                 // Model name with fetch button
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
-                      child: _availableModels.isEmpty
+                      child: !_usesCodexOauth && _availableModels.isEmpty
                           ? TextFormField(
+                              key: const ValueKey('ai-provider-model'),
                               controller: _modelController,
                               decoration: InputDecoration(
                                 labelText: l.defaultModel,
@@ -757,6 +639,11 @@ class _ProviderFormDialogState extends State<_ProviderFormDialog> {
                           // validation pass as the text fields around it now
                           // that it no longer carries its own.
                           : FormField<String>(
+                              key: ValueKey((
+                                _kind,
+                                Object.hashAll(_availableModels),
+                                _modelController.text,
+                              )),
                               initialValue:
                                   _availableModels.contains(
                                     _modelController.text,
@@ -764,8 +651,14 @@ class _ProviderFormDialogState extends State<_ProviderFormDialog> {
                                   ? _modelController.text
                                   : null,
                               validator: (v) =>
-                                  v == null || v.isEmpty ? 'Required' : null,
+                                  v == null ||
+                                      v.isEmpty ||
+                                      (_usesCodexOauth &&
+                                          !_availableModels.contains(v))
+                                  ? l.selectModel
+                                  : null,
                               builder: (field) => CbSelect<String>(
+                                key: const ValueKey('ai-provider-model-select'),
                                 label: l.defaultModel,
                                 placeholder: l.selectModel,
                                 expand: true,
@@ -775,12 +668,14 @@ class _ProviderFormDialogState extends State<_ProviderFormDialog> {
                                   for (final m in _availableModels)
                                     CbSelectItem<String>(value: m, label: m),
                                 ],
-                                onChanged: (value) {
-                                  field.didChange(value);
-                                  setState(() {
-                                    _modelController.text = value;
-                                  });
-                                },
+                                onChanged: _usesCodexOauth && _isFetchingModels
+                                    ? null
+                                    : (value) {
+                                        field.didChange(value);
+                                        setState(() {
+                                          _modelController.text = value;
+                                        });
+                                      },
                               ),
                             ),
                     ),
@@ -860,7 +755,7 @@ class _ProviderFormDialogState extends State<_ProviderFormDialog> {
                       Expanded(
                         child: Semantics(
                           container: true,
-                          child: Slider(
+                          child: CbSlider(
                             value: _temperature,
                             min: 0.0,
                             max: 2.0,
@@ -923,7 +818,9 @@ class _ProviderFormDialogState extends State<_ProviderFormDialog> {
           child: Text(l.cancel),
         ),
         FilledButton(
-          onPressed: _isSaving ? null : _save,
+          onPressed: _isSaving || (_usesCodexOauth && _isFetchingModels)
+              ? null
+              : _save,
           child: _isSaving
               ? const SizedBox(
                   width: 16,
@@ -943,7 +840,8 @@ class _ProviderFormDialogState extends State<_ProviderFormDialog> {
     final apiKey = _apiKeyController.text.trim();
     final endpoint = _endpointController.text.trim();
 
-    if ((!_usesCodexOauth && apiKey.isEmpty) || endpoint.isEmpty) {
+    if ((_authMode == AiProviderAuthMode.apiKey && apiKey.isEmpty) ||
+        endpoint.isEmpty) {
       setState(() {
         _fetchModelsError = _usesCodexOauth
             ? 'Endpoint is required to fetch models'
@@ -952,10 +850,11 @@ class _ProviderFormDialogState extends State<_ProviderFormDialog> {
       return;
     }
 
+    final request = ++_modelsRequest;
     setState(() {
       _isFetchingModels = true;
       _fetchModelsError = null;
-      _availableModels = [];
+      if (!_usesCodexOauth) _availableModels = [];
     });
 
     try {
@@ -966,19 +865,28 @@ class _ProviderFormDialogState extends State<_ProviderFormDialog> {
         endpoint: endpoint,
       );
 
-      if (mounted) {
+      if (mounted && request == _modelsRequest) {
         setState(() {
           _isFetchingModels = false;
-          _availableModels = models.toSet().toList();
-          if (models.isEmpty) {
+          _availableModels = models
+              .map((model) => model.trim())
+              .where((model) => model.isNotEmpty)
+              .toSet()
+              .toList();
+          if (_usesCodexOauth &&
+              !_availableModels.contains(_modelController.text)) {
+            _modelController.clear();
+          }
+          if (_availableModels.isEmpty) {
             _fetchModelsError = AppLocalizations.of(context)!.noModelsFound;
           }
         });
       }
     } catch (e) {
-      if (mounted) {
+      if (mounted && request == _modelsRequest) {
         setState(() {
           _isFetchingModels = false;
+          if (_usesCodexOauth) _availableModels = [];
           _fetchModelsError = AppLocalizations.of(
             context,
           )!.fetchModelsError('$e');
@@ -987,21 +895,36 @@ class _ProviderFormDialogState extends State<_ProviderFormDialog> {
     }
   }
 
-  void _applyPreset(_AiProviderPreset preset) {
+  void _resetModelDiscovery() {
+    _modelsRequest++;
+    _isFetchingModels = false;
+    _availableModels = [];
+    _fetchModelsError = null;
+  }
+
+  void _selectKind(_ProviderKind kind) {
+    if (_kind == kind) return;
     setState(() {
-      _selectedPresetName = preset.name;
-      _apiType = preset.apiType;
-      _authMode = AiProviderAuthMode.apiKey;
-      _nameController.text = preset.name;
-      _endpointController.text = preset.endpoint;
-      _modelController.text = preset.modelName;
-      if (_apiKeyController.text.trim().isEmpty &&
-          preset.apiKeyPlaceholder != null) {
-        _apiKeyController.text = preset.apiKeyPlaceholder!;
-      }
-      _availableModels = [];
-      _fetchModelsError = null;
+      _kind = kind;
+      _apiType = kind == _ProviderKind.claude
+          ? AiApiType.anthropic
+          : AiApiType.openaiCompatible;
+      _authMode = kind == _ProviderKind.codex
+          ? AiProviderAuthMode.codexOAuth
+          : AiProviderAuthMode.apiKey;
+      _nameController.text = switch (kind) {
+        _ProviderKind.codex => 'Codex',
+        _ProviderKind.claude => 'Claude',
+        _ProviderKind.custom => '',
+      };
+      _apiKeyController.clear();
+      _endpointController.text = kind == _ProviderKind.custom
+          ? ''
+          : AiProviderConfig.defaultEndpoint(_apiType);
+      _modelController.clear();
+      _resetModelDiscovery();
     });
+    if (_usesCodexOauth) _fetchAvailableModels();
   }
 
   Future<void> _save() async {
@@ -1094,6 +1017,7 @@ class _ProviderFormDialogState extends State<_ProviderFormDialog> {
     final l = AppLocalizations.of(context)!;
     final ok = await CodexCliProvider.hasOauthCredentials();
     if (!mounted) return;
+    if (ok && _usesCodexOauth) _fetchAvailableModels();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(ok ? l.connectionSuccess : l.codexCredentialMissing),
@@ -1104,20 +1028,4 @@ class _ProviderFormDialogState extends State<_ProviderFormDialog> {
       ),
     );
   }
-}
-
-class _AiProviderPreset {
-  final String name;
-  final AiApiType apiType;
-  final String endpoint;
-  final String modelName;
-  final String? apiKeyPlaceholder;
-
-  const _AiProviderPreset({
-    required this.name,
-    this.apiType = AiApiType.openaiCompatible,
-    required this.endpoint,
-    required this.modelName,
-    this.apiKeyPlaceholder,
-  });
 }

@@ -8,6 +8,8 @@ import 'dart:async';
 import 'dart:io';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:shared_preferences_platform_interface/shared_preferences_platform_interface.dart';
+import 'package:shared_preferences_windows/shared_preferences_windows.dart';
 
 import 'ui/tab_manager/core/tab_main_screen.dart';
 import 'helpers/tags/tag_manager.dart';
@@ -22,6 +24,7 @@ import 'helpers/ui/frame_timing_optimizer.dart';
 import 'helpers/tags/batch_tag_manager.dart';
 import 'models/database/database_manager.dart';
 import 'services/network_credentials_service.dart';
+import 'services/preferences/windows_preferences_store.dart';
 import 'services/torrent/torrent_service.dart';
 import 'services/torrent/torrent_background_receiver.dart';
 import 'services/torrent/torrent_launch_request.dart';
@@ -55,6 +58,10 @@ import 'package:cb_file_manager/ui/controllers/archive_navigation.dart';
 import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
 import 'package:cb_file_manager/helpers/files/external_app_helper.dart';
 import 'services/windowing/window_startup_payload.dart';
+import 'services/windowing/windows_engine_host.dart';
+import 'services/windowing/engine_window_lifetime.dart';
+import 'services/local_ai/local_model_downloads.dart';
+import 'ui/controllers/operation_progress_controller.dart';
 import 'services/windowing/video_window_service.dart';
 import 'services/windowing/windows_native_tab_drag_drop_service.dart';
 import 'services/windowing/window_acrylic_service.dart';
@@ -188,6 +195,7 @@ void main(List<String> args) {
     },
     (error, stackTrace) {
       debugPrint('Error during app initialization: $error');
+      debugPrint('$stackTrace');
     },
     zoneSpecification: ZoneSpecification(
       print: (self, parent, zone, line) {
@@ -203,6 +211,13 @@ void main(List<String> args) {
 Future<void> runCbFileApp() async {
   final startupStopwatch = Stopwatch()..start();
   WidgetsFlutterBinding.ensureInitialized();
+  await WindowsEngineHost.initialize();
+
+  // Engines and external app instances have separate preference caches. Merge
+  // writes under a file lock so one cannot revert another's newer settings.
+  if (SharedPreferencesStorePlatform.instance is SharedPreferencesWindows) {
+    SharedPreferencesStorePlatform.instance = WindowsPreferencesStore();
+  }
 
   // Bundled Inter / JetBrains Mono are OFL-licensed; the licence has to ship
   // with them. Lazy — the text is only read if the user opens the licence page.
@@ -236,7 +251,7 @@ Future<void> runCbFileApp() async {
     // here ensures each test gets a clean navigator with no stale state.
     navigatorKey = GlobalKey<NavigatorState>();
   }
-  final env = Platform.environment;
+  final env = WindowsEngineHost.environment;
   if (env[WindowStartupPayload.envWindowRoleKey] ==
       TorrentOptionsWindowService.role) {
     await runTorrentOptionsWindow(env);
@@ -395,6 +410,12 @@ Future<void> runCbFileApp() async {
   }
 
   final windowAcrylicService = WindowAcrylicService();
+  // Register the SQLite worker from the long-lived coordinator before any
+  // spare/player engine can connect to it. A child engine must never own the
+  // worker and take every window's database down when that engine closes.
+  if (WindowsEngineHost.isAvailable && WindowsEngineHost.isPrimary) {
+    await DatabaseManager.getInstance().initialize();
+  }
   final List<Future<void> Function()> deferredSecondaryInitializers = [];
 
   if (isDesktopPlatform) {
@@ -562,6 +583,14 @@ Future<void> runCbFileApp() async {
   }
 
   await setupServiceLocator();
+  if (WindowsEngineHost.isAvailable) {
+    EngineWindowLifetime.bind(
+      operations: locator<OperationProgressController>(),
+      torrents: locator<TorrentService>(),
+      downloads: locator<LocalModelDownloads>(),
+      windows: locator<DesktopWindowingService>(),
+    );
+  }
   debugPrint('Service locator initialized successfully');
 
   // One download owner per app, never a player/spare window or E2E sandbox.
@@ -733,15 +762,14 @@ Future<void> runCbFileApp() async {
       : kCbE2E && CbE2EConfig.startupPayload != null
       ? CbE2EConfig.startupPayload
       : WindowStartupPayload.fromEnvironment();
-  runApp(
-    ChangeNotifierProvider(
-      create: (context) => locator<ThemeProvider>(),
-      child: CBFileApp(
-        startupPayload: startupPayload,
-        windowAcrylicService: windowAcrylicService,
-      ),
+  final mainApp = ChangeNotifierProvider(
+    create: (context) => locator<ThemeProvider>(),
+    child: CBFileApp(
+      startupPayload: startupPayload,
+      windowAcrylicService: windowAcrylicService,
     ),
   );
+  runApp(mainApp);
 
   debugPrint('Startup: runApp after ${startupStopwatch.elapsedMilliseconds}ms');
   if (TorrentOptionsWindowService.isSupported &&
@@ -773,9 +801,9 @@ Future<void> runCbFileApp() async {
       !startHidden) {
     SchedulerBinding.instance.addPostFrameCallback((_) {
       unawaited(
-        Future<void>.delayed(const Duration(milliseconds: 16), () async {
-          await WindowsNativeTabDragDropService.startWindowDragIfMouseDown();
-        }),
+        WindowsNativeTabDragDropService.startTabWindowDrag(
+          mergeTabs: startupPayload?.tabs ?? const <WindowTabPayload>[],
+        ),
       );
     });
   }
@@ -855,6 +883,7 @@ void goHome(BuildContext context) {
 class CBFileApp extends StatefulWidget {
   final WindowStartupPayload? startupPayload;
   final WindowAcrylicService windowAcrylicService;
+
   const CBFileApp({
     super.key,
     this.startupPayload,

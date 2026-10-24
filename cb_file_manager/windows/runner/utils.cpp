@@ -41,6 +41,14 @@ std::vector<std::string> GetCommandLineArguments() {
   return command_line_arguments;
 }
 
+flutter::UIThreadPolicy PreferredUIThreadPolicy() {
+  wchar_t value[8];
+  const DWORD length = ::GetEnvironmentVariableW(L"CB_MERGED_UI_THREAD", value, 8);
+  return length == 1 && value[0] == L'1'
+             ? flutter::UIThreadPolicy::RunOnPlatformThread
+             : flutter::UIThreadPolicy::RunOnSeparateThread;
+}
+
 std::string Utf8FromUtf16(const wchar_t* utf16_string) {
   if (utf16_string == nullptr) {
     return std::string();

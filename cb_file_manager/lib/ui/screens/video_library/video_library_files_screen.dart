@@ -44,6 +44,50 @@ import 'package:cb_file_manager/ui/utils/view_mode_spectrum.dart';
 import 'package:cb_file_manager/ui/widgets/file_list_view_builder.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tabbed_folder/tabbed_folder_drag_selection_controller.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tabbed_folder/tabbed_folder_keyboard_controller.dart';
+import 'package:cb_file_manager/ui/tab_manager/core/tab_window_transfer.dart';
+
+/// How a library was last shown in this window, or in the window its tab came
+/// from. A remounted or moved tab draws in that view at once instead of
+/// waiting for its preferences, which showed an empty page meanwhile.
+class _LibraryDisplay {
+  const _LibraryDisplay({
+    required this.viewMode,
+    required this.sortOption,
+    required this.gridZoomLevel,
+    required this.showFileTags,
+    required this.columnVisibility,
+  });
+
+  final ViewMode viewMode;
+  final SortOption sortOption;
+  final int gridZoomLevel;
+  final bool showFileTags;
+  final ColumnVisibility columnVisibility;
+
+  Map<String, dynamic> toJson() => {
+    'viewMode': viewMode.name,
+    'sortOption': sortOption.name,
+    'gridZoomLevel': gridZoomLevel,
+    'showFileTags': showFileTags,
+    'columns': columnVisibility.toMap(),
+  };
+
+  static _LibraryDisplay? fromJson(Map<String, dynamic> json) {
+    try {
+      return _LibraryDisplay(
+        viewMode: ViewMode.values.byName(json['viewMode'] as String),
+        sortOption: SortOption.values.byName(json['sortOption'] as String),
+        gridZoomLevel: json['gridZoomLevel'] as int,
+        showFileTags: json['showFileTags'] as bool,
+        columnVisibility: ColumnVisibility.fromMap(
+          Map<String, dynamic>.from(json['columns'] as Map),
+        ),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+}
 
 class VideoLibraryFilesScreen extends StatefulWidget {
   final VideoLibrary library;
@@ -68,7 +112,9 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
   );
   final TextEditingController _addressController = TextEditingController();
 
-  bool _isInitialized = false;
+  // Display preferences are applied before the files load (see
+  // _loadPreferencesThenLibrary); until then the body stays empty.
+  bool _preferencesReady = false;
   String _searchQuery = '';
   List<String> _activeSearchTags = const [];
   Set<String>? _tagMatchedPaths;
@@ -84,18 +130,40 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
   StreamSubscription<String>? _tagChanges;
   Timer? _tagRefreshDebounce;
   int _gridCrossAxisCount = 1;
+  ScrollController? _transferScrollController;
+  double _initialTransferScroll = 0;
+
+  static final Map<int, _LibraryDisplay> _displays = {};
 
   @override
   void initState() {
     super.initState();
-    _bloc = VideoLibraryNavigationBloc(libraryId: widget.library.id);
-    _selectionBloc = SelectionBloc();
+    final tabId = widget.tabId;
+    final initial = tabId == null
+        ? <String, dynamic>{}
+        : TabWindowTransfer.takeInitial(tabId);
+    final transferred = _LibraryDisplay.fromJson(initial);
+    _startLibrary(
+      transferred ?? _displays[widget.library.id],
+      initial: initial,
+    );
+    if (tabId != null) TabWindowTransfer.register(tabId, _readTransfer);
+    final selected =
+        (initial['selection'] as List?)?.whereType<String>().toSet() ??
+        <String>{};
+    _selectionBloc = SelectionBloc(
+      initialState: SelectionState(
+        selectedFilePaths: selected,
+        isSelectionMode: selected.isNotEmpty,
+        lastSelectedPath: initial['lastSelected'] as String?,
+      ),
+    );
     _dragFolderListBloc = FolderListBloc();
     _dragSelectionController = TabbedFolderDragSelectionController(
       folderListBloc: _dragFolderListBloc,
       selectionBloc: _selectionBloc,
     );
-    _bloc.loadLibrary(); // Kick off initial load
+    _restoreTransfer(initial);
     _tagChanges = TagManager.onTagChanged.listen((_) {
       if (!mounted || _activeSearchTags.isEmpty) return;
       _tagRefreshDebounce?.cancel();
@@ -113,9 +181,8 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
     if (oldWidget.library.id != widget.library.id) {
       _searchRequests.invalidate();
       _tagRefreshDebounce?.cancel();
+      _displays[oldWidget.library.id] = _currentDisplay();
       _bloc.close();
-      _bloc = VideoLibraryNavigationBloc(libraryId: widget.library.id);
-      _isInitialized = false;
       _searchQuery = '';
       _removedPaths = {};
       _activeSearchTags = const [];
@@ -124,12 +191,109 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
       _isSearchLoading = false;
       _useRegexSearch = false;
       _clearSelection();
-      _bloc.loadLibrary();
+      _startLibrary(_displays[widget.library.id]);
     }
   }
 
+  /// Creates the bloc for this library. With a known display it is shown at
+  /// once; otherwise the saved preferences are read first.
+  void _startLibrary(
+    _LibraryDisplay? display, {
+    Map<String, dynamic> initial = const {},
+  }) {
+    if (display == null) {
+      _bloc = VideoLibraryNavigationBloc(libraryId: widget.library.id);
+      _preferencesReady = false;
+      unawaited(_loadPreferencesThenLibrary());
+      return;
+    }
+    _bloc = VideoLibraryNavigationBloc(
+      libraryId: widget.library.id,
+      initialState:
+          FileNavigationState.initial(
+            '#video-library/${widget.library.id}',
+          ).copyWith(
+            viewMode: display.viewMode,
+            sortOption: display.sortOption,
+            gridZoomLevel: display.gridZoomLevel,
+            files: (initial['loadedFiles'] as List?)
+                ?.whereType<String>()
+                .map(File.new)
+                .toList(),
+            isLoading: initial['loadedFiles'] is! List,
+          ),
+    );
+    _showFileTags = display.showFileTags;
+    _columnVisibility = display.columnVisibility;
+    _preferencesReady = true;
+    if (initial['loadedFiles'] is! List) _bloc.loadLibrary();
+  }
+
+  Map<String, dynamic> _readTransfer() {
+    final scroll = _transferScrollController;
+    final selection = _selectionBloc.state;
+    return {
+      ..._currentDisplay().toJson(),
+      'library': widget.library.toDatabaseMap(),
+      if (!_bloc.state.isLoading)
+        'loadedFiles': _bloc.state.files.map((file) => file.path).toList(),
+      'query': _searchQuery,
+      'regex': _useRegexSearch,
+      'searchBar': _showSearchBar,
+      'searchLoading': _isSearchLoading,
+      'searchTags': _activeSearchTags,
+      'tagMatches': _tagMatchedPaths?.toList(),
+      'searchSource': _liveSearchSource?.map((file) => file.path).toList(),
+      'removed': _removedPaths.toList(),
+      'selection': selection.selectedFilePaths.toList(),
+      'lastSelected': selection.lastSelectedPath,
+      'scroll': scroll != null && scroll.hasClients ? scroll.offset : 0.0,
+    };
+  }
+
+  void _restoreTransfer(Map<String, dynamic> initial) {
+    if (initial.isEmpty) return;
+    List<String> strings(String key) =>
+        (initial[key] as List?)?.whereType<String>().toList() ?? [];
+    _searchQuery = initial['query'] as String? ?? '';
+    _useRegexSearch = initial['regex'] == true;
+    _showSearchBar = initial['searchBar'] == true;
+    _activeSearchTags = strings('searchTags');
+    _tagMatchedPaths = initial['tagMatches'] is List
+        ? strings('tagMatches').toSet()
+        : null;
+    _liveSearchSource = initial['searchSource'] is List
+        ? strings('searchSource').map(File.new).toList()
+        : null;
+    _removedPaths = strings('removed').toSet();
+    final scroll = initial['scroll'];
+    if (scroll is num && scroll.isFinite) {
+      _initialTransferScroll = scroll.toDouble().clamp(0.0, double.infinity);
+    }
+    // An in-flight source search has no completed result to transfer.
+    if (initial['searchLoading'] == true) {
+      if (_activeSearchTags.isNotEmpty) {
+        unawaited(_applyTagSearch(List.of(_activeSearchTags), false));
+      } else if (_searchQuery.isNotEmpty) {
+        unawaited(_applySearchWithOptions(_searchQuery, _useRegexSearch));
+      }
+    }
+  }
+
+  _LibraryDisplay _currentDisplay() => _LibraryDisplay(
+    viewMode: _bloc.state.viewMode,
+    sortOption: _bloc.state.sortOption,
+    gridZoomLevel: _bloc.state.gridZoomLevel,
+    showFileTags: _showFileTags,
+    columnVisibility: _columnVisibility,
+  );
+
   @override
   void dispose() {
+    if (_preferencesReady) _displays[widget.library.id] = _currentDisplay();
+    if (widget.tabId != null) {
+      TabWindowTransfer.unregister(widget.tabId!, _readTransfer);
+    }
     _searchFocusNode.dispose();
     _tagRefreshDebounce?.cancel();
     _tagChanges?.cancel();
@@ -179,11 +343,16 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
     }
   }
 
-  void _onBlocStateChange(VideoLibraryNavigationBloc bloc) {
-    if (!_isInitialized) {
-      _isInitialized = true;
-      _loadPreferences();
-    }
+  /// Applies view mode, sort and zoom, then loads the files. Reading them
+  /// after the first file list showed every freshly opened library (a new tab,
+  /// or a tab moved to another window) in the default view and order, then
+  /// switched.
+  Future<void> _loadPreferencesThenLibrary() async {
+    final bloc = _bloc;
+    await _loadPreferences();
+    if (!mounted || !identical(bloc, _bloc)) return;
+    setState(() => _preferencesReady = true);
+    bloc.loadLibrary();
   }
 
   Future<void> _handleBackButton() async {
@@ -758,16 +927,13 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
         ],
         child: BlocBuilder<SelectionBloc, SelectionState>(
           builder: (context, selectionState) {
-            return BlocConsumer<
-              VideoLibraryNavigationBloc,
-              FileNavigationState
-            >(
-              listener: (context, state) => _onBlocStateChange(_bloc),
+            return BlocBuilder<VideoLibraryNavigationBloc, FileNavigationState>(
               builder: (context, state) {
                 final folderListState = _folderListStateFor(state);
                 return BrowserLikeFileSurface(
                   selectionState: selectionState,
                   viewMode: state.viewMode,
+                  initialScrollOffset: _initialTransferScroll,
                   isDesktop: isDesktop,
                   visiblePaths: _visibleFilesForState(
                     state,
@@ -868,6 +1034,10 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
     FileNavigationState state,
     TabbedFolderKeyboardController keyboardController,
   ) {
+    _transferScrollController = keyboardController.scrollController;
+    // Neither a skeleton nor files in a view mode that is about to change.
+    if (!_preferencesReady) return const SizedBox.shrink();
+
     final isGridView =
         state.viewMode == ViewMode.grid ||
         state.viewMode == ViewMode.gridPreview;

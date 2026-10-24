@@ -833,6 +833,11 @@ abstract class AppLocalizations {
   String get openVideoInNewWindowEnabled;
   String get openVideoInNewWindowDisabled;
   String get seekSpeed;
+  String get videoSeekAcceleration;
+  String get videoSeekAccelerationDescription;
+  String get videoKeyboardSeekStep;
+  String get videoKeyboardSeekStepDescription;
+  String videoSeekSeconds(int seconds);
   String get seekSpeedDescription;
   String get seekSpeedSlow;
   String get seekSpeedMedium;
@@ -1582,6 +1587,8 @@ abstract class AppLocalizations {
   String get aiProvider;
   String get aiProviders;
   String get addProvider;
+  String get aiProviderKind;
+  String get aiProviderCustom;
   String get editProvider;
   String get deleteProvider;
   String get providerPreset;
@@ -1781,6 +1788,8 @@ abstract class AppLocalizations {
   String get diskCleanerSkipAllRemaining;
   String get diskCleanerSkip;
   String get diskCleanerTryAgain;
+  String get diskCleanerProtectedLabel;
+  String get diskCleanerProtectedReason;
   String get diskCleanerPermanentDeleteConfirmTitle;
   String diskCleanerPermanentDeleteFromBinContent(int count, String size);
   String diskCleanerPermanentDeleteSelectedContent(int count, String size);

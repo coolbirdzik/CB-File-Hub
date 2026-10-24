@@ -7,6 +7,7 @@ import 'dart:typed_data';
 import 'package:path/path.dart' as p;
 
 import '../local_ai/windows_process_reaper.dart';
+import '../windowing/windows_engine_host.dart';
 import 'torrent_metainfo.dart';
 import 'magnet_link.dart';
 
@@ -18,10 +19,29 @@ class Aria2RpcException implements Exception {
   String toString() => message;
 }
 
+/// Another app window runs aria2 and this one did not ask to take it over.
+class Aria2EngineOwnedElsewhere extends StateError {
+  Aria2EngineOwnedElsewhere()
+    : super('Torrent downloads are managed by another app window');
+}
+
 /// Private loopback RPC server, authenticated by a fresh per-process token.
 /// aria2 is stopped with its parent; task intent is persisted in SQLite and
 /// `.aria2` control files preserve verified pieces across app restarts.
+///
+/// One app window (process) runs aria2 at a time, guarded by `engine.lock`.
+/// A window that needs it while another owns it writes `engine.takeover`;
+/// the owner stops aria2 on its next poll and the newest requester starts it,
+/// restoring tasks from SQLite.
 class Aria2Engine {
+  static String get _ownerId => WindowsEngineHost.isAvailable
+      ? '$pid-${WindowsEngineHost.engineId}'
+      : '$pid';
+
+  static const _takeoverTimeout = Duration(seconds: 15);
+  // Longer than a requester waits, so a crashed requester's file is ignored.
+  static const _takeoverExpiry = Duration(seconds: 20);
+
   Aria2Engine({this._enablePeerDiscovery = true});
   final bool _enablePeerDiscovery;
 
@@ -43,10 +63,17 @@ class Aria2Engine {
   String _secret = '';
   bool get running => _process != null;
 
-  Future<void> start(String stateDirectory, {String? executable}) async {
+  /// Starts aria2 unless this window already runs it. When another window
+  /// owns it, [takeOver] asks that window to hand it over; otherwise this
+  /// throws [Aria2EngineOwnedElsewhere].
+  Future<void> start(
+    String stateDirectory, {
+    String? executable,
+    bool takeOver = false,
+  }) async {
     if (_starting != null) return _starting!;
     if (running) return;
-    final future = _start(stateDirectory, executable);
+    final future = _start(stateDirectory, executable, takeOver);
     _starting = future;
     try {
       await future;
@@ -58,7 +85,11 @@ class Aria2Engine {
     }
   }
 
-  Future<void> _start(String stateDirectory, String? executable) async {
+  Future<void> _start(
+    String stateDirectory,
+    String? executable,
+    bool takeOver,
+  ) async {
     if (!(Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
       throw UnsupportedError(
         'Torrent downloads currently require desktop aria2',
@@ -68,13 +99,12 @@ class Aria2Engine {
     final lock = await File(
       p.join(stateDirectory, 'engine.lock'),
     ).open(mode: FileMode.append);
-    try {
-      await lock.lock(FileLock.exclusive);
-      _ownershipLock = lock;
-    } on FileSystemException {
+    if (!await _tryLock(lock) &&
+        !(takeOver && await _requestTakeover(stateDirectory, lock))) {
       await lock.close();
-      throw StateError('Torrent downloads are managed by another app window');
+      throw Aria2EngineOwnedElsewhere();
     }
+    _ownershipLock = lock;
     final socket = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
     _port = socket.port;
     await socket.close();
@@ -246,6 +276,72 @@ class Aria2Engine {
         as String;
   }
 
+  static Future<bool> _tryLock(RandomAccessFile lock) async {
+    try {
+      await lock.lock(FileLock.exclusive);
+      return true;
+    } on FileSystemException {
+      return false;
+    }
+  }
+
+  static File _takeoverFile(String stateDirectory) =>
+      File(p.join(stateDirectory, 'engine.takeover'));
+
+  static Future<String?> _readTakeover(File request) async {
+    try {
+      return await request.readAsString();
+    } on FileSystemException {
+      return null;
+    }
+  }
+
+  /// Asks the owning window to stop aria2 and waits for its lock. Gives up
+  /// when a newer window asks after this one: the newest request wins.
+  Future<bool> _requestTakeover(
+    String stateDirectory,
+    RandomAccessFile lock,
+  ) async {
+    final request = _takeoverFile(stateDirectory);
+    final token = '$_ownerId:${DateTime.now().millisecondsSinceEpoch}';
+    await request.writeAsString(token, flush: true);
+    final deadline = DateTime.now().add(_takeoverTimeout);
+    var acquired = false;
+    while (DateTime.now().isBefore(deadline)) {
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+      if (await _readTakeover(request) != token) break;
+      if (await _tryLock(lock)) {
+        acquired = true;
+        break;
+      }
+    }
+    if (await _readTakeover(request) == token) {
+      try {
+        await request.delete();
+      } on FileSystemException catch (_) {}
+    }
+    return acquired;
+  }
+
+  /// Stops aria2 when another window has asked for it, so that window can
+  /// run the downloads. Returns whether this window handed it over.
+  Future<bool> releaseIfRequested(String stateDirectory) async {
+    if (!running || _starting != null) return false;
+    final token = await _readTakeover(_takeoverFile(stateDirectory));
+    final parts = token?.split(':');
+    if (parts == null || parts.length != 2 || parts.first == _ownerId) {
+      return false;
+    }
+    final requestedAt = int.tryParse(parts.last);
+    if (requestedAt == null ||
+        DateTime.now().millisecondsSinceEpoch - requestedAt >
+            _takeoverExpiry.inMilliseconds) {
+      return false;
+    }
+    await stop();
+    return true;
+  }
+
   Future<void> _releaseOwnership() async {
     if (_releasingOwnership != null) return _releasingOwnership!;
     final lock = _ownershipLock;
@@ -267,7 +363,9 @@ class Aria2Engine {
     }
   }
 
-  Future<void> dispose() async {
+  /// Shuts aria2 down gracefully (saving `.aria2` control files) and releases
+  /// ownership; [start] can run it again later.
+  Future<void> stop() async {
     if (running) {
       try {
         await call('shutdown');
@@ -282,9 +380,15 @@ class Aria2Engine {
           child.kill();
           await child.exitCode;
         }
+        if (identical(_process, child)) _process = null;
       }
     }
     await _releaseOwnership();
+  }
+
+  Future<void> dispose() async {
+    await stop();
     _httpClient?.close(force: true);
+    _httpClient = null;
   }
 }

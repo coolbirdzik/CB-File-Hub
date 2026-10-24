@@ -13,6 +13,7 @@ import 'package:cb_file_manager/services/torrent/torrent_import_confirmation.dar
 import 'torrent_fixtures.dart';
 import 'package:cb_file_manager/services/torrent/torrent_entry.dart';
 import 'package:cb_file_manager/services/torrent/torrent_background_receiver.dart';
+import 'package:cb_file_manager/ui/controllers/operation_progress_controller.dart';
 
 // Override widget-test networking only for temporary loopback test servers.
 class _LoopbackHttpOverrides extends HttpOverrides {}
@@ -52,8 +53,14 @@ class FakeEngine extends Aria2Engine {
   Object? startError;
   @override
   bool get running => _running;
+  final takeOvers = <bool>[];
   @override
-  Future<void> start(String stateDirectory, {String? executable}) async {
+  Future<void> start(
+    String stateDirectory, {
+    String? executable,
+    bool takeOver = false,
+  }) async {
+    takeOvers.add(takeOver);
     if (startError != null) throw startError!;
     _running = true;
   }
@@ -117,9 +124,9 @@ class FakeEngine extends Aria2Engine {
   }
 
   @override
-  Future<void> dispose() async {
+  Future<void> stop() async {
     _running = false;
-    await super.dispose();
+    await super.stop();
   }
 }
 
@@ -332,11 +339,13 @@ void main() {
       await service.setDefaultDownloadDirectory(p.join(root.path, 'payload'));
       engine.startError = StateError('aria2 unavailable');
       final notices = <({String title, String body, bool isError})>[];
+      final statusCenter = OperationProgressController();
       final receiver = TorrentBackgroundReceiver(
         service,
         notify: ({required title, required body, required isError}) async {
           notices.add((title: title, body: body, isError: isError));
         },
+        statusCenter: statusCenter,
       );
       expect(await receiver.receiveSource(source.path), isNull);
       final failed = (await repo.page()).entries.single;
@@ -348,6 +357,14 @@ void main() {
       expect(notices.last.isError, isFalse);
       expect(notices.last.body, contains('Second.mp4'));
       expect((await repo.page()).total, 2);
+      // Both results land in the Status Center as unseen notifications.
+      final statuses = statusCenter.finishedEntries;
+      expect(statuses.map((e) => e.status), [
+        OperationProgressStatus.success,
+        OperationProgressStatus.error,
+      ]);
+      expect(statuses.first.detail, contains('Second.mp4'));
+      expect(statusCenter.unseenCount, 2);
     },
   );
 
@@ -1287,6 +1304,62 @@ void main() {
       expect((await repo.get(entry.hash))!.status, 'active');
     },
   );
+
+  test(
+    'idle windows show the owner progress; actions and new tabs take over',
+    () async {
+      final file = await create('a.torrent');
+      await service.importFile(file.path);
+      var entry = (await repo.page()).entries.single;
+      await repo.update(entry.hash, {
+        'status': 'paused',
+        'gid': entry.hash.substring(0, 16),
+        'download_dir': root.path,
+      });
+      entry = (await repo.get(entry.hash))!;
+
+      engine.startError = Aria2EngineOwnedElsewhere();
+      await service.sync();
+      expect(engine.takeOvers, [false]);
+      expect(service.lastError, isNull);
+      expect((await repo.get(entry.hash))!.status, 'paused');
+
+      engine.startError = null;
+      await service.claimEngine();
+      expect(engine.takeOvers.last, isTrue);
+      expect(service.ownsEngine, isTrue);
+    },
+  );
+
+  test('the owner hands aria2 over when a newer window asks', () async {
+    final file = await create('a.torrent');
+    await service.importFile(file.path);
+    final entry = (await repo.page()).entries.single;
+    await repo.update(entry.hash, {
+      'status': 'paused',
+      'gid': entry.hash.substring(0, 16),
+      'download_dir': root.path,
+    });
+    await service.claimEngine();
+    expect(service.ownsEngine, isTrue);
+
+    // A request from this same process, or an expired one, is ignored.
+    final request = File(p.join(root.path, 'engine.takeover'));
+    await request.writeAsString(
+      '$pid:${DateTime.now().millisecondsSinceEpoch}',
+    );
+    await service.sync();
+    expect(service.ownsEngine, isTrue);
+    await request.writeAsString('${pid + 1}:0');
+    await service.sync();
+    expect(service.ownsEngine, isTrue);
+
+    await request.writeAsString(
+      '${pid + 1}:${DateTime.now().millisecondsSinceEpoch}',
+    );
+    await service.sync();
+    expect(service.ownsEngine, isFalse);
+  });
 
   test('cancelled scan can run again and reports unavailable roots', () async {
     for (var i = 0; i < 10; i++) {

@@ -14,7 +14,11 @@ import 'torrent_fixtures.dart';
 
 class _NoDownloads extends Aria2Engine {
   @override
-  Future<void> start(String stateDirectory, {String? executable}) async {
+  Future<void> start(
+    String stateDirectory, {
+    String? executable,
+    bool takeOver = false,
+  }) async {
     throw StateError('Import must not start payload downloads');
   }
 }

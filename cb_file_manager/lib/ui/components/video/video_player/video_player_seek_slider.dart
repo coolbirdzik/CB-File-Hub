@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/design_system/primitives/cb_slider.dart';
 import 'package:flutter/material.dart';
 
 /// Seek slider used in mobile controls. Parent wires StreamBuilder/ValueListenable
@@ -29,7 +30,7 @@ class VideoPlayerSeekSlider extends StatelessWidget {
           trackHeight: 3,
           thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
         ),
-        child: Slider(
+        child: CbSlider(
           value: value,
           min: min,
           max: max,

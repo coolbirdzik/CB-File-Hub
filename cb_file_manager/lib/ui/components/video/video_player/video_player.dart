@@ -377,6 +377,11 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
   Duration? _seekDragPosition;
   Timer? _seekPreviewTimer;
   Duration? _pendingSeekPreview;
+  bool _pendingSeekPreviewExact = false;
+  // The last preview already landed on this exact frame; releasing there needs
+  // no second seek.
+  Duration? _exactPreviewTarget;
+  Future<void>? _exactPreviewSeek;
 
   // Seek bar hover thumbnails, decoded apart from the main player.
   VideoSeekPreviewController? _seekHoverFrames;
@@ -497,6 +502,12 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
   // Seek speed: 0=slow, 1=medium, 2=fast — loaded from preferences
   @override
   int _videoSeekSpeed = 1;
+  // Off: a held seek keeps its first step instead of growing over time.
+  @override
+  bool _videoSeekAcceleration = false;
+  @override
+  int _videoKeyboardSeekSeconds =
+      UserPreferences.defaultVideoKeyboardSeekSeconds;
 
   @override
   void initState() {
@@ -1644,14 +1655,13 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
     }
 
     if (event is KeyDownEvent) {
-      // Ctrl+Left/Right for 1 minute seek (desktop)
-      // Ctrl+Arrow for fast seeking with higher initial speed (starts at 60s)
+      // Ctrl+Arrow starts at 30 seconds and accelerates while held.
       if (isCtrlPressed && event.logicalKey == LogicalKeyboardKey.arrowLeft) {
-        _startFastSeeking(forward: false, withCtrl: true);
+        _startFastSeeking(forward: false, withCtrl: true, fromKeyboard: true);
         return KeyEventResult.handled;
       } else if (isCtrlPressed &&
           event.logicalKey == LogicalKeyboardKey.arrowRight) {
-        _startFastSeeking(forward: true, withCtrl: true);
+        _startFastSeeking(forward: true, withCtrl: true, fromKeyboard: true);
         return KeyEventResult.handled;
       }
       // Spacebar for pause/play
@@ -1661,10 +1671,10 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
       }
       // Arrow keys for seeking (hold for continuous seek)
       else if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
-        _startFastSeeking(forward: false, withCtrl: false);
+        _startFastSeeking(forward: false, fromKeyboard: true);
         return KeyEventResult.handled;
       } else if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
-        _startFastSeeking(forward: true, withCtrl: false);
+        _startFastSeeking(forward: true, fromKeyboard: true);
         return KeyEventResult.handled;
       }
       // Arrow up/down for volume
@@ -1885,18 +1895,28 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
   }
 
   // Fast seeking methods (hold arrow on desktop, long press on mobile)
-  // Accelerated seeking: aggressive acceleration, tick every 100ms
-  // Normal: 3s -> 5s -> 10s -> 20s -> 30s -> 60s -> 2m -> 5m -> 10m
-  // With Ctrl: 30s -> 60s -> 2m -> 5m -> 10m -> 20m
-  void _startFastSeeking({required bool forward, bool withCtrl = false}) {
+  // Repeats every 100ms after a hold delay, by the configured key step (30s
+  // with Ctrl). With acceleration on, the step grows while held:
+  // normal: step -> 5s -> ... -> 10m; Ctrl: 30s -> 60s -> 2m -> ... -> 20m
+  void _startFastSeeking({
+    required bool forward,
+    bool withCtrl = false,
+    bool fromKeyboard = false,
+  }) {
     if (_isFastSeeking || _player == null) return;
 
     // Same live, throttled previews as a slider drag, with audio kept playing.
+    final origin = _seekDragPosition ?? _player!.state.position;
     _startSeekDrag();
-    _seekDragPosition = _player!.state.position;
+    _seekDragPosition = origin;
+
+    // Every repeat restarts the audio at a new position; held, that is only
+    // stutter. Stay silent until the release position is reached.
+    unawaited(_player!.setAudioSuppressed(true));
 
     _fastSeekTicks = 0;
-    _fastSeekSeconds = withCtrl ? 30 : 3;
+    final baseStep = fromKeyboard ? _videoKeyboardSeekSeconds : 3;
+    _fastSeekSeconds = withCtrl ? 30 : baseStep;
 
     setState(() {
       _isFastSeeking = true;
@@ -1906,12 +1926,14 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
     // Perform initial seek
     _advanceFastSeek();
 
-    // Tick every 100ms for responsive previews
-    _fastSeekTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
+    // Give a normal key tap time to release before continuous seeking starts.
+    _fastSeekTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
       if (!mounted || !_isFastSeeking) {
         _fastSeekTimer?.cancel();
         return;
       }
+
+      if (fromKeyboard && timer.tick < 4) return;
 
       // Hold the boundary preview until release instead of resuming into EOF
       // while the user still has the key/finger down.
@@ -1923,6 +1945,11 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
         return;
       }
       if (!_fastSeekingForward && currentPos <= Duration.zero) {
+        return;
+      }
+
+      if (!_videoSeekAcceleration) {
+        _advanceFastSeek();
         return;
       }
 
@@ -1957,7 +1984,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
         }
       } else {
         // Normal arrow: acceleration (10 ticks = 1s real time)
-        // 0-0.3s: 3s, 0.3-1s: 5s, 1-2s: 10s, 2-3s: 20s
+        // Start from the configured step, then accelerate as before.
         // 3-4s: 30s, 4-5.5s: 60s, 5.5-7s: 2m
         // 7-9s: 5m, 9s+: 10m
         if (scaledTick > 90) {
@@ -1977,7 +2004,11 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
         } else if (scaledTick > 3) {
           _fastSeekSeconds = 5;
         } else {
-          _fastSeekSeconds = 3;
+          _fastSeekSeconds = baseStep;
+        }
+        // A larger configured step must not slow down when acceleration starts.
+        if (_fastSeekSeconds < baseStep) {
+          _fastSeekSeconds = baseStep;
         }
       }
 
@@ -2003,8 +2034,12 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
       0,
       player.state.duration.inMilliseconds,
     );
+    // A keyframe preview lands on the keyframe before its target. While the
+    // step is shorter than a typical GOP that is the same keyframe each tick,
+    // and the picture keeps snapping back. Long steps clear the GOP anyway.
     _seekDuringDrag(
       (current + delta).inMilliseconds.clamp(0, maxMs).toDouble(),
+      exact: _fastSeekSeconds < 30,
     );
   }
 
@@ -2013,7 +2048,17 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
     _fastSeekTimer = null;
 
     if (_isFastSeeking) {
-      _finishSeekDrag();
+      final player = _player;
+      final landed = _finishSeekDrag();
+      if (player != null) {
+        unawaited(() async {
+          try {
+            await landed;
+          } catch (_) {}
+          // A new hold may have started while the final seek was in flight.
+          if (!_isFastSeeking) await player.setAudioSuppressed(false);
+        }());
+      }
       setState(() {
         _isFastSeeking = false;
         _fastSeekSeconds = 5;
@@ -2440,7 +2485,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
                                   enabledThumbRadius: 7,
                                 ),
                               ),
-                              child: Slider(
+                              child: CbSlider(
                                 value: value,
                                 min: 0,
                                 max: maxMs.toDouble(),
@@ -3584,17 +3629,22 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
     _seekPreviewTimer?.cancel();
     _seekPreviewTimer = null;
     _pendingSeekPreview = null;
+    _exactPreviewTarget = null;
+    _exactPreviewSeek = null;
     setState(() {
       _isSeeking = true;
       _seekDragPosition = null;
     });
   }
 
-  void _seekDuringDrag(double value) {
+  /// [exact] previews land on the target frame. Keyframe previews are cheaper,
+  /// but land on the keyframe before the target, which can be seconds back.
+  void _seekDuringDrag(double value, {bool exact = false}) {
     final target = Duration(milliseconds: value.toInt());
     setState(() => _seekDragPosition = target);
 
     _pendingSeekPreview = target;
+    _pendingSeekPreviewExact = exact;
     if (_seekPreviewTimer == null) _flushSeekPreview();
   }
 
@@ -3603,9 +3653,13 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
     _pendingSeekPreview = null;
     final player = _player;
     if (target == null || player == null) return;
-    // Keyframe previews keep 4K scrubbing responsive; _finishSeekDrag lands
-    // on the exact frame.
-    unawaited(player.seek(target, exact: false));
+    // Slider and wheel previews use keyframes to keep 4K scrubbing responsive;
+    // _finishSeekDrag lands on the exact frame.
+    final exact = _pendingSeekPreviewExact;
+    final seek = player.seek(target, exact: exact);
+    unawaited(seek);
+    _exactPreviewTarget = exact ? target : null;
+    _exactPreviewSeek = exact ? seek : null;
 
     // Seeks stay throttled because a playing input needs time to reacquire its
     // clock between seeks, or the decoder strands in "no reference clock".
@@ -3617,13 +3671,23 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
     });
   }
 
-  void _finishSeekDrag([Duration? finalPosition]) {
+  /// Completes when the final seek has landed.
+  Future<void> _finishSeekDrag([Duration? finalPosition]) {
     _seekPreviewTimer?.cancel();
     _seekPreviewTimer = null;
+    final previewed = _pendingSeekPreview == null ? _exactPreviewSeek : null;
+    final previewTarget = _exactPreviewTarget;
     _pendingSeekPreview = null;
+    _exactPreviewTarget = null;
+    _exactPreviewSeek = null;
     final target = finalPosition ?? _seekDragPosition;
     final player = _player;
-    if (target != null && player != null) unawaited(player.seek(target));
+    // Seeking again to the frame on screen re-decodes it: a visible stall.
+    final landed = target == null || player == null
+        ? Future<void>.value()
+        : previewed != null && target == previewTarget
+        ? previewed
+        : player.seek(target);
 
     _seekingTimer?.cancel();
     _seekingTimer = Timer(const Duration(milliseconds: 200), () {
@@ -3634,6 +3698,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
       });
       _startHideControlsTimer();
     });
+    return landed;
   }
 
   /// Starts the seeking state to prevent UI flickering during seek operations.

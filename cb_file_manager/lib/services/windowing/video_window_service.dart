@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'windows_engine_host.dart';
+
 import 'package:cb_file_manager/services/windowing/window_startup_payload.dart';
 import 'package:cb_file_manager/utils/app_logger.dart';
 import 'package:flutter/foundation.dart';
@@ -62,7 +64,7 @@ class VideoWindowService {
       final executable = Platform.resolvedExecutable;
       final workingDir = File(executable).parent.path;
 
-      final env = Map<String, String>.from(Platform.environment);
+      final env = WindowsEngineHost.newWindowEnvironment();
       env[envFlagKey] = '1';
       env[envArgsKey] = jsonEncode(<String, dynamic>{'path': filePath});
       env[envInitiallyMaximizedKey] = initiallyMaximized ? '1' : '0';
@@ -133,6 +135,12 @@ class VideoWindowService {
     required Map<String, String> environment,
     required String workingDirectory,
   }) async {
+    if (Platform.isWindows) {
+      if (!await WindowsEngineHost.open(environment)) {
+        throw StateError('Failed to create window engine');
+      }
+      return;
+    }
     await Process.start(
       executable,
       arguments,
@@ -273,7 +281,7 @@ class VideoWindowService {
       const Duration(milliseconds: 500),
       onTimeout: () {},
     );
-    exit(0);
+    await WindowsEngineHost.closeOrExit();
   }
 
   @visibleForTesting
@@ -294,8 +302,10 @@ class VideoWindowService {
 
   /// Video path this process was started with, or null for a normal window.
   static String? startupVideoPath() {
-    if (!isSupported || Platform.environment[envFlagKey] != '1') return null;
-    final raw = Platform.environment[envArgsKey];
+    if (!isSupported || WindowsEngineHost.environment[envFlagKey] != '1') {
+      return null;
+    }
+    final raw = WindowsEngineHost.environment[envArgsKey];
     if (raw == null || raw.trim().isEmpty) return null;
     try {
       final decoded = jsonDecode(raw);
@@ -308,14 +318,15 @@ class VideoWindowService {
   }
 
   static bool startupInitiallyMaximized() {
-    return isSupported && Platform.environment[envInitiallyMaximizedKey] == '1';
+    return isSupported &&
+        WindowsEngineHost.environment[envInitiallyMaximizedKey] == '1';
   }
 
   /// Whether the Windows runner already created this process's window in
   /// place: over its parent and maximized as requested (see
   /// windows/runner/main.cpp). File-association launches are not placed.
   static bool startupPlacedByRunner() {
-    final env = Platform.environment;
+    final env = WindowsEngineHost.environment;
     // A PiP window spawned from the player inherits the player's role.
     return Platform.isWindows &&
         env[WindowStartupPayload.envWindowRoleKey] == 'video' &&

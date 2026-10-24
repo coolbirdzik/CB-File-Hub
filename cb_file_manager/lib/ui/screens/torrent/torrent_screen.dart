@@ -191,6 +191,8 @@ class _TorrentScreenState extends State<TorrentScreen> {
             .toSet();
     await _service.initialize();
     if (!mounted) return;
+    // Downloads run in the window whose torrent tab was opened last.
+    unawaited(_service.claimEngine());
     setState(() => _ready = true);
     _checkServiceError();
     // Opening an association must not wait for a large/filtered library page.

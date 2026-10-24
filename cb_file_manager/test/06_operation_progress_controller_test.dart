@@ -119,4 +119,21 @@ void main() {
       expect(controller.unseenCount, 1);
     },
   );
+
+  test('06.07 unseen count keeps growing past the finished history limit', () {
+    final controller = OperationProgressController(finishedHistoryLimit: 3);
+
+    for (var i = 0; i < 5; i++) {
+      controller.succeed(controller.begin(title: 'Task $i', total: 1));
+    }
+
+    expect(controller.finishedEntries, hasLength(3));
+    expect(controller.unseenCount, 5);
+
+    controller.markAllSeen();
+    expect(controller.unseenCount, 0);
+
+    controller.succeed(controller.begin(title: 'Task 5', total: 1));
+    expect(controller.unseenCount, 1);
+  });
 }

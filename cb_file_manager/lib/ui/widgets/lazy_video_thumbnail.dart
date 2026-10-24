@@ -70,7 +70,6 @@ class _LazyVideoThumbnailState extends State<LazyVideoThumbnail>
   bool _isLoading = false;
   bool _isThumbnailGenerated = false;
   bool _shouldRegenerateThumbnail = true;
-  bool _hasSyncLoadLog = false;
 
   // Progress simulation timer
   Timer? _progressTimer;
@@ -200,7 +199,6 @@ class _LazyVideoThumbnailState extends State<LazyVideoThumbnail>
     // Only set regeneration flag if the path actually changed
     if (widget.videoPath != oldWidget.videoPath) {
       _shouldRegenerateThumbnail = true;
-      _hasSyncLoadLog = false;
       _scheduleInitialLoad();
     }
   }
@@ -234,7 +232,6 @@ class _LazyVideoThumbnailState extends State<LazyVideoThumbnail>
     _thumbnailVersion++; // Increment version to force Image widget rebuild
     _isLoading =
         false; // BUGFIX: Reset loading state so _loadThumbnail doesn't early-return
-    _hasSyncLoadLog = false; // Reset sync log flag when cache is cleared
 
     // Reload thumbnail after cache clear.
     // Use a slightly longer delay to allow clearCache() to fully complete
@@ -485,11 +482,6 @@ class _LazyVideoThumbnailState extends State<LazyVideoThumbnail>
       // Use a post-frame callback to avoid calling during build
       SchedulerBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          // Use the helper's throttled log method
-          VideoThumbnailHelper.logWithThrottle(
-            '[Thumbnail] Notifying parent about thumbnail generated',
-            widget.videoPath,
-          );
           widget.onThumbnailGenerated!(path);
         }
       });
@@ -683,14 +675,6 @@ class _LazyVideoThumbnailState extends State<LazyVideoThumbnail>
           },
           frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
             if (wasSynchronouslyLoaded) {
-              if (!_hasSyncLoadLog) {
-                // Use the helper's throttled log method
-                VideoThumbnailHelper.logWithThrottle(
-                  '[Thumbnail] Thumbnail image loaded synchronously',
-                  widget.videoPath,
-                );
-                _hasSyncLoadLog = true;
-              }
               // Also notify for synchronously loaded images
               SchedulerBinding.instance.addPostFrameCallback((_) {
                 if (mounted &&

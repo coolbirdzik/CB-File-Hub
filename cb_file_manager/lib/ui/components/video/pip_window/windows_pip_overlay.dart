@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:cb_file_manager/design_system/primitives/cb_slider.dart';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
@@ -303,7 +304,7 @@ class _WindowsPipOverlayWidgetState extends State<_WindowsPipOverlayWidget> {
                         enabledThumbRadius: 6,
                       ),
                     ),
-                    child: Slider(
+                    child: CbSlider(
                       value: _duration.inMilliseconds == 0
                           ? 0
                           : _position.inMilliseconds.toDouble(),
@@ -339,7 +340,7 @@ class _WindowsPipOverlayWidgetState extends State<_WindowsPipOverlayWidget> {
                 width: 80,
                 child: Semantics(
                   container: true,
-                  child: Slider(
+                  child: CbSlider(
                     value: ((_player?.state.volume ?? 100).clamp(
                       0,
                       100,

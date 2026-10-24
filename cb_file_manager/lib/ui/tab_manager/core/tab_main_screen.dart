@@ -20,12 +20,14 @@ import '../../../services/progress/desktop_app_icon_progress_service.dart';
 import '../../controllers/operation_progress_controller.dart';
 import '../../../services/windowing/window_startup_payload.dart';
 import '../../../services/windowing/windows_native_tab_drag_drop_service.dart';
+import '../../../services/windowing/windows_engine_host.dart';
 import 'tab_manager.dart';
 import 'tab_screen.dart';
 
 /// The main screen that provides the tabbed interface for the file manager
 class TabMainScreen extends StatefulWidget {
   final WindowStartupPayload? startupPayload;
+
   const TabMainScreen({super.key, this.startupPayload});
 
   /// Static method to create and open a new tab with a specific path
@@ -98,6 +100,7 @@ class _TabMainScreenState extends State<TabMainScreen> {
               name: tab.name,
               switchToTab: i == active,
               highlightedFileName: tab.highlightedFileName,
+              windowPayload: tab,
             ),
           );
         }
@@ -131,7 +134,8 @@ class _TabMainScreenState extends State<TabMainScreen> {
 
   bool _isSecondaryDesktopWindow() {
     if (!_isDesktopPlatform()) return false;
-    return Platform.environment[WindowStartupPayload.envSecondaryWindowKey] ==
+    return WindowsEngineHost.environment[WindowStartupPayload
+            .envSecondaryWindowKey] ==
         '1';
   }
 

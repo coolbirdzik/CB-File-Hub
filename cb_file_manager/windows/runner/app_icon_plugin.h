@@ -5,6 +5,7 @@
 #include <flutter/plugin_registrar_windows.h>
 #include <windows.h>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -52,6 +53,10 @@ class AppIconPlugin : public flutter::Plugin {
 
   // Plugin registrar
   flutter::PluginRegistrarWindows* registrar_;
+
+  // Last taskbar badge count, re-applied when the taskbar button is recreated.
+  int badge_count_ = 0;
+  int window_proc_delegate_id_ = 0;
 };
 
 #endif  // APP_ICON_PLUGIN_H_ 

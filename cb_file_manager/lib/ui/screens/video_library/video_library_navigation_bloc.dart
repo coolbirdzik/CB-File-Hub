@@ -302,10 +302,16 @@ class VideoLibraryNavigationBloc
     emit(state.copyWith(gridZoomLevel: event.zoomLevel));
   }
 
-  void _onSetSortOption(
+  Future<void> _onSetSortOption(
     FileNavigationSetSortOption event,
     Emitter<FileNavigationState> emit,
   ) async {
+    // The saved sort arrives before the first load. Clearing isLoading on the
+    // still-empty list showed "no videos" until the library load emitted.
+    if (state.files.isEmpty) {
+      emit(state.copyWith(sortOption: event.sortOption));
+      return;
+    }
     emit(state.copyWith(isLoading: true));
 
     final sortedFiles = await FileSystemSorter.sortFiles(

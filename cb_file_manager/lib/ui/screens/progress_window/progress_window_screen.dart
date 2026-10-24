@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/services/windowing/windows_engine_host.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -182,7 +183,7 @@ class _ProgressWindowScreenState extends State<ProgressWindowScreen>
     try {
       await windowManager.close();
     } catch (_) {
-      exit(0);
+      await WindowsEngineHost.closeOrExit();
     }
   }
 

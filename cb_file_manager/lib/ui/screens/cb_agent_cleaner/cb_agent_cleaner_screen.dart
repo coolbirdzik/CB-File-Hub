@@ -1456,6 +1456,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     for (final candidate in candidates) {
       final node = _findTreeNodeByExactPath(root, candidate.path);
       if (node == null ||
+          node.isSystemProtected ||
           !node.isJunk ||
           node.junkCategoryId != candidate.categoryId) {
         continue;
@@ -2412,7 +2413,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
   }
 
   List<DiskTreeNode> _selectedTreeNodes() {
-    return List<DiskTreeNode>.unmodifiable(_selectedTreeTargets);
+    return List<DiskTreeNode>.unmodifiable(
+      _selectedTreeTargets.where((node) => !node.isSystemProtected),
+    );
   }
 
   void _publishTreeSelection() {
@@ -2433,7 +2436,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
   }
 
   void _replaceTreeTargets(Iterable<DiskTreeNode> targets) {
-    final nextTargets = targets.toSet();
+    final nextTargets = targets
+        .where((node) => !node.isSystemProtected)
+        .toSet();
     for (final current in _selectedTreeTargets) {
       if (!nextTargets.contains(current)) {
         current.isSelectedForDeletion = false;
@@ -2702,6 +2707,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       if (!replace) ..._selectedTreeTargets,
       ...nodes,
     ]);
+    if (targets.isEmpty) return const <DiskTreeNode>[];
     _chartUpdateTimer?.cancel();
     setState(() {
       _showCleanableOnly = false;
@@ -2722,7 +2728,8 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
   Set<DiskTreeNode> _canonicalTreeTargets(Iterable<DiskTreeNode> nodes) {
     final paths = {
       for (final node in nodes)
-        if (node.fullPath.isNotEmpty) node: CleanerPaths.key(node.fullPath),
+        if (node.fullPath.isNotEmpty && !node.isSystemProtected)
+          node: CleanerPaths.key(node.fullPath),
     };
     final sorted = paths.keys.toList()
       ..sort((a, b) => paths[a]!.length.compareTo(paths[b]!.length));
@@ -6544,6 +6551,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
           ),
           ContextMenuAction(
             id: 'cut',
+            isEnabled: !node.isSystemProtected,
             label: l10n.cut,
             icon: PhosphorIconsLight.scissors,
             onSelected: (_) => FileOperationsHandler.cutToClipboard(
@@ -6563,6 +6571,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
             ),
           ContextMenuAction(
             id: 'rename',
+            isEnabled: !node.isSystemProtected,
             label: l10n.rename,
             icon: PhosphorIconsLight.pencilSimple,
             onSelected: (_) => FileOperationsHandler.showRenameDialog(
@@ -6588,7 +6597,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
             icon: PhosphorIconsLight.info,
             onSelected: (_) => _showNodeProperties(node),
           ),
-          if (canShowShellMenu)
+          if (canShowShellMenu && !node.isSystemProtected)
             ContextMenuAction(
               id: 'more_options',
               label: l10n.moreOptions,
@@ -6646,7 +6655,7 @@ class _TreeRowState extends State<_TreeRow> {
   bool _isHovering = false;
 
   int _countJunkNodes(DiskTreeNode node) {
-    int count = node.fullPath.isNotEmpty ? 1 : 0;
+    int count = node.fullPath.isNotEmpty && !node.isSystemProtected ? 1 : 0;
     for (final c in node.children) {
       count += _countJunkNodes(c);
     }
@@ -6672,7 +6681,7 @@ class _TreeRowState extends State<_TreeRow> {
 
   void _applyCheckRecursive(DiskTreeNode node, bool checked) {
     if (node.fullPath.isNotEmpty) {
-      node.isSelectedForDeletion = checked;
+      node.isSelectedForDeletion = checked && !node.isSystemProtected;
     }
     for (final c in node.children) {
       _applyCheckRecursive(c, checked);
@@ -6724,17 +6733,19 @@ class _TreeRowState extends State<_TreeRow> {
                     child: Checkbox(
                       tristate: true,
                       value: _checkboxState(node),
-                      onChanged: (v) {
-                        // Flutter tristate cycles true -> null -> false.
-                        // For cleaner UX, clicking a fully checked node
-                        // unchecks the whole subtree; clicking partial or
-                        // unchecked nodes checks the subtree.
-                        final target = _checkboxState(node) != true;
-                        setState(() {
-                          _applyCheckRecursive(node, target);
-                        });
-                        widget.onToggleJunk(node, target);
-                      },
+                      onChanged: node.isSystemProtected
+                          ? null
+                          : (v) {
+                              // Flutter tristate cycles true -> null -> false.
+                              // For cleaner UX, clicking a fully checked node
+                              // unchecks the whole subtree; clicking partial or
+                              // unchecked nodes checks the subtree.
+                              final target = _checkboxState(node) != true;
+                              setState(() {
+                                _applyCheckRecursive(node, target);
+                              });
+                              widget.onToggleJunk(node, target);
+                            },
                       visualDensity: VisualDensity.compact,
                     ),
                   ),
@@ -6787,7 +6798,9 @@ class _TreeRowState extends State<_TreeRow> {
                           ),
                         ),
                         // Junk category badge
-                        if (categoryId != null)
+                        if (node.isSystemProtected)
+                          _CleanerProtectionBadge(node: node),
+                        if (categoryId != null && !node.isSystemProtected)
                           CbTooltip(
                             // Answers "why is this junk?" without making the
                             // user open the folder to find out.
@@ -7104,6 +7117,49 @@ class _PieChartPainter extends CustomPainter {
 // Flat tree row model + widget for ListView.builder
 // =============================================================================
 
+class _CleanerProtectionBadge extends StatelessWidget {
+  final DiskTreeNode node;
+
+  const _CleanerProtectionBadge({required this.node});
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context)!;
+    final color = Theme.of(context).colorScheme.onSurfaceVariant;
+    return CbTooltip(
+      message: l.diskCleanerProtectedReason,
+      child: Semantics(
+        label:
+            '${l.diskCleanerProtectedLabel}. ${l.diskCleanerProtectedReason}',
+        child: Container(
+          key: ValueKey('cleaner-protected-${node.fullPath}'),
+          margin: const EdgeInsets.only(left: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.09),
+            borderRadius: BorderRadius.circular(3),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(PhosphorIconsLight.lockSimple, size: 11, color: color),
+              const SizedBox(width: 3),
+              Text(
+                l.diskCleanerProtectedLabel,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: color,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _FlatRow {
   final DiskTreeNode node;
   final int depth;
@@ -7300,11 +7356,16 @@ class _FlatTreeRowWidgetState extends State<_FlatTreeRowWidget> {
                                 color: theme.colorScheme.primary,
                               ),
                             ),
-                          if (widget.agentAnalysis case final analysis?) ...[
+                          if (node.isSystemProtected)
+                            _CleanerProtectionBadge(node: node),
+                          if (!node.isSystemProtected &&
+                              widget.agentAnalysis != null) ...[
                             const SizedBox(width: 6),
-                            CleanerDecisionBadge(analysis: analysis),
+                            CleanerDecisionBadge(
+                              analysis: widget.agentAnalysis!,
+                            ),
                           ],
-                          if (categoryId != null)
+                          if (categoryId != null && !node.isSystemProtected)
                             CbTooltip(
                               // Answers "why is this junk?" without making the
                               // user open the folder to find out.

@@ -2,6 +2,10 @@ import 'app_localizations.dart';
 
 class TurkishLocalizations implements AppLocalizations {
   @override
+  String get aiProviderKind => 'Sağlayıcı türü';
+  @override
+  String get aiProviderCustom => 'Özel';
+  @override
   String get deviceMediaOnDevice => 'Bu cihazda';
   @override
   String get deviceMediaLimited =>
@@ -1771,6 +1775,18 @@ class TurkishLocalizations implements AppLocalizations {
       'Videolar uygulama içi oynatıcıda açılacak';
   @override
   String get seekSpeed => 'Atlama hızı';
+  @override
+  String get videoSeekAcceleration => 'Basılı tuttukça hızlan';
+  @override
+  String get videoSeekAccelerationDescription =>
+      'Atlama tuşunu ne kadar uzun basılı tutarsanız her atlama o kadar büyür. Kapalı: her atlama aynı adımı kullanır.';
+  @override
+  String get videoKeyboardSeekStep => 'Klavye atlama adımı';
+  @override
+  String get videoKeyboardSeekStepDescription =>
+      'Sol/sağ tuşuna her basışta atlanan süre. Sürekli atlamak için tuşu basılı tutun.';
+  @override
+  String videoSeekSeconds(int seconds) => '$seconds sn';
   @override
   String get seekSpeedDescription =>
       'Atlama tuşunu basılı tutarken veya mobilde uzun basarken videonun ne kadar hızlı atladığı';
@@ -4262,6 +4278,11 @@ class TurkishLocalizations implements AppLocalizations {
   String get diskCleanerSkip => 'Atla';
   @override
   String get diskCleanerTryAgain => 'Yeniden dene';
+  @override
+  String get diskCleanerProtectedLabel => 'Silinemez';
+  @override
+  String get diskCleanerProtectedReason =>
+      'Bu öğe temel sistem verileri içerir veya bu verilere aittir. CB Cleaner, yönetici erişimi kullanılırken bile bu öğeyi korur. Disk kullanımını inceleyebilirsiniz.';
   @override
   String get diskCleanerPermanentDeleteConfirmTitle =>
       'Kalıcı olarak silinsin mi?';

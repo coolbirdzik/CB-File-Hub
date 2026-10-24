@@ -13,6 +13,7 @@ import '../../../config/theme_config.dart';
 import '../../../core/service_locator.dart';
 import '../../../providers/theme_provider.dart';
 import '../../../services/windowing/video_window_service.dart';
+import '../../../services/windowing/windows_engine_host.dart';
 import '../../../services/windowing/windows_native_tab_drag_drop_service.dart';
 import 'video_player_full_screen.dart';
 
@@ -39,6 +40,9 @@ class _VideoWindowAppState extends State<VideoWindowApp> with WindowListener {
     super.initState();
     _languageController.languageNotifier.addListener(_onLanguageChanged);
     VideoWindowService.startPlayerIpcServer(_playPath);
+    if (WindowsEngineHost.isAvailable) {
+      WindowsEngineHost.onCloseRequested = VideoWindowService.closePlayerWindow;
+    }
     _interceptNativeClose();
   }
 

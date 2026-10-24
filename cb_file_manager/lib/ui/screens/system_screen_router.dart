@@ -42,6 +42,7 @@ import 'ai_chat/ai_chat_screen.dart';
 import 'cb_agent_cleaner/cb_agent_cleaner_screen.dart';
 import 'package:path/path.dart' as pathlib;
 import '../tab_manager/core/tab_paths.dart';
+import '../tab_manager/core/tab_window_transfer.dart';
 import 'media_gallery/device_media_sources.dart';
 
 /// A router that handles system screens and special paths
@@ -273,6 +274,15 @@ class SystemScreenRouter {
     final libraryIdStr = path.substring('#video-library/'.length);
     final libraryId = int.tryParse(libraryIdStr);
     if (libraryId != null) {
+      final metadata = TabWindowTransfer.peekInitial(tabId)['library'];
+      if (metadata is Map && metadata['id'] == libraryId) {
+        return VideoLibraryFilesScreen(
+          library: VideoLibrary.fromDatabaseMap(
+            Map<String, Object?>.from(metadata),
+          ),
+          tabId: tabId,
+        );
+      }
       return FutureBuilder<VideoLibrary?>(
         future: VideoLibraryService().getLibraryById(libraryId),
         builder: (context, snapshot) {

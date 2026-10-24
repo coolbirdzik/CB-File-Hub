@@ -185,12 +185,6 @@ bool Win32Window::CreateWithPhysicalBounds(const std::wstring &title,
   const wchar_t *window_class =
       WindowClassRegistrar::GetInstance()->GetWindowClass();
 
-  // Detect progress window role from environment variable.
-  // Used to paint the correct background color in WM_ERASEBKGND.
-  wchar_t roleBuf[32];
-  DWORD roleLen = GetEnvironmentVariableW(L"CB_WINDOW_ROLE", roleBuf, 32);
-  is_progress_window_ = (roleLen > 0 && wcscmp(roleBuf, L"progress") == 0);
-
   // Use WS_OVERLAPPEDWINDOW for all windows \u2014 flutter_controller_ requires
   // this style for correct child window embedding (FlutterViewController).
   //

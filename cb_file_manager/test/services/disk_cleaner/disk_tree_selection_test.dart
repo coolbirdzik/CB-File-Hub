@@ -3,6 +3,50 @@ import 'package:cb_file_manager/services/disk_cleaner/disk_tree_selection.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test(
+    'protected system rows cannot be checked even with a stale junk category',
+    () {
+      final protected = DiskTreeNode(
+        name: 'pagefile.sys',
+        fullPath: r'C:\pagefile.sys',
+        isFile: true,
+        junkCategoryId: 'windows_temp',
+        isSelectedForDeletion: true,
+      );
+      final cache = DiskTreeNode(
+        name: 'cache.tmp',
+        fullPath: r'C:\Windows\Temp\cache.tmp',
+        isFile: true,
+        junkCategoryId: 'windows_temp',
+      );
+      final windows = DiskTreeNode(
+        name: 'Windows',
+        fullPath: r'C:\Windows',
+        children: [cache],
+        junkCategoryId: 'windows_temp',
+        isSelectedForDeletion: true,
+      );
+      final root = DiskTreeNode(
+        name: 'C:',
+        fullPath: r'C:\',
+        children: [protected, windows],
+      );
+      expect(DiskTreeSelection.countCleanableNodes(root), 1);
+      expect(DiskTreeSelection.setAllCleanableChecked(root, true), {
+        cache.fullPath,
+      });
+      expect(protected.isSelectedForDeletion, isFalse);
+      expect(windows.isSelectedForDeletion, isFalse);
+      expect(
+        DiskTreeSelection.setExactTargetChecked({cache}, protected, true),
+        {cache},
+      );
+      protected.isSelectedForDeletion = true;
+      windows.isSelectedForDeletion = true;
+      expect(DiskTreeSelection.collectDeletionTargets(root), [cache]);
+    },
+  );
+
   test('Check all cleanable never selects the drive or safe ancestors', () {
     final junkFile = DiskTreeNode(
       name: 'cache.tmp',

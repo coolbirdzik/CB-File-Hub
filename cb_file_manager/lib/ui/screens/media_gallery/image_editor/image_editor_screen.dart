@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:math';
 import 'dart:ui' as ui;
 
+import 'package:cb_file_manager/design_system/primitives/cb_slider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -1703,7 +1704,7 @@ class _EditorSlider extends StatelessWidget {
             ),
             child: Semantics(
               label: label,
-              child: Slider(
+              child: CbSlider(
                 value: value.clamp(min, max),
                 min: min,
                 max: max,

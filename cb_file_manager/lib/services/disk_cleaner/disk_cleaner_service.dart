@@ -18,6 +18,7 @@ import 'cleaner_categories.dart';
 import 'cleaner_agent_review.dart';
 import 'cleaner_models.dart';
 import 'cleaner_safety.dart';
+import 'cleaner_system_protection.dart';
 import 'cleaner_paths.dart';
 import 'macos_cleaner_platform.dart';
 import 'disk_cleaner_isolate.dart';
@@ -284,7 +285,9 @@ int _countCleanableNodes(DiskTreeNode root) {
   final stack = <DiskTreeNode>[root];
   while (stack.isNotEmpty) {
     final node = stack.removeLast();
-    if (node.fullPath.isNotEmpty && node.isJunk) count++;
+    if (node.fullPath.isNotEmpty && node.isJunk && !node.isSystemProtected) {
+      count++;
+    }
     stack.addAll(node.children);
   }
   return count;
@@ -467,8 +470,9 @@ class DiskCleanerService {
         );
       }
       if (analysis.decision == CleanerItemDecision.clean &&
-          CleanerCategories.byId(node.junkCategoryId ?? '')?.safety !=
-              CleanerSafety.safe) {
+          (node.isSystemProtected ||
+              CleanerCategories.byId(node.junkCategoryId ?? '')?.safety !=
+                  CleanerSafety.safe)) {
         return const CleanerItemInteractionResult(
           error:
               'This item is not scanner-marked safe junk. Use REVIEW or KEEP and explain the evidence.',
@@ -566,6 +570,11 @@ class DiskCleanerService {
       }
       found[normalize(path)] = node;
       corrections[path] = node.fullPath;
+    }
+    if (found.values.any((node) => node.isSystemProtected)) {
+      return const CleanerSelectionResult(
+        error: 'System-protected items cannot be selected for cleanup.',
+      );
     }
     if (unresolved.isNotEmpty) {
       return CleanerSelectionResult(
@@ -1043,8 +1052,16 @@ class DiskCleanerService {
 
     final trash = _trashForTesting ?? TrashManager();
     onProgress?.call(0, 0, null);
+    final eligibleItems = <JunkItem>[];
+    for (final item in items) {
+      if (CleanerSystemProtection.isProtected(item.path)) {
+        skippedUnsafe.add(item.path);
+      } else {
+        eligibleItems.add(item);
+      }
+    }
     final expandedItems = await _expandDirectoryTargets(
-      items,
+      eligibleItems,
       onPreparing: (currentPath) {
         // Surface the directory being expanded so the UI can show
         // "Preparing files…" instead of appearing frozen on huge junk
@@ -1052,7 +1069,7 @@ class DiskCleanerService {
         onProgress?.call(0, 0, currentPath);
       },
     );
-    final total = expandedItems.length;
+    final total = expandedItems.length + skippedUnsafe.length;
 
     // Filter unsafe paths first and bucket the rest by handling strategy.
     // Bulk operations are batched into a single native IFileOperation call
@@ -1071,7 +1088,8 @@ class DiskCleanerService {
       );
       // Allow paths the user explicitly selected from the disk tree. Keep the
       // stricter allowlist for scanner rules and AI-driven cleanup.
-      if (!safeByRule && !item.isUserSelected) {
+      if (CleanerSystemProtection.isProtected(item.path) ||
+          (!safeByRule && !item.isUserSelected)) {
         skippedUnsafe.add(item.path);
         continue;
       }

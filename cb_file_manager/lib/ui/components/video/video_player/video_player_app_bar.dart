@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/services/windowing/windows_engine_host.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -45,11 +46,11 @@ class _VideoPlayerAppBarState extends State<VideoPlayerAppBar> {
   bool get _isDesktopPlatform =>
       Platform.isWindows || Platform.isMacOS || Platform.isLinux;
 
-  VoidCallback get _onCloseDefault => () {
+  VoidCallback get _onCloseDefault => () async {
     if (Navigator.of(context).canPop()) {
       Navigator.of(context).pop();
     } else {
-      exit(0);
+      await WindowsEngineHost.closeOrExit();
     }
   };
 

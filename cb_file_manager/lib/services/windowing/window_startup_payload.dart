@@ -1,15 +1,21 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'windows_engine_host.dart';
+
 class WindowTabPayload {
   final String path;
   final String? name;
   final String? highlightedFileName;
 
+  /// Serializable tab session; no widget keys or engine-local objects.
+  final Map<String, dynamic>? session;
+
   const WindowTabPayload({
     required this.path,
     this.name,
     this.highlightedFileName,
+    this.session,
   });
 
   factory WindowTabPayload.fromJson(Map<String, dynamic> json) {
@@ -17,6 +23,9 @@ class WindowTabPayload {
       path: (json['path'] as String?) ?? '',
       name: json['name'] as String?,
       highlightedFileName: json['highlightedFileName'] as String?,
+      session: json['session'] is Map
+          ? Map<String, dynamic>.from(json['session'] as Map)
+          : null,
     );
   }
 
@@ -24,6 +33,7 @@ class WindowTabPayload {
     'path': path,
     if (name != null) 'name': name,
     if (highlightedFileName != null) 'highlightedFileName': highlightedFileName,
+    if (session != null) 'session': session,
   };
 }
 
@@ -54,7 +64,7 @@ class WindowStartupPayload {
       return null;
     }
 
-    final raw = Platform.environment[envTabsKey];
+    final raw = WindowsEngineHost.environment[envTabsKey];
     if (raw == null || raw.trim().isEmpty) return null;
 
     try {

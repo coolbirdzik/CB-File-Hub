@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:cb_file_manager/design_system/primitives/cb_slider.dart';
 import 'package:flutter/material.dart';
 import 'package:cb_file_manager/services/media/media_kit_playback.dart';
 import 'package:path/path.dart' as p;
@@ -321,7 +322,7 @@ class _VideoFramePickerDialogState extends State<VideoFramePickerDialog> {
                     Expanded(
                       child: Semantics(
                         container: true,
-                        child: Slider(
+                        child: CbSlider(
                           // Use one discrete tick per second so the selected
                           // frame always maps to an exact second position.
                           value: _selectedSecond.toDouble().clamp(

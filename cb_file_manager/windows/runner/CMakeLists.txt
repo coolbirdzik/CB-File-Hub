@@ -8,6 +8,11 @@ project(runner LANGUAGES CXX)
 # Any new source files that you add to the application should be added here.
 add_executable(${BINARY_NAME} WIN32
   "flutter_window.cpp"
+  "custom_frame_message.h"
+  "flutter_mouse_input_guard.cpp"
+  "flutter_mouse_input_guard.h"
+  "engine_window_host.cpp"
+  "engine_window_host.h"
   "main.cpp"
   "utils.cpp"
   "torrent_launch.cpp"

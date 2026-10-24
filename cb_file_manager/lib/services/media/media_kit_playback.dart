@@ -61,6 +61,21 @@ class PlaybackPlayer {
     // Subscribed before any UI listener, so [fellBackToSoftware] is already
     // set when theirs runs for the same error.
     _errorSubscription = stream.error.listen(_onError);
+    _live.add(this);
+  }
+
+  static final _live = <PlaybackPlayer>{};
+
+  /// Disposes every player of this isolate. libmpv's event thread calls back
+  /// into the isolate that created the player, so this must finish before an
+  /// engine is torn down, or that callback crashes the whole process.
+  static Future<void> disposeAll({
+    Duration timeout = const Duration(seconds: 3),
+  }) async {
+    if (_live.isEmpty) return;
+    await Future.wait([
+      for (final player in _live.toList()) player.dispose(),
+    ]).timeout(timeout, onTimeout: () => const []);
   }
 
   /// libmpv decoder errors that a software decoder can recover from.
@@ -225,6 +240,16 @@ class PlaybackPlayer {
 
   Future<void> setVolume(double volume) =>
       _player.setVolume(volume.clamp(0, 100));
+
+  /// Silences output through libmpv's own mute, leaving the volume and mute
+  /// preference the UI owns untouched.
+  Future<void> setAudioSuppressed(bool suppressed) async {
+    if (_disposal != null) return;
+    if (_player.platform case final mk.NativePlayer native) {
+      await native.setProperty('mute', suppressed ? 'yes' : 'no');
+    }
+  }
+
   Future<void> setRate(double rate) => _player.setRate(rate);
   Future<void> next() => _player.next();
   Future<void> previous() => _player.previous();
@@ -232,6 +257,7 @@ class PlaybackPlayer {
   Future<void> dispose() => _disposal ??= _dispose();
 
   Future<void> _dispose() async {
+    _live.remove(this);
     await _durationSubscription.cancel();
     await _errorSubscription.cancel();
     for (final subscription in _sizeSubscriptions) {

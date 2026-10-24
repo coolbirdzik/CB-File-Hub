@@ -434,7 +434,6 @@ class TagManager {
   ) async {
     if (filePaths.isEmpty) return {};
 
-    final stopwatch = Stopwatch()..start();
     final result = <String, List<String>>{};
     final uncachedPaths = <String>[];
 
@@ -450,14 +449,7 @@ class TagManager {
       }
     }
 
-    AppLogger.perf(
-      '⏱️ [PERF] TagManager.getTagsForFiles: ${result.length} cached, ${uncachedPaths.length} uncached',
-    );
-
     if (uncachedPaths.isEmpty) {
-      AppLogger.perf(
-        '⏱️ [PERF] TagManager.getTagsForFiles (all cached) took: ${stopwatch.elapsedMilliseconds}ms',
-      );
       return result;
     }
 
@@ -495,9 +487,6 @@ class TagManager {
       debugPrint('Error in getTagsForFiles: $e');
     }
 
-    AppLogger.perf(
-      '⏱️ [PERF] TagManager.getTagsForFiles for ${filePaths.length} files took: ${stopwatch.elapsedMilliseconds}ms',
-    );
     return result;
   }
 

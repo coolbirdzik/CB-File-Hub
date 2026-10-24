@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/design_system/primitives/cb_slider.dart';
 import 'package:flutter/material.dart';
 
 import '../../../utils/route.dart';
@@ -79,7 +80,7 @@ class VideoPlayerLabeledSlider extends StatelessWidget {
         Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
         Semantics(
           container: true,
-          child: Slider(
+          child: CbSlider(
             value: value,
             min: min,
             max: max,
@@ -114,7 +115,7 @@ class VideoPlayerFilterSlider extends StatelessWidget {
         Text('$label: ${(value * 100).round()}%'),
         Semantics(
           container: true,
-          child: Slider(
+          child: CbSlider(
             value: value,
             min: 0.0,
             max: 2.0,

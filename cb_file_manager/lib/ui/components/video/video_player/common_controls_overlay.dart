@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/design_system/primitives/cb_slider.dart';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
@@ -68,7 +69,7 @@ class CommonVideoControlsOverlay extends StatelessWidget {
               Expanded(
                 child: Semantics(
                   container: true,
-                  child: Slider(
+                  child: CbSlider(
                     value: progress,
                     onChanged: onSeek,
                     activeColor: Colors.redAccent,
@@ -136,7 +137,7 @@ class CommonVideoControlsOverlay extends StatelessWidget {
                       width: 100,
                       child: Semantics(
                         container: true,
-                        child: Slider(
+                        child: CbSlider(
                           value: (volume ?? 70).clamp(0, 100),
                           min: 0,
                           max: 100,

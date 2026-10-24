@@ -7,8 +7,11 @@ import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';
 import 'package:cb_file_manager/utils/app_logger.dart';
 import 'package:uuid/uuid.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:window_manager/window_manager.dart';
 
+import 'windows_engine_host.dart';
+import '../../ui/tab_manager/core/tab_window_transfer.dart';
 import 'desktop_window_process_launcher.dart';
 import 'window_startup_payload.dart';
 import 'windows_native_tab_drag_drop_service.dart';
@@ -17,9 +20,23 @@ import '../torrent/torrent_service.dart';
 import '../torrent/torrent_background_receiver.dart';
 import '../../core/service_locator.dart';
 
-const double kDefaultTabTearOffAnchorX = 140.0;
-const double kDefaultTabTearOffAnchorY = 18.0;
-const Duration kDefaultTabTearOffDragDelay = Duration(milliseconds: 16);
+/// Size of a window opened for torn-off tabs (the runner creates secondary
+/// windows at this size), which the drag preview matches.
+const Size kTearOffWindowSize = Size(1200, 800);
+
+/// Where the cursor lands in a torn-off window when the caller does not say:
+/// roughly the middle of the first tab.
+const Offset kDefaultTabTearOffAnchor = Offset(140.0, 27.0);
+
+/// A spare window loaded with torn-off tabs, still hidden.
+class PreparedTabWindow {
+  final DesktopWindowInfo window;
+
+  /// Its top-level handle, for the native hand-off on release.
+  final int? windowHandle;
+
+  const PreparedTabWindow(this.window, this.windowHandle);
+}
 
 class DesktopWindowInfo {
   final String windowId;
@@ -76,7 +93,10 @@ class DesktopWindowingService {
     required this._registryPort,
     this.torrentService,
     this.torrentNotice,
-  }) : _allowE2EPeers = true;
+    String? windowRole,
+  }) : _allowE2EPeers = true {
+    if (windowRole != null) _windowRole = windowRole;
+  }
   final TorrentService? torrentService;
   final TorrentBackgroundNotice? torrentNotice;
   Future<void> _torrentLaunches = Future<void>.value();
@@ -85,16 +105,27 @@ class DesktopWindowingService {
 
   final String _windowId = const Uuid().v4();
   final bool _isSecondaryWindow =
-      Platform.environment[WindowStartupPayload.envSecondaryWindowKey] == '1';
+      WindowsEngineHost.environment[WindowStartupPayload
+          .envSecondaryWindowKey] ==
+      '1';
   String _windowRole =
-      (Platform.environment[WindowStartupPayload.envWindowRoleKey] ?? 'normal')
+      (WindowsEngineHost.environment[WindowStartupPayload.envWindowRoleKey] ??
+              'normal')
           .trim()
           .isEmpty
       ? 'normal'
-      : (Platform.environment[WindowStartupPayload.envWindowRoleKey] ??
+      : (WindowsEngineHost.environment[WindowStartupPayload.envWindowRoleKey] ??
             'normal');
   Timer? _spareWarmupTimer;
   bool _spareWarmupInFlight = false;
+  int _orphanedSpareBeats = 0;
+  bool _closing = false;
+
+  /// Spawning a process while a torn-off window is being dragged makes the
+  /// drag stutter, so a used spare is replaced only after this delay.
+  static const Duration _spareRewarmDelay = Duration(milliseconds: 1500);
+  // A debug engine can take seconds to boot; release ones well under one.
+  static const Duration _spareBootTimeout = Duration(seconds: 10);
 
   ServerSocket? _peerServer;
   int? _peerPort;
@@ -110,6 +141,7 @@ class DesktopWindowingService {
   StreamSubscription<TabManagerState>? _tabStateSub;
 
   String _lastTitle = 'CB File Hub';
+  int _lastRegisteredTabCount = -1;
   int? _torrentLaunchPriority;
 
   String get windowId => _windowId;
@@ -136,6 +168,12 @@ class DesktopWindowingService {
     await _ensureRegistryServerOrClient();
     _startHeartbeat();
     _listenToTabUpdates();
+    if (Platform.isWindows) {
+      WindowsNativeTabDragDropService.onTabWindowMerged = () =>
+          unawaited(_closeSelf());
+      WindowsNativeTabDragDropService.onTabWindowRevealed = () =>
+          unawaited(_finishReveal());
+    }
     if (Platform.isWindows &&
         !_allowE2EPeers &&
         !const bool.fromEnvironment('CB_E2E')) {
@@ -158,6 +196,8 @@ class DesktopWindowingService {
   }
 
   Future<void> dispose() async {
+    WindowsNativeTabDragDropService.onTabWindowMerged = null;
+    WindowsNativeTabDragDropService.onTabWindowRevealed = null;
     if (_torrentLaunchPriority != null) {
       locator<TorrentService>().removeListener(_updateTorrentLaunchRouting);
       WindowsNativeTabDragDropService.onTorrentSources = null;
@@ -215,8 +255,58 @@ class DesktopWindowingService {
   Future<List<DesktopWindowInfo>> listOtherWindows() async {
     final windows = await listWindows();
     return windows
-        .where((w) => w.windowId != _windowId && w.role != 'spare')
+        .where((w) => w.windowId != _windowId && w.role == 'normal')
         .toList(growable: false);
+  }
+
+  /// Loads [tabs] into the pre-warmed spare window behind the scenes (shown,
+  /// but cloaked), while a tab drag preview is still moving. Returns null when
+  /// no spare is free right now.
+  Future<PreparedTabWindow?> prepareTearOffWindow(
+    List<WindowTabPayload> tabs,
+  ) async {
+    if (!Platform.isWindows || tabs.isEmpty) return null;
+    final spare = await _findSpareWindow();
+    if (spare == null) {
+      unawaited(ensureSpareWindow());
+      return null;
+    }
+    final response = await _sendPeerMessage(
+      port: spare.port,
+      message: <String, dynamic>{
+        'type': 'prepare_tabs',
+        'tabs': tabs.map((t) => t.toJson()).toList(growable: false),
+      },
+    );
+    if (response?['type'] != 'ok') return null;
+    final handle = response?['windowHandle'];
+    return PreparedTabWindow(spare, handle is int ? handle : null);
+  }
+
+  /// Shows a window readied by [prepareTearOffWindow] with its content's
+  /// top-left at [clientOrigin] (physical screen pixels), when the native
+  /// hand-off did not.
+  Future<bool> revealPreparedWindow(
+    DesktopWindowInfo window,
+    Offset clientOrigin,
+  ) async {
+    final response = await _sendPeerMessage(
+      port: window.port,
+      message: <String, dynamic>{
+        'type': 'reveal_prepared',
+        'x': clientOrigin.dx,
+        'y': clientOrigin.dy,
+      },
+    );
+    return response?['type'] == 'ok';
+  }
+
+  /// Returns a window readied by [prepareTearOffWindow] to being a spare.
+  Future<void> discardPreparedWindow(DesktopWindowInfo window) async {
+    await _sendPeerMessage(
+      port: window.port,
+      message: <String, dynamic>{'type': 'discard_prepared'},
+    );
   }
 
   /// Called before constructing another app shell for a Windows association.
@@ -323,6 +413,15 @@ class DesktopWindowingService {
   /// Show the shell before opening a torrent dialog, preserving maximization.
   static Future<void> focusTorrentWindow() async {
     if (!Platform.isWindows && !Platform.isLinux && !Platform.isMacOS) return;
+    if (WindowsEngineHost.isAvailable) {
+      await WindowsEngineHost.setRole('normal');
+      if (locator.isRegistered<DesktopWindowingService>()) {
+        final service = locator<DesktopWindowingService>();
+        service._windowRole = 'normal';
+        service._closing = false;
+        unawaited(service._registerSelf());
+      }
+    }
     try {
       // window_manager.show restores minimized windows without unmaximizing.
       await windowManager.show();
@@ -334,30 +433,21 @@ class DesktopWindowingService {
     }
   }
 
+  /// Opens a window holding [tabs]. With [startDragging] the window follows
+  /// the cursor (a tab tear-off) with [dragAnchor], a point of its content in
+  /// logical pixels, under the cursor; [sourcePointerPosition] is the cursor in
+  /// this window, used only when no pre-warmed window is available.
   Future<bool> openNewWindow({
     List<WindowTabPayload> tabs = const [],
     Offset? sourcePointerPosition,
+    Offset dragAnchor = kDefaultTabTearOffAnchor,
     bool startDragging = false,
   }) async {
     if (!isDesktop) return false;
 
-    Offset? initialPosition;
-    if (sourcePointerPosition != null) {
-      try {
-        final sourceWindowPosition = await windowManager.getPosition();
-        initialPosition = Offset(
-          sourceWindowPosition.dx +
-              sourcePointerPosition.dx -
-              kDefaultTabTearOffAnchorX,
-          sourceWindowPosition.dy +
-              sourcePointerPosition.dy -
-              kDefaultTabTearOffAnchorY,
-        );
-      } catch (_) {}
-    }
-
     if (Platform.isWindows) {
-      await WindowsNativeTabDragDropService.allowForegroundWindow();
+      final allowForeground =
+          WindowsNativeTabDragDropService.allowForegroundWindow();
       DesktopWindowInfo? spare = await _findSpareWindow();
       if (spare == null) {
         // If the user triggers "new window" very quickly after startup,
@@ -367,28 +457,29 @@ class DesktopWindowingService {
           timeout: const Duration(milliseconds: 900),
         );
       }
+      await allowForeground;
       if (spare != null) {
+        // One round trip: the spare takes the tabs before it first shows, so
+        // it never flashes empty, and starts following the cursor itself.
         final shown = await requestShowWindow(
           spare,
           consumeSpare: true,
-          initialPosition: initialPosition,
-          startDragging: startDragging,
+          tabs: tabs,
+          dragAnchor: startDragging ? dragAnchor : null,
         );
-        if (shown) {
-          if (tabs.isNotEmpty) {
-            // Make the window appear immediately, then stream tabs in.
-            // This feels closer to Chrome where the window shows first.
-            final delivered = await sendTabsToWindow(spare, tabs);
-            unawaited(ensureSpareWindow());
-            return delivered;
-          }
-          unawaited(ensureSpareWindow());
-          return true;
-        }
+        if (shown) return true;
         // Spare not ready: fall back to creating a fresh window.
       }
     }
 
+    Offset? initialPosition;
+    if (sourcePointerPosition != null) {
+      try {
+        final sourceWindowPosition = await windowManager.getPosition();
+        initialPosition =
+            sourceWindowPosition + sourcePointerPosition - dragAnchor;
+      } catch (_) {}
+    }
     final created = await DesktopWindowProcessLauncher.openWindow(
       tabs: tabs,
       startHidden: false,
@@ -397,15 +488,18 @@ class DesktopWindowingService {
       initialPositionY: initialPosition?.dy,
       startDragging: startDragging,
     );
-    unawaited(ensureSpareWindow());
+    _scheduleSpareWarmup(delay: _spareRewarmDelay);
     return created;
   }
 
+  /// Shows [target]. A [dragAnchor] makes it follow the cursor until the mouse
+  /// button is released, with that point of its content under the cursor.
   Future<bool> requestShowWindow(
     DesktopWindowInfo target, {
     bool consumeSpare = false,
     Offset? initialPosition,
-    bool startDragging = false,
+    List<WindowTabPayload> tabs = const [],
+    Offset? dragAnchor,
   }) async {
     if (!isDesktop) return false;
     final response = await _sendPeerMessage(
@@ -417,7 +511,12 @@ class DesktopWindowingService {
           'positionX': initialPosition.dx,
           'positionY': initialPosition.dy,
         },
-        'startDragging': startDragging,
+        if (tabs.isNotEmpty)
+          'tabs': tabs.map((t) => t.toJson()).toList(growable: false),
+        if (dragAnchor != null) ...<String, dynamic>{
+          'anchorX': dragAnchor.dx,
+          'anchorY': dragAnchor.dy,
+        },
       },
     );
     return response != null && response['type'] == 'ok';
@@ -427,17 +526,24 @@ class DesktopWindowingService {
     if (_allowE2EPeers || const bool.fromEnvironment('CB_E2E')) return;
     if (!isDesktop) return;
     if (!Platform.isWindows) return;
-    if (_isSecondaryWindow) return;
+    // Only the primary window, or whichever window took over the registry
+    // after it closed, keeps a spare, so windows never warm one each.
+    if (_isSecondaryWindow && _registryServer == null) return;
     if (_windowRole == 'spare') return;
     if (_spareWarmupInFlight) return;
     _spareWarmupInFlight = true;
     try {
       final existing = await _findSpareWindow();
       if (existing != null) return;
-      await DesktopWindowProcessLauncher.openWindow(
+      final launched = await DesktopWindowProcessLauncher.openWindow(
         startHidden: true,
         windowRole: 'spare',
       );
+      // The launch returns before the spare's isolate boots and registers.
+      // Until it does, another call (the startup timer, a tear-off finding no
+      // spare) would start a second and third engine; booting them together
+      // stalled every window and the shared database for seconds.
+      if (launched) await _waitForSpareWindow(timeout: _spareBootTimeout);
     } finally {
       _spareWarmupInFlight = false;
     }
@@ -453,9 +559,11 @@ class DesktopWindowingService {
     return null;
   }
 
-  void _scheduleSpareWarmup() {
+  void _scheduleSpareWarmup({
+    Duration delay = const Duration(milliseconds: 200),
+  }) {
     if (_spareWarmupTimer != null) return;
-    _spareWarmupTimer = Timer(const Duration(milliseconds: 200), () {
+    _spareWarmupTimer = Timer(delay, () {
       _spareWarmupTimer = null;
       unawaited(ensureSpareWindow());
     });
@@ -617,36 +725,61 @@ class DesktopWindowingService {
 
     if (type == 'show_window') {
       final bool consumeSpare = message['consumeSpare'] == true;
-      final bool startDragging = message['startDragging'] == true;
       final positionX = message['positionX'];
       final positionY = message['positionY'];
       final initialPosition = positionX is num && positionY is num
           ? Offset(positionX.toDouble(), positionY.toDouble())
           : null;
+      final anchorX = message['anchorX'];
+      final anchorY = message['anchorY'];
+      final dragAnchor = anchorX is num && anchorY is num
+          ? Offset(anchorX.toDouble(), anchorY.toDouble())
+          : null;
+      final tabs = _decodeTabList(message['tabs']);
 
       try {
-        if (isDesktop) {
-          await windowManager.setSkipTaskbar(false);
-          if (initialPosition != null) {
-            await windowManager.setPosition(initialPosition);
-          }
-          await windowManager.show();
-          await windowManager.focus();
-          await WindowsNativeTabDragDropService.forceActivateWindow();
+        final bloc = _tabBloc;
+        if (tabs.isNotEmpty && bloc != null) {
+          WindowsNativeTabDragDropService.addTabs(bloc, tabs);
         }
         if (consumeSpare && _windowRole == 'spare') {
           _windowRole = 'normal';
+          if (WindowsEngineHost.isAvailable) {
+            await WindowsEngineHost.setRole(_windowRole);
+          }
           if (_torrentLaunchPriority != null) _updateTorrentLaunchRouting();
           unawaited(_registerSelf());
         }
-        _writeJsonLine(socket, <String, dynamic>{'type': 'ok'});
-        if (startDragging && isDesktop) {
-          unawaited(
-            Future<void>.delayed(kDefaultTabTearOffDragDelay, () async {
-              await WindowsNativeTabDragDropService.startWindowDragIfMouseDown();
-            }),
-          );
+        if (isDesktop) {
+          // Shown cloaked: a hidden window draws nothing, so revealing it
+          // right away showed whatever it last drew (its empty home screen),
+          // then the tab half-loaded, while the source window already
+          // switched to its next tab.
+          final holdHidden = Platform.isWindows && tabs.isNotEmpty;
+          if (holdHidden) {
+            await WindowsNativeTabDragDropService.holdTabWindowHidden(true);
+          }
+          if (dragAnchor != null) {
+            // Start following the cursor before it appears, so the window
+            // shows up under it instead of where the cursor was a moment ago.
+            await WindowsNativeTabDragDropService.startTabWindowDrag(
+              mergeTabs: tabs,
+              anchor: dragAnchor,
+            );
+          } else if (initialPosition != null) {
+            await windowManager.setPosition(initialPosition);
+          }
+          await windowManager.setSkipTaskbar(false);
+          await windowManager.show();
+          if (holdHidden) {
+            await waitForContentToSettle();
+            await WindowsNativeTabDragDropService.holdTabWindowHidden(false);
+          }
         }
+        // The source closes its tabs on this reply, so it comes only once the
+        // tabs are on screen here.
+        _writeJsonLine(socket, <String, dynamic>{'type': 'ok'});
+        if (isDesktop) unawaited(_activateShownWindow());
       } catch (e, st) {
         AppLogger.warning(
           'Failed to show a detached tab window.',
@@ -658,6 +791,94 @@ class DesktopWindowingService {
           'message': 'Failed to show window',
         });
       }
+      return;
+    }
+
+    if (type == 'prepare_tabs') {
+      final tabs = _decodeTabList(message['tabs']);
+      final bloc = _tabBloc;
+      if (_windowRole != 'spare' ||
+          bloc == null ||
+          tabs.isEmpty ||
+          !Platform.isWindows) {
+        _writeJsonLine(socket, <String, dynamic>{'type': 'unavailable'});
+        return;
+      }
+      // Taken: no other tear-off may use this spare meanwhile.
+      _windowRole = 'preparing';
+      if (WindowsEngineHost.isAvailable) {
+        await WindowsEngineHost.setRole(_windowRole);
+      }
+      unawaited(_registerSelf());
+      try {
+        WindowsNativeTabDragDropService.addTabs(bloc, tabs);
+        // Shown, so it renders the tabs, but cloaked and off the taskbar
+        // until revealed. Inactive: the source window is mid-drag.
+        await WindowsNativeTabDragDropService.holdTabWindowHidden(true);
+        await WindowsNativeTabDragDropService.showWindowInactive();
+        // The spare left the taskbar while hidden; showing it adds a button.
+        await windowManager.setSkipTaskbar(true);
+        _writeJsonLine(socket, <String, dynamic>{
+          'type': 'ok',
+          'windowHandle':
+              ?await WindowsNativeTabDragDropService.topLevelWindowHandle(),
+        });
+      } catch (e, st) {
+        AppLogger.warning(
+          'Failed to prepare a tab window.',
+          error: e,
+          stackTrace: st,
+        );
+        _writeJsonLine(socket, <String, dynamic>{'type': 'error'});
+      }
+      return;
+    }
+
+    if (type == 'reveal_prepared') {
+      final x = message['x'];
+      final y = message['y'];
+      if (_windowRole != 'preparing' || x is! num || y is! num) {
+        _writeJsonLine(socket, <String, dynamic>{'type': 'unavailable'});
+        return;
+      }
+      try {
+        // The tabs loaded while the preview was dragged: appear at once, and
+        // let the source drop its preview; the rest follows.
+        await WindowsNativeTabDragDropService.placeWindowClientAt(
+          Offset(x.toDouble(), y.toDouble()),
+        );
+        await WindowsNativeTabDragDropService.holdTabWindowHidden(false);
+        if (WindowsEngineHost.isAvailable) {
+          // The source may close its final tab as soon as it receives this ack.
+          await WindowsEngineHost.setRole('normal');
+        }
+        _writeJsonLine(socket, <String, dynamic>{'type': 'ok'});
+        unawaited(_finishReveal());
+      } catch (e, st) {
+        AppLogger.warning(
+          'Failed to reveal a tab window.',
+          error: e,
+          stackTrace: st,
+        );
+        _writeJsonLine(socket, <String, dynamic>{'type': 'error'});
+      }
+      return;
+    }
+
+    if (type == 'discard_prepared') {
+      if (_windowRole == 'preparing') {
+        try {
+          _tabBloc?.add(CloseAllTabs());
+          await windowManager.hide();
+          await WindowsNativeTabDragDropService.holdTabWindowHidden(false);
+        } catch (_) {}
+        _windowRole = 'spare';
+        if (WindowsEngineHost.isAvailable) {
+          await WindowsEngineHost.setRole(_windowRole);
+        }
+        unawaited(_registerSelf());
+      }
+      _writeJsonLine(socket, <String, dynamic>{'type': 'ok'});
       return;
     }
 
@@ -675,13 +896,7 @@ class DesktopWindowingService {
             ? activeIndex
             : null,
         'tabs': tabs
-            .map(
-              (t) => WindowTabPayload(
-                path: t.path,
-                name: t.name,
-                highlightedFileName: t.highlightedFileName,
-              ).toJson(),
-            )
+            .map((t) => TabWindowTransfer.capture(t).toJson())
             .toList(growable: false),
       });
       return;
@@ -699,11 +914,7 @@ class DesktopWindowingService {
         return;
       }
 
-      final payloads = tabsValue
-          .whereType<Map>()
-          .map((m) => WindowTabPayload.fromJson(Map<String, dynamic>.from(m)))
-          .where((t) => t.path.trim().isNotEmpty)
-          .toList(growable: false);
+      final payloads = _decodeTabList(tabsValue);
 
       for (int i = 0; i < payloads.length; i++) {
         final p = payloads[i];
@@ -714,6 +925,7 @@ class DesktopWindowingService {
             name: p.name,
             switchToTab: shouldSwitch,
             highlightedFileName: p.highlightedFileName,
+            windowPayload: p,
           ),
         );
       }
@@ -724,15 +936,10 @@ class DesktopWindowingService {
 
     if (type == 'close_window') {
       _writeJsonLine(socket, <String, dynamic>{'type': 'ok'});
-      Future<void>.delayed(const Duration(milliseconds: 50), () async {
-        try {
-          if (isDesktop) {
-            await windowManager.close();
-            return;
-          }
-        } catch (_) {}
-        exit(0);
-      });
+      Future<void>.delayed(
+        const Duration(milliseconds: 50),
+        () => unawaited(_closeSelf()),
+      );
       return;
     }
 
@@ -740,6 +947,95 @@ class DesktopWindowingService {
       'type': 'error',
       'message': 'Not implemented',
     });
+  }
+
+  static List<WindowTabPayload> _decodeTabList(Object? value) {
+    if (value is! List) return const <WindowTabPayload>[];
+    return value
+        .whereType<Map>()
+        .map((m) => WindowTabPayload.fromJson(Map<String, dynamic>.from(m)))
+        .where((t) => t.path.trim().isNotEmpty)
+        .toList(growable: false);
+  }
+
+  /// Waits until freshly added tabs have loaded and drawn: no frame pending
+  /// for two checks in a row. Bounded, since spinners or thumbnails can keep
+  /// frames coming.
+  @visibleForTesting
+  static Future<void> waitForContentToSettle({
+    Duration limit = const Duration(milliseconds: 300),
+  }) async {
+    final binding = SchedulerBinding.instance;
+    final elapsed = Stopwatch()..start();
+    await Future<void>.delayed(Duration.zero);
+    try {
+      await binding.endOfFrame.timeout(limit);
+    } catch (_) {}
+    var quietChecks = 0;
+    while (elapsed.elapsed < limit) {
+      await Future<void>.delayed(const Duration(milliseconds: 16));
+      final idle =
+          !binding.hasScheduledFrame &&
+          binding.schedulerPhase == SchedulerPhase.idle;
+      quietChecks = idle ? quietChecks + 1 : 0;
+      if (quietChecks >= 2) return;
+    }
+  }
+
+  /// A readied window has appeared (natively, or via `reveal_prepared`):
+  /// make it an ordinary window.
+  Future<void> _finishReveal() async {
+    if (_windowRole != 'preparing') return;
+    _windowRole = 'normal';
+    if (WindowsEngineHost.isAvailable) {
+      await WindowsEngineHost.setRole(_windowRole);
+    }
+    if (_torrentLaunchPriority != null) _updateTorrentLaunchRouting();
+    unawaited(_registerSelf());
+    try {
+      await windowManager.setSkipTaskbar(false);
+    } catch (_) {}
+    await _activateShownWindow();
+  }
+
+  static Future<void> _activateShownWindow() async {
+    try {
+      await windowManager.focus();
+    } catch (_) {}
+    await WindowsNativeTabDragDropService.forceActivateWindow();
+  }
+
+  /// Closes this window, unregistering first so window pickers elsewhere never
+  /// list it while it shuts down.
+  Future<void> _closeSelf() async {
+    if (_closing) return;
+    _closing = true;
+    if (WindowsEngineHost.isAvailable) {
+      await prepareForEngineClose();
+      await WindowsEngineHost.close();
+      return;
+    }
+    _heartbeat?.cancel();
+    _heartbeat = null;
+    await _sendRegistryMessage(<String, dynamic>{
+      'type': 'unregister',
+      'windowId': _windowId,
+    });
+    try {
+      if (isDesktop) {
+        await windowManager.close();
+        return;
+      }
+    } catch (_) {}
+    await WindowsEngineHost.closeOrExit();
+  }
+
+  /// A retained engine still serves IPC/tasks, but is no longer a tab target.
+  Future<void> prepareForEngineClose() async {
+    _windowRole = 'background';
+    await WindowsEngineHost.setRole('background');
+    if (_torrentLaunchPriority != null) _updateTorrentLaunchRouting();
+    await _registerSelf();
   }
 
   void _writeJsonLine(Socket socket, Map<String, dynamic> message) {
@@ -843,6 +1139,12 @@ class DesktopWindowingService {
         return;
       }
 
+      final previousRole = _registry[windowId]?.info.role;
+      if ((previousRole == 'spare' || previousRole == 'preparing') &&
+          role == 'normal') {
+        // A spare was just put to use; warm the next one.
+        _scheduleSpareWarmup(delay: _spareRewarmDelay);
+      }
       _registry[windowId] = _RegistryEntry(
         info: DesktopWindowInfo(
           windowId: windowId,
@@ -900,8 +1202,21 @@ class DesktopWindowingService {
     _heartbeat?.cancel();
     _heartbeat = Timer.periodic(_heartbeatInterval, (_) async {
       await _registerSelf();
+      if (_windowRole == 'spare') await _exitIfOrphanedSpare();
     });
     unawaited(_registerSelf());
+  }
+
+  /// A hidden spare outliving every visible window would never be used; quit
+  /// once no normal window has been registered for two heartbeats.
+  Future<void> _exitIfOrphanedSpare() async {
+    final windows = await listWindows();
+    if (windows.any((w) => w.role == 'normal')) {
+      _orphanedSpareBeats = 0;
+      return;
+    }
+    if (++_orphanedSpareBeats < 2 || _windowRole != 'spare') return;
+    await _closeSelf();
   }
 
   void _listenToTabUpdates() {
@@ -909,10 +1224,23 @@ class DesktopWindowingService {
     final bloc = _tabBloc;
     if (bloc == null) return;
     _tabStateSub = bloc.stream.listen((state) {
-      final title = state.activeTab?.name.trim();
-      _lastTitle = (title == null || title.isEmpty) ? 'CB File Hub' : title;
-
-      unawaited(_updateWindowTitle());
+      final name = state.activeTab?.name.trim();
+      final title = (name == null || name.isEmpty) ? 'CB File Hub' : name;
+      final tabCount = state.tabs.length;
+      if (WindowsEngineHost.isAvailable &&
+          _windowRole == 'normal' &&
+          tabCount == 0 &&
+          _lastRegisteredTabCount > 0) {
+        unawaited(_closeSelf());
+        return;
+      }
+      // Reorders, drags and loading flags emit too; only what other windows
+      // and the title bar show is worth a native call and a registry trip.
+      if (title == _lastTitle && tabCount == _lastRegisteredTabCount) return;
+      final titleChanged = title != _lastTitle;
+      _lastTitle = title;
+      _lastRegisteredTabCount = tabCount;
+      if (titleChanged) unawaited(_updateWindowTitle());
       unawaited(_registerSelf());
     });
   }

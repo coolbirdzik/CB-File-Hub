@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/design_system/primitives/cb_slider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -88,7 +89,7 @@ class _BackdropSlider extends StatelessWidget {
           Semantics(
             container: true,
             label: title,
-            child: Slider(
+            child: CbSlider(
               min: 0,
               max: 2,
               divisions: 20,

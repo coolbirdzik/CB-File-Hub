@@ -48,6 +48,10 @@ abstract class _VideoPlayerSettingsHost extends _VideoPlayerVolumeHost {
   set _videoOutputFormat(String v);
   int get _videoSeekSpeed;
   set _videoSeekSpeed(int v);
+  bool get _videoSeekAcceleration;
+  set _videoSeekAcceleration(bool v);
+  int get _videoKeyboardSeekSeconds;
+  set _videoKeyboardSeekSeconds(int v);
   VideoWheelAction get _videoWheelAction;
   set _videoWheelAction(VideoWheelAction v);
 
@@ -369,37 +373,92 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
                     ),
                     const SizedBox(height: 16),
 
-                    // Seek Speed
                     Text(
-                      AppLocalizations.of(context)!.seekSpeed,
+                      context.tr.videoKeyboardSeekStep,
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        _buildSeekSpeedChip(
-                          context: context,
-                          label: AppLocalizations.of(context)!.seekSpeedSlow,
-                          value: 0,
-                          setDialogState: setDialogState,
-                        ),
-                        const SizedBox(width: 8),
-                        _buildSeekSpeedChip(
-                          context: context,
-                          label: AppLocalizations.of(context)!.seekSpeedMedium,
-                          value: 1,
-                          setDialogState: setDialogState,
-                        ),
-                        const SizedBox(width: 8),
-                        _buildSeekSpeedChip(
-                          context: context,
-                          label: AppLocalizations.of(context)!.seekSpeedFast,
-                          value: 2,
-                          setDialogState: setDialogState,
-                        ),
+                    CbSelect<int>(
+                      value: _videoKeyboardSeekSeconds,
+                      expand: true,
+                      items: [
+                        for (
+                          var seconds = 1;
+                          seconds <=
+                              UserPreferences.maxVideoKeyboardSeekSeconds;
+                          seconds++
+                        )
+                          CbSelectItem(
+                            value: seconds,
+                            label: context.tr.videoSeekSeconds(seconds),
+                          ),
                       ],
+                      onChanged: (value) {
+                        setDialogState(() => _videoKeyboardSeekSeconds = value);
+                        setState(() => _videoKeyboardSeekSeconds = value);
+                        _saveSettings();
+                      },
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      context.tr.videoKeyboardSeekStepDescription,
+                      style: Theme.of(context).textTheme.bodySmall,
                     ),
                     const SizedBox(height: 16),
+
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(
+                        context.tr.videoSeekAcceleration,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      subtitle: Text(
+                        context.tr.videoSeekAccelerationDescription,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      value: _videoSeekAcceleration,
+                      onChanged: (value) {
+                        setDialogState(() => _videoSeekAcceleration = value);
+                        setState(() => _videoSeekAcceleration = value);
+                        _saveSettings();
+                      },
+                    ),
+                    const SizedBox(height: 8),
+
+                    // Seek speed only shapes the acceleration.
+                    if (_videoSeekAcceleration) ...[
+                      Text(
+                        AppLocalizations.of(context)!.seekSpeed,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          _buildSeekSpeedChip(
+                            context: context,
+                            label: AppLocalizations.of(context)!.seekSpeedSlow,
+                            value: 0,
+                            setDialogState: setDialogState,
+                          ),
+                          const SizedBox(width: 8),
+                          _buildSeekSpeedChip(
+                            context: context,
+                            label: AppLocalizations.of(
+                              context,
+                            )!.seekSpeedMedium,
+                            value: 1,
+                            setDialogState: setDialogState,
+                          ),
+                          const SizedBox(width: 8),
+                          _buildSeekSpeedChip(
+                            context: context,
+                            label: AppLocalizations.of(context)!.seekSpeedFast,
+                            value: 2,
+                            setDialogState: setDialogState,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                    ],
 
                     // Mouse wheel action
                     Text(
@@ -545,6 +604,8 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
       );
       await prefs.setVideoPlayerString('video_scale_mode', _videoScaleMode);
       await prefs.setVideoSeekSpeed(_videoSeekSpeed);
+      await prefs.setVideoSeekAcceleration(_videoSeekAcceleration);
+      await prefs.setVideoKeyboardSeekSeconds(_videoKeyboardSeekSeconds);
       await prefs.setVideoWheelAction(_videoWheelAction);
       debugPrint('Video player settings saved successfully');
     } catch (e) {
@@ -586,6 +647,8 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
           networkTimeout,
           subtitleEncoding,
           videoSeekSpeed,
+          videoSeekAcceleration,
+          videoKeyboardSeekSeconds,
           videoWheelAction,
         ),
       ) = await (
@@ -610,6 +673,8 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
             defaultValue: 'utf-8',
           ),
           prefs.getVideoSeekSpeed(),
+          prefs.getVideoSeekAcceleration(),
+          prefs.getVideoKeyboardSeekSeconds(),
           prefs.getVideoWheelAction(),
         ).wait,
       ).wait;
@@ -622,6 +687,8 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
       _videoOutputFormat = videoOutputFormat ?? 'auto';
       _videoScaleMode = videoScaleMode ?? 'contain';
       _videoSeekSpeed = videoSeekSpeed;
+      _videoSeekAcceleration = videoSeekAcceleration;
+      _videoKeyboardSeekSeconds = videoKeyboardSeekSeconds;
       _videoWheelAction = videoWheelAction;
 
       debugPrint('Video player settings loaded successfully');
@@ -641,6 +708,9 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
       _videoOutputFormat = 'auto';
       _videoScaleMode = 'contain';
       _videoSeekSpeed = 1;
+      _videoSeekAcceleration = false;
+      _videoKeyboardSeekSeconds =
+          UserPreferences.defaultVideoKeyboardSeekSeconds;
       _videoWheelAction = VideoWheelAction.volume;
     });
     _saveSettings();

@@ -14,6 +14,7 @@
 #include "file_operations_plugin.h"
 #include "window_utils_plugin.h"
 #include "store_update_plugin.h"
+#include "custom_frame_message.h"
 
 namespace
 {
@@ -58,8 +59,9 @@ namespace
   }
 }
 
-FlutterWindow::FlutterWindow(const flutter::DartProject &project)
-    : project_(project) {}
+FlutterWindow::FlutterWindow(const flutter::DartProject &project,
+                             EngineWindowHost::Environment environment)
+    : project_(project), environment_(std::move(environment)) {}
 
 FlutterWindow::~FlutterWindow() {}
 
@@ -85,10 +87,15 @@ bool FlutterWindow::OnCreate()
   // drop targets. Otherwise they retain the unparented child HWND and file
   // operation completion messages never reach the top-level window delegate.
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
+  mouse_input_guard_ = std::make_unique<FlutterMouseInputGuard>(
+      flutter_controller_->view()->GetNativeWindow());
+  EngineWindowHost::Register(this, flutter_controller_->engine(), environment_);
   wchar_t role[32];
   const DWORD role_length = GetEnvironmentVariableW(L"CB_WINDOW_ROLE", role, 32);
-  if (role_length > 0 && role_length < 32 &&
-      wcscmp(role, L"torrent-options") == 0)
+  const auto engine_role = environment_.find("CB_WINDOW_ROLE");
+  if ((engine_role != environment_.end() && engine_role->second == "torrent-options") ||
+      (engine_role == environment_.end() && role_length > 0 && role_length < 32 &&
+       wcscmp(role, L"torrent-options") == 0))
   {
     // This form only needs window positioning/chrome. Avoid initializing video,
     // PDF, network, AI and shell integrations before its first frame. The folder
@@ -186,6 +193,8 @@ bool FlutterWindow::OnCreate()
 
 void FlutterWindow::OnDestroy()
 {
+  EngineWindowHost::OnDestroyed(this);
+  mouse_input_guard_.reset();
   if (flutter_controller_)
   {
     flutter_controller_ = nullptr;
@@ -199,6 +208,21 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                               WPARAM const wparam,
                               LPARAM const lparam) noexcept
 {
+  return DispatchCustomFrameMessage(
+      hwnd, message, wparam, lparam, [&](LPARAM forwarded_lparam) {
+        return DispatchMessageToPlugins(hwnd, message, wparam, forwarded_lparam);
+      });
+}
+
+LRESULT FlutterWindow::DispatchMessageToPlugins(HWND hwnd, UINT message,
+                                               WPARAM wparam,
+                                               LPARAM lparam) noexcept
+{
+  if (message == EngineWindowHost::kCloseWindowMessage) {
+    EngineWindowHost::Close(this);
+    return 0;
+  }
+  if (message == WM_CLOSE && EngineWindowHost::HandleClose(this)) return 0;
   // Give Flutter, including plugins, an opportunity to handle window messages.
   if (flutter_controller_)
   {
@@ -216,6 +240,32 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
   case WM_FONTCHANGE:
     flutter_controller_->engine()->ReloadSystemFonts();
     break;
+  case WM_NCCALCSIZE:
+  {
+    // Every window draws its caption in Flutter. Don't rely on each engine's
+    // window_manager state (TitleBarStyle.hidden) alone to hide the native
+    // one: it is per engine and the OS title bar reappeared on the primary
+    // window. window_manager still wins above when it handles the message.
+    // Native fullscreen drops WS_CAPTION and keeps the default calculation.
+    if (!wparam ||
+        (::GetWindowLongPtr(hwnd, GWL_STYLE) & WS_CAPTION) != WS_CAPTION)
+    {
+      break;
+    }
+    auto *params = reinterpret_cast<NCCALCSIZE_PARAMS *>(lparam);
+    const LONG top = params->rgrc[0].top;
+    // Keep the side and bottom resize borders, drop the caption.
+    ::DefWindowProc(hwnd, message, wparam, lparam);
+    params->rgrc[0].top = top;
+    if (::IsZoomed(hwnd))
+    {
+      // A maximized frame overhangs the work area by its resize border.
+      const UINT dpi = ::GetDpiForWindow(hwnd);
+      params->rgrc[0].top += ::GetSystemMetricsForDpi(SM_CYFRAME, dpi) +
+                             ::GetSystemMetricsForDpi(SM_CXPADDEDBORDER, dpi);
+    }
+    return 0;
+  }
   case WM_SYSCOMMAND:
   {
     // Block the Alt+Space system menu popup.  With TitleBarStyle.hidden the

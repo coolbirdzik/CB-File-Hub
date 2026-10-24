@@ -1,12 +1,14 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:cb_file_manager/design_system/primitives/cb_slider.dart';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/services/media/media_kit_playback.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../helpers/core/user_preferences.dart';
+import '../../../../services/windowing/windows_engine_host.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 
@@ -60,6 +62,13 @@ class _DesktopPipWindowState extends State<DesktopPipWindow>
   @override
   void initState() {
     super.initState();
+    if (WindowsEngineHost.isAvailable) {
+      WindowsEngineHost.onCloseRequested = () async {
+        await _saveCurrentSize();
+        _sendState(closing: true);
+        await WindowsEngineHost.close();
+      };
+    }
     _initWindow();
     _initPlayer();
     _initIpc();
@@ -689,7 +698,7 @@ class _DesktopPipWindowState extends State<DesktopPipWindow>
                         enabledThumbRadius: 7,
                       ),
                     ),
-                    child: Slider(
+                    child: CbSlider(
                       value: totalMs == 0 ? 0 : posMs.toDouble(),
                       min: 0,
                       max: (totalMs == 0 ? 1 : totalMs).toDouble(),
@@ -729,7 +738,7 @@ class _DesktopPipWindowState extends State<DesktopPipWindow>
                 width: 90,
                 child: Semantics(
                   container: true,
-                  child: Slider(
+                  child: CbSlider(
                     value: ((_player?.state.volume ?? 100).clamp(
                       0,
                       100,

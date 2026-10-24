@@ -65,6 +65,7 @@ public:
 
   // If true, closing this window will quit the application.
   void SetQuitOnClose(bool quit_on_close);
+  void SetProgressWindow(bool progress) { is_progress_window_ = progress; }
 
   // Return a RECT representing the bounds of the current client area.
   RECT GetClientArea();

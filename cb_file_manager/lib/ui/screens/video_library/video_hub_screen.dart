@@ -8,6 +8,7 @@ import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/ui/screens/video_library/create_video_library_dialog.dart';
 import 'package:cb_file_manager/ui/screens/video_library/widgets/video_library_cover.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';
+import 'package:cb_file_manager/ui/tab_manager/core/tab_window_transfer.dart';
 import 'package:cb_file_manager/ui/screens/video_library/widgets/video_library_helpers.dart';
 import 'package:cb_file_manager/ui/components/common/skeleton.dart';
 import 'package:cb_file_manager/ui/components/common/library_hub_scaffold.dart';
@@ -33,11 +34,59 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
   bool _isLoading = true;
   bool _isCountsLoading = false;
   int _totalVideos = 0;
+  late final ScrollController _scrollController;
 
   @override
   void initState() {
     super.initState();
-    _refreshData();
+    final initial = TabWindowTransfer.takeInitial(widget.tabId);
+    final scroll = initial['scroll'];
+    _scrollController = ScrollController(
+      initialScrollOffset: scroll is num && scroll.isFinite
+          ? scroll.toDouble().clamp(0.0, double.infinity)
+          : 0.0,
+    );
+    TabWindowTransfer.register(widget.tabId, _readTransfer);
+    if (initial['libraries'] is List) {
+      _libraries = (initial['libraries'] as List)
+          .whereType<Map>()
+          .map(
+            (map) =>
+                VideoLibrary.fromDatabaseMap(Map<String, Object?>.from(map)),
+          )
+          .toList();
+      final counts = initial['counts'];
+      if (counts is Map) {
+        _videoCounts = {
+          for (final library in _libraries)
+            library.id: (counts['${library.id}'] as int?) ?? 0,
+        };
+      }
+      _totalVideos = _videoCounts.values.fold(0, (sum, count) => sum + count);
+      _isLoading = false;
+      if (initial['countsLoading'] == true) _refreshData(showLoading: false);
+    } else {
+      _refreshData();
+    }
+  }
+
+  Map<String, dynamic> _readTransfer() => {
+    if (!_isLoading)
+      'libraries': _libraries
+          .map((library) => library.toDatabaseMap())
+          .toList(),
+    'counts': {
+      for (final entry in _videoCounts.entries) '${entry.key}': entry.value,
+    },
+    'countsLoading': _isCountsLoading,
+    'scroll': _scrollController.hasClients ? _scrollController.offset : 0.0,
+  };
+
+  @override
+  void dispose() {
+    TabWindowTransfer.unregister(widget.tabId, _readTransfer);
+    _scrollController.dispose();
+    super.dispose();
   }
 
   /// Refresh both libraries and video counts.
@@ -45,10 +94,8 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
   /// Phase 1: Load library metadata from DB (instant).
   /// Phase 2: Load cached file counts from DB config table (instant, no I/O).
   /// Phase 3: Background filesystem scan to refresh stale counts.
-  Future<void> _refreshData() async {
-    setState(() {
-      _isLoading = true;
-    });
+  Future<void> _refreshData({bool showLoading = true}) async {
+    if (showLoading) setState(() => _isLoading = true);
 
     final libraries = await _service.getAllLibraries();
 
@@ -256,6 +303,7 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
           child: RefreshIndicator(
             onRefresh: _refreshData,
             child: CustomScrollView(
+              controller: _scrollController,
               slivers: [
                 // Welcome Section
                 SliverToBoxAdapter(

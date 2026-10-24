@@ -223,6 +223,9 @@ class _Service extends TorrentService {
   List<TorrentMoveSource> cleanupSources = [];
   TorrentMovePlan? shownMove;
   TorrentMovePlan? appliedMove;
+  // Opening the screen must not start a real engine.
+  @override
+  Future<void> claimEngine() async {}
   @override
   String get storageMode => configuredMode;
   @override

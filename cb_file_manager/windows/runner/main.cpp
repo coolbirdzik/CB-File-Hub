@@ -151,6 +151,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   ::CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
 
   flutter::DartProject project(L"data");
+  project.set_ui_thread_policy(PreferredUIThreadPolicy());
 
   // The dedicated video player (CB_WINDOW_ROLE=video, which a PiP window
   // spawned from it inherits) is a fresh process, so engine startup sits
@@ -200,6 +201,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   }
   const bool torrent_options_mode =
       roleLen > 0 && roleLen < 32 && wcscmp(roleBuf, L"torrent-options") == 0;
+  window.SetProgressWindow(progress_mode);
 
   // Prepare origin and size
   Win32Window::Point origin(0, 0);
@@ -257,6 +259,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
     ::DispatchMessage(&msg);
   }
 
+  EngineWindowHost::Shutdown();
+  window.Destroy();
   ::CoUninitialize();
   return EXIT_SUCCESS;
 }

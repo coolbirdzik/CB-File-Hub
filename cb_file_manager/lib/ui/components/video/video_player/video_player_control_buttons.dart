@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/design_system/primitives/cb_slider.dart';
 import 'package:cb_file_manager/design_system/primitives/cb_tooltip.dart';
 import 'package:flutter/material.dart';
 
@@ -25,7 +26,7 @@ class VideoPlayerVolumeSlider extends StatelessWidget {
           thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 4),
           overlayShape: const RoundSliderOverlayShape(overlayRadius: 8),
         ),
-        child: Slider(
+        child: CbSlider(
           value: value.clamp(0.0, 100.0),
           min: 0.0,
           max: 100.0,

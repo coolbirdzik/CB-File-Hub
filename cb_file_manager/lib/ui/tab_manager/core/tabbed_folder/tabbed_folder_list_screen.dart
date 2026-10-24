@@ -45,6 +45,7 @@ import 'package:cb_file_manager/bloc/selection/selection.dart';
 // Import our new components with a clear namespace
 import '../../components/index.dart' as tab_components;
 import '../tab_data.dart';
+import '../tab_window_transfer.dart';
 import 'tabbed_folder_drag_selection_controller.dart';
 import 'tabbed_folder_keyboard_controller.dart';
 import 'package:cb_file_manager/ui/screens/system_screen_router.dart';
@@ -229,6 +230,93 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
   bool _hasPendingThumbnails = false;
   StreamSubscription<int>? _pendingTasksSubscription;
   StreamSubscription<WindowsExplorerFileDropEvent>? _fileDropSubscription;
+  StreamSubscription<FolderListState>? _transferRestoreSubscription;
+
+  Map<String, dynamic> _captureWindowState() {
+    final folder = _folderListBloc.state;
+    final selection = _selectionBloc.state;
+    final scroll = _keyboardController.scrollController;
+    return {
+      'scroll': scroll.hasClients ? scroll.offset : 0.0,
+      'files': selection.selectedFilePaths.toList(),
+      'folders': selection.selectedFolderPaths.toList(),
+      'lastSelected': selection.lastSelectedPath,
+      'focused': _keyboardController.focusedPath,
+      'searchBar': _showSearchBar,
+      'query': folder.currentSearchQuery,
+      'recursive': folder.searchRecursive,
+      'filter': folder.currentFilter,
+      'viewMode': folder.viewMode.name,
+      'sort': folder.sortOption.name,
+      'zoom': folder.gridZoomLevel,
+    };
+  }
+
+  void _restoreWindowState(Map<String, dynamic> initial) {
+    if (initial.isEmpty) return;
+    _showSearchBar = initial['searchBar'] == true;
+    _searchController.text = initial['query'] as String? ?? '';
+    var searchStarted = false;
+    var restored = false;
+    _transferRestoreSubscription = _folderListBloc.stream.listen((state) {
+      if (restored ||
+          state.isLoading ||
+          state.isRefreshing ||
+          state.currentPath.path != _currentPath) {
+        return;
+      }
+      if (!searchStarted) {
+        searchStarted = true;
+        final query = initial['query'] as String?;
+        if (query != null && query.isNotEmpty) {
+          _folderListBloc.add(
+            SearchByFileName(query, recursive: initial['recursive'] == true),
+          );
+          return;
+        }
+      }
+      restored = true;
+      _transferRestoreSubscription?.cancel();
+      final view = ViewMode.values
+          .where((v) => v.name == initial['viewMode'])
+          .firstOrNull;
+      final sort = SortOption.values
+          .where((v) => v.name == initial['sort'])
+          .firstOrNull;
+      if (view != null) _folderListBloc.add(SetViewMode(view));
+      if (sort != null) {
+        _folderListBloc.add(SetSortOption(sort, persist: false));
+      }
+      if (initial['zoom'] is int) {
+        _folderListBloc.add(SetGridZoom(initial['zoom'] as int));
+      }
+      if (initial['filter'] is String) {
+        _folderListBloc.add(FolderListFilter(initial['filter'] as String));
+      }
+      _selectionBloc.add(
+        SelectItemsInRect(
+          filePaths: (initial['files'] as List? ?? [])
+              .whereType<String>()
+              .toSet(),
+          folderPaths: (initial['folders'] as List? ?? [])
+              .whereType<String>()
+              .toSet(),
+          lastSelectedPath: initial['lastSelected'] as String?,
+        ),
+      );
+      _keyboardController.focusedPath = initial['focused'] as String?;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final scroll = _keyboardController.scrollController;
+        final offset = initial['scroll'];
+        if (scroll.hasClients && offset is num && offset.isFinite) {
+          scroll.jumpTo(
+            offset.toDouble().clamp(0, scroll.position.maxScrollExtent),
+          );
+        }
+      });
+    });
+  }
 
   // Add a method to check if there are any video/image files in the current state
   bool _hasVideoOrImageFiles(FolderListState state) {
@@ -388,6 +476,8 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
 
     // Initialize selection bloc
     _selectionBloc = SelectionBloc();
+    TabWindowTransfer.register(widget.tabId, _captureWindowState);
+    _restoreWindowState(TabWindowTransfer.takeInitial(widget.tabId));
     _dragSelectionController = TabbedFolderDragSelectionController(
       folderListBloc: _folderListBloc,
       selectionBloc: _selectionBloc,
@@ -477,6 +567,8 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
 
   @override
   void dispose() {
+    TabWindowTransfer.unregister(widget.tabId, _captureWindowState);
+    _transferRestoreSubscription?.cancel();
     // Clean up resources
     _searchController.dispose();
     _searchFocusNode.dispose();

@@ -156,6 +156,9 @@ class OperationProgressController extends ChangeNotifier {
   final Duration finishedRetention;
   final Map<String, OperationProgressEntry> _entriesById = {};
   final Set<String> _seenEntryIds = <String>{};
+  // Unseen notifications dropped from the capped history still count until
+  // the user opens the Status Center.
+  int _unseenPrunedCount = 0;
   int _sequence = 0;
 
   OperationProgressController({
@@ -188,7 +191,7 @@ class OperationProgressController extends ChangeNotifier {
       .where((entry) => !_seenEntryIds.contains(entry.id))
       .toList(growable: false);
 
-  int get unseenCount => unseenEntries.length;
+  int get unseenCount => unseenEntries.length + _unseenPrunedCount;
 
   int get runningCount => runningEntries.length;
 
@@ -369,8 +372,10 @@ class OperationProgressController extends ChangeNotifier {
 
   void markAllSeen() {
     final oldCount = _seenEntryIds.length;
+    final hadPruned = _unseenPrunedCount > 0;
     _seenEntryIds.addAll(entries.map((entry) => entry.id));
-    if (_seenEntryIds.length == oldCount) return;
+    _unseenPrunedCount = 0;
+    if (_seenEntryIds.length == oldCount && !hadPruned) return;
     notifyListeners();
   }
 
@@ -408,8 +413,7 @@ class OperationProgressController extends ChangeNotifier {
         .map((entry) => entry.key)
         .toList(growable: false);
     for (final id in expired) {
-      _entriesById.remove(id);
-      _seenEntryIds.remove(id);
+      _prune(id);
     }
 
     final finished =
@@ -423,8 +427,15 @@ class OperationProgressController extends ChangeNotifier {
           });
     if (finished.length <= finishedHistoryLimit) return;
     for (final entry in finished.skip(finishedHistoryLimit)) {
-      _entriesById.remove(entry.id);
-      _seenEntryIds.remove(entry.id);
+      _prune(entry.id);
+    }
+  }
+
+  void _prune(String id) {
+    final entry = _entriesById.remove(id);
+    final wasSeen = _seenEntryIds.remove(id);
+    if (entry != null && entry.showInStatusCenter && !wasSeen) {
+      _unseenPrunedCount++;
     }
   }
 

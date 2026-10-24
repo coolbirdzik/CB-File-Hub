@@ -4,7 +4,8 @@ import 'selection_state.dart';
 import '../../utils/app_logger.dart';
 
 class SelectionBloc extends Bloc<SelectionEvent, SelectionState> {
-  SelectionBloc() : super(const SelectionState()) {
+  SelectionBloc({SelectionState initialState = const SelectionState()})
+    : super(initialState) {
     on<ToggleFileSelection>(_onToggleFileSelection);
     on<ToggleFolderSelection>(_onToggleFolderSelection);
     on<ClearSelection>(_onClearSelection);

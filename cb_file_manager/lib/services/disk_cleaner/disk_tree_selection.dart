@@ -14,7 +14,9 @@ class DiskTreeSelection {
     var count = 0;
 
     void walk(DiskTreeNode node) {
-      if (node.fullPath.isNotEmpty && node.isJunk) count++;
+      if (node.fullPath.isNotEmpty && node.isJunk && !node.isSystemProtected) {
+        count++;
+      }
       for (final child in node.children) {
         walk(child);
       }
@@ -36,7 +38,10 @@ class DiskTreeSelection {
     void walk(DiskTreeNode node, {required bool ancestorSelected}) {
       if (node.fullPath.isNotEmpty) {
         node.isSelectedForDeletion =
-            checked && node.isJunk && !ancestorSelected;
+            checked &&
+            node.isJunk &&
+            !node.isSystemProtected &&
+            !ancestorSelected;
       }
       if (node.isSelectedForDeletion && node.fullPath.isNotEmpty) {
         selectedPaths.add(node.fullPath);
@@ -69,7 +74,7 @@ class DiskTreeSelection {
     final targetPath = _normalizePath(target.fullPath);
     if (targetPath.isEmpty) return result;
 
-    if (!checked) {
+    if (!checked || target.isSystemProtected) {
       for (final existing in result.toList(growable: false)) {
         if (_normalizePath(existing.fullPath) != targetPath) continue;
         existing.isSelectedForDeletion = false;
@@ -109,7 +114,9 @@ class DiskTreeSelection {
     final targets = <DiskTreeNode>[];
 
     void walk(DiskTreeNode node) {
-      if (node.fullPath.isNotEmpty && node.isSelectedForDeletion) {
+      if (node.fullPath.isNotEmpty &&
+          node.isSelectedForDeletion &&
+          !node.isSystemProtected) {
         targets.add(node);
         return;
       }

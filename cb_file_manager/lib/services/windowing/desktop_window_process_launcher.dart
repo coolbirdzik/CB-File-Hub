@@ -1,9 +1,12 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'windows_engine_host.dart';
+
 import 'package:cb_file_manager/services/windowing/window_startup_payload.dart';
 import 'package:cb_file_manager/utils/app_logger.dart';
 
+/// Windows launches another engine; other desktop platforms launch a process.
 class DesktopWindowProcessLauncher {
   static Future<bool> openWindow({
     List<WindowTabPayload> tabs = const <WindowTabPayload>[],
@@ -22,7 +25,7 @@ class DesktopWindowProcessLauncher {
       final executable = Platform.resolvedExecutable;
       final workingDir = File(executable).parent.path;
 
-      final env = Map<String, String>.from(Platform.environment);
+      final env = WindowsEngineHost.newWindowEnvironment();
       env[WindowStartupPayload.envSecondaryWindowKey] = '1';
       env[WindowStartupPayload.envStartHiddenKey] = startHidden ? '1' : '0';
       env[WindowStartupPayload.envWindowRoleKey] = windowRole;
@@ -55,6 +58,8 @@ class DesktopWindowProcessLauncher {
                 })
                 .toList(growable: false)
           : const <String>[];
+
+      if (Platform.isWindows) return await WindowsEngineHost.open(env);
 
       await Process.start(
         executable,
@@ -92,7 +97,7 @@ class DesktopWindowProcessLauncher {
       final executable = Platform.resolvedExecutable;
       final workingDir = File(executable).parent.path;
 
-      final env = Map<String, String>.from(Platform.environment);
+      final env = WindowsEngineHost.newWindowEnvironment();
       env[WindowStartupPayload.envSecondaryWindowKey] = '1';
       env[WindowStartupPayload.envStartHiddenKey] = '0';
       env[WindowStartupPayload.envWindowRoleKey] = 'progress';
@@ -118,6 +123,8 @@ class DesktopWindowProcessLauncher {
                 })
                 .toList(growable: false)
           : const <String>[];
+
+      if (Platform.isWindows) return await WindowsEngineHost.open(env);
 
       await Process.start(
         executable,

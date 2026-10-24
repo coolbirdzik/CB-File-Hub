@@ -19,6 +19,7 @@ class BrowserLikeFileSurface extends StatefulWidget {
   final bool isDesktop;
   final int? selectionTotalSize;
   final Iterable<String> visiblePaths;
+  final double initialScrollOffset;
   final Widget Function(
     BuildContext context,
     TabbedFolderKeyboardController keyboardController,
@@ -86,6 +87,7 @@ class BrowserLikeFileSurface extends StatefulWidget {
     required this.isDesktop,
     this.selectionTotalSize,
     required this.visiblePaths,
+    this.initialScrollOffset = 0,
     required this.bodyBuilder,
     required this.onClearSelection,
     required this.showRemoveTagsDialog,
@@ -133,7 +135,9 @@ class _BrowserLikeFileSurfaceState extends State<BrowserLikeFileSurface> {
   @override
   void initState() {
     super.initState();
-    _keyboardController = TabbedFolderKeyboardController();
+    _keyboardController = TabbedFolderKeyboardController(
+      initialScrollOffset: widget.initialScrollOffset,
+    );
   }
 
   @override

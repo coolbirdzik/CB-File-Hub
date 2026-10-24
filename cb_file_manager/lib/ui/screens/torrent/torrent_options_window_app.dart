@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/services/windowing/windows_engine_host.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -17,7 +18,8 @@ Future<void> runTorrentOptionsWindow(Map<String, String> env) async {
   final port = int.tryParse(env[TorrentOptionsWindowService.envPort] ?? '');
   final token = env[TorrentOptionsWindowService.envToken];
   if (port == null || port <= 0 || token == null || token.isEmpty) {
-    exit(1);
+    await WindowsEngineHost.closeOrExit(1);
+    return;
   }
   await windowManager.ensureInitialized();
   await windowManager.waitUntilReadyToShow(
@@ -162,7 +164,12 @@ class _TorrentOptionsWindowAppState extends State<TorrentOptionsWindowApp>
     _destroying = true;
     if (_painted?.isCompleted == false) _painted!.complete();
     _socket?.destroy();
-    await windowManager.destroy();
+    // windowManager.destroy posts WM_QUIT, which now ends every window.
+    if (WindowsEngineHost.isAvailable) {
+      await WindowsEngineHost.close();
+    } else {
+      await windowManager.destroy();
+    }
   }
 
   @override

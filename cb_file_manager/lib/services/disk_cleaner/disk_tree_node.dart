@@ -1,3 +1,5 @@
+import 'cleaner_system_protection.dart';
+
 /// Tree node representing a directory or file in the full disk scan.
 ///
 /// Used by the full-disk TreeSize-style view. Each node tracks its own size
@@ -9,6 +11,11 @@ class DiskTreeNode {
 
   /// Full absolute path.
   final String fullPath;
+
+  /// Cached lazily because most scanned rows are never displayed or selected.
+  late final bool isSystemProtected = CleanerSystemProtection.isProtected(
+    fullPath,
+  );
 
   /// True if this node is a file (leaf), false if directory.
   final bool isFile;

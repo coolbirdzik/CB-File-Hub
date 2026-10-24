@@ -2,6 +2,10 @@ import 'app_localizations.dart';
 
 class ChineseLocalizations implements AppLocalizations {
   @override
+  String get aiProviderKind => '提供商类型';
+  @override
+  String get aiProviderCustom => '自定义';
+  @override
   String get deviceMediaOnDevice => '此设备上的媒体';
   @override
   String get deviceMediaLimited => '仅显示您允许访问的照片和视频。';
@@ -1664,6 +1668,17 @@ class ChineseLocalizations implements AppLocalizations {
   String get useSystemDefaultForVideoDisabled => '视频将在应用内播放器中打开';
   @override
   String get seekSpeed => '快进快退速度';
+  @override
+  String get videoSeekAcceleration => '按住越久跳得越快';
+  @override
+  String get videoSeekAccelerationDescription =>
+      '按住跳转键或长按越久，每次跳转的时长越大。关闭时每次跳转时长保持不变。';
+  @override
+  String get videoKeyboardSeekStep => '方向键跳转时长';
+  @override
+  String get videoKeyboardSeekStepDescription => '每次按左/右方向键跳转的时间。按住可连续快进快退。';
+  @override
+  String videoSeekSeconds(int seconds) => '$seconds 秒';
   @override
   String get seekSpeedDescription => '按住快进快退键或在移动端长按时，视频跳转的速度';
   @override
@@ -4014,6 +4029,11 @@ class ChineseLocalizations implements AppLocalizations {
   String get diskCleanerSkip => '跳过';
   @override
   String get diskCleanerTryAgain => '重试';
+  @override
+  String get diskCleanerProtectedLabel => '不可删除';
+  @override
+  String get diskCleanerProtectedReason =>
+      '此项目包含或属于必要的系统数据。即使使用管理员权限，CB Cleaner 也会保护此项目。您仍然可以查看其磁盘使用情况。';
   @override
   String get diskCleanerPermanentDeleteConfirmTitle => '永久删除？';
   @override

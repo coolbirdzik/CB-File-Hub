@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart' as sqflite;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'database_provider.dart';
+import 'desktop_database_factory.dart';
 
 /// Shared SQLite provider for the application data store.
 class SqliteDatabaseProvider implements IDatabaseProvider {
@@ -108,8 +109,7 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
 
   DatabaseFactory _resolveDatabaseFactory() {
     if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-      sqfliteFfiInit();
-      return databaseFactoryFfi;
+      return DesktopDatabaseFactory.instance;
     }
 
     return sqflite.databaseFactory;
@@ -127,9 +127,9 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
 
   Future<void> _configureDatabase(Database db) => configureConnection(db);
 
-  /// Connection settings of the shared database. Every desktop window is its
-  /// own process with its own connection to the same file (main, spare,
-  /// video and secondary windows), and sqflite starts every transaction with
+  /// Connection settings of the shared database. Windows engines share an FFI
+  /// worker; external app instances can still connect to the same file.
+  /// sqflite starts every transaction with
   /// `BEGIN IMMEDIATE`. Without a busy timeout a write that meets another
   /// process's transaction fails at once instead of waiting for it.
   @visibleForTesting

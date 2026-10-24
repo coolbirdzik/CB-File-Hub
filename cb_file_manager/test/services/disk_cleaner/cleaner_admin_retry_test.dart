@@ -82,6 +82,47 @@ JunkItem _item(String name) => JunkItem(
 void main() {
   for (final permanent in [false, true]) {
     test(
+      'system protection cannot be bypassed by manual selection or admin retry ($permanent)',
+      () async {
+        final trash = _Trash();
+        final service = DiskCleanerService.forTesting(
+          fullDiskScanSpawner: spawnFullDiskScan,
+          trashManager: trash,
+        );
+        final protected = [
+          r'C:\pagefile.sys',
+          r'C:\hiberfil.sys',
+          r'C:\Windows',
+          r'C:\Windows\System32\file.dll',
+        ];
+        for (final selected in [false, true]) {
+          final result = await service.cleanJunk(
+            items: [
+              for (final path in protected)
+                JunkItem(
+                  path: path,
+                  sizeBytes: 100,
+                  categoryId: 'windows_temp',
+                  isUserSelected: selected,
+                  isContainerOnly: true,
+                ),
+            ],
+            permanent: permanent,
+            onDeleteFailure: (_) async {
+              fail('Protected items must never reach an admin prompt');
+            },
+          );
+          expect(result.skippedUnsafe, protected);
+          expect(result.succeeded, isEmpty);
+          expect(result.freedBytes, 0);
+          expect(trash.attempts, isEmpty);
+        }
+      },
+    );
+  }
+
+  for (final permanent in [false, true]) {
+    test(
       'asks before elevating only the failed target (permanent: $permanent)',
       () async {
         final trash = _Trash();

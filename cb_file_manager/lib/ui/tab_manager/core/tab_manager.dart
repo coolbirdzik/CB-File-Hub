@@ -3,6 +3,8 @@ import 'dart:typed_data';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'dart:math';
 import 'tab_data.dart';
+import 'tab_window_transfer.dart';
+import '../../../services/windowing/window_startup_payload.dart';
 import 'package:flutter/material.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/helpers/core/uri_utils.dart';
@@ -18,17 +20,23 @@ abstract class TabEvent {}
 
 /// Event to add a new tab
 class AddTab extends TabEvent {
+  final WindowTabPayload? windowPayload;
   final String path;
   final String? name;
   final bool switchToTab;
   final String?
   highlightedFileName; // File to highlight/focus after opening tab
 
+  /// Position of the new tab; appended when null. Clamped to the tab count.
+  final int? insertIndex;
+
   AddTab({
     required this.path,
     this.name,
     this.switchToTab = true,
     this.highlightedFileName,
+    this.insertIndex,
+    this.windowPayload,
   });
 }
 
@@ -227,6 +235,12 @@ class TabManagerBloc extends Bloc<TabEvent, TabManagerState> {
   }
 
   void _onAddTab(AddTab event, Emitter<TabManagerState> emit) {
+    final transferredId = event.windowPayload?.session?['id'];
+    if (transferredId is String &&
+        state.tabs.any((t) => t.id == transferredId)) {
+      if (event.switchToTab) emit(state.copyWith(activeTabId: transferredId));
+      return;
+    }
     final source = TorrentLaunchRequest.sourceFromPath(event.path);
     if (source != null) {
       final active = state.activeTab;
@@ -261,37 +275,42 @@ class TabManagerBloc extends Bloc<TabEvent, TabManagerState> {
     final newTabId =
         'tab_${DateTime.now().millisecondsSinceEpoch}_${random.nextInt(10000)}';
 
-    debugPrint(
-      'TabManagerBloc._onAddTab: path=${event.path}, highlightedFileName=${event.highlightedFileName}',
-    );
-    final newTab = TabData(
-      id: newTabId,
-      name: event.name ?? _extractNameFromPath(event.path),
-      path: path,
-      pendingTorrentSources: source == null
-          ? const []
-          : [TorrentLaunchRequest(source)],
-      isLoading: false,
-      highlightedFileName: event.highlightedFileName,
-    );
+    final newTab = event.windowPayload?.session != null
+        ? TabWindowTransfer.restore(event.windowPayload!)
+        : TabData(
+            id: newTabId,
+            name: event.name ?? _extractNameFromPath(event.path),
+            path: path,
+            pendingTorrentSources: source == null
+                ? const []
+                : [TorrentLaunchRequest(source)],
+            isLoading: false,
+            highlightedFileName: event.highlightedFileName,
+          );
 
-    final tabs = List<TabData>.from(state.tabs)..add(newTab);
+    final tabs = List<TabData>.from(state.tabs);
+    final insertIndex = event.insertIndex;
+    if (insertIndex == null) {
+      tabs.add(newTab);
+    } else {
+      tabs.insert(insertIndex.clamp(0, tabs.length), newTab);
+    }
 
     // Track newly opened tab in the activity manager. If the user is
     // switching to it, mark it as focused; otherwise it starts as background.
     final activity = _activity;
     if (activity != null) {
       if (event.switchToTab) {
-        activity.onTabFocused(newTabId, path: event.path);
+        activity.onTabFocused(newTab.id, path: newTab.path);
       } else {
-        activity.onTabInteraction(newTabId, path: event.path);
+        activity.onTabInteraction(newTab.id, path: newTab.path);
       }
     }
 
     emit(
       state.copyWith(
         tabs: tabs,
-        activeTabId: event.switchToTab ? newTabId : state.activeTabId,
+        activeTabId: event.switchToTab ? newTab.id : state.activeTabId,
         // When a new tab becomes active (e.g., Ctrl+N), clear multi-selection.
         selectedTabIds: event.switchToTab ? <String>{} : state.selectedTabIds,
       ),
@@ -330,6 +349,7 @@ class TabManagerBloc extends Bloc<TabEvent, TabManagerState> {
   }
 
   void _onCloseTab(CloseTab event, Emitter<TabManagerState> emit) {
+    TabWindowTransfer.forget(event.tabId);
     if (state.tabs.isEmpty) return;
 
     // Evict photo thumbnails for the tab's path from the short-term memory
@@ -380,6 +400,9 @@ class TabManagerBloc extends Bloc<TabEvent, TabManagerState> {
   }
 
   void _onCloseAllTabs(CloseAllTabs event, Emitter<TabManagerState> emit) {
+    for (final tab in state.tabs) {
+      TabWindowTransfer.forget(tab.id);
+    }
     final activity = _activity;
     if (activity != null) {
       for (final tab in state.tabs) {
@@ -405,6 +428,9 @@ class TabManagerBloc extends Bloc<TabEvent, TabManagerState> {
         .where((tab) => tab.id != event.keepTabId)
         .toList();
     if (closing.isEmpty) return;
+    for (final tab in closing) {
+      TabWindowTransfer.forget(tab.id);
+    }
 
     if (activity != null) {
       for (final tab in closing) {

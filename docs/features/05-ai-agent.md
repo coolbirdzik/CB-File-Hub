@@ -54,6 +54,13 @@ Provider settings include:
 
 For Codex OAuth mode, the runtime delegates requests to the local `codex exec` CLI in read-only mode and reads available models from `~/.codex/models_cache.json`. The settings dialog can launch `codex login` so the user can complete the ChatGPT sign-in flow outside the app.
 
+Selecting Codex or editing a Codex provider automatically loads its model list.
+Choose the default model from that list; Codex has no free-text model input.
+An empty list or discovery error keeps the picker and offers a refresh. Saving
+requires a listed model, and a saved model absent from a refreshed list must be
+selected again. Other provider types keep manual model entry when discovery
+is unavailable.
+
 The chat UI loads model catalogs from every enabled provider and groups them by provider name in the model selector. The provider-level model saved in settings is only the default selection for new chats and fallback resolution when a provider cannot return a remote model list.
 
 ## Conversation Model

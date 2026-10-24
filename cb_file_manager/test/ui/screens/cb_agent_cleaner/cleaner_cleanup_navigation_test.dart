@@ -135,7 +135,11 @@ class _Cleaner extends DiskCleanerService {
   }
 }
 
-Future<void> _pumpCleaner(WidgetTester tester, _Cleaner cleaner) async {
+Future<void> _pumpCleaner(
+  WidgetTester tester,
+  _Cleaner cleaner, {
+  String languageCode = 'en',
+}) async {
   SharedPreferences.setMockInitialValues({});
   tester.view.physicalSize = const Size(1500, 1000);
   tester.view.devicePixelRatio = 1;
@@ -143,8 +147,8 @@ Future<void> _pumpCleaner(WidgetTester tester, _Cleaner cleaner) async {
   addTearDown(tester.view.resetDevicePixelRatio);
   await tester.pumpWidget(
     MaterialApp(
-      locale: const Locale('en'),
-      supportedLocales: const [Locale('en')],
+      locale: Locale(languageCode),
+      supportedLocales: const [Locale('en'), Locale('vi')],
       localizationsDelegates: const [
         AppLocalizationsDelegate(),
         GlobalMaterialLocalizations.delegate,
@@ -187,6 +191,91 @@ Future<void> _finishCleanup(WidgetTester tester) async {
 }
 
 void main() {
+  for (final languageCode in ['en', 'vi']) {
+    testWidgets(
+      'system files stay visible and cannot be deleted ($languageCode)',
+      (tester) async {
+        final cleaner = _Cleaner();
+        final pagefile = DiskTreeNode(
+          name: 'pagefile.sys',
+          fullPath: r'C:\pagefile.sys',
+          isFile: true,
+          sizeBytes: _gb,
+        );
+        final cache = DiskTreeNode(
+          name: 'cache.tmp',
+          fullPath: r'C:\Windows\Temp\cache.tmp',
+          isFile: true,
+          sizeBytes: 1024,
+          junkCategoryId: 'windows_temp',
+        );
+        final windows = DiskTreeNode(
+          name: 'Windows',
+          fullPath: r'C:\Windows',
+          sizeBytes: _gb,
+          isExpanded: true,
+          children: [cache],
+        );
+        cleaner.root.replaceChildren([pagefile, windows]);
+        await _pumpCleaner(tester, cleaner, languageCode: languageCode);
+        for (final node in [pagefile, windows]) {
+          final badge = find.byKey(
+            ValueKey('cleaner-protected-${node.fullPath}'),
+          );
+          expect(badge, findsOneWidget);
+          expect(
+            find.descendant(
+              of: badge,
+              matching: find.text(
+                languageCode == 'vi' ? 'Không được xoá' : 'Cannot delete',
+              ),
+            ),
+            findsOneWidget,
+          );
+          await tester.tap(
+            find.byKey(ValueKey('cleaner-tree-row-idle-${node.fullPath}')),
+          );
+          await tester.pumpAndSettle();
+          await tester.sendKeyEvent(LogicalKeyboardKey.space);
+          await tester.sendKeyEvent(LogicalKeyboardKey.delete);
+          await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+          await tester.sendKeyEvent(LogicalKeyboardKey.delete);
+          await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+          await tester.pumpAndSettle();
+          expect(find.byType(AlertDialog), findsNothing);
+          expect(node.isSelectedForDeletion, isFalse);
+        }
+        expect(cleaner.requests, isEmpty);
+        if (!windows.isExpanded) {
+          await tester.tap(
+            find
+                .descendant(
+                  of: find.byKey(
+                    ValueKey('cleaner-tree-row-idle-${windows.fullPath}'),
+                  ),
+                  matching: find.byType(Icon),
+                )
+                .first,
+          );
+          await tester.pumpAndSettle();
+        }
+        expect(
+          find.byKey(ValueKey('cleaner-protected-${cache.fullPath}')),
+          findsNothing,
+        );
+        await tester.tap(
+          find.byKey(ValueKey('cleaner-tree-row-idle-${cache.fullPath}')),
+        );
+        await tester.pumpAndSettle();
+        await tester.sendKeyEvent(LogicalKeyboardKey.delete);
+        await tester.pumpAndSettle();
+        expect(find.byType(AlertDialog), findsOneWidget);
+        await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+        await tester.pumpAndSettle();
+      },
+    );
+  }
+
   for (final requiresAdmin in [true, false]) {
     testWidgets(
       'delete failure offers the appropriate retry (admin: $requiresAdmin)',

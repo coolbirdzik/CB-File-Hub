@@ -28,6 +28,7 @@ import 'package:cb_file_manager/models/database/database_manager.dart';
 import 'package:cb_file_manager/services/video_library_cache_service.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
+import 'package:cb_file_manager/config/translation_helper.dart';
 import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:cb_file_manager/ui/screens/settings/ai_settings_section.dart';
 import 'package:cb_file_manager/ui/screens/settings/local_ai_advisor_settings_section.dart';
@@ -80,6 +81,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _useSystemDefaultForVideo = false;
   bool _openVideoInNewWindow = true;
   VideoWheelAction _videoWheelAction = VideoWheelAction.volume;
+  int _videoKeyboardSeekSeconds =
+      UserPreferences.defaultVideoKeyboardSeekSeconds;
+  bool _videoSeekAcceleration = false;
   bool _isThemeExpanded = false;
   String _appVersion = '';
   bool _updatesSupported = false;
@@ -190,6 +194,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           .getUseSystemDefaultForVideo();
       final openVideoInNewWindow = await _preferences.getOpenVideoInNewWindow();
       final videoWheelAction = await _preferences.getVideoWheelAction();
+      final videoKeyboardSeekSeconds = await _preferences
+          .getVideoKeyboardSeekSeconds();
+      final videoSeekAcceleration = await _preferences
+          .getVideoSeekAcceleration();
       final tabInactiveMinutes = await _preferences
           .getTabInactiveThresholdMinutes();
       _preferences.isUsingDatabaseStorage();
@@ -208,6 +216,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _useSystemDefaultForVideo = useSystemDefaultForVideo;
           _openVideoInNewWindow = openVideoInNewWindow;
           _videoWheelAction = videoWheelAction;
+          _videoKeyboardSeekSeconds = videoKeyboardSeekSeconds;
+          _videoSeekAcceleration = videoSeekAcceleration;
           _tabInactiveThresholdMinutes = tabInactiveMinutes;
           _isLoading = false;
         });
@@ -363,6 +373,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _updateVideoWheelAction(VideoWheelAction value) async {
     await _preferences.setVideoWheelAction(value);
     if (mounted) setState(() => _videoWheelAction = value);
+  }
+
+  Future<void> _updateVideoKeyboardSeekSeconds(int value) async {
+    await _preferences.setVideoKeyboardSeekSeconds(value);
+    if (mounted) setState(() => _videoKeyboardSeekSeconds = value);
+  }
+
+  Future<void> _updateVideoSeekAcceleration(bool value) async {
+    await _preferences.setVideoSeekAcceleration(value);
+    if (mounted) setState(() => _videoSeekAcceleration = value);
   }
 
   Future<void> _updateOpenVideoInNewWindow(bool value) async {
@@ -853,6 +873,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ],
             ),
           ),
+        if (isDesktopPlatform)
+          _buildCompactSettingTile(
+            title: context.tr.videoKeyboardSeekStep,
+            subtitle: context.tr.videoKeyboardSeekStepDescription,
+            icon: PhosphorIconsLight.keyboard,
+            trailing: CbSelect<int>(
+              value: _videoKeyboardSeekSeconds,
+              onChanged: _updateVideoKeyboardSeekSeconds,
+              items: [
+                for (
+                  var seconds = 1;
+                  seconds <= UserPreferences.maxVideoKeyboardSeekSeconds;
+                  seconds++
+                )
+                  CbSelectItem(
+                    value: seconds,
+                    label: context.tr.videoSeekSeconds(seconds),
+                  ),
+              ],
+            ),
+          ),
+        _buildCompactSettingTile(
+          title: context.tr.videoSeekAcceleration,
+          subtitle: context.tr.videoSeekAccelerationDescription,
+          icon: PhosphorIconsLight.fastForward,
+          trailing: Switch(
+            value: _videoSeekAcceleration,
+            onChanged: _updateVideoSeekAcceleration,
+          ),
+        ),
         // Thumbnail Mode Selection
         Padding(
           padding: const EdgeInsets.all(16),
@@ -933,7 +983,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const SizedBox(height: 12),
                 Semantics(
                   container: true,
-                  child: Slider(
+                  child: CbSlider(
                     value: _videoThumbnailPercentage.toDouble(),
                     min: UserPreferences.minVideoThumbnailPercentage.toDouble(),
                     max: UserPreferences.maxVideoThumbnailPercentage.toDouble(),
@@ -997,7 +1047,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const SizedBox(height: 12),
               Semantics(
                 container: true,
-                child: Slider(
+                child: CbSlider(
                   value: _maxConcurrency.toDouble(),
                   min: UserPreferences.minThumbnailConcurrency.toDouble(),
                   max: UserPreferences.maxThumbnailConcurrency.toDouble(),

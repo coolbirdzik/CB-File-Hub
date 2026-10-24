@@ -1112,8 +1112,30 @@ class TorrentService extends ChangeNotifier {
     }
   }
 
-  Future<void> _ensureEngine() =>
-      _engine.start(_stateDirectory, executable: executable);
+  /// User actions take the engine over from another window; background sync
+  /// passes `takeOver: false` so idle windows never pull downloads back.
+  Future<void> _ensureEngine({bool takeOver = true}) => _engine.start(
+    _stateDirectory,
+    executable: executable,
+    takeOver: takeOver,
+  );
+
+  /// Runs this window's pending downloads here, taking them over from another
+  /// window: the most recently opened torrent tab wins.
+  Future<void> claimEngine() async {
+    await initialize();
+    if (_engine.running || (await repository.pending(limit: 1)).isEmpty) {
+      return;
+    }
+    try {
+      await _ensureEngine();
+    } catch (e) {
+      lastError = e.toString();
+      notifyListeners();
+      return;
+    }
+    await sync();
+  }
 
   Future<void> _approveImport(
     String hash,
@@ -1492,11 +1514,26 @@ class TorrentService extends ChangeNotifier {
     _syncing = true;
     var changed = false;
     try {
+      if (_actions.isEmpty &&
+          await _engine.releaseIfRequested(_stateDirectory)) {
+        // A newer window took the downloads over.
+        changed = true;
+        return;
+      }
       var after = '';
       while (true) {
         final entries = await repository.pending(after: after);
         if (entries.isEmpty) break;
-        await _ensureEngine();
+        if (!_engine.running) {
+          try {
+            await _ensureEngine(takeOver: false);
+          } on Aria2EngineOwnedElsewhere {
+            // The owning window writes progress to the shared database;
+            // refresh this window's view of it.
+            changed = true;
+            break;
+          }
+        }
         for (final entry in entries) {
           after = entry.hash;
           if (_actions.contains(entry.hash)) continue;

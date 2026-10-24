@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/design_system/primitives/cb_slider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
@@ -83,7 +84,7 @@ class FolderListAppBar extends StatelessWidget implements PreferredSizeWidget {
                     fontSize: 12.0,
                   ),
                 ),
-                child: Slider(
+                child: CbSlider(
                   // Invert: right = larger items (fewer columns).
                   // display = (2 + 5) - zoom; convert back on change.
                   value: (7 - currentGridZoomLevel).toDouble(),
@@ -172,7 +173,7 @@ class FolderListAppBar extends StatelessWidget implements PreferredSizeWidget {
                     overlayRadius: 14.0,
                   ),
                 ),
-                child: Slider(
+                child: CbSlider(
                   // Invert: right = larger items (fewer columns).
                   value: (7 - currentGridZoomLevel).toDouble(),
                   min: 2,

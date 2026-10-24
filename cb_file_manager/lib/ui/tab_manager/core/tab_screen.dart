@@ -39,6 +39,9 @@ import '../../screens/home/home_screen.dart'; // Import home screen
 import 'package:cb_file_manager/core/service_locator.dart';
 import 'package:cb_file_manager/services/windowing/desktop_windowing_service.dart';
 import 'package:cb_file_manager/services/windowing/window_startup_payload.dart';
+import 'package:cb_file_manager/services/windowing/windows_native_tab_drag_drop_service.dart';
+import 'package:cb_file_manager/services/windowing/windows_engine_host.dart';
+import 'tab_window_transfer.dart';
 import 'package:cb_file_manager/ui/widgets/drawer/cubit/drawer_cubit.dart';
 import 'split_pane_view.dart'; // Split-pane view
 import '../../screens/ai_chat/ai_panel_controller.dart';
@@ -92,12 +95,15 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
       !DesignSystemConfig.enableLegacyMaterialDesktopShell;
   bool get _isSecondaryDesktopWindow =>
       _isDesktop &&
-      Platform.environment[WindowStartupPayload.envSecondaryWindowKey] == '1';
+      WindowsEngineHost.environment[WindowStartupPayload
+              .envSecondaryWindowKey] ==
+          '1';
 
   final TabDragOverlayController _windowDropOverlay =
       TabDragOverlayController();
-  final Map<String, _CachedTabContent> _tabContentCache =
-      <String, _CachedTabContent>{};
+
+  /// Cached widget content belongs to this engine only.
+  final Map<String, _CachedTabContent> _tabContentCache = {};
 
   /// One focus scope per tab, so keyboard shortcuts only ever reach the tab
   /// the user is looking at. See [TabFocusGate].
@@ -139,6 +145,7 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
   @override
   void dispose() {
     _windowDropOverlay.dispose();
+    // Other windows may hold some of these tabs; they evict the rest.
     _tabContentCache.clear();
     for (final node in _tabFocusScopes.values) {
       node.dispose();
@@ -321,6 +328,8 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
   }
 
   Future<void> _persistLastOpenedTabPath(TabManagerState state) async {
+    // The workspace is the main window's tabs.
+    if (_isSecondaryDesktopWindow) return;
     try {
       final prefs = UserPreferences.instance;
       await prefs.init();
@@ -585,8 +594,9 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
 
   // Xác định thiết bị là tablet hay điện thoại dựa trên kích thước màn hình
   bool _isTablet(BuildContext context) {
-    // Coi rộng > 600dp là tablet, theo Material Design guidelines
-    return MediaQuery.of(context).size.shortestSide >= 600;
+    // Desktop windows can be shorter than 600dp after a tear-off or resize.
+    // Keep the mounted tab tree instead of swapping it for MobileTabView.
+    return _isDesktop || MediaQuery.of(context).size.shortestSide >= 600;
   }
 
   // Method to close the current active tab
@@ -886,6 +896,14 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                                                       child: ScrollableTabBar(
                                                         controller:
                                                             _tabController, // Ensure this controller has the correct length
+                                                        activeTabIndex: state
+                                                            .tabs
+                                                            .indexWhere(
+                                                              (t) =>
+                                                                  t.id ==
+                                                                  state
+                                                                      .activeTabId,
+                                                            ),
                                                         barBackgroundColor:
                                                             desktopTopBarColor,
                                                         activeTabBackgroundColor:
@@ -979,10 +997,14 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                                                                     ) => DesktopTabDragData(
                                                                       tabId:
                                                                           t.id,
-                                                                      tab:
-                                                                          _toWindowTabPayload(
-                                                                            t,
-                                                                          ),
+                                                                      tab: WindowTabPayload(
+                                                                        path: t
+                                                                            .path,
+                                                                        name: t
+                                                                            .name,
+                                                                        highlightedFileName:
+                                                                            t.highlightedFileName,
+                                                                      ),
                                                                     ),
                                                                   )
                                                                   .toList(
@@ -1018,6 +1040,11 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                                                             Platform.isWindows
                                                             ? _handleNativeTabDrag
                                                             : null,
+                                                        externalTabDrop:
+                                                            (Platform.isWindows
+                                                            ? WindowsNativeTabDragDropService
+                                                                  .externalTabDrop
+                                                            : null),
                                                         onTabDragStarted:
                                                             (_isDesktop &&
                                                                 !Platform
@@ -1314,9 +1341,10 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
 
   void _syncTabContentCache(List<TabData> tabs) {
     final currentIds = tabs.map((tab) => tab.id).toSet();
-    _tabContentCache.removeWhere((id, _) => !currentIds.contains(id));
+    final liveIds = currentIds;
+    _tabContentCache.removeWhere((id, _) => !liveIds.contains(id));
     // Closing a tab forgets its preview/properties pane toggles.
-    TabPaneState.retainTabs(currentIds);
+    TabPaneState.retainTabs(liveIds);
 
     // Focus scopes of closed tabs are dropped here, but only disposed after the
     // frame: their FocusScope widget is still mounted while this build runs.
@@ -1529,13 +1557,8 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
     }
   }
 
-  WindowTabPayload _toWindowTabPayload(TabData tab) {
-    return WindowTabPayload(
-      path: tab.path,
-      name: tab.name,
-      highlightedFileName: tab.highlightedFileName,
-    );
-  }
+  WindowTabPayload _toWindowTabPayload(TabData tab) =>
+      TabWindowTransfer.capture(tab);
 
   _ResolvedTabMoveSelection _resolveTabMoveSelection(String triggerTabId) {
     final bloc = context.read<TabManagerBloc>();
@@ -1760,28 +1783,115 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
   Future<void> _handleNativeTabDrag(
     DesktopTabDragData data,
     Offset pointerPosition,
+    TabDetachGeometry geometry,
   ) async {
     if (!Platform.isWindows) return;
 
     final tabBloc = context.read<TabManagerBloc>();
-    if (tabBloc.state.tabs.length <= 1) {
-      await windowManager.startDragging();
-      return;
-    }
-
+    // Capture only when the drag leaves the strip. Building the tab bar must
+    // not serialize/compress loaded galleries, and its earlier data may predate
+    // the mounted screen or its latest search/scroll state.
     final moveSelection = _resolveTabMoveSelection(data.tabId);
     final payloads = moveSelection.payloads;
     final tabs = payloads.isNotEmpty ? payloads : <WindowTabPayload>[data.tab];
-    final opened = await locator<DesktopWindowingService>().openNewWindow(
-      tabs: tabs,
-      sourcePointerPosition: pointerPosition,
-      startDragging: true,
-    );
-    if (!mounted || !opened) return;
 
-    for (final id in moveSelection.tabIds) {
-      tabBloc.add(CloseTab(id));
+    if (tabBloc.state.tabs.length <= 1) {
+      // As in Chrome, dragging a window's only tab drags the window, and
+      // releasing it on another window's tab strip moves the tab there. With
+      // no such window, the system move loop keeps Aero Snap.
+      final dragging = await WindowsNativeTabDragDropService.startTabWindowDrag(
+        mergeTabs: tabs,
+        anchor: geometry.windowAnchor,
+        requireMergeTarget: true,
+      );
+      if (!dragging) await windowManager.startDragging();
+      return;
     }
+
+    final svc = locator<DesktopWindowingService>();
+
+    // The preview appears and follows the cursor at once, from this process;
+    // the tabs stay here until the drop decides where they go.
+    final tearOff = await WindowsNativeTabDragDropService.startTabTearOff(
+      tabs: tabs,
+      geometry: geometry,
+      windowSize: kTearOffWindowSize,
+      bodyColor: Theme.of(context).scaffoldBackgroundColor,
+      includeContent: tabBloc.state.activeTabId == data.tabId,
+    );
+    if (tearOff == null) {
+      final opened = await svc.openNewWindow(
+        tabs: tabs,
+        sourcePointerPosition: pointerPosition,
+        dragAnchor: geometry.windowAnchor,
+        startDragging: true,
+      );
+      if (!mounted || !opened) return;
+      for (final id in moveSelection.tabIds) {
+        tabBloc.add(CloseTab(id));
+      }
+      return;
+    }
+
+    // Meanwhile a spare window loads the tabs, hidden, ready for the drop,
+    // and the preview learns which window to hand over to.
+    var dragEnded = false;
+    final prepared = svc.prepareTearOffWindow(tabs).then((window) async {
+      final handle = window?.windowHandle;
+      if (handle != null && !dragEnded) await tearOff.handTo(handle);
+      return window;
+    });
+    void discardPrepared() => unawaited(
+      prepared.then((prepared) async {
+        if (prepared != null) await svc.discardPreparedWindow(prepared.window);
+      }),
+    );
+    void closeMovedTabs() {
+      if (tabBloc.isClosed) return;
+      for (final id in moveSelection.tabIds) {
+        tabBloc.add(CloseTab(id));
+      }
+    }
+
+    final result = await tearOff.result;
+    dragEnded = true;
+    switch (result.outcome) {
+      case TabTearOffOutcome.revealed:
+        closeMovedTabs();
+      case TabTearOffOutcome.merged:
+        discardPrepared();
+        closeMovedTabs();
+      case TabTearOffOutcome.canceled:
+        discardPrepared();
+      case TabTearOffOutcome.returned:
+        discardPrepared();
+        _moveTabToDropGap(tabBloc, data.tabId, result.dropPosition);
+      case TabTearOffOutcome.detached:
+        // Released before the spare was ready to take over natively.
+        final window = await prepared;
+        var opened =
+            window != null &&
+            await svc.revealPreparedWindow(window.window, result.windowOrigin);
+        // No spare was free: start a window the slow way.
+        if (!opened) opened = await svc.openNewWindow(tabs: tabs);
+        if (opened) closeMovedTabs();
+        await tearOff.end();
+    }
+  }
+
+  /// A tab dragged out and back onto this strip lands in the gap it opened.
+  void _moveTabToDropGap(
+    TabManagerBloc tabBloc,
+    String tabId,
+    Offset dropPosition,
+  ) {
+    final insert = WindowsNativeTabDragDropService.externalTabDrop
+        .insertIndexAt(dropPosition);
+    final tabs = tabBloc.state.tabs;
+    final from = tabs.indexWhere((t) => t.id == tabId);
+    if (insert == null || from < 0) return;
+    final to = (insert > from ? insert - 1 : insert).clamp(0, tabs.length - 1);
+    if (to != from) tabBloc.add(ReorderTab(fromIndex: from, toIndex: to));
   }
 
   Future<DesktopWindowInfo?> _pickTargetWindow(BuildContext context) async {
@@ -1853,6 +1963,7 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
           name: t.name,
           switchToTab: i == incomingTabs.length - 1,
           highlightedFileName: t.highlightedFileName,
+          windowPayload: t,
         ),
       );
     }
@@ -1983,6 +2094,7 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
           // The menu above was awaited, so re-check this context before handing
           // it to another dialog.
           if (!context.mounted) return;
+
           final target = await _pickTargetWindow(context);
           if (target == null || !mounted) return;
 

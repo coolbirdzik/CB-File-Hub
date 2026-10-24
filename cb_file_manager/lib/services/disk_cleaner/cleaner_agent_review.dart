@@ -396,6 +396,7 @@ class CleanerReviewGroup {
   final List<DiskTreeNode> examples = [];
   int fileBytes = 0;
   int largestFolderBytes = 0;
+  bool _hasProtectedItems = false;
   CleanerItemAnalysis? analysis;
   bool usedFallback = false;
   bool fallbackPendingReconciled = false;
@@ -410,12 +411,14 @@ class CleanerReviewGroup {
   });
 
   bool get canClean =>
+      !_hasProtectedItems &&
       type != 'folder' &&
       cause?.verdict != 'KEEP' &&
       CleanerCategories.byId(categoryId ?? '')?.safety == CleanerSafety.safe;
   DiskTreeNode get representative => examples.first;
 
   void add(DiskTreeNode node, {DiskTreeNode? parent}) {
+    _hasProtectedItems |= node.isSystemProtected;
     nodes.add(node);
     if (node.isFile) {
       fileBytes += node.sizeBytes;
