@@ -3,6 +3,7 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
+  connectivity_plus
   desktop_drop
   flutter_edge_ai
   flutter_secure_storage_windows
