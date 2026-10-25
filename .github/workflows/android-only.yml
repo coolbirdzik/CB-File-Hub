@@ -27,7 +27,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  FLUTTER_VERSION: "3.47.2"
+  FLUTTER_VERSION: "3.47.8"
   PROJECT_DIR: "cb_file_manager"
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 

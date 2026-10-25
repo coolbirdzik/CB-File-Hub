@@ -69,6 +69,23 @@ features:
       - "flutter test test/18_app_storage_tool_test.dart"
     windows_build_required_for_native_changes: true
 
+  cleaner_app_leftovers:
+    paths:
+      - cb_file_manager/lib/services/app_insights/app_leftover_finder.dart
+      - cb_file_manager/lib/services/app_insights/app_leftover_scanner.dart
+      - cb_file_manager/lib/services/app_insights/posix_app_leftover_finder.dart
+      - cb_file_manager/lib/services/app_insights/posix_app_inventory.dart
+      - cb_file_manager/lib/bloc/cleaner_app_leftovers/
+      - cb_file_manager/lib/ui/screens/cb_agent_cleaner/cleaner_leftovers_view.dart
+    focused_tests:
+      - "flutter test test/services/app_insights/app_leftover_finder_test.dart"
+      - "flutter test test/services/app_insights/app_leftover_scanner_test.dart"
+      - "flutter test test/services/app_insights/app_leftover_measure_test.dart"
+      - "flutter test test/services/app_insights/posix_app_leftover_finder_test.dart"
+      - "flutter test test/services/app_insights/posix_app_inventory_test.dart"
+      - "flutter test test/bloc/cleaner_app_leftovers_cubit_test.dart"
+      - "flutter test test/ui/screens/cb_agent_cleaner/cleaner_leftovers_view_test.dart"
+
   windows_shell_context_menu:
     paths:
       - cb_file_manager/lib/helpers/files/windows_shell_context_menu.dart

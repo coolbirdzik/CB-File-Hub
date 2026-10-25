@@ -131,6 +131,7 @@ bool Create(const Environment& env) {
   }), windows.end());
   flutter::DartProject project(L"data");
   project.set_ui_thread_policy(PreferredUIThreadPolicy());
+  project.set_impeller_switch(PreferredImpellerSwitch());
   const auto role = Value(env, "CB_WINDOW_ROLE", "normal");
   if (role == "video" || role == "torrent-options" || role == "progress") {
     project.set_impeller_switch(flutter::ImpellerSwitch::Disabled);

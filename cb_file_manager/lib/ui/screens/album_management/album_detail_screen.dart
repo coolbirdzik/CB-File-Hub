@@ -1,4 +1,6 @@
 import 'package:cb_file_manager/services/smart_album_scanner.dart';
+import 'package:cb_file_manager/services/album_file_scanner.dart';
+import 'package:cb_file_manager/helpers/core/batch_file_probe.dart';
 // ignore_for_file: deprecated_member_use
 
 import 'dart:io';
@@ -82,6 +84,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
   List<File> _imageFiles = [];
   List<File> _originalImageFiles = [];
   Map<String, FileStat> _fileStats = {};
+  Map<String, FileInfo> _fileInfos = {};
   bool _isLoading = true;
   // Grid zoom level — uses the SAME key, range, and column-count formula
   // as the main file browser so that the same setting produces identical
@@ -346,7 +349,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
     }
     if (mounted) {
       if (_isSmartAlbum) {
-        await _refreshSmartStatus();
+        unawaited(_refreshSmartStatus());
         await _loadCachedSmartImages();
         _startAutoRescan();
       }
@@ -468,19 +471,18 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
         return;
       }
       final albumFiles = await _albumService.getAlbumFileInfos(widget.album.id);
-      final imageFiles = <File>[];
-      final fileStats = <String, FileStat>{};
-      for (final af in albumFiles) {
-        final file = File(af.path);
-        final stat = await file.stat();
-        if (stat.type == FileSystemEntityType.file) {
-          imageFiles.add(file);
-          fileStats[file.path] = stat;
-        }
-      }
+      // The scanner already supplies size and modification time. Validate cached
+      // paths in a batch instead of reading every file's metadata a second time.
+      final exists = await probeFiles([for (final af in albumFiles) af.path]);
+      final valid = [
+        for (var i = 0; i < albumFiles.length; i++)
+          if (exists[i]) albumFiles[i],
+      ];
+      final imageFiles = [for (final info in valid) File(info.path)];
       if (mounted) {
         setState(() {
-          _fileStats = fileStats;
+          _fileStats = {};
+          _fileInfos = {for (final info in valid) info.path: info};
           _originalImageFiles = List<File>.from(imageFiles);
           _applyFiltersAndOrder();
           _isLoading = false;
@@ -581,9 +583,12 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
             .where((r) => r.albumId == widget.album.id && r.isActive)
             .toList();
         final files = <File>[];
-        for (final p in cached) {
+        final exists = await probeFiles(cached);
+        if (!mounted) return;
+        for (var i = 0; i < cached.length; i++) {
+          if (!exists[i]) continue;
+          final p = cached[i];
           final f = File(p);
-          if (!f.existsSync()) continue;
           if (rules.isEmpty) {
             // No active rules — show all cached files (unfiltered).
             files.add(f);
@@ -781,17 +786,17 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
         break;
       case SortOption.dateAsc:
       case SortOption.dateCreatedAsc:
-        result = _statFor(a).modified.compareTo(_statFor(b).modified);
+        result = _modifiedFor(a).compareTo(_modifiedFor(b));
         break;
       case SortOption.dateDesc:
       case SortOption.dateCreatedDesc:
-        result = _statFor(b).modified.compareTo(_statFor(a).modified);
+        result = _modifiedFor(b).compareTo(_modifiedFor(a));
         break;
       case SortOption.sizeAsc:
-        result = _statFor(a).size.compareTo(_statFor(b).size);
+        result = _sizeFor(a).compareTo(_sizeFor(b));
         break;
       case SortOption.sizeDesc:
-        result = _statFor(b).size.compareTo(_statFor(a).size);
+        result = _sizeFor(b).compareTo(_sizeFor(a));
         break;
       case SortOption.typeAsc:
       case SortOption.extensionAsc:
@@ -828,6 +833,11 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
     }
     return result == 0 ? aName.compareTo(bName) : result;
   }
+
+  int _sizeFor(File file) => _fileInfos[file.path]?.size ?? _statFor(file).size;
+
+  DateTime _modifiedFor(File file) =>
+      _fileInfos[file.path]?.modifiedTime ?? _statFor(file).modified;
 
   FileStat _statFor(File file) => _fileStats.putIfAbsent(file.path, () {
     try {
@@ -1466,6 +1476,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
     final theme = Theme.of(context);
     final name = pathlib.basename(file.path);
     final stat = mode == ViewMode.details ? _fileStats[file.path] : null;
+    final info = mode == ViewMode.details ? _fileInfos[file.path] : null;
     final selectedColor = isSelected
         ? theme.colorScheme.primary.withValues(alpha: 0.16)
         : Colors.transparent;
@@ -1513,15 +1524,19 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
             Expanded(
               flex: 2,
               child: Text(
-                stat == null ? '—' : FormatUtils.formatFileSize(stat.size),
+                info == null && stat == null
+                    ? '—'
+                    : FormatUtils.formatFileSize(info?.size ?? stat!.size),
               ),
             ),
             Expanded(
               flex: 3,
               child: Text(
-                stat == null
+                info == null && stat == null
                     ? '—'
-                    : DateFormat('dd/MM/yyyy HH:mm').format(stat.modified),
+                    : DateFormat(
+                        'dd/MM/yyyy HH:mm',
+                      ).format(info?.modifiedTime ?? stat!.modified),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),

@@ -49,6 +49,21 @@ flutter::UIThreadPolicy PreferredUIThreadPolicy() {
              : flutter::UIThreadPolicy::RunOnSeparateThread;
 }
 
+flutter::ImpellerSwitch PreferredImpellerSwitch() {
+  wchar_t value[16] = {};
+  const DWORD length =
+      ::GetEnvironmentVariableW(L"CB_WINDOWS_RENDERER", value, 16);
+  if (length > 0 && length < 16) {
+    if (wcscmp(value, L"skia") == 0) {
+      return flutter::ImpellerSwitch::Disabled;
+    }
+    if (wcscmp(value, L"impeller") == 0) {
+      return flutter::ImpellerSwitch::Enabled;
+    }
+  }
+  return flutter::ImpellerSwitch::Default;
+}
+
 std::string Utf8FromUtf16(const wchar_t* utf16_string) {
   if (utf16_string == nullptr) {
     return std::string();

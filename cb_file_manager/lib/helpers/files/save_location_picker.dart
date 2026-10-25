@@ -84,15 +84,11 @@ class PickedSaveLocation {
 Future<PickedSaveLocation?> pickSaveLocation({
   required String fileName,
   String? dialogTitle,
-  FileType type = FileType.any,
-  List<String>? allowedExtensions,
 }) async {
   final uri = await FilePicker.saveFile(
     fileName: fileName,
     bytes: Uint8List(0),
     dialogTitle: dialogTitle,
-    type: type,
-    allowedExtensions: allowedExtensions,
   );
   if (uri == null) return null;
   return PickedSaveLocation._(

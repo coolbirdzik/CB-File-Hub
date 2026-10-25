@@ -1029,6 +1029,10 @@ class _CBFileAppState extends State<CBFileApp>
   }
 
   void _scheduleAcrylicReapplyAfterWindowMutation() {
+    // The Windows delegate restores the root material and child alpha together
+    // after native sizing settles. Re-clearing the background from Dart here
+    // races that restore and starts nested frame/style/reapply event bursts.
+    if (Platform.isWindows) return;
     if (!(Platform.isWindows || Platform.isMacOS) ||
         !_useDesktopAcrylicVisuals) {
       return;
@@ -1270,7 +1274,11 @@ class _CBFileAppState extends State<CBFileApp>
       navigatorKey: navigatorKey,
       theme: _resolveFluentLightTheme(themeProvider),
       darkTheme: _resolveFluentDarkTheme(themeProvider),
-      themeMode: themeProvider.themeMode,
+      themeMode: switch (themeProvider.themeMode) {
+        ThemeMode.system => fluent.ThemeMode.system,
+        ThemeMode.light => fluent.ThemeMode.light,
+        ThemeMode.dark => fluent.ThemeMode.dark,
+      },
       debugShowCheckedModeBanner: false,
       locale: _languageController.currentLocale,
       localizationsDelegates: const [

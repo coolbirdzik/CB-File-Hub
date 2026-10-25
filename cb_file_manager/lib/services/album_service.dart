@@ -620,29 +620,37 @@ class AlbumService {
 
     final manualFiles = await getAlbumFiles(albumId);
     final result = <FileInfo>[];
-    for (final albumFile in manualFiles) {
-      final file = File(albumFile.filePath);
-      FileStat? stat;
-      try {
-        stat = await file.stat();
-      } catch (_) {
-        continue;
-      }
-      result.add(
-        FileInfo(
-          path: albumFile.filePath,
-          name: path.basename(albumFile.filePath),
-          size: stat.size,
-          modifiedTime: stat.modified,
-          isImage: FileTypeRegistry.isCategory(
-            path.extension(albumFile.filePath),
+    final images = manualFiles
+        .where(
+          (file) => FileTypeRegistry.isCategory(
+            path.extension(file.filePath),
             FileCategory.image,
           ),
-          isVideo: false,
-        ),
+        )
+        .toList(growable: false);
+    // Bound filesystem work while preserving the album's stored order.
+    for (var offset = 0; offset < images.length; offset += 50) {
+      final batch = await Future.wait(
+        images.skip(offset).take(50).map((albumFile) async {
+          try {
+            final stat = await File(albumFile.filePath).stat();
+            if (stat.type != FileSystemEntityType.file) return null;
+            return FileInfo(
+              path: albumFile.filePath,
+              name: path.basename(albumFile.filePath),
+              size: stat.size,
+              modifiedTime: stat.modified,
+              isImage: true,
+              isVideo: false,
+            );
+          } on FileSystemException {
+            return null;
+          }
+        }),
       );
+      result.addAll(batch.whereType<FileInfo>());
     }
-    return result.where((file) => file.isImage).toList(growable: false);
+    return result;
   }
 
   /// Returns the real image total rather than the in-memory scan limit.

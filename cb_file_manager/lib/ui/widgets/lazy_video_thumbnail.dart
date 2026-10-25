@@ -272,12 +272,27 @@ class _LazyVideoThumbnailState extends State<LazyVideoThumbnail>
     // Don't schedule if we've determined we don't need to regenerate
     if (!_shouldRegenerateThumbnail) return;
 
-    SchedulerBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
+    final videoPath = widget.videoPath;
+    final cached = VideoThumbnailHelper.peekCachedThumbnailPath(videoPath);
+    if (cached != null) {
+      _thumbnailPathNotifier.value = cached;
+      _isThumbnailGenerated = true;
+      _shouldRegenerateThumbnail = false;
+      // Parent callbacks can setState; never invoke them during init/build.
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        if (mounted && widget.videoPath == videoPath) {
+          widget.onThumbnailGenerated?.call(cached);
+        }
+      });
+      return;
+    }
 
-      VideoThumbnailHelper.getFromCache(widget.videoPath)
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || widget.videoPath != videoPath) return;
+
+      VideoThumbnailHelper.getFromCache(videoPath)
           .then((cachedThumbnailPath) {
-            if (!mounted) return;
+            if (!mounted || widget.videoPath != videoPath) return;
 
             // If we have a cached path, use it immediately
             if (cachedThumbnailPath != null) {
@@ -640,6 +655,7 @@ class _LazyVideoThumbnailState extends State<LazyVideoThumbnail>
 
   /// Build the actual thumbnail image
   Widget _buildThumbnailImage(String thumbnailPath) {
+    final videoPath = widget.videoPath;
     return RepaintBoundary(
       child: SizedBox(
         width: widget.width,
@@ -666,11 +682,20 @@ class _LazyVideoThumbnailState extends State<LazyVideoThumbnail>
               widget.videoPath,
             );
 
-            _thumbnailPathNotifier.value = null;
-            _isLoading = false;
-            _isThumbnailGenerated = false;
-            _shouldRegenerateThumbnail = true;
-            VideoThumbnailHelper.removeFromCache(widget.videoPath);
+            // Image calls this while building. Notify the parent only after
+            // the frame, and ignore failures from a source already replaced.
+            SchedulerBinding.instance.addPostFrameCallback((_) {
+              if (!mounted ||
+                  widget.videoPath != videoPath ||
+                  _thumbnailPathNotifier.value != thumbnailPath) {
+                return;
+              }
+              _thumbnailPathNotifier.value = null;
+              _isLoading = false;
+              _isThumbnailGenerated = false;
+              _shouldRegenerateThumbnail = true;
+              unawaited(VideoThumbnailHelper.removeFromCache(videoPath));
+            });
             return widget.fallbackBuilder();
           },
           frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {

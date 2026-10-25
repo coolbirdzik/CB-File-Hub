@@ -517,7 +517,9 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
                         onTap: () => _navigateToAiChat(context),
                       ),
 
-                      if (Platform.isWindows || Platform.isMacOS)
+                      if (Platform.isWindows ||
+                          Platform.isMacOS ||
+                          Platform.isLinux)
                         DrawerNavigationItem(
                           icon: PhosphorIconsLight.broom,
                           title: context.tr.cbAgentCleanerTitle,
@@ -799,7 +801,9 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
                           ),
                           onPressed: () => _navigateToAiChat(context),
                         ),
-                        if (Platform.isWindows || Platform.isMacOS)
+                        if (Platform.isWindows ||
+                            Platform.isMacOS ||
+                            Platform.isLinux)
                           _fluentNavigationItem(
                             context,
                             icon: PhosphorIconsLight.broom,

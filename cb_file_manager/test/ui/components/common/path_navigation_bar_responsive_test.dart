@@ -19,6 +19,11 @@ void main() {
       for (final width in [88.7, 40.0, 120.0, 240.0, 600.0, 88.7]) {
         await tester.pumpWidget(
           fluent.FluentApp(
+            // Fluent 4.17 supplies material_ui localizations; this fixture also
+            // hosts Flutter Material controls, as the app's bridge does.
+            localizationsDelegates: const [
+              DefaultMaterialLocalizations.delegate,
+            ],
             home: Material(
               child: Center(
                 child: SizedBox(

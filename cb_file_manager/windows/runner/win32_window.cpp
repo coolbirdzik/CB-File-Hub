@@ -1,4 +1,5 @@
 #include "win32_window.h"
+#include "custom_frame_message.h"
 
 #include <dwmapi.h>
 #include <flutter_windows.h>
@@ -285,6 +286,48 @@ LRESULT CALLBACK Win32Window::WndProc(HWND const window,
   return DefWindowProc(window, message, wparam, lparam);
 }
 
+void Win32Window::ReclaimWindowProc()
+{
+  // media_kit_video 2.0.1 replaces this WNDPROC and forwards every message
+  // through one process-wide plugin instance. Each engine registers its own,
+  // so closing the newest engine leaves every other window forwarding to
+  // DefWindowProc: the native caption returns (no custom WM_NCCALCSIZE) and
+  // neither this runner nor any plugin delegate sees messages again.
+  if (!window_handle_)
+  {
+    return;
+  }
+  const auto current = reinterpret_cast<WNDPROC>(
+      GetWindowLongPtr(window_handle_, GWLP_WNDPROC));
+  if (current == WndProc || current == ReclaimedWndProc)
+  {
+    return;
+  }
+  replaced_window_proc_ = current;
+  SetWindowLongPtr(window_handle_, GWLP_WNDPROC,
+                   reinterpret_cast<LONG_PTR>(ReclaimedWndProc));
+}
+
+// static
+LRESULT CALLBACK Win32Window::ReclaimedWndProc(HWND const window,
+                                               UINT const message,
+                                               WPARAM const wparam,
+                                               LPARAM const lparam) noexcept
+{
+  // MediaKitVideoPlugin::kMainThreadTaskMessage drains the plugin's queue.
+  constexpr UINT kMediaKitMainThreadTaskMessage = WM_USER + 1001;
+  if (message == kMediaKitMainThreadTaskMessage)
+  {
+    Win32Window *that = GetThisFromHandle(window);
+    if (that && that->replaced_window_proc_)
+    {
+      return CallWindowProc(that->replaced_window_proc_, window, message,
+                            wparam, lparam);
+    }
+  }
+  return WndProc(window, message, wparam, lparam);
+}
+
 LRESULT
 Win32Window::MessageHandler(HWND hwnd,
                             UINT const message,
@@ -468,6 +511,7 @@ void Win32Window::OnDestroy()
 
 void Win32Window::UpdateTheme(HWND const window)
 {
+  SuppressCustomFrameBorder(window);
   DWORD light_mode;
   DWORD light_mode_size = sizeof(light_mode);
   LSTATUS result = RegGetValue(HKEY_CURRENT_USER, kGetPreferredBrightnessRegKey,

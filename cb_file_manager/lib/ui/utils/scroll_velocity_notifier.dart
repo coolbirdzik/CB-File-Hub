@@ -17,28 +17,33 @@ class ScrollVelocityNotifier extends ChangeNotifier {
   DateTime _lastUpdate = DateTime.now();
   Timer? _resetTimer;
   bool _isScrollingFast = false;
+  bool _isScrolling = false;
 
-  // Configuration - pixels per frame threshold for "fast scrolling"
+  // Configuration - pixels per second threshold for "fast scrolling"
   static const double _fastScrollThreshold = 800.0;
   // Time window to consider scroll "stopped"
   static const Duration _resetDelay = Duration(milliseconds: 150);
-  // Minimum velocity to consider as "scrolling"
-  static const double _minScrollVelocity = 50.0;
 
-  /// Current scroll velocity in pixels per frame
+  /// Current scroll velocity in pixels per second
   double get velocity => _velocity;
 
   /// Whether the user is currently scrolling fast
   bool get isScrollingFast => _isScrollingFast;
 
-  /// Whether any scrolling is happening (above minimum threshold)
-  bool get isScrolling => _velocity > _minScrollVelocity;
+  /// Any non-zero scrolling remains active until end/idle, including the
+  /// first slow tick after a long pause.
+  bool get isScrolling => _isScrolling;
 
   /// Update the scroll velocity based on scroll delta
   /// Call this from ScrollNotification callbacks
   void updateVelocity(double scrollDelta) {
+    if (scrollDelta == 0) return;
+    final wasScrolling = _isScrolling;
+    _isScrolling = true;
     final now = DateTime.now();
-    final deltaTime = now.difference(_lastUpdate).inMilliseconds;
+    final deltaTime = wasScrolling
+        ? now.difference(_lastUpdate).inMilliseconds
+        : 16;
 
     // Calculate velocity (pixels per second approximation)
     if (deltaTime > 0) {
@@ -56,7 +61,7 @@ class ScrollVelocityNotifier extends ChangeNotifier {
     _isScrollingFast = _velocity > _fastScrollThreshold;
 
     // Notify listeners if state changed
-    if (wasScrollingFast != _isScrollingFast) {
+    if (!wasScrolling || wasScrollingFast != _isScrollingFast) {
       notifyListeners();
     }
 
@@ -64,23 +69,17 @@ class ScrollVelocityNotifier extends ChangeNotifier {
     _resetTimer?.cancel();
 
     // Set timer to reset velocity after scroll stops
-    _resetTimer = Timer(_resetDelay, () {
-      if (_velocity > 0) {
-        _velocity = 0;
-        _isScrollingFast = false;
-        notifyListeners();
-      }
-    });
+    _resetTimer = Timer(_resetDelay, reset);
   }
 
   /// Reset velocity (call when scroll ends)
   void reset() {
+    final wasScrolling = _isScrolling || _isScrollingFast;
     _velocity = 0;
-    if (_isScrollingFast) {
-      _isScrollingFast = false;
-      notifyListeners();
-    }
+    _isScrolling = false;
+    _isScrollingFast = false;
     _resetTimer?.cancel();
+    if (wasScrolling) notifyListeners();
   }
 
   /// Dispose resources

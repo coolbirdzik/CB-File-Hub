@@ -5,6 +5,7 @@ import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/helpers/core/uri_utils.dart';
 import 'package:cb_file_manager/helpers/media/folder_thumbnail_service.dart';
 import 'package:cb_file_manager/helpers/media/video_thumbnail_helper.dart';
+import 'package:cb_file_manager/helpers/media/thumbnail_work_scheduler.dart';
 import 'package:cb_file_manager/helpers/tags/tag_color_manager.dart';
 import 'package:cb_file_manager/helpers/tags/tag_thumbnail_manager.dart';
 import 'package:cb_file_manager/ui/widgets/thumbnail_loader.dart';
@@ -115,6 +116,7 @@ class _FolderThumbnailState extends State<FolderThumbnail> {
   @override
   void dispose() {
     _disposed = true;
+    ThumbnailWorkScheduler.instance.cancel(this);
     _thumbnailChangedSubscription?.cancel();
     _videoThumbnailReadySubscription?.cancel();
     _cacheChangedSubscription?.cancel();
@@ -123,20 +125,35 @@ class _FolderThumbnailState extends State<FolderThumbnail> {
   }
 
   Future<void> _loadFromCacheOrFetch() async {
+    ThumbnailWorkScheduler.instance.cancel(this);
     final folderPath = widget.folder.path;
-    final cached = _folderThumbnailPathCache[widget.folder.path];
-    final valid = cached != null && await _isCachedPathValid(cached);
-    if (_disposed || widget.folder.path != folderPath) return;
-    if (valid) {
-      // Apply immediately without awaiting for faster display
+    final cached =
+        _folderThumbnailPathCache[folderPath] ??
+        _thumbnailService.peekCachedThumbnailPath(folderPath);
+    if (cached != null) {
+      _folderThumbnailPathCache[folderPath] = cached;
+      // Restore before the first build. Rechecking the source on a mapped drive
+      // here made every recycled folder flash its loading icon on scroll.
+      _thumbnailPath = cached;
+      _videoPath = _isVideoPath(cached) ? _getVideoPath(cached) : null;
+      _cachedVideoThumbnailPath = _videoPath == null
+          ? null
+          : VideoThumbnailHelper.peekCachedThumbnailPath(_videoPath!);
       _isLoading = false;
-      await _applyFolderThumbnailPath(cached);
+      _loadFailed = false;
+      _isVideoThumbnailLoading =
+          _videoPath != null && _cachedVideoThumbnailPath == null;
+      // Keep validation and recovery, but do not blank an already known cover
+      // while the source and thumbnail cache are checked asynchronously.
+      ThumbnailWorkScheduler.instance.schedule(
+        this,
+        () => _applyFolderThumbnailPath(cached),
+      );
       return;
     }
-    if (cached != null) {
-      _folderThumbnailPathCache.remove(widget.folder.path);
-    }
-    _loadThumbnail();
+    _thumbnailPath = null;
+    _isLoading = true;
+    ThumbnailWorkScheduler.instance.schedule(this, _loadThumbnail);
   }
 
   Future<bool> _isCachedPathValid(String cached) {

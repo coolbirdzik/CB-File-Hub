@@ -184,8 +184,10 @@ opt-in developer caches. Rule-based cleanup stays within those resolved user
 paths; application data and personal files are excluded. Trash moves use
 Foundation `FileManager.trashItem` on a utility queue and report each failed
 path. The result screen offers Finder Trash instead of Windows bin deletion.
-Apps inventory/uninstall and Windows-specific cleanup suggestions remain
-Windows-only. Full Disk Access restrictions appear as scan coverage gaps;
+Apps inventory/uninstall remains Windows-only. Leftover app data (folders of
+uninstalled or outdated apps) works on Windows, macOS and Linux and moves
+folders to the Trash on macOS and Linux; on Linux it is the only Cleaner page.
+Full Disk Access restrictions appear as scan coverage gaps;
 Cleaner does not change macOS permissions.
 
 **Quick review** groups retained scan entries by scope, scanner category, known cause and file type. Known categories, causes, types and folders receive immediate explanations from scan metadata. AI reviews at most 24 of the largest unrecognized file groups, with at most eight groups per prompt and four calls per run, further bounded by the context window. Valid partial answers are saved, including completed entries in truncated JSON. Invalid output is not retried automatically: missing verdicts receive conservative scan-based REVIEW advice. A provider failure ends AI calls and completes the overview using scan metadata. The pane labels the source of each recommendation, and the summary distinguishes metadata groups from AI recommendations and notes scan coverage limits. No file contents are read, no group verdict selects files, and existing user selections remain intact. Metadata batches yield for UI frames and Stop. Stop and scan invalidation retain accepted progress; Retry resumes unfinished groups. The GGUF runtime uses direct responses for these short classification calls; normal chat keeps its existing reasoning settings. This is preliminary guidance, not an exhaustive file inspection. Cleanup still requires user confirmation.

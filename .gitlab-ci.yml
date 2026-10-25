@@ -11,7 +11,7 @@ workflow:
 variables:
   GIT_DEPTH: "0"
   GIT_STRATEGY: clone
-  FLUTTER_VERSION: "3.47.2"
+  FLUTTER_VERSION: "3.47.8"
   GITHUB_REPO: "coolbirdzik/cb-file-hub"
   RELEASE_OUTPUT_DIR: "ci/release"
 
@@ -31,13 +31,20 @@ prepare_release:
 
 build_android_release:
   stage: build
-  image: ghcr.io/cirruslabs/flutter:${FLUTTER_VERSION}
+  # Versioned container tags can lag SDK releases; pin the SDK below instead.
+  image: ghcr.io/cirruslabs/flutter:stable
   needs:
     - job: prepare_release
       artifacts: true
   before_script:
     - apt-get update
     - apt-get install -y bash make zip curl nodejs
+    - |
+      sdk_root="$(dirname "$(dirname "$(readlink -f "$(command -v flutter)")")")"
+      test -f "$sdk_root/bin/internal/engine.version"
+      git -C "$sdk_root" fetch --depth 1 origin "refs/tags/$FLUTTER_VERSION:refs/tags/$FLUTTER_VERSION"
+      git -C "$sdk_root" checkout --force --detach "$FLUTTER_VERSION"
+      (cd cb_file_manager && flutter --version)
     - bash scripts/ci/setup_rust_android.sh
   script:
     - make android

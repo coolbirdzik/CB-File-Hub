@@ -90,7 +90,7 @@ void main() {
         findsNothing,
       );
       expect(
-        find.byKey(const ValueKey('cleaner-utility-suggestions')),
+        find.byKey(const ValueKey('cleaner-utility-appLeftovers')),
         findsOneWidget,
       );
       await tester.tap(find.byKey(const ValueKey('cleaner-scan-cta')));

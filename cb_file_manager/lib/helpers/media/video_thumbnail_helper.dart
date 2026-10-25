@@ -12,6 +12,7 @@ import 'package:video_thumbnail/video_thumbnail.dart';
 import 'package:path/path.dart' as path;
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/helpers/core/app_path_helper.dart';
+import 'package:cb_file_manager/ui/utils/scroll_velocity_notifier.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import 'fc_native_video_thumbnail.dart';
@@ -907,6 +908,12 @@ class VideoThumbnailHelper {
         if (_shouldStopProcessing) {
           break;
         }
+        // Do not start another decode while the file grid is moving. Existing
+        // decodes finish normally, and a single queue timer resumes the batch.
+        if (ScrollVelocityNotifier.instance.isScrolling) {
+          await Future<void>.delayed(const Duration(milliseconds: 100));
+          continue;
+        }
 
         // Fill up to _maxConcurrency parallel generation slots.
         // Priority order is maintained: highest-priority items are taken first
@@ -1646,6 +1653,17 @@ class VideoThumbnailHelper {
     }
 
     return null;
+  }
+
+  /// Memory-only lookup for the first frame of a recycled thumbnail widget.
+  /// No filesystem access: the image's error handler handles a removed cache
+  /// file, while [getFromCache] remains the validating asynchronous lookup.
+  static String? peekCachedThumbnailPath(String videoPath) {
+    final key = _cacheKeyForPath(videoPath);
+    return _inMemoryPathCache[key] ??
+        _inMemoryPathCache[videoPath] ??
+        _fileCache[key] ??
+        _fileCache[videoPath];
   }
 
   static Future<String?> getFromCache(String videoPath) async {

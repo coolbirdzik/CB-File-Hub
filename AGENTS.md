@@ -22,7 +22,7 @@ below).
 
 ## Flutter version
 
-Pinned to **3.47.2 stable** (`build.config`, CI workflows). Use this exact version.
+Pinned to **3.47.8 stable** (`build.config`, CI workflows). Use this exact version.
 
 ## Developer commands
 

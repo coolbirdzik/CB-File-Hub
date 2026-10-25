@@ -152,6 +152,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
 
   flutter::DartProject project(L"data");
   project.set_ui_thread_policy(PreferredUIThreadPolicy());
+  project.set_impeller_switch(PreferredImpellerSwitch());
 
   // The dedicated video player (CB_WINDOW_ROLE=video, which a PiP window
   // spawned from it inherits) is a fresh process, so engine startup sits

@@ -7,6 +7,9 @@ import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:cb_file_manager/ui/widgets/selection_rectangle_painter.dart';
 import 'package:cb_file_manager/ui/widgets/value_listenable_builders.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 
 class TabbedFolderDragSelectionController {
@@ -20,6 +23,7 @@ class TabbedFolderDragSelectionController {
 
   final Map<String, Rect> _itemPositions = {};
   final Map<String, RenderBox> _itemRenderBoxes = {};
+  final Map<String, bool> _itemIsFolder = {};
 
   final ValueNotifier<bool> isDragging = ValueNotifier<bool>(false);
   final ValueNotifier<Offset?> dragStartPosition = ValueNotifier<Offset?>(null);
@@ -32,11 +36,17 @@ class TabbedFolderDragSelectionController {
   /// coordinates so it can be compared with _itemPositions (global coords).
   final GlobalKey stackKey = GlobalKey();
 
-  // Snapshot of selection state taken at the moment a Ctrl+drag starts.
+  // Selection state at drag-start, used by Ctrl and Shift rectangle selection.
   // Prevents per-frame toggle flickering by computing the delta against
   // this fixed baseline rather than the live selection state.
-  Set<String> _preCtrlDragFiles = const {};
-  Set<String> _preCtrlDragFolders = const {};
+  Set<String> _initialFiles = const {};
+  Set<String> _initialFolders = const {};
+
+  Set<String> _knownFolderPaths = const {};
+  Set<String>? _lastFiles;
+  Set<String>? _lastFolders;
+  int? _selectionFrame;
+  bool _selectionPending = false;
 
   // Auto-clear item positions whenever the folder state changes (navigation,
   // new files created, refresh, etc.) so that stale rects cannot ghost-select
@@ -61,7 +71,10 @@ class TabbedFolderDragSelectionController {
   void dispose() {
     _folderListSub?.cancel();
     _folderListSub = null;
+    _cancelSelectionFrame();
+    _itemPositions.clear();
     _itemRenderBoxes.clear();
+    _itemIsFolder.clear();
     isDragging.dispose();
     dragStartPosition.dispose();
     dragCurrentPosition.dispose();
@@ -75,25 +88,50 @@ class TabbedFolderDragSelectionController {
     _itemPositions[path] = position;
   }
 
-  /// Grid tiles register once. Read their final bounds only during selection,
+  /// Items register once. Read their final bounds only during selection,
   /// rather than scheduling a measurement for every tile on every resize frame.
-  void registerItemRenderBox(String path, RenderBox box) {
+  void registerItemRenderBox(String path, RenderBox box, {bool? isFolder}) {
     _itemRenderBoxes[path] = box;
+    if (isFolder == null) {
+      _itemIsFolder.remove(path);
+    } else {
+      _itemIsFolder[path] = isFolder;
+    }
   }
 
   void unregisterItemRenderBox(String path, RenderBox box) {
-    if (identical(_itemRenderBoxes[path], box)) _itemRenderBoxes.remove(path);
+    if (identical(_itemRenderBoxes[path], box)) {
+      _itemRenderBoxes.remove(path);
+      _itemIsFolder.remove(path);
+    }
   }
 
   Iterable<MapEntry<String, Rect>> get _currentItemPositions sync* {
     for (final entry in _itemPositions.entries) {
       if (!_itemRenderBoxes.containsKey(entry.key)) yield entry;
     }
+    final viewportBounds = <RenderBox, Rect>{};
+    final surface = stackKey.currentContext?.findRenderObject() as RenderBox?;
+    final surfaceBounds = surface != null && surface.hasSize
+        ? surface.localToGlobal(Offset.zero) & surface.size
+        : null;
     for (final entry in _itemRenderBoxes.entries) {
       final box = entry.value;
-      if (box.attached && box.hasSize) {
-        yield MapEntry(entry.key, box.localToGlobal(Offset.zero) & box.size);
+      if (!box.attached || !box.hasSize) continue;
+      var bounds = box.localToGlobal(Offset.zero) & box.size;
+      // Sliver caches keep rows alive outside the visible viewport. Exclude
+      // those portions, including rows hidden behind the details header.
+      final Object? viewport = RenderAbstractViewport.maybeOf(box);
+      if (viewport is RenderBox && viewport.hasSize) {
+        bounds = bounds.intersect(
+          viewportBounds.putIfAbsent(
+            viewport,
+            () => viewport.localToGlobal(Offset.zero) & viewport.size,
+          ),
+        );
       }
+      if (surfaceBounds != null) bounds = bounds.intersect(surfaceBounds);
+      if (!bounds.isEmpty) yield MapEntry(entry.key, bounds);
     }
   }
 
@@ -113,24 +151,19 @@ class TabbedFolderDragSelectionController {
   void start(Offset position) {
     if (isDragging.value) return;
 
-    // Snapshot the current selection so Ctrl+drag can compute a stable delta
-    // against this baseline on every pan-update frame.
-    final keyboard = HardwareKeyboard.instance;
-    final bool isCtrlPressed =
-        keyboard.logicalKeysPressed.contains(LogicalKeyboardKey.control) ||
-        keyboard.logicalKeysPressed.contains(LogicalKeyboardKey.controlLeft) ||
-        keyboard.logicalKeysPressed.contains(LogicalKeyboardKey.controlRight) ||
-        keyboard.logicalKeysPressed.contains(LogicalKeyboardKey.meta) ||
-        keyboard.logicalKeysPressed.contains(LogicalKeyboardKey.metaLeft) ||
-        keyboard.logicalKeysPressed.contains(LogicalKeyboardKey.metaRight);
-
-    if (isCtrlPressed) {
-      _preCtrlDragFiles = Set.of(selectionBloc.state.selectedFilePaths);
-      _preCtrlDragFolders = Set.of(selectionBloc.state.selectedFolderPaths);
-    } else {
-      _preCtrlDragFiles = const {};
-      _preCtrlDragFolders = const {};
-    }
+    // Always capture a baseline, including an empty selection. Modifiers may
+    // change while dragging, but each update must resolve against drag-start.
+    _initialFiles = Set.of(selectionBloc.state.selectedFilePaths);
+    _initialFolders = Set.of(selectionBloc.state.selectedFolderPaths);
+    _knownFolderPaths =
+        folderPaths?.call().toSet() ??
+        folderListBloc?.state.folders
+            .whereType<Directory>()
+            .map((folder) => folder.path)
+            .toSet() ??
+        const <String>{};
+    _lastFiles = null;
+    _lastFolders = null;
 
     isDragging.value = true;
     dragStartPosition.value = position;
@@ -142,24 +175,45 @@ class TabbedFolderDragSelectionController {
 
     dragCurrentPosition.value = position;
 
-    if (dragStartPosition.value == null || dragCurrentPosition.value == null) {
-      return;
-    }
+    _selectionPending = true;
+    // Mouse devices can send many moves per frame. Hit-test only the latest
+    // rectangle once per frame instead of queuing intermediate bloc states.
+    _selectionFrame ??= SchedulerBinding.instance.scheduleFrameCallback((_) {
+      _selectionFrame = null;
+      _flushSelection();
+    });
+  }
 
-    final Rect selectionRect = Rect.fromPoints(
-      dragStartPosition.value!,
-      dragCurrentPosition.value!,
-    );
-    _selectItemsInRect(selectionRect);
+  void _flushSelection() {
+    if (!_selectionPending || !isDragging.value) return;
+    _selectionPending = false;
+    final start = dragStartPosition.value;
+    final current = dragCurrentPosition.value;
+    if (start != null && current != null) {
+      _selectItemsInRect(Rect.fromPoints(start, current));
+    }
+  }
+
+  void _cancelSelectionFrame() {
+    final frame = _selectionFrame;
+    if (frame != null) {
+      SchedulerBinding.instance.cancelFrameCallbackWithId(frame);
+    }
+    _selectionFrame = null;
   }
 
   void end() {
+    _cancelSelectionFrame();
+    // Preserve the last pointer move even if release arrives before a frame.
+    _flushSelection();
     isDragging.value = false;
     dragStartPosition.value = null;
     dragCurrentPosition.value = null;
-    // Clear Ctrl-drag snapshot
-    _preCtrlDragFiles = const {};
-    _preCtrlDragFolders = const {};
+    _initialFiles = const {};
+    _initialFolders = const {};
+    _knownFolderPaths = const {};
+    _lastFiles = null;
+    _lastFolders = null;
   }
 
   Widget buildOverlay() {
@@ -176,13 +230,15 @@ class TabbedFolderDragSelectionController {
 
         return Positioned.fill(
           child: IgnorePointer(
-            child: CustomPaint(
-              painter: SelectionRectanglePainter(
-                selectionRect: selectionRect,
-                fillColor: Theme.of(
-                  context,
-                ).colorScheme.primaryContainer.withValues(alpha: 0.4),
-                borderColor: Theme.of(context).primaryColor,
+            child: RepaintBoundary(
+              child: CustomPaint(
+                painter: SelectionRectanglePainter(
+                  selectionRect: selectionRect,
+                  fillColor: Theme.of(
+                    context,
+                  ).colorScheme.primaryContainer.withValues(alpha: 0.4),
+                  borderColor: Theme.of(context).primaryColor,
+                ),
               ),
             ),
           ),
@@ -217,15 +273,6 @@ class TabbedFolderDragSelectionController {
         keyboard.logicalKeysPressed.contains(LogicalKeyboardKey.shiftLeft) ||
         keyboard.logicalKeysPressed.contains(LogicalKeyboardKey.shiftRight);
 
-    final configuredFolderPaths = folderPaths?.call();
-    final knownFolderPaths = configuredFolderPaths != null
-        ? configuredFolderPaths.toSet()
-        : folderListBloc?.state.folders
-                  .whereType<Directory>()
-                  .map((folder) => folder.path)
-                  .toSet() ??
-              const <String>{};
-
     final Set<String> selectedFoldersInDrag = {};
     final Set<String> selectedFilesInDrag = {};
 
@@ -233,24 +280,34 @@ class TabbedFolderDragSelectionController {
       final path = entry.key;
       if (!globalSelectionRect.overlaps(entry.value)) continue;
 
-      if (knownFolderPaths.contains(path)) {
+      if (_itemIsFolder[path] ?? _knownFolderPaths.contains(path)) {
         selectedFoldersInDrag.add(path);
       } else {
         selectedFilesInDrag.add(path);
       }
     }
 
+    // Submit an absolute selection so Ctrl+drag also stays stable when the
+    // baseline is empty. Shift adds to the baseline; Ctrl toggles against it.
+    Set<String> resolve(Set<String> hits, Set<String> baseline) {
+      if (isShiftPressed) return {...baseline, ...hits};
+      if (!isCtrlPressed) return hits;
+      return {...baseline.difference(hits), ...hits.difference(baseline)};
+    }
+
+    final files = resolve(selectedFilesInDrag, _initialFiles);
+    final folders = resolve(selectedFoldersInDrag, _initialFolders);
+    if (setEquals(files, _lastFiles) && setEquals(folders, _lastFolders)) {
+      return;
+    }
+    _lastFiles = files;
+    _lastFolders = folders;
+    if (setEquals(files, selectionBloc.state.selectedFilePaths) &&
+        setEquals(folders, selectionBloc.state.selectedFolderPaths)) {
+      return;
+    }
     selectionBloc.add(
-      SelectItemsInRect(
-        folderPaths: selectedFoldersInDrag,
-        filePaths: selectedFilesInDrag,
-        isCtrlPressed: isCtrlPressed,
-        isShiftPressed: isShiftPressed,
-        // Pass the pre-drag snapshot so the bloc can compute a stable toggle
-        // delta instead of re-toggling against the live state each frame.
-        preCtrlDragFiles: _preCtrlDragFiles,
-        preCtrlDragFolders: _preCtrlDragFolders,
-      ),
+      SelectItemsInRect(folderPaths: folders, filePaths: files),
     );
   }
 }

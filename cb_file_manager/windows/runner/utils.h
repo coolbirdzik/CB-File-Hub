@@ -24,4 +24,8 @@ std::vector<std::string> GetCommandLineArguments();
 // policy so the app can be checked against it before then.
 flutter::UIThreadPolicy PreferredUIThreadPolicy();
 
+// Allows renderer A/B profiling without changing the deployed default.
+// Dedicated lightweight windows still enforce their existing Skia policy.
+flutter::ImpellerSwitch PreferredImpellerSwitch();
+
 #endif  // RUNNER_UTILS_H_

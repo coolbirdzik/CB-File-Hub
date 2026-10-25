@@ -168,7 +168,7 @@ Install the app for your platform, open a folder, and pin your favorite location
 
 ## Development
 
-Use **Flutter 3.47.2 stable** and `just`:
+Use **Flutter 3.47.8 stable** and `just`:
 
 ```bash
 git clone https://github.com/coolbirdzik/cb-file-hub.git

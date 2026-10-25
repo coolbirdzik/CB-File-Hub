@@ -46,7 +46,7 @@ diagnostics.
 
 ## Verification
 
-Run Flutter/Dart commands from `cb_file_manager/` with Flutter 3.47.2:
+Run Flutter/Dart commands from `cb_file_manager/` with Flutter 3.47.8:
 
 ```sh
 flutter test test/services/local_ai/llama_cpp_server_launch_test.dart test/services/local_ai/llama_cpp_chat_client_test.dart test/14_local_ai_advisor_service_test.dart

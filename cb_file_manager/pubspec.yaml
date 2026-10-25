@@ -20,6 +20,7 @@ environment:
   # also the package's language version, so the code is analysed and formatted
   # as Dart 3.12 rather than the 2.15 the old floor implied.
   sdk: ">=3.12.0 <4.0.0"
+  flutter: ">=3.47.8"
 
 # package:sqlite3 (via sqflite_common_ffi): use OS SQLite on Windows so integration_test
 # does not rely on bundled sqlite3.dll next to the exe (avoids load error 126 on Debug runs).
@@ -39,7 +40,7 @@ dependencies:
   provider: ^6.1.2
   path_provider: ^2.1.1
   package_info_plus: ^10.2.2
-  equatable: ^2.0.7
+  equatable: ^3.0.0
   permission_handler: ^13.0.2
   # video_thumbnail: ^0.5.3  # Commented out the pub.dev version
   # Sử dụng video_thumbnail trực tiếp từ GitHub repository
@@ -70,8 +71,8 @@ dependencies:
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
-  cupertino_icons: ^1.0.6
-  file_picker: ^12.3.0
+  cupertino_icons: ^2.0.0
+  file_picker: ^13.2.0
   win32: ^6.4.0
   crypto: ^3.0.6
   # Dependency injection
@@ -85,13 +86,11 @@ dependencies:
   uuid: ^4.0.0
   flutter_staggered_grid_view: ^0.7.0
   logger: ^2.8.0
-  # 4.17 removes ScaffoldPage/PageHeader APIs and reworks desktop layout.
-  # Review that migration separately before allowing the next minor release.
-  fluent_ui: ">=4.16.1 <4.17.0"
+  fluent_ui: ^4.17.0
 
   ffi: ^2.1.0
   url_launcher: ^6.3.3
-  open_filex: ^4.3.4
+  open_filex: ^5.0.0
   gal: ^2.3.0
   # Removed smb_connect - using mobile_smb_native instead
   mobile_smb_native:
@@ -115,7 +114,7 @@ dependencies:
   # Successor of flutter_gemma (renamed upstream; flutter_gemma is discontinued).
   flutter_edge_ai: ^2.5.2
   flutter_edge_ai_litertlm: ^1.17.0
-  google_fonts: ^8.2.1
+  google_fonts: ^9.0.0
   highlight: ^0.7.0
   archive: ^4.5.2
   dartssh2: ^4.1.0
@@ -131,8 +130,7 @@ dev_dependencies:
   integration_test:
     sdk: flutter
   flutter_lints: ^6.0.0
-  # 2.17 requires build 5; keep this update on the build 4 toolchain.
-  build_runner: ">=2.16.2 <2.17.0"
+  build_runner: ^2.17.1
   msix: ^3.16.9
   # Used by integration_test/e2e_sandbox_paths.dart to isolate app data
   # (DB/tags/prefs/cache) into a throwaway sandbox during E2E + screenshots.

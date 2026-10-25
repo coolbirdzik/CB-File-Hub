@@ -5,7 +5,21 @@
 /// deterministic fixtures.
 library;
 
-enum InstalledAppSource { win32, msix }
+enum InstalledAppSource {
+  win32,
+  msix,
+
+  /// A macOS `.app` bundle; [InstalledAppInfo.packageFamilyName] holds its
+  /// bundle identifier.
+  macApp,
+
+  /// A Linux desktop entry; [InstalledAppInfo.packageFamilyName] holds its
+  /// desktop file id.
+  linuxDesktop,
+
+  /// A command on `PATH` or a package-manager package (macOS and Linux).
+  executable,
+}
 
 enum AppUsageSource { userAssist, prefetch }
 

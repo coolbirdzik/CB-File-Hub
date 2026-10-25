@@ -21,6 +21,7 @@ stale async results, lost provider context, or expensive pane rebuilds.
 | Cleaner row focus and cleanup targets | `CbAgentCleanerScreen` | Cleaner pane; row focus is independent from canonical top-level cleanup targets | `cb_file_manager/lib/ui/screens/cb_agent_cleaner/cb_agent_cleaner_screen.dart` |
 | Cleaner folder-growth baseline | `CleanerGrowthHistoryService` persisted via SharedPreferences | Application persistence; one latest completed snapshot per drive | `cb_file_manager/lib/services/disk_cleaner/cleaner_growth_history_service.dart` |
 | Cleaner App Insights filters | `CleanerAppInsightsCubit` | Cleaner Apps pane | `cb_file_manager/lib/bloc/cleaner_app_insights/cleaner_app_insights_cubit.dart` |
+| Cleaner leftover app data (report, measurements, selection) | `CleanerAppLeftoversCubit` | Cleaner Leftover data pane; reset on every leftover scan | `cb_file_manager/lib/bloc/cleaner_app_leftovers/cleaner_app_leftovers_cubit.dart` |
 | Local model catalog/runtime | `LocalAiAdvisorService` via GetIt | Application; runtime changes with model/context | `cb_file_manager/lib/services/local_ai/local_ai_advisor_service.dart` |
 | Tab inactivity evaluation | `TabActivityManager` via GetIt | Application | `cb_file_manager/lib/services/tab_activity/tab_activity_manager.dart` |
 | Shell context menu session | `WindowsShellContextMenu` cache | Exact selection plus Shift state, bounded TTL and leases | `cb_file_manager/lib/helpers/files/windows_shell_context_menu.dart` |

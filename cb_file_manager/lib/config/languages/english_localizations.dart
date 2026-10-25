@@ -4589,112 +4589,7 @@ class EnglishLocalizations implements AppLocalizations {
   String get cleanerAppsUtilityDescription =>
       'Find large or rarely used apps and review their data';
 
-  // Cleaner - cleanup suggestions
-  @override
-  String get cleanerSuggestionsTitle => 'Cleanup suggestions';
-  @override
-  String get cleanerSuggestionsUtilityDescription =>
-      'Scan for things worth cleaning on this drive';
-  @override
-  String get cleanerSuggestionsIntro =>
-      'Finds junk files, leftover installers, old large files and space that '
-      'the system can reclaim, and explains why each one is suggested. Nothing '
-      'is deleted until you confirm, and files go to Trash.';
-  @override
-  String get cleanerSuggestionsScan => 'Scan for suggestions';
-  @override
-  String get cleanerSuggestionsStepJunk =>
-      'Checking caches and temporary files...';
-  @override
-  String get cleanerSuggestionsStepDownloads =>
-      'Checking the Downloads folder...';
-  @override
-  String get cleanerSuggestionsStepSystem => 'Checking Windows system files...';
-  @override
-  String get cleanerSuggestionsStepDiskScan =>
-      'Reviewing the Disk usage results...';
-  @override
-  String cleanerSuggestionsFoundItems(int count) => '$count items found';
-  @override
-  String cleanerSuggestionsFoundSize(String size) => '$size found';
-  @override
-  String get cleanerSuggestionsSourcesTitle => 'Sources checked';
-  @override
-  String get cleanerSuggestionsSourceDownloads => 'Downloads folder';
-  @override
-  String get cleanerSuggestionsSourceSystem => 'Windows system files';
-  @override
-  String get cleanerSuggestionsSourceDiskScan => 'Disk usage results';
-  @override
-  String get cleanerSuggestionsTierClean => 'Safe to clean';
-  @override
-  String get cleanerSuggestionsTierCleanHint =>
-      'Recreated automatically by the system or apps.';
-  @override
-  String get cleanerSuggestionsTierReview => 'Review before cleaning';
-  @override
-  String get cleanerSuggestionsTierReviewHint =>
-      'Usually removable, but check that you no longer need them.';
-  @override
-  String get cleanerSuggestionsTierGuided => 'Free up with Windows tools';
-  @override
-  String get cleanerSuggestionsTierGuidedHint =>
-      'Do not delete these directly; use the suggested tool instead.';
-  @override
-  String cleanerSuggestionsReclaimable(String size) =>
-      'Up to $size can be freed';
-  @override
-  String cleanerSuggestionsSelected(String size, int count) =>
-      'Selected: $size in $count items';
-  @override
-  String get cleanerSuggestionsNothing =>
-      'Nothing worth cleaning was found on this drive.';
-  @override
-  String get cleanerSuggestionsDiskScanHint =>
-      'Run a Disk usage scan of this drive to also find large unused files, '
-      'node_modules folders and virtual disks.';
-  @override
-  String get cleanerSuggestionsConfirmTitle => 'Move to Recycle Bin?';
-  @override
-  String cleanerSuggestionsConfirmBody(int count, String size) =>
-      '$count items ($size) will be moved to the Recycle Bin. You can restore '
-      'them from there.';
-  @override
-  String cleanerSuggestionsConfirmPersonal(int count) =>
-      '$count of them are your own files, not junk. Make sure you no longer '
-      'need them.';
-  @override
-  String cleanerSuggestionsConfirmRecycleBin(int count) =>
-      '$count items already in the Recycle Bin will be deleted permanently.';
-  @override
-  String cleanerSuggestionsCleaned(String size) =>
-      'Cleaned $size. Files moved to the Recycle Bin still use space until '
-      'it is emptied.';
-  @override
-  String get cleanerSuggestionsCopyCommand => 'Copy command';
-  @override
-  String cleanerSuggestionsCommandCopied(String command) =>
-      'Copied "$command". Run it in Terminal (Admin).';
-  @override
-  String get cleanerSuggestionsOpenSettings => 'Open Windows settings';
-  @override
-  String cleanerSuggestionsShowItems(int count) => 'Show $count items';
-  @override
-  String get cleanerSuggestionsHideItems => 'Hide items';
-  @override
-  String cleanerSuggestionsAtLeast(String size) => 'at least $size';
-  @override
-  String cleanerSuggestionsMoreItems(int count) => '... and $count more';
-  @override
-  String cleanerSuggestionsScanFailed(String error) =>
-      'Could not scan for suggestions: $error';
-  @override
-  String get cleanerSuggestionsJunkScanBusy =>
-      'Another junk scan is running (Quick clean or CB Agent), so caches and '
-      'temporary files were skipped. Scan again when it finishes.';
-  @override
-  String cleanerSuggestionsPartialScan(String error) =>
-      'Part of the scan failed, so some suggestions may be missing: $error';
+  // Cleaner - space usage causes (Disk usage dashboard)
   @override
   String cleanerSuggestionTitle(String id) => switch (id) {
     'downloads_leftovers' => 'Old installers and archives in Downloads',
@@ -4904,6 +4799,120 @@ class EnglishLocalizations implements AppLocalizations {
   String get cleanerAppsStorageUnknown => 'Other storage';
   @override
   String get cleanerAppsCleanableBadge => 'Cleanable';
+
+  // Cleaner - leftover app data
+  @override
+  String get cleanerLeftoversTitle => 'Leftover app data';
+  @override
+  String get cleanerLeftoversUtilityDescription =>
+      'Find folders left behind by uninstalled or outdated apps';
+  @override
+  String get cleanerLeftoversLoading =>
+      'Reading installed apps and app data folders...';
+  @override
+  String get cleanerLeftoversIntro =>
+      'These folders match no installed app. Portable apps and command-line tools may not show up as installed, so check each folder before deleting it.';
+  @override
+  String get cleanerLeftoversInventoryUnavailable =>
+      'The installed app list could not be read, so leftovers cannot be identified.';
+  @override
+  String get cleanerLeftoversPartialBanner =>
+      'The app list or disk scan is incomplete. Some folders may still be in use.';
+  @override
+  String get cleanerLeftoversSearchHint => 'Search folders';
+  @override
+  String get cleanerLeftoversInactiveLabel => 'Not modified for';
+  @override
+  String get cleanerLeftoversInactiveAny => 'Any time';
+  @override
+  String cleanerLeftoversInactiveDays(int days) => '$days+ days';
+  @override
+  String cleanerLeftoversHiddenRecent(int count) =>
+      '$count recently used ${count == 1 ? 'folder' : 'folders'} hidden';
+  @override
+  String get cleanerLeftoversEmpty => 'No leftover folders found.';
+  @override
+  String cleanerLeftoversReasonOlderVersion(String app) =>
+      'Older version of $app';
+  @override
+  String cleanerLeftoversLastModified(String date) => 'Last changed $date';
+  @override
+  String get cleanerLeftoversActivityUnknown => 'Last change unknown';
+  @override
+  String get cleanerLeftoversPartialSize => 'Partly measured';
+  @override
+  String get cleanerLeftoversLocationLocal => 'Local AppData';
+  @override
+  String get cleanerLeftoversLocationRoaming => 'Roaming AppData';
+  @override
+  String get cleanerLeftoversLocationLocalLow => 'LocalLow';
+  @override
+  String get cleanerLeftoversLocationProgramData => 'ProgramData';
+  @override
+  String get cleanerLeftoversLocationUserPrograms => 'User programs';
+  @override
+  String get cleanerLeftoversLocationProgramFiles => 'Program Files';
+  @override
+  String cleanerLeftoversScanProgress(int done, int total) =>
+      'Checked $done of $total ${total == 1 ? 'folder' : 'folders'}';
+  @override
+  String get cleanerLeftoversConfirmWarning =>
+      'These folders may hold settings, saves or logins of apps that are no longer installed. Apps that still use them will start fresh.';
+  @override
+  String get cleanerLeftoversScan => 'Find leftovers';
+  @override
+  String get cleanerLeftoversMeasuring => 'Measuring leftover folders...';
+  @override
+  String cleanerLeftoversReclaimable(String size) => 'Up to $size can be freed';
+  @override
+  String cleanerLeftoversFound(String size) => 'Found $size so far';
+  @override
+  String cleanerLeftoversSelected(String size, int count) =>
+      '$size selected ($count ${count == 1 ? 'folder' : 'folders'})';
+  @override
+  String get cleanerLeftoversTierNoApp => 'Apps no longer installed';
+  @override
+  String get cleanerLeftoversTierNoAppHint =>
+      'No installed app or publisher matches these folders.';
+  @override
+  String get cleanerLeftoversTierOlder => 'Older versions';
+  @override
+  String get cleanerLeftoversTierOlderHint =>
+      'A newer version of the same app is installed.';
+  @override
+  String cleanerLeftoversFolderCount(int count) =>
+      '$count ${count == 1 ? 'folder' : 'folders'}';
+  @override
+  String cleanerLeftoversMoveTo(int count, String size, String destination) =>
+      'Move $count ${count == 1 ? 'folder' : 'folders'} to $destination ($size)';
+  @override
+  String cleanerLeftoversConfirmTitle(String destination) =>
+      'Move to $destination?';
+  @override
+  String cleanerLeftoversConfirmBody(
+    int count,
+    String size,
+    String destination,
+  ) =>
+      '$count ${count == 1 ? 'folder' : 'folders'} ($size) will be moved to $destination. You can restore them from there.';
+  @override
+  String cleanerLeftoversCleaned(String size, String destination) =>
+      'Moved $size to $destination. It still uses space until you empty it.';
+  @override
+  String get cleanerLeftoversSelectAll => 'Select all';
+  @override
+  String get cleanerLeftoversColumnFolder => 'Folder';
+  @override
+  String get cleanerLeftoversColumnChanged => 'Last changed';
+  @override
+  String get cleanerLeftoversColumnSize => 'Size';
+  @override
+  String cleanerLeftoversDaysAgo(int days) => '$days days ago';
+  @override
+  String cleanerLeftoversNewestFile(String path) => 'Newest file inside: $path';
+  @override
+  String get cleanerLeftoversChangedInFolder =>
+      'Changed in the folder itself, for example a file was deleted or renamed';
 
   @override
   String get aiThinking0 => 'Thinking...';

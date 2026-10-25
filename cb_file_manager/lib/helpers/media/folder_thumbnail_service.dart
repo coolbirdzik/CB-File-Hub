@@ -364,6 +364,16 @@ class FolderThumbnailService {
     }
   }
 
+  /// Memory-only lookup when a folder tile re-enters the viewport.
+  String? peekCachedThumbnailPath(String folderPath) {
+    final cached = _thumbnailCache[folderPath];
+    if (cached != null) {
+      _cacheAccessOrder.remove(folderPath);
+      _cacheAccessOrder.add(folderPath);
+    }
+    return cached;
+  }
+
   // Get thumbnail for a folder
   Future<String?> getFolderThumbnail(String folderPath) async {
     // Check if we have a cached thumbnail

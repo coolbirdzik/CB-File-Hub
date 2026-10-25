@@ -12,6 +12,7 @@ import 'package:cb_file_manager/ui/tab_manager/core/tab_window_transfer.dart';
 import 'package:cb_file_manager/ui/screens/video_library/widgets/video_library_helpers.dart';
 import 'package:cb_file_manager/ui/components/common/skeleton.dart';
 import 'package:cb_file_manager/ui/components/common/library_hub_scaffold.dart';
+import 'package:cb_file_manager/ui/components/common/item_shell.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'dart:io';
@@ -34,6 +35,7 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
   bool _isLoading = true;
   bool _isCountsLoading = false;
   int _totalVideos = 0;
+  int? _selectedLibraryId;
   late final ScrollController _scrollController;
 
   @override
@@ -108,6 +110,9 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
 
     setState(() {
       _libraries = libraries;
+      if (!libraries.any((library) => library.id == _selectedLibraryId)) {
+        _selectedLibraryId = null;
+      }
       _videoCounts = cachedCounts;
       _totalVideos = cachedCounts.values.fold(0, (sum, c) => sum + c);
       _isLoading = false;
@@ -283,6 +288,7 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
       title: localizations.videoGallery,
       icon: PhosphorIconsLight.filmStrip,
       onRefresh: _refreshData,
+      onEscape: () => setState(() => _selectedLibraryId = null),
       body: DeviceMediaSources(
         tabId: widget.tabId,
         type: RequestType.video,
@@ -584,6 +590,7 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
 
     return RepaintBoundary(
       child: _LibraryCardContent(
+        key: ValueKey('video-library-${library.id}'),
         library: library,
         cardColor: cardColor,
         videoCount: videoCount,
@@ -592,7 +599,13 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
         isDesktopPlatform: isDesktopPlatform,
         cs: cs,
         localizations: localizations,
-        onTap: () => _navigateToLibrary(library),
+        isSelected: _selectedLibraryId == library.id,
+        onTap: isDesktopPlatform
+            ? () => setState(() => _selectedLibraryId = library.id)
+            : () => _navigateToLibrary(library),
+        onDoubleTap: isDesktopPlatform
+            ? () => _navigateToLibrary(library)
+            : null,
         onSettings: () => _navigateToSettings(library),
         onToggleNsfw: () => _toggleLibraryNsfw(library),
         onDelete: () => _deleteLibrary(library),
@@ -679,12 +692,15 @@ class _LibraryCardContent extends StatelessWidget {
   final ColorScheme cs;
   final AppLocalizations localizations;
   final VoidCallback onTap;
+  final VoidCallback? onDoubleTap;
+  final bool isSelected;
   final VoidCallback onSettings;
   final VoidCallback onToggleNsfw;
   final VoidCallback onDelete;
   final BuildContext context;
 
   const _LibraryCardContent({
+    super.key,
     required this.library,
     required this.cardColor,
     required this.videoCount,
@@ -694,6 +710,8 @@ class _LibraryCardContent extends StatelessWidget {
     required this.cs,
     required this.localizations,
     required this.onTap,
+    required this.onDoubleTap,
+    required this.isSelected,
     required this.onSettings,
     required this.onToggleNsfw,
     required this.onDelete,
@@ -706,109 +724,116 @@ class _LibraryCardContent extends StatelessWidget {
     // can be rebuilt with const semantics when only the count changes.
     final double bgAlpha = isDesktopPlatform ? 0.46 : 1.0;
 
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        onTap: onTap,
+    return Semantics(
+      selected: isSelected,
+      child: Material(
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(16),
-        child: Container(
-          clipBehavior: Clip.antiAlias,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            color: isLightMode
-                ? cs.surface.withValues(alpha: bgAlpha)
-                : cs.surface,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Cover banner with overlaid menu
-              Expanded(
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    VideoLibraryCover(
-                      coverImagePath: library.coverImagePath,
-                      placeholderIcon: PhosphorIconsLight.filmStrip,
-                      accentColor: cardColor,
-                    ),
-                    Positioned(
-                      top: 6,
-                      right: 6,
-                      child: _LibraryMenuButton(
-                        isNsfw: library.isNsfw,
-                        onToggleNsfw: onToggleNsfw,
-                        onSettings: onSettings,
-                        onDelete: onDelete,
-                        settingsLabel: localizations.settings,
-                        deleteLabel: localizations.delete,
+        child: GridItemShell(
+          isSelected: isSelected,
+          isSelectionMode: false,
+          isDesktopMode: isDesktopPlatform,
+          onTap: onTap,
+          onDoubleTap: onDoubleTap,
+          child: Container(
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              color: isLightMode
+                  ? cs.surface.withValues(alpha: bgAlpha)
+                  : cs.surface,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Cover banner with overlaid menu
+                Expanded(
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      VideoLibraryCover(
+                        coverImagePath: library.coverImagePath,
+                        placeholderIcon: PhosphorIconsLight.filmStrip,
+                        accentColor: cardColor,
                       ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Library info
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      library.name,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    if (library.description != null) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        library.description!,
-                        style: Theme.of(context).textTheme.bodySmall,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-
-              // Footer with count (shimmer while loading)
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
-                  borderRadius: const BorderRadius.only(
-                    bottomLeft: Radius.circular(16),
-                    bottomRight: Radius.circular(16),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      PhosphorIconsLight.videoCamera,
-                      size: 16,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                    const SizedBox(width: 4),
-                    if (videoCount == null)
-                      const _CountShimmer()
-                    else
-                      Text(
-                        '$videoCount ${localizations.videos.toLowerCase()}',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      Positioned(
+                        top: 6,
+                        right: 6,
+                        child: _LibraryMenuButton(
+                          isNsfw: library.isNsfw,
+                          onToggleNsfw: onToggleNsfw,
+                          onSettings: onSettings,
+                          onDelete: onDelete,
+                          settingsLabel: localizations.settings,
+                          deleteLabel: localizations.delete,
                         ),
                       ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
+
+                // Library info
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        library.name,
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.bold),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (library.description != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          library.description!,
+                          style: Theme.of(context).textTheme.bodySmall,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+
+                // Footer with count (shimmer while loading)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest
+                        .withValues(alpha: 0.2),
+                    borderRadius: const BorderRadius.only(
+                      bottomLeft: Radius.circular(16),
+                      bottomRight: Radius.circular(16),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        PhosphorIconsLight.videoCamera,
+                        size: 16,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 4),
+                      if (videoCount == null)
+                        const _CountShimmer()
+                      else
+                        Text(
+                          '$videoCount ${localizations.videos.toLowerCase()}',
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                              ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

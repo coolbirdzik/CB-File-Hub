@@ -19,6 +19,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../e2e/cb_e2e_config.dart';
@@ -27,6 +28,7 @@ import '../../../bloc/ai_agent/ai_agent_event.dart';
 import '../../../bloc/ai_agent/ai_agent_state.dart';
 import '../../../bloc/cleaner_app_insights/cleaner_app_insights_cubit.dart';
 import '../../../bloc/cleaner_app_insights/cleaner_app_insights_state.dart';
+import '../../../bloc/cleaner_app_leftovers/cleaner_app_leftovers.dart';
 import '../../../config/languages/app_localizations.dart';
 import '../../../helpers/files/external_app_helper.dart';
 import '../../../helpers/files/windows_shell_context_menu.dart';
@@ -41,6 +43,9 @@ import '../../../ui/utils/route.dart';
 import '../../../services/ai/ai_provider_service.dart';
 import '../../../services/local_ai/local_ai_advisor_service.dart';
 import '../../../services/app_insights/app_insights_models.dart';
+import '../../../services/app_insights/app_leftover_finder.dart';
+import '../../../services/app_insights/app_leftover_scanner.dart';
+import '../../../services/app_insights/posix_app_inventory.dart';
 import '../../../services/app_insights/app_storage_analyzer.dart';
 import '../../../services/app_insights/windows_app_inventory_service.dart';
 import '../../../services/disk_cleaner/cleaner_categories.dart';
@@ -62,8 +67,7 @@ import '../../tab_manager/core/tab_manager.dart';
 import '../../widgets/app_progress_indicator.dart';
 import '../ai_chat/ai_panel_controller.dart';
 import 'cleaner_apps_view.dart';
-import 'cleaner_suggestions_view.dart';
-import '../../../services/disk_cleaner/cleaner_suggestions.dart';
+import 'cleaner_leftovers_view.dart';
 import 'cleaner_utilities_shell.dart';
 import 'package:cb_file_manager/config/translation_helper.dart';
 
@@ -149,7 +153,19 @@ enum _CleanDeleteMode { recycleBin, permanent }
 /// about reclaiming space, instead of requiring them to walk the hierarchy.
 enum _TreePreset { none, largeFiles, logsAndCaches, installers }
 
-enum _CleanerSubFeature { diskCleaner, appInsights, suggestions }
+enum _CleanerSubFeature { diskCleaner, appInsights, appLeftovers }
+
+/// Disk usage and App Insights need the Windows/macOS scanners; Linux only
+/// has the leftover app data page.
+bool get _hasDiskTools => defaultTargetPlatform != TargetPlatform.linux;
+
+bool get _hasAppInsights =>
+    defaultTargetPlatform != TargetPlatform.macOS &&
+    defaultTargetPlatform != TargetPlatform.linux;
+
+_CleanerSubFeature get _initialSubFeature => _hasDiskTools
+    ? _CleanerSubFeature.diskCleaner
+    : _CleanerSubFeature.appLeftovers;
 
 class _AppInsightsEvidence {
   final InstalledAppInventoryResult inventory;
@@ -365,6 +381,10 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
   bool _isShowingCachedDiskScan = false;
   late final CleanerAppInsightsCubit _appInsightsCubit;
   StreamSubscription<CleanerAppInsightsState>? _appInsightsStateSub;
+  final CleanerAppLeftoversCubit _appLeftoversCubit =
+      CleanerAppLeftoversCubit();
+  int _appLeftoversGeneration = 0;
+  AppLeftoverMeasureJob? _appLeftoversJob;
   AppStorageReport? _appStorageReport;
   FullDiskScanResult? _lastDiskScanResult;
   List<CleanerFolderGrowth> _recentFolderGrowthList =
@@ -400,9 +420,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
   bool _isScanningAppInsights = false;
   final ValueNotifier<FullDiskScanProgress?> _appInsightsProgressListenable =
       ValueNotifier<FullDiskScanProgress?>(null);
-  _CleanerSubFeature _activeSubFeature = _CleanerSubFeature.diskCleaner;
+  _CleanerSubFeature _activeSubFeature = _initialSubFeature;
   final ValueNotifier<_CleanerSubFeature> _subFeatureListenable =
-      ValueNotifier<_CleanerSubFeature>(_CleanerSubFeature.diskCleaner);
+      ValueNotifier<_CleanerSubFeature>(_initialSubFeature);
   bool _appInsightsSharedWithAgent = false;
 
   // Agent activity (when CB Agent triggers scan_disk_junk from AI panel)
@@ -421,6 +441,12 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
 
   final FocusNode _resultsFocusNode = FocusNode(debugLabel: 'cbCleanerResults');
   final FocusNode _appsFocusNode = FocusNode(debugLabel: 'cbCleanerApps');
+  final FocusNode _leftoversFocusNode = FocusNode(
+    debugLabel: 'cbCleanerLeftovers',
+  );
+
+  bool get _showsAppInsightsData =>
+      _activeSubFeature == _CleanerSubFeature.appInsights;
 
   @override
   void initState() {
@@ -446,11 +472,14 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     }
     _diskScanGeneration++;
     _appInsightsGeneration++;
+    _appLeftoversGeneration++;
+    _appLeftoversJob?.cancel();
     _agentActivitySub?.cancel();
     _agentReviewStateSub?.cancel();
     _agentReviewPercent.dispose();
     _appInsightsStateSub?.cancel();
     _appInsightsCubit.close();
+    _appLeftoversCubit.close();
     if (_publishedCleanerContextTabId != null) {
       _service.clearCleanerScanContext(_publishedCleanerContextTabId!);
     }
@@ -465,6 +494,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     _treeScrollController.dispose();
     _resultsFocusNode.dispose();
     _appsFocusNode.dispose();
+    _leftoversFocusNode.dispose();
     super.dispose();
   }
 
@@ -568,9 +598,13 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     await _loadLastScanSummaries();
     _aiAvailable = await _hasUsableAi();
     if (mounted) setState(() {});
-    if (_activeSubFeature == _CleanerSubFeature.appInsights &&
+    if (_showsAppInsightsData &&
         _appInsightsCubit.state.status == CleanerAppInsightsStatus.idle) {
       unawaited(_startAppInsightsScan());
+    }
+    if (_activeSubFeature == _CleanerSubFeature.appLeftovers &&
+        _appLeftoversCubit.state.status == CleanerAppLeftoversStatus.idle) {
+      unawaited(_startLeftoverScan());
     }
   }
 
@@ -1039,7 +1073,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
         _publishCleanerScanContext();
         unawaited(_updateFolderGrowthHistory(result, diskScanGeneration));
         unawaited(_recordLastScanSummary(drive, result));
-        if (_activeSubFeature == _CleanerSubFeature.appInsights &&
+        if (_showsAppInsightsData &&
             _appStorageReport == null &&
             !_isScanningAppInsights) {
           unawaited(_startAppInsightsScan());
@@ -1061,7 +1095,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
             ),
           ),
         );
-        if (_activeSubFeature == _CleanerSubFeature.appInsights &&
+        if (_showsAppInsightsData &&
             _appStorageReport == null &&
             !_isScanningAppInsights) {
           unawaited(_startAppInsightsScan());
@@ -1405,6 +1439,115 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
 
   void _openAppStorageFolder(AppStorageEntry entry) {
     EntityOpenActions.openInNewTab(context, sourcePath: entry.path);
+  }
+
+  /// Lists leftover folders and measures them one by one, so the page fills
+  /// in while the walk runs. Independent of the full-disk scan.
+  Future<void> _startLeftoverScan() async {
+    final generation = ++_appLeftoversGeneration;
+    _appLeftoversJob?.cancel();
+    _appLeftoversJob = null;
+    _appLeftoversCubit.setLoading();
+    if (mounted) setState(() {});
+    try {
+      if (kCbE2E) {
+        _appLeftoversCubit.setReport(
+          AppLeftoverReport(
+            drivePath: r'C:\',
+            candidates: const <AppLeftoverCandidate>[],
+            generatedAt: DateTime.now(),
+          ),
+        );
+        return;
+      }
+      final environment = Map<String, String>.from(Platform.environment);
+      final AppLeftoverInventory inventory;
+      if (Platform.isWindows) {
+        final windows = await _loadInstalledAppInventory();
+        inventory = AppLeftoverInventory(
+          apps: windows.apps,
+          isPartial: windows.isPartial,
+        );
+      } else {
+        inventory = await PosixAppInventoryLoader(
+          environment: environment,
+          operatingSystem: Platform.operatingSystem,
+        ).load();
+      }
+      final excluded = await _ownAppPaths();
+      if (!mounted || generation != _appLeftoversGeneration) return;
+      const scanner = AppLeftoverScanner();
+      final report = await scanner.discover(
+        inventory: inventory,
+        environment: environment,
+        excludedPaths: excluded,
+      );
+      if (!mounted || generation != _appLeftoversGeneration) return;
+      final paths = report.candidates.map((c) => c.path).toList();
+      _appLeftoversCubit.setReport(report, scanning: paths.isNotEmpty);
+      if (paths.isEmpty) return;
+      final job = await scanner.measure(paths);
+      if (!mounted || generation != _appLeftoversGeneration) {
+        job.cancel();
+        return;
+      }
+      _appLeftoversJob = job;
+      // Hundreds of folders would otherwise rebuild the list once each.
+      final pending = <String, AppLeftoverMeasurement>{};
+      Timer? flush;
+      void publish() {
+        flush = null;
+        if (pending.isEmpty || generation != _appLeftoversGeneration) return;
+        _appLeftoversCubit.addMeasurements(Map.of(pending));
+        pending.clear();
+      }
+
+      await for (final (path, measurement) in job.results) {
+        if (generation != _appLeftoversGeneration) break;
+        pending[path] = measurement;
+        flush ??= Timer(const Duration(milliseconds: 150), publish);
+      }
+      flush?.cancel();
+      publish();
+    } catch (error) {
+      if (!mounted || generation != _appLeftoversGeneration) return;
+      _appLeftoversCubit.setError('$error');
+    } finally {
+      if (mounted && generation == _appLeftoversGeneration) {
+        _appLeftoversJob = null;
+        _appLeftoversCubit.finishScan();
+        setState(() {});
+      }
+    }
+  }
+
+  /// Stops measuring; folders already measured stay listed.
+  void _cancelLeftoverScan() {
+    _appLeftoversGeneration++;
+    _appLeftoversJob?.cancel();
+    _appLeftoversJob = null;
+    if (_appLeftoversCubit.state.status == CleanerAppLeftoversStatus.loading) {
+      _appLeftoversCubit.clear();
+    } else {
+      _appLeftoversCubit.finishScan();
+    }
+    setState(() {});
+  }
+
+  /// This app's own folders are never leftovers, even in a dev build that is
+  /// not in the uninstall list.
+  Future<List<String>> _ownAppPaths() async {
+    final paths = <String>[p.dirname(Platform.resolvedExecutable)];
+    try {
+      paths.add((await getApplicationSupportDirectory()).path);
+    } catch (_) {
+      // Unsupported platform or plugin missing in tests.
+    }
+    return paths;
+  }
+
+  void _openLeftoverFolder(String path) {
+    EntityOpenActions.openInNewTab(context, sourcePath: path);
   }
 
   Future<void> _manageInstalledApp(InstalledAppInfo app) async {
@@ -1972,14 +2115,15 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
         valueListenable: _subFeatureListenable,
         builder: (context, feature, child) {
           final destinations = <CleanerUtilityDestination>[
-            CleanerUtilityDestination(
-              id: _CleanerSubFeature.diskCleaner.name,
-              title: l.cleanerDiskUsageTitle,
-              description: l.cleanerDiskUtilityDescription,
-              group: l.cleanerUtilitiesStorageGroup,
-              icon: PhosphorIconsLight.hardDrive,
-            ),
-            if (defaultTargetPlatform != TargetPlatform.macOS)
+            if (_hasDiskTools)
+              CleanerUtilityDestination(
+                id: _CleanerSubFeature.diskCleaner.name,
+                title: l.cleanerDiskUsageTitle,
+                description: l.cleanerDiskUtilityDescription,
+                group: l.cleanerUtilitiesStorageGroup,
+                icon: PhosphorIconsLight.hardDrive,
+              ),
+            if (_hasAppInsights)
               CleanerUtilityDestination(
                 id: _CleanerSubFeature.appInsights.name,
                 title: l.cleanerAppsTitle,
@@ -1988,11 +2132,11 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
                 icon: PhosphorIconsLight.appWindow,
               ),
             CleanerUtilityDestination(
-              id: _CleanerSubFeature.suggestions.name,
-              title: l.cleanerSuggestionsTitle,
-              description: l.cleanerSuggestionsUtilityDescription,
+              id: _CleanerSubFeature.appLeftovers.name,
+              title: l.cleanerLeftoversTitle,
+              description: l.cleanerLeftoversUtilityDescription,
               group: l.cleanerUtilitiesStorageGroup,
-              icon: PhosphorIconsLight.sparkle,
+              icon: PhosphorIconsLight.folderDashed,
             ),
           ];
           return CleanerUtilitiesShell(
@@ -2012,25 +2156,27 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
               index: switch (feature) {
                 _CleanerSubFeature.diskCleaner => 0,
                 _CleanerSubFeature.appInsights => 1,
-                _CleanerSubFeature.suggestions => 2,
+                _CleanerSubFeature.appLeftovers => 2,
               },
               children: [
                 RepaintBoundary(
                   key: const ValueKey<String>('cleaner-storage-results-pane'),
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 300),
-                    child: _buildPhase(theme, l),
-                  ),
+                  child: _hasDiskTools
+                      ? AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 300),
+                          child: _buildPhase(theme, l),
+                        )
+                      : const SizedBox.shrink(),
                 ),
                 RepaintBoundary(
                   key: const ValueKey<String>('cleaner-apps-results-pane'),
-                  child: defaultTargetPlatform == TargetPlatform.macOS
-                      ? const SizedBox.shrink()
-                      : _buildAppsFeature(theme, l),
+                  child: _hasAppInsights
+                      ? _buildAppsFeature(theme, l)
+                      : const SizedBox.shrink(),
                 ),
                 RepaintBoundary(
-                  key: const ValueKey<String>('cleaner-suggestions-pane'),
-                  child: _buildSuggestionsFeature(l),
+                  key: const ValueKey<String>('cleaner-leftovers-pane'),
+                  child: _buildLeftoversFeature(),
                 ),
               ],
             ),
@@ -2989,7 +3135,13 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     if (_activeSubFeature == feature) return;
     _activeSubFeature = feature;
     _subFeatureListenable.value = feature;
-    if (feature == _CleanerSubFeature.appInsights) {
+    if (feature == _CleanerSubFeature.appLeftovers) {
+      // Keeps Delete and Ctrl+A away from the hidden Disk Usage tree.
+      _leftoversFocusNode.requestFocus();
+      if (_appLeftoversCubit.state.status == CleanerAppLeftoversStatus.idle) {
+        unawaited(_startLeftoverScan());
+      }
+    } else if (_showsAppInsightsData) {
       _appsFocusNode.requestFocus();
       if (_appInsightsCubit.state.status == CleanerAppInsightsStatus.idle) {
         if (_isScanningFullDisk) {
@@ -3033,7 +3185,15 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
         : '${drive.path}  ${drive.label}';
   }
 
-  Widget _buildAppsFeature(ThemeData theme, AppLocalizations l) {
+  /// Drive picker and rescan for the panes fed by the shared App Insights
+  /// scan. [keyPrefix] keeps each pane's widget keys distinct.
+  Widget _buildAppInsightsHeader(
+    ThemeData theme,
+    AppLocalizations l, {
+    required IconData icon,
+    required String title,
+    required String keyPrefix,
+  }) {
     final selectedDrivePath =
         _appInsightsDrive ?? _defaultDrivePath(_drives) ?? r'C:\';
     DriveSpace? selectedDrive;
@@ -3044,107 +3204,111 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       }
     }
     final canChangeDrive = !_isScanningFullDisk;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(
+        children: [
+          Icon(icon, size: 19, color: theme.colorScheme.primary),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                ValueListenableBuilder<FullDiskScanProgress?>(
+                  valueListenable: _appInsightsProgressListenable,
+                  builder: (context, progress, child) {
+                    final text = progress == null
+                        ? selectedDrive == null
+                              ? selectedDrivePath
+                              : l.diskCleanerDriveFree(
+                                  _driveDisplayName(selectedDrive),
+                                  _fmt(selectedDrive.freeBytes),
+                                )
+                        : l.diskCleanerScannedProgress(
+                            _fmt(progress.bytesScanned),
+                            progress.filesScanned,
+                          );
+                    return Text(
+                      text,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          CbSelect<String>(
+            key: ValueKey<String>('$keyPrefix-drive-picker'),
+            width: 190,
+            size: CbSelectSize.lg,
+            value: selectedDrive?.path,
+            placeholder: l.diskCleanerSelectDrives,
+            enabled: canChangeDrive,
+            onChanged: _selectAppInsightsDrive,
+            items: [
+              for (final drive in _drives)
+                CbSelectItem<String>(
+                  value: drive.path,
+                  // The menu has room for the free space, the 190px
+                  // trigger does not.
+                  label: l.diskCleanerDriveFree(
+                    _driveDisplayName(drive),
+                    _fmt(drive.freeBytes),
+                  ),
+                  triggerLabel: _driveDisplayName(drive),
+                ),
+            ],
+          ),
+          const SizedBox(width: 8),
+          OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(shape: _cleanerButtonShape),
+            key: ValueKey<String>('$keyPrefix-rescan'),
+            onPressed: _isScanningFullDisk
+                ? null
+                : _isScanningAppInsights
+                ? _cancelAppInsightsScan
+                : () => unawaited(_startAppInsightsScan(forceDiskScan: true)),
+            icon: _isScanningAppInsights
+                ? const Icon(Icons.stop_rounded, size: 16)
+                : const Icon(
+                    PhosphorIconsLight.arrowCounterClockwise,
+                    size: 16,
+                  ),
+            label: Text(
+              _isScanningAppInsights
+                  ? l.diskCleanerCancel
+                  : l.diskCleanerScanAgain,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAppsFeature(ThemeData theme, AppLocalizations l) {
     return Focus(
       focusNode: _appsFocusNode,
       onKeyEvent: _handleResultsKeyEvent,
       child: Column(
         key: const ValueKey<String>('cleaner-apps-feature'),
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            child: Row(
-              children: [
-                Icon(
-                  PhosphorIconsLight.appWindow,
-                  size: 19,
-                  color: theme.colorScheme.primary,
-                ),
-                const SizedBox(width: 9),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        l.cleanerAppsTitle,
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      ValueListenableBuilder<FullDiskScanProgress?>(
-                        valueListenable: _appInsightsProgressListenable,
-                        builder: (context, progress, child) {
-                          final text = progress == null
-                              ? selectedDrive == null
-                                    ? selectedDrivePath
-                                    : l.diskCleanerDriveFree(
-                                        _driveDisplayName(selectedDrive),
-                                        _fmt(selectedDrive.freeBytes),
-                                      )
-                              : l.diskCleanerScannedProgress(
-                                  _fmt(progress.bytesScanned),
-                                  progress.filesScanned,
-                                );
-                          return Text(
-                            text,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-                CbSelect<String>(
-                  key: const ValueKey<String>('cleaner-apps-drive-picker'),
-                  width: 190,
-                  size: CbSelectSize.lg,
-                  value: selectedDrive?.path,
-                  placeholder: l.diskCleanerSelectDrives,
-                  enabled: canChangeDrive,
-                  onChanged: _selectAppInsightsDrive,
-                  items: [
-                    for (final drive in _drives)
-                      CbSelectItem<String>(
-                        value: drive.path,
-                        // The menu has room for the free space, the 190px
-                        // trigger does not.
-                        label: l.diskCleanerDriveFree(
-                          _driveDisplayName(drive),
-                          _fmt(drive.freeBytes),
-                        ),
-                        triggerLabel: _driveDisplayName(drive),
-                      ),
-                  ],
-                ),
-                const SizedBox(width: 8),
-                OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(shape: _cleanerButtonShape),
-                  key: const ValueKey<String>('cleaner-apps-rescan'),
-                  onPressed: _isScanningFullDisk
-                      ? null
-                      : _isScanningAppInsights
-                      ? _cancelAppInsightsScan
-                      : () => unawaited(
-                          _startAppInsightsScan(forceDiskScan: true),
-                        ),
-                  icon: _isScanningAppInsights
-                      ? const Icon(Icons.stop_rounded, size: 16)
-                      : const Icon(
-                          PhosphorIconsLight.arrowCounterClockwise,
-                          size: 16,
-                        ),
-                  label: Text(
-                    _isScanningAppInsights
-                        ? l.diskCleanerCancel
-                        : l.diskCleanerScanAgain,
-                  ),
-                ),
-              ],
-            ),
+          _buildAppInsightsHeader(
+            theme,
+            l,
+            icon: PhosphorIconsLight.appWindow,
+            title: l.cleanerAppsTitle,
+            keyPrefix: 'cleaner-apps',
           ),
           if (_isScanningAppInsights)
             const LinearProgressIndicator(minHeight: 2),
@@ -3161,6 +3325,20 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildLeftoversFeature() {
+    return Focus(
+      focusNode: _leftoversFocusNode,
+      child: CleanerLeftoversView(
+        cubit: _appLeftoversCubit,
+        usesTrash: !Platform.isWindows,
+        onScan: _isCleaningJunk ? null : () => unawaited(_startLeftoverScan()),
+        onCancel: _cancelLeftoverScan,
+        onOpenFolder: _openLeftoverFolder,
+        onClean: _isCleaningJunk ? null : _cleanSelectedItems,
       ),
     );
   }
@@ -5089,6 +5267,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
 
       await _pruneCleanedFromTree(succeededSet);
       if (!mounted) return;
+      _appLeftoversCubit.removePaths(succeededSet);
 
       setState(() {
         _isCleaningJunk = false;
@@ -5179,47 +5358,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // Cleanup suggestions
-  // ---------------------------------------------------------------------------
-
-  String get _suggestionsDrive =>
-      _selectedDrive ?? _defaultDrivePath(_drives) ?? CleanerPaths.defaultRoot;
-
-  /// The Disk usage tree, when it is complete and belongs to the drive the
-  /// suggestions are for.
-  DiskTreeNode? get _suggestionsDiskTree {
-    final root = _rootNode;
-    if (root == null || _isScanningFullDisk) return null;
-    return CleanerPaths.contains(_suggestionsDrive, root.fullPath)
-        ? root
-        : null;
-  }
-
-  Future<CleanerSuggestionReport> _scanSuggestions(
-    void Function(CleanerSuggestionProgress progress) onProgress,
-  ) {
-    final tree = _suggestionsDiskTree;
-    final scanResult = identical(_lastDiskScanResult?.root, tree)
-        ? _lastDiskScanResult
-        : null;
-    return CleanerSuggestionScanner(
-      scanJunk: (drives, ids, onJunkProgress) => _service.scanJunk(
-        drivePaths: drives,
-        categoryIds: ids,
-        onProgress: onJunkProgress,
-      ),
-    ).scan(
-      drivePath: _suggestionsDrive,
-      diskTree: tree,
-      oldLargeItems: scanResult?.oldLargeItems ?? const [],
-      onProgress: onProgress,
-    );
-  }
-
-  /// Moves the items checked in Cleanup suggestions to the Recycle Bin
-  /// through the same guarded pipeline as the Disk usage cleanup.
-  Future<CleanReport?> _cleanSuggestionItems(
+  /// Moves items checked outside the Disk usage tree (leftover app data) to
+  /// the Recycle Bin / Trash through the same guarded pipeline.
+  Future<CleanReport?> _cleanSelectedItems(
     List<JunkItem> items,
     void Function(int done, int total, String? path) onProgress,
   ) async {
@@ -5268,27 +5409,6 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     } finally {
       if (mounted) setState(() => _isCleaningJunk = false);
     }
-  }
-
-  Widget _buildSuggestionsFeature(AppLocalizations l) {
-    return CleanerSuggestionsView(
-      drivePath: _suggestionsDrive,
-      hasDiskScan: _suggestionsDiskTree != null,
-      // Suggestions use the junk scanner, not the full-disk scan, so a Disk
-      // usage or App Insights scan running in the background must not block
-      // them. Only a cleanup in progress does.
-      enabled: !_isCleaningJunk && !_isQuickCleaning,
-      onScan: _scanSuggestions,
-      onClean: _cleanSuggestionItems,
-      onOpenFolder: (path) =>
-          EntityOpenActions.openInNewTab(context, sourcePath: path),
-      onOpenSettings: (uri) => unawaited(
-        launchUrl(Uri.parse(uri), mode: LaunchMode.externalApplication),
-      ),
-      onOpenDiskUsage: () => _setSubFeature(_CleanerSubFeature.diskCleaner),
-      categoryLabel: (id) => _junkCategoryTitle(l, id),
-      categoryReason: (id) => _junkReason(l, id),
-    );
   }
 
   Future<void> _permanentDeleteCleaned() async {

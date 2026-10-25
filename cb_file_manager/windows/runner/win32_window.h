@@ -86,6 +86,10 @@ protected:
   // Called when Destroy is called.
   virtual void OnDestroy();
 
+  // Routes messages straight to MessageHandler again after plugins replaced
+  // the top-level WNDPROC. Call once all plugins are registered.
+  void ReclaimWindowProc();
+
 private:
   friend class WindowClassRegistrar;
 
@@ -98,6 +102,13 @@ private:
                                   UINT const message,
                                   WPARAM const wparam,
                                   LPARAM const lparam) noexcept;
+
+  // Installed by ReclaimWindowProc. Hands only media_kit_video's task
+  // message to |replaced_window_proc_|; everything else goes to WndProc.
+  static LRESULT CALLBACK ReclaimedWndProc(HWND const window,
+                                           UINT const message,
+                                           WPARAM const wparam,
+                                           LPARAM const lparam) noexcept;
 
   // Retrieves a class instance pointer for |window|
   static Win32Window *GetThisFromHandle(HWND const window) noexcept;
@@ -115,6 +126,9 @@ private:
 
   // window handle for hosted content.
   HWND child_content_ = nullptr;
+
+  // The plugin WNDPROC that ReclaimWindowProc took the window back from.
+  WNDPROC replaced_window_proc_ = nullptr;
 };
 
 #endif // RUNNER_WIN32_WINDOW_H_

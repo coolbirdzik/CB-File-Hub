@@ -887,11 +887,11 @@ class _ThumbnailLoaderState extends State<ThumbnailLoader>
               // Became visible
               NetworkThumbnailHelper().markVisible(widget.filePath);
 
-              // Only trigger load for network/video files. Local images
-              // are displayed via ResizeImage which manages its own
-              // loading lifecycle — no _loadThumbnail needed.
-              final bool needsExplicitLoad =
-                  widget.filePath.startsWith('#') || widget.isVideo;
+              // Local videos already have LazyVideoThumbnail's cache/generation
+              // pipeline; starting another one here duplicated mapped-drive
+              // file probes and video requests for every newly visible tile.
+              // Local images likewise use ResizeImage's own lifecycle.
+              final bool needsExplicitLoad = widget.filePath.startsWith('#');
               if (needsExplicitLoad &&
                   _networkThumbnailPath == null &&
                   !_cache.isGeneratingThumbnail(widget.filePath) &&

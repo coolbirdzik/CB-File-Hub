@@ -225,8 +225,10 @@ void main() {
       final point = mode == 'list'
           ? tester.getCenter(firstName)
           : tester.getTopLeft(first) + const Offset(30, 30);
+      // The interaction layer uses wall-clock time. Rendering a frame between
+      // clicks can exceed its 300 ms window on a loaded worker even though the
+      // test only advances fake time; dispatch the pair before rendering.
       await tester.tapAt(point, kind: PointerDeviceKind.mouse);
-      await tester.pump(const Duration(milliseconds: 80));
       await tester.tapAt(point, kind: PointerDeviceKind.mouse);
       await tester.pump();
       await tester.pump();

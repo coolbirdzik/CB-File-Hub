@@ -1,6 +1,6 @@
 # Development setup
 
-Use Flutter **3.47.2 stable**, as pinned in [`build.config`](../../build.config), and its bundled Dart SDK. Install `just`; Windows also needs Git Bash for the recipes.
+Use Flutter **3.47.8 stable**, as pinned in [`build.config`](../../build.config), and its bundled Dart SDK. Install `just`; Windows also needs Git Bash for the recipes.
 
 | Target | Build requirements |
 |--------|--------------------|

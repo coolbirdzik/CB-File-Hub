@@ -132,6 +132,17 @@ void main() {
             tester.element(find.byType(Scaffold)),
           ),
         );
+        await tester.runAsync(
+          () => precacheImage(
+            ResizeImage(
+              FileImage(thumb),
+              width: 512,
+              allowUpscaling: false,
+              policy: ResizeImagePolicy.fit,
+            ),
+            tester.element(find.byType(Scaffold)),
+          ),
+        );
         await tester.pump();
         final grid = FileListViewBuilder.build(
           state: state,

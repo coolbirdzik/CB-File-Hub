@@ -57,38 +57,43 @@ class AppUiFontConfig {
 
   /// Applies [font] across [theme]'s text ramps (keeps sizes/weights).
   static ThemeData applyToTheme(ThemeData theme, AppUiFont font) {
-    final TextTheme Function(TextTheme) mapper;
-    switch (font) {
-      case AppUiFont.inter:
-        return theme;
-      case AppUiFont.roboto:
-        mapper = GoogleFonts.robotoTextTheme;
-        break;
-      case AppUiFont.openSans:
-        mapper = GoogleFonts.openSansTextTheme;
-        break;
-      case AppUiFont.notoSans:
-        mapper = GoogleFonts.notoSansTextTheme;
-        break;
-      case AppUiFont.nunitoSans:
-        mapper = GoogleFonts.nunitoSansTextTheme;
-        break;
-      case AppUiFont.sourceSans3:
-        mapper = GoogleFonts.sourceSans3TextTheme;
-        break;
-      case AppUiFont.ibmPlexSans:
-        mapper = GoogleFonts.ibmPlexSansTextTheme;
-        break;
-    }
+    if (font == AppUiFont.inter) return theme;
 
-    final textTheme = mapper(theme.textTheme);
-    final primaryTextTheme = mapper(theme.primaryTextTheme);
-    final family = textTheme.bodyMedium?.fontFamily ?? resolveFamily(font);
-
+    // Google Fonts 9 returns material_ui.TextTheme. Map the shared TextStyle
+    // values instead so this also works with Flutter's Material bridge.
     TextStyle? mapStyle(TextStyle? style) {
       if (style == null) return null;
-      return style.copyWith(fontFamily: family);
+      return switch (font) {
+        AppUiFont.inter => style,
+        AppUiFont.roboto => GoogleFonts.roboto(textStyle: style),
+        AppUiFont.openSans => GoogleFonts.openSans(textStyle: style),
+        AppUiFont.notoSans => GoogleFonts.notoSans(textStyle: style),
+        AppUiFont.nunitoSans => GoogleFonts.nunitoSans(textStyle: style),
+        AppUiFont.sourceSans3 => GoogleFonts.sourceSans3(textStyle: style),
+        AppUiFont.ibmPlexSans => GoogleFonts.ibmPlexSans(textStyle: style),
+      };
     }
+
+    TextTheme mapTextTheme(TextTheme text) => text.copyWith(
+      displayLarge: mapStyle(text.displayLarge),
+      displayMedium: mapStyle(text.displayMedium),
+      displaySmall: mapStyle(text.displaySmall),
+      headlineLarge: mapStyle(text.headlineLarge),
+      headlineMedium: mapStyle(text.headlineMedium),
+      headlineSmall: mapStyle(text.headlineSmall),
+      titleLarge: mapStyle(text.titleLarge),
+      titleMedium: mapStyle(text.titleMedium),
+      titleSmall: mapStyle(text.titleSmall),
+      bodyLarge: mapStyle(text.bodyLarge),
+      bodyMedium: mapStyle(text.bodyMedium),
+      bodySmall: mapStyle(text.bodySmall),
+      labelLarge: mapStyle(text.labelLarge),
+      labelMedium: mapStyle(text.labelMedium),
+      labelSmall: mapStyle(text.labelSmall),
+    );
+
+    final textTheme = mapTextTheme(theme.textTheme);
+    final primaryTextTheme = mapTextTheme(theme.primaryTextTheme);
 
     return theme.copyWith(
       textTheme: textTheme,

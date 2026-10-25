@@ -38,7 +38,9 @@ Widget _desktopFluentHost({
   return fluent.FluentApp(
     theme: fluentTheme,
     darkTheme: fluentTheme,
-    themeMode: brightness == Brightness.dark ? ThemeMode.dark : ThemeMode.light,
+    themeMode: brightness == Brightness.dark
+        ? fluent.ThemeMode.dark
+        : fluent.ThemeMode.light,
     home: Theme(data: appTheme, child: child),
   );
 }

@@ -55,6 +55,17 @@ LRESULT CALLBACK FlutterMouseInputGuard::WindowProc(
     return ::DefSubclassProc(hwnd, message, wparam, lparam);
   }
 
+  if (message == WM_NCHITTEST) {
+    // The view now covers the entire client, including the resize grips. Let
+    // Windows reach the top-level HWND at its edges instead of resizing the
+    // Flutter child or swallowing the parent's non-client mouse messages.
+    const HWND root = ::GetAncestor(hwnd, GA_ROOT);
+    if (root && root != hwnd) {
+      const LRESULT hit = ::SendMessageW(root, message, wparam, lparam);
+      if (hit >= HTLEFT && hit <= HTBOTTOMRIGHT) return HTTRANSPARENT;
+    }
+  }
+
   // Flutter handles touch/pen through WM_POINTER. Leave their promoted mouse
   // messages alone; only physical mouse gestures have capture tracked here.
   const bool promoted =

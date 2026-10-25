@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:cb_file_manager/core/service_locator.dart';
 import 'package:cb_file_manager/models/database/database_manager.dart';
 import 'package:cb_file_manager/models/database/sqlite_database_provider.dart';
+import 'package:cb_file_manager/services/directory_watcher_service.dart';
 import 'package:cb_file_manager/ui/controllers/operation_progress_controller.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_bloc.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_event.dart';
@@ -38,6 +39,9 @@ void main() {
   });
 
   tearDownAll(() async {
+    // The singleton watch cancels its Windows handle asynchronously. Wait for
+    // that cancellation before removing the test-owned directory tree.
+    await DirectoryWatcherService.instance.stopWatching();
     await DatabaseManager.getInstance().close();
     await SqliteDatabaseProvider.closeSharedDatabase();
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger

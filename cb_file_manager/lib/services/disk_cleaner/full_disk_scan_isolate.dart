@@ -601,7 +601,7 @@ Future<void> _fullDiskScanWorker(_FullScanArgs args) async {
     return nativeCategories.length - 1;
   }
 
-  final useNativeScanner =
+  var useNativeScanner =
       args.useNativeScanner && !args.usePortableScanner && CbNative.isAvailable;
   final nativeWholeDirRules = [
     for (final rule in wholeDirRules)
@@ -1072,6 +1072,12 @@ Future<void> _fullDiskScanWorker(_FullScanArgs args) async {
     final baseDirs = totalDirs;
     final baseFiles = totalFiles;
     final baseBytes = totalBytes;
+    final baseInaccessibleCount = inaccessible.length;
+    final baseCoverageIssueCount = coverageIssues.length;
+    // Retention may evict evidence from an earlier incremental subtree, so
+    // preserve the contents, not just their lengths, before trying native.
+    final baseOldLargeFiles = oldLargeFiles.toList();
+    final baseOldLargeDirectories = oldLargeDirectories.toList();
     String? category(int index) => index < 0 ? null : nativeCategories[index];
     DateTime? fileTime(int ticks) =>
         _fileTimePartsToDateTime(ticks & 0xffffffff, ticks >> 32);
@@ -1207,6 +1213,27 @@ Future<void> _fullDiskScanWorker(_FullScanArgs args) async {
         if (batch.finished) break;
         sleep(const Duration(milliseconds: 8));
       }
+    } on NativeDiskScanIncomplete catch (error) {
+      print(
+        'DiskCleaner: Native scan incomplete for ${node.fullPath}: $error '
+        'Retrying with the Dart scanner.',
+      );
+      useNativeScanner = false;
+      node.replaceChildren(const <DiskTreeNode>[]);
+      node.sizeBytes = 0;
+      node.fileCount = 0;
+      totalDirs = baseDirs;
+      totalFiles = baseFiles;
+      totalBytes = baseBytes;
+      inaccessible.length = baseInaccessibleCount;
+      coverageIssues.length = baseCoverageIssueCount;
+      oldLargeFiles
+        ..clear()
+        ..addAll(baseOldLargeFiles);
+      oldLargeDirectories
+        ..clear()
+        ..addAll(baseOldLargeDirectories);
+      return false;
     } finally {
       scan.dispose();
     }

@@ -134,7 +134,8 @@ class SystemScreenRouter {
       case '#webdav':
         return WebDAVBrowserScreen(tabId: tabId);
       case '#cb-agent-cleaner':
-        if (!CleanerPaths.isSupported) {
+        // Linux has only the leftover app data page.
+        if (!CleanerPaths.isSupported && !Platform.isLinux) {
           return _buildErrorWidget(
             context,
             AppLocalizations.of(context)!.diskCleanerNotAvailable,

@@ -185,6 +185,9 @@ bool FlutterWindow::OnCreate()
       flutter::PluginRegistrarManager::GetInstance()
           ->GetRegistrar<flutter::PluginRegistrarWindows>(store_update_registrar));
 
+  // After every plugin: media_kit_video swaps this window's WNDPROC.
+  ReclaimWindowProc();
+
   // Window visibility is managed by Dart via the window_manager package.
   // This avoids startup flicker from multiple show/maximize transitions on
   // Windows when window options (e.g. hidden title bar) are applied.
@@ -240,32 +243,6 @@ LRESULT FlutterWindow::DispatchMessageToPlugins(HWND hwnd, UINT message,
   case WM_FONTCHANGE:
     flutter_controller_->engine()->ReloadSystemFonts();
     break;
-  case WM_NCCALCSIZE:
-  {
-    // Every window draws its caption in Flutter. Don't rely on each engine's
-    // window_manager state (TitleBarStyle.hidden) alone to hide the native
-    // one: it is per engine and the OS title bar reappeared on the primary
-    // window. window_manager still wins above when it handles the message.
-    // Native fullscreen drops WS_CAPTION and keeps the default calculation.
-    if (!wparam ||
-        (::GetWindowLongPtr(hwnd, GWL_STYLE) & WS_CAPTION) != WS_CAPTION)
-    {
-      break;
-    }
-    auto *params = reinterpret_cast<NCCALCSIZE_PARAMS *>(lparam);
-    const LONG top = params->rgrc[0].top;
-    // Keep the side and bottom resize borders, drop the caption.
-    ::DefWindowProc(hwnd, message, wparam, lparam);
-    params->rgrc[0].top = top;
-    if (::IsZoomed(hwnd))
-    {
-      // A maximized frame overhangs the work area by its resize border.
-      const UINT dpi = ::GetDpiForWindow(hwnd);
-      params->rgrc[0].top += ::GetSystemMetricsForDpi(SM_CYFRAME, dpi) +
-                             ::GetSystemMetricsForDpi(SM_CXPADDEDBORDER, dpi);
-    }
-    return 0;
-  }
   case WM_SYSCOMMAND:
   {
     // Block the Alt+Space system menu popup.  With TitleBarStyle.hidden the

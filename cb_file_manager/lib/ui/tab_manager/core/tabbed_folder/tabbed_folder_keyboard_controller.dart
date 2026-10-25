@@ -7,14 +7,18 @@ import 'package:cb_file_manager/ui/components/common/file_entry_presentation.dar
 import 'package:cb_file_manager/bloc/selection/selection.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:cb_file_manager/ui/utils/view_mode_utils.dart';
+import 'package:cb_file_manager/ui/widgets/smooth_wheel_scroll_controller.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 class TabbedFolderKeyboardController {
   TabbedFolderKeyboardController({double initialScrollOffset = 0})
-    : scrollController = ScrollController(
+    : scrollController = SmoothWheelScrollController(
         initialScrollOffset: initialScrollOffset,
+        enabled:
+            !kIsWeb &&
+            (Platform.isWindows || Platform.isLinux || Platform.isMacOS),
       );
 
   final FocusNode focusNode = FocusNode(

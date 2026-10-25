@@ -199,7 +199,7 @@
       "paths": [
         "cb_file_manager/lib/services/file_drag_drop/**",
         "cb_file_manager/lib/services/windowing/windows_{explorer,native_tab}_drag_drop_service.dart",
-        "cb_file_manager/lib/ui/widgets/{file_drag_drop_item,drag_selection_geometry}.dart"
+        "cb_file_manager/lib/ui/widgets/{file_drag_drop_item,drag_selection_geometry,drag_selection_region,selection_geometry_item}.dart"
       ],
       "suites": ["file_drag_drop", "app"]
     },

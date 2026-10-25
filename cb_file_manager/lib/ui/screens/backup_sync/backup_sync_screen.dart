@@ -144,8 +144,6 @@ class _BackupSyncScreenState extends State<BackupSyncScreen> {
       dialogTitle: tr.exportBackupZip,
       fileName: CloudBackupService.archiveName(),
       bytes: Uint8List(0),
-      type: FileType.custom,
-      allowedExtensions: ['zip'],
       mimeType: 'application/zip',
     );
     if (saved == null) return;

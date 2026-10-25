@@ -92,8 +92,12 @@ function(coolbird_resolve_ffmpeg_dir OUT_VAR)
   set(_coolbird_ffmpeg_deps_dir "${CMAKE_BINARY_DIR}/_deps")
   # Key both archive and extraction cache by content, so a version bump cannot
   # reuse the old headers/import libraries/DLLs from a previous configuration.
-  set(_coolbird_ffmpeg_root "${_coolbird_ffmpeg_deps_dir}/ffmpeg-${COOLBIRD_FFMPEG_SHA256}")
-  set(_coolbird_ffmpeg_archive "${_coolbird_ffmpeg_root}.zip")
+  # MSVC cannot open headers at MAX_PATH even when Windows long paths are on.
+  # Parallel E2E build directories add enough depth to hit that limit. Keep
+  # the extraction path short; still validate the archive with the full hash.
+  string(SUBSTRING "${COOLBIRD_FFMPEG_SHA256}" 0 12 _coolbird_ffmpeg_cache_key)
+  set(_coolbird_ffmpeg_root "${_coolbird_ffmpeg_deps_dir}/ffmpeg-${_coolbird_ffmpeg_cache_key}")
+  set(_coolbird_ffmpeg_archive "${_coolbird_ffmpeg_deps_dir}/ffmpeg-${COOLBIRD_FFMPEG_SHA256}.zip")
   file(MAKE_DIRECTORY "${_coolbird_ffmpeg_deps_dir}")
 
   if(NOT EXISTS "${_coolbird_ffmpeg_archive}")

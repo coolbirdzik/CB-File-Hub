@@ -129,6 +129,39 @@ class NativeDiskScanBatch {
 
   final List<NativeDirRecord> records;
   final bool finished;
+
+  /// Tracks directories announced by earlier records, starting with root 0.
+  /// An abandoned native scan may discard buffered records; never accept its
+  /// remaining records as a complete tree or pass an orphan to the caller.
+  void validate(Set<int> pendingDirectoryIds) {
+    for (final record in records) {
+      if (!pendingDirectoryIds.remove(record.id)) {
+        throw NativeDiskScanIncomplete(
+          'Directory ${record.id} has no pending parent entry.',
+        );
+      }
+      for (final child in record.subdirs) {
+        if (child.id == record.id || !pendingDirectoryIds.add(child.id)) {
+          throw NativeDiskScanIncomplete('Duplicate directory ${child.id}.');
+        }
+      }
+    }
+    if (finished && pendingDirectoryIds.isNotEmpty) {
+      throw NativeDiskScanIncomplete(
+        '${pendingDirectoryIds.length} directory records are missing.',
+      );
+    }
+  }
+}
+
+/// The native stream lost records, for example after its owner stopped polling.
+class NativeDiskScanIncomplete implements Exception {
+  const NativeDiskScanIncomplete(this.message);
+
+  final String message;
+
+  @override
+  String toString() => 'NativeDiskScanIncomplete: $message';
 }
 
 class NativeDiskScanProgress {
@@ -165,6 +198,7 @@ class NativeDiskScan implements Finalizable {
   );
 
   Pointer<b.DiskScanHandle> _handle;
+  final _pendingDirectoryIds = <int>{0};
 
   /// Returns null when the native library is unavailable.
   static NativeDiskScan? start({
@@ -230,7 +264,7 @@ class NativeDiskScan implements Finalizable {
       return NativeDiskScanBatch(
         _RecordReader(bytes).readAll(),
         finished: finished,
-      );
+      )..validate(_pendingDirectoryIds);
     });
   }
 

@@ -1929,46 +1929,7 @@ abstract class AppLocalizations {
   String get cleanerAppsTitle;
   String get cleanerAppsUtilityDescription;
 
-  // Cleaner - cleanup suggestions
-  String get cleanerSuggestionsTitle;
-  String get cleanerSuggestionsUtilityDescription;
-  String get cleanerSuggestionsIntro;
-  String get cleanerSuggestionsScan;
-  String get cleanerSuggestionsStepJunk;
-  String get cleanerSuggestionsStepDownloads;
-  String get cleanerSuggestionsStepSystem;
-  String get cleanerSuggestionsStepDiskScan;
-  String cleanerSuggestionsFoundItems(int count);
-  String cleanerSuggestionsFoundSize(String size);
-  String get cleanerSuggestionsSourcesTitle;
-  String get cleanerSuggestionsSourceDownloads;
-  String get cleanerSuggestionsSourceSystem;
-  String get cleanerSuggestionsSourceDiskScan;
-  String get cleanerSuggestionsTierClean;
-  String get cleanerSuggestionsTierCleanHint;
-  String get cleanerSuggestionsTierReview;
-  String get cleanerSuggestionsTierReviewHint;
-  String get cleanerSuggestionsTierGuided;
-  String get cleanerSuggestionsTierGuidedHint;
-  String cleanerSuggestionsReclaimable(String size);
-  String cleanerSuggestionsSelected(String size, int count);
-  String get cleanerSuggestionsNothing;
-  String get cleanerSuggestionsDiskScanHint;
-  String get cleanerSuggestionsConfirmTitle;
-  String cleanerSuggestionsConfirmBody(int count, String size);
-  String cleanerSuggestionsConfirmPersonal(int count);
-  String cleanerSuggestionsConfirmRecycleBin(int count);
-  String cleanerSuggestionsCleaned(String size);
-  String get cleanerSuggestionsCopyCommand;
-  String cleanerSuggestionsCommandCopied(String command);
-  String get cleanerSuggestionsOpenSettings;
-  String cleanerSuggestionsShowItems(int count);
-  String get cleanerSuggestionsHideItems;
-  String cleanerSuggestionsAtLeast(String size);
-  String cleanerSuggestionsMoreItems(int count);
-  String cleanerSuggestionsScanFailed(String error);
-  String get cleanerSuggestionsJunkScanBusy;
-  String cleanerSuggestionsPartialScan(String error);
+  // Cleaner - space usage causes (Disk usage dashboard)
   String cleanerSuggestionTitle(String id);
   String cleanerSuggestionDetail(String id);
   String get cleanerAppsLoading;
@@ -2045,6 +2006,57 @@ abstract class AppLocalizations {
   String get cleanerAppsStorageShared;
   String get cleanerAppsStorageUnknown;
   String get cleanerAppsCleanableBadge;
+
+  // Cleaner - leftover app data
+  String get cleanerLeftoversTitle;
+  String get cleanerLeftoversUtilityDescription;
+  String get cleanerLeftoversLoading;
+  String get cleanerLeftoversIntro;
+  String get cleanerLeftoversInventoryUnavailable;
+  String get cleanerLeftoversPartialBanner;
+  String get cleanerLeftoversSearchHint;
+  String get cleanerLeftoversInactiveLabel;
+  String get cleanerLeftoversInactiveAny;
+  String cleanerLeftoversInactiveDays(int days);
+  String cleanerLeftoversHiddenRecent(int count);
+  String get cleanerLeftoversEmpty;
+  String cleanerLeftoversReasonOlderVersion(String app);
+  String cleanerLeftoversLastModified(String date);
+  String get cleanerLeftoversActivityUnknown;
+  String get cleanerLeftoversPartialSize;
+  String get cleanerLeftoversLocationLocal;
+  String get cleanerLeftoversLocationRoaming;
+  String get cleanerLeftoversLocationLocalLow;
+  String get cleanerLeftoversLocationProgramData;
+  String get cleanerLeftoversLocationUserPrograms;
+  String get cleanerLeftoversLocationProgramFiles;
+  String cleanerLeftoversScanProgress(int done, int total);
+  String get cleanerLeftoversConfirmWarning;
+  String get cleanerLeftoversScan;
+  String get cleanerLeftoversMeasuring;
+  String cleanerLeftoversReclaimable(String size);
+  String cleanerLeftoversFound(String size);
+  String cleanerLeftoversSelected(String size, int count);
+  String get cleanerLeftoversTierNoApp;
+  String get cleanerLeftoversTierNoAppHint;
+  String get cleanerLeftoversTierOlder;
+  String get cleanerLeftoversTierOlderHint;
+  String cleanerLeftoversFolderCount(int count);
+  String cleanerLeftoversMoveTo(int count, String size, String destination);
+  String cleanerLeftoversConfirmTitle(String destination);
+  String cleanerLeftoversConfirmBody(
+    int count,
+    String size,
+    String destination,
+  );
+  String cleanerLeftoversCleaned(String size, String destination);
+  String get cleanerLeftoversSelectAll;
+  String get cleanerLeftoversColumnFolder;
+  String get cleanerLeftoversColumnChanged;
+  String get cleanerLeftoversColumnSize;
+  String cleanerLeftoversDaysAgo(int days);
+  String cleanerLeftoversNewestFile(String path);
+  String get cleanerLeftoversChangedInFolder;
 
   // AI thinking / loading indicators
   String get aiThinking0;

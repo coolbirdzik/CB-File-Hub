@@ -138,7 +138,10 @@ class FluentThemeConfig {
       menuColor: menuColor,
       cardColor: cardColor,
       shadowColor: materialTheme.shadowColor,
-      visualDensity: materialTheme.visualDensity,
+      visualDensity: fluent.VisualDensity(
+        horizontal: materialTheme.visualDensity.horizontal,
+        vertical: materialTheme.visualDensity.vertical,
+      ),
       buttonTheme: _buttonTheme(),
     );
   }

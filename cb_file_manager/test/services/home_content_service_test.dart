@@ -128,6 +128,47 @@ void main() {
     await service.deleteAlbum(album.id);
   });
 
+  test(
+    'manual album batches retain order and metadata and omit missing images',
+    () async {
+      final service = AlbumService.instance;
+      final album = (await service.createAlbum(name: 'Batched manual album'))!;
+      final db = await provider.getDatabase();
+      final expected = <String>[];
+      final batch = db.batch();
+      for (var i = 0; i < 121; i++) {
+        final image = File(p.join(root.path, 'manual-${121 - i}.jpg'));
+        await image.writeAsBytes(List.filled(i + 1, 0));
+        expected.add(image.path);
+        batch.insert('album_files', {
+          'album_id': album.id,
+          'file_path': image.path,
+          'order_index': i,
+          'added_at': 0,
+        });
+      }
+      for (final name in ['missing.jpg', 'folder.jpg', 'document.txt']) {
+        final filePath = p.join(root.path, name);
+        if (name == 'folder.jpg') await Directory(filePath).create();
+        if (name == 'document.txt') await File(filePath).writeAsString('text');
+        batch.insert('album_files', {
+          'album_id': album.id,
+          'file_path': filePath,
+          'order_index': 999,
+          'added_at': 0,
+        });
+      }
+      await batch.commit(noResult: true);
+      final files = await service.getAlbumFileInfos(album.id);
+      expect(files.map((file) => file.path), expected);
+      expect(files.map((file) => file.size), List.generate(121, (i) => i + 1));
+      expect(
+        files.first.modifiedTime,
+        (await File(expected.first).stat()).modified,
+      );
+    },
+  );
+
   test('image source count is not capped by the scan load limit', () async {
     final sourceRoot = Directory(p.join(root.path, 'counted-image-source'));
     if (await sourceRoot.exists()) await sourceRoot.delete(recursive: true);

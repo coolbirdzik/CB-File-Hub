@@ -1,6 +1,9 @@
 import 'dart:io';
 import 'file_drag_drop_item.dart';
 import 'file_tags_tooltip.dart';
+import 'selection_geometry_item.dart';
+import 'drag_selection_region.dart';
+import '../tab_manager/core/tabbed_folder/tabbed_folder_drag_selection_controller.dart';
 import '../components/common/file_entry_presentation.dart';
 
 import 'package:cb_native/cb_native.dart';
@@ -33,6 +36,7 @@ class FileTreeView extends StatefulWidget {
   final void Function(String path, {bool shiftSelect, bool ctrlSelect})
   toggleFolderSelection;
   final VoidCallback clearSelection;
+  final TabbedFolderDragSelectionController? dragSelectionController;
   final ValueChanged<List<String>>? onStartFileDrag;
   final Future<void> Function(List<String>, String)? onMoveItemsToFolder;
   final void Function(BuildContext context, Offset position) showContextMenu;
@@ -47,6 +51,7 @@ class FileTreeView extends StatefulWidget {
     required this.toggleFileSelection,
     required this.toggleFolderSelection,
     required this.clearSelection,
+    this.dragSelectionController,
     this.onStartFileDrag,
     this.onMoveItemsToFolder,
     required this.showContextMenu,
@@ -142,7 +147,7 @@ class _FileTreeViewState extends State<FileTreeView> {
   Widget build(BuildContext context) {
     final selected = widget.selectionState.allSelectedPaths.toSet();
 
-    return GestureDetector(
+    final content = GestureDetector(
       behavior: HitTestBehavior.translucent,
       onTap: () {
         if (widget.selectionState.isSelectionMode) widget.clearSelection();
@@ -200,21 +205,34 @@ class _FileTreeViewState extends State<FileTreeView> {
             ],
           );
           if (!widget.isDesktopPlatform) return row;
-          return FileDragDropItem(
+          return SelectionGeometryItem(
             path: entity.path,
             isFolder: isDir,
-            selectedPaths: selected,
-            onStartFileDrag: widget.onStartFileDrag,
-            onMoveItemsToFolder: widget.onMoveItemsToFolder,
-            child: SizedBox.expand(
-              child: isDir
-                  ? row
-                  : FileTagsTooltip(path: entity.path, child: row),
+            controller: widget.dragSelectionController,
+            child: FileDragDropItem(
+              path: entity.path,
+              isFolder: isDir,
+              selectedPaths: selected,
+              onStartFileDrag: widget.onStartFileDrag,
+              onMoveItemsToFolder: widget.onMoveItemsToFolder,
+              child: SizedBox.expand(
+                child: isDir
+                    ? row
+                    : FileTagsTooltip(path: entity.path, child: row),
+              ),
             ),
           );
         },
       ),
     );
+    final controller = widget.dragSelectionController;
+    return controller == null
+        ? content
+        : DragSelectionRegion(
+            controller: controller,
+            enabled: widget.isDesktopPlatform,
+            child: content,
+          );
   }
 }
 

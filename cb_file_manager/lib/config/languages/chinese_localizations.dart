@@ -4335,99 +4335,7 @@ class ChineseLocalizations implements AppLocalizations {
   @override
   String get cleanerAppsUtilityDescription => '查找体积大或很少使用的应用，并查看它们的数据';
 
-  // Cleaner - cleanup suggestions
-  @override
-  String get cleanerSuggestionsTitle => '清理建议';
-  @override
-  String get cleanerSuggestionsUtilityDescription => '扫描此驱动器上值得清理的内容';
-  @override
-  String get cleanerSuggestionsIntro =>
-      '查找垃圾文件、遗留的安装程序、旧的大文件以及系统可回收的空间，'
-      '并说明为什么建议清理每一项。在您确认之前不会删除任何内容，'
-      '文件会被移到回收站。';
-  @override
-  String get cleanerSuggestionsScan => '扫描建议';
-  @override
-  String get cleanerSuggestionsStepJunk => '正在检查缓存和临时文件...';
-  @override
-  String get cleanerSuggestionsStepDownloads => '正在检查“下载”文件夹...';
-  @override
-  String get cleanerSuggestionsStepSystem => '正在检查 Windows 系统文件...';
-  @override
-  String get cleanerSuggestionsStepDiskScan => '正在查看磁盘使用情况结果...';
-  @override
-  String cleanerSuggestionsFoundItems(int count) => '找到 $count 个项目';
-  @override
-  String cleanerSuggestionsFoundSize(String size) => '找到 $size';
-  @override
-  String get cleanerSuggestionsSourcesTitle => '已检查的来源';
-  @override
-  String get cleanerSuggestionsSourceDownloads => '“下载”文件夹';
-  @override
-  String get cleanerSuggestionsSourceSystem => 'Windows 系统文件';
-  @override
-  String get cleanerSuggestionsSourceDiskScan => '磁盘使用情况结果';
-  @override
-  String get cleanerSuggestionsTierClean => '可安全清理';
-  @override
-  String get cleanerSuggestionsTierCleanHint => '系统或应用会自动重新生成。';
-  @override
-  String get cleanerSuggestionsTierReview => '清理前请查看';
-  @override
-  String get cleanerSuggestionsTierReviewHint => '通常可以删除，但请确认您不再需要它们。';
-  @override
-  String get cleanerSuggestionsTierGuided => '使用 Windows 工具释放空间';
-  @override
-  String get cleanerSuggestionsTierGuidedHint => '请勿直接删除这些内容，请改用建议的工具。';
-  @override
-  String cleanerSuggestionsReclaimable(String size) => '最多可释放 $size';
-  @override
-  String cleanerSuggestionsSelected(String size, int count) =>
-      '已选择：$count 个项目，共 $size';
-  @override
-  String get cleanerSuggestionsNothing => '此驱动器上没有发现值得清理的内容。';
-  @override
-  String get cleanerSuggestionsDiskScanHint =>
-      '对此驱动器运行一次磁盘使用情况扫描，还可以找到未使用的大文件、'
-      'node_modules 文件夹和虚拟磁盘。';
-  @override
-  String get cleanerSuggestionsConfirmTitle => '移到回收站？';
-  @override
-  String cleanerSuggestionsConfirmBody(int count, String size) =>
-      '$count 个项目（$size）将被移到回收站。您可以从那里恢复它们。';
-  @override
-  String cleanerSuggestionsConfirmPersonal(int count) =>
-      '其中 $count 个是您自己的文件，不是垃圾。请确保您不再需要它们。';
-  @override
-  String cleanerSuggestionsConfirmRecycleBin(int count) =>
-      '回收站中已有的 $count 个项目将被永久删除。';
-  @override
-  String cleanerSuggestionsCleaned(String size) =>
-      '已清理 $size。移到回收站的文件在回收站清空之前仍会占用空间。';
-  @override
-  String get cleanerSuggestionsCopyCommand => '复制命令';
-  @override
-  String cleanerSuggestionsCommandCopied(String command) =>
-      '已复制“$command”。请在终端（管理员）中运行。';
-  @override
-  String get cleanerSuggestionsOpenSettings => '打开 Windows 设置';
-  @override
-  String cleanerSuggestionsShowItems(int count) => '显示 $count 个项目';
-  @override
-  String get cleanerSuggestionsHideItems => '隐藏项目';
-  @override
-  String cleanerSuggestionsAtLeast(String size) => '至少 $size';
-  @override
-  String cleanerSuggestionsMoreItems(int count) => '... 以及另外 $count 个';
-  @override
-  String cleanerSuggestionsScanFailed(String error) => '无法扫描建议：$error';
-  @override
-  String get cleanerSuggestionsJunkScanBusy =>
-      '另一项垃圾扫描正在运行（快速清理或 CB Agent），因此已跳过缓存和'
-      '临时文件。请在其完成后重新扫描。';
-  @override
-  String cleanerSuggestionsPartialScan(String error) =>
-      '部分扫描失败，因此可能缺少一些建议：$error';
+  // Cleaner - space usage causes (Disk usage dashboard)
   @override
   String cleanerSuggestionTitle(String id) => switch (id) {
     'downloads_leftovers' => '“下载”中的旧安装程序和压缩文件',
@@ -4612,6 +4520,108 @@ class ChineseLocalizations implements AppLocalizations {
   String get cleanerAppsStorageUnknown => '其他存储';
   @override
   String get cleanerAppsCleanableBadge => '可清理';
+
+  // Cleaner - leftover app data
+  @override
+  String get cleanerLeftoversTitle => '残留应用数据';
+  @override
+  String get cleanerLeftoversUtilityDescription => '查找已卸载或旧版本应用留下的文件夹';
+  @override
+  String get cleanerLeftoversLoading => '正在读取已安装的应用和应用数据文件夹...';
+  @override
+  String get cleanerLeftoversIntro =>
+      '这些文件夹与任何已安装的应用都不匹配。便携应用和命令行工具可能不会显示为已安装，删除前请逐一检查。';
+  @override
+  String get cleanerLeftoversInventoryUnavailable => '无法读取已安装应用列表，因此无法识别残留数据。';
+  @override
+  String get cleanerLeftoversPartialBanner => '应用列表或磁盘扫描不完整，部分文件夹可能仍在使用。';
+  @override
+  String get cleanerLeftoversSearchHint => '搜索文件夹';
+  @override
+  String get cleanerLeftoversInactiveLabel => '未修改时长';
+  @override
+  String get cleanerLeftoversInactiveAny => '不限';
+  @override
+  String cleanerLeftoversInactiveDays(int days) => '$days 天以上';
+  @override
+  String cleanerLeftoversHiddenRecent(int count) => '已隐藏 $count 个最近使用过的文件夹';
+  @override
+  String get cleanerLeftoversEmpty => '未发现残留文件夹。';
+  @override
+  String cleanerLeftoversReasonOlderVersion(String app) => '$app 的旧版本';
+  @override
+  String cleanerLeftoversLastModified(String date) => '最后修改于 $date';
+  @override
+  String get cleanerLeftoversActivityUnknown => '最后修改时间未知';
+  @override
+  String get cleanerLeftoversPartialSize => '部分测量';
+  @override
+  String get cleanerLeftoversLocationLocal => 'Local AppData';
+  @override
+  String get cleanerLeftoversLocationRoaming => 'Roaming AppData';
+  @override
+  String get cleanerLeftoversLocationLocalLow => 'LocalLow';
+  @override
+  String get cleanerLeftoversLocationProgramData => 'ProgramData';
+  @override
+  String get cleanerLeftoversLocationUserPrograms => '用户程序';
+  @override
+  String get cleanerLeftoversLocationProgramFiles => 'Program Files';
+  @override
+  String cleanerLeftoversScanProgress(int done, int total) =>
+      '已检查 $done/$total 个文件夹';
+  @override
+  String get cleanerLeftoversConfirmWarning =>
+      '这些文件夹可能包含已卸载应用的设置、存档或登录信息。仍在使用它们的应用将从头开始。';
+  @override
+  String get cleanerLeftoversScan => '查找残留';
+  @override
+  String get cleanerLeftoversMeasuring => '正在测量残留文件夹...';
+  @override
+  String cleanerLeftoversReclaimable(String size) => '最多可释放 $size';
+  @override
+  String cleanerLeftoversFound(String size) => '目前已找到 $size';
+  @override
+  String cleanerLeftoversSelected(String size, int count) =>
+      '已选择 $size（$count 个文件夹）';
+  @override
+  String get cleanerLeftoversTierNoApp => '已不再安装的应用';
+  @override
+  String get cleanerLeftoversTierNoAppHint => '没有已安装的应用或发行商与这些文件夹匹配。';
+  @override
+  String get cleanerLeftoversTierOlder => '旧版本';
+  @override
+  String get cleanerLeftoversTierOlderHint => '已安装同一应用的较新版本。';
+  @override
+  String cleanerLeftoversFolderCount(int count) => '$count 个文件夹';
+  @override
+  String cleanerLeftoversMoveTo(int count, String size, String destination) =>
+      '将 $count 个文件夹移到$destination（$size）';
+  @override
+  String cleanerLeftoversConfirmTitle(String destination) => '移到$destination？';
+  @override
+  String cleanerLeftoversConfirmBody(
+    int count,
+    String size,
+    String destination,
+  ) => '$count 个文件夹（$size）将被移到$destination。你可以从那里恢复。';
+  @override
+  String cleanerLeftoversCleaned(String size, String destination) =>
+      '已将 $size 移到$destination。清空之前仍会占用空间。';
+  @override
+  String get cleanerLeftoversSelectAll => '全选';
+  @override
+  String get cleanerLeftoversColumnFolder => '文件夹';
+  @override
+  String get cleanerLeftoversColumnChanged => '最后修改';
+  @override
+  String get cleanerLeftoversColumnSize => '大小';
+  @override
+  String cleanerLeftoversDaysAgo(int days) => '$days 天前';
+  @override
+  String cleanerLeftoversNewestFile(String path) => '内部最新的文件：$path';
+  @override
+  String get cleanerLeftoversChangedInFolder => '文件夹本身发生了变化，例如有文件被删除或重命名';
 
   @override
   String get aiThinking0 => '正在思考...';

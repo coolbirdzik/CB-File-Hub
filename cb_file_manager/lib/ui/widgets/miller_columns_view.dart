@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'file_drag_drop_item.dart';
 import 'file_tags_tooltip.dart';
+import 'selection_geometry_item.dart';
+import 'drag_selection_region.dart';
 import '../components/common/file_entry_presentation.dart';
 
 import 'package:flutter/material.dart';
@@ -278,42 +280,39 @@ class _MillerColumnsViewState extends State<MillerColumnsView> {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      key: widget.dragSelectionController.stackKey,
-      clipBehavior: Clip.none,
-      children: [
-        GestureDetector(
-          onSecondaryTapUp: (details) {
-            widget.showContextMenu(context, details.globalPosition);
-          },
-          behavior: HitTestBehavior.translucent,
-          child: Scrollbar(
+    return DragSelectionRegion(
+      controller: widget.dragSelectionController,
+      enabled: widget.isDesktopPlatform,
+      child: GestureDetector(
+        onSecondaryTapUp: (details) {
+          widget.showContextMenu(context, details.globalPosition);
+        },
+        behavior: HitTestBehavior.translucent,
+        child: Scrollbar(
+          controller: _horizontalScrollController,
+          thumbVisibility: true,
+          child: SingleChildScrollView(
             controller: _horizontalScrollController,
-            thumbVisibility: true,
-            child: SingleChildScrollView(
-              controller: _horizontalScrollController,
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  for (int i = 0; i < _columns.length; i++) ...[
-                    if (i > 0)
-                      VerticalDivider(
-                        width: MillerColumnsView.dividerWidth,
-                        thickness: 1,
-                        color: Theme.of(
-                          context,
-                        ).dividerColor.withValues(alpha: 0.3),
-                      ),
-                    _buildColumn(context, i),
-                  ],
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (int i = 0; i < _columns.length; i++) ...[
+                  if (i > 0)
+                    VerticalDivider(
+                      width: MillerColumnsView.dividerWidth,
+                      thickness: 1,
+                      color: Theme.of(
+                        context,
+                      ).dividerColor.withValues(alpha: 0.3),
+                    ),
+                  _buildColumn(context, i),
                 ],
-              ),
+              ],
             ),
           ),
         ),
-        widget.dragSelectionController.buildOverlay(),
-      ],
+      ),
     );
   }
 
@@ -361,21 +360,36 @@ class _MillerColumnsViewState extends State<MillerColumnsView> {
                   padding: const EdgeInsets.only(bottom: 100.0),
                   itemCount: itemCount,
                   itemBuilder: (context, index) {
-                    if (index < column.folders.length) {
-                      return _buildFolderItem(
-                        context,
-                        columnIndex,
-                        column.folders[index] as Directory,
-                        selectionState,
-                      );
-                    } else {
-                      return _buildFileItem(
-                        context,
-                        columnIndex,
-                        column.files[index - column.folders.length] as File,
-                        selectionState,
-                      );
+                    final isFolder = index < column.folders.length;
+                    final entity = isFolder
+                        ? column.folders[index]
+                        : column.files[index - column.folders.length];
+                    Widget buildContent() {
+                      if (isFolder) {
+                        return _buildFolderItem(
+                          context,
+                          columnIndex,
+                          column.folders[index] as Directory,
+                          selectionState,
+                        );
+                      } else {
+                        return _buildFileItem(
+                          context,
+                          columnIndex,
+                          column.files[index - column.folders.length] as File,
+                          selectionState,
+                        );
+                      }
                     }
+
+                    return SelectionGeometryItem(
+                      path: entity.path,
+                      isFolder: isFolder,
+                      controller: widget.isDesktopPlatform
+                          ? widget.dragSelectionController
+                          : null,
+                      child: buildContent(),
+                    );
                   },
                 );
               },

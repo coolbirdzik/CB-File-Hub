@@ -9,7 +9,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 
@@ -31,6 +30,8 @@ import 'package:cb_file_manager/ui/widgets/file_tree_view.dart';
 import 'package:cb_file_manager/ui/utils/view_mode_utils.dart';
 import 'adaptive_file_list.dart';
 import 'stable_layout_builder.dart';
+import 'selection_geometry_item.dart';
+import 'drag_selection_region.dart';
 
 /// Static factory class for building file list views in different modes
 class FileListViewBuilder {
@@ -264,6 +265,7 @@ class FileListViewBuilder {
         toggleFolderSelection: toggleFolderSelection,
         clearSelection: clearSelection,
         showContextMenu: showContextMenu,
+        dragSelectionController: dragSelectionController,
       );
     } else {
       contentView = _buildListView(
@@ -342,308 +344,272 @@ class FileListViewBuilder {
   }) {
     final itemSelectionMode =
         selectionState.isSelectionMode && !isDesktopPlatform;
-    return Stack(
-      key: dragSelectionController.stackKey,
-      clipBehavior: Clip.none,
-      children: [
-        FluentBackground(
-          blurAmount: 8.0,
-          opacity: 0.0,
-          backgroundColor: Colors.transparent,
-          enableBlur: false,
-          child: BlocBuilder<SelectionBloc, SelectionState>(
-            builder: (context, selectionState) {
-              return GestureDetector(
-                key: const ValueKey<String>(
-                  'file-browser-background-context-target',
-                ),
-                onTap: () {
-                  if (selectionState.isSelectionMode) {
-                    clearSelection();
-                  }
-                },
-                onSecondaryTapUp: (details) {
-                  showContextMenu(context, details.globalPosition);
-                },
-                onLongPressStart: !isDesktopPlatform
-                    ? (details) {
-                        HapticFeedback.mediumImpact();
-                        showContextMenu(context, details.globalPosition);
-                      }
-                    : null,
-                onPanStart: isDesktopPlatform
-                    ? (details) {
-                        // Don't start drag selection if user is editing text (inline rename)
-                        final focused = FocusManager.instance.primaryFocus;
-                        final focusedContext = focused?.context;
-                        if (focusedContext != null) {
-                          final isEditableText =
-                              focusedContext.widget is EditableText ||
-                              focusedContext
-                                      .findAncestorWidgetOfExactType<
-                                        EditableText
-                                      >() !=
-                                  null;
-                          if (isEditableText) {
-                            return; // Don't start drag selection
-                          }
-                        }
-                        dragSelectionController.start(details.localPosition);
-                      }
-                    : null,
-                onPanUpdate: isDesktopPlatform
-                    ? (details) {
-                        dragSelectionController.update(details.localPosition);
-                      }
-                    : null,
-                onPanEnd: isDesktopPlatform
-                    ? (details) {
-                        dragSelectionController.end();
-                      }
-                    : null,
-                behavior: HitTestBehavior.translucent,
-                // Ctrl+scroll is handled by an outer CtrlScrollZoom wrapper
-                // (the unified view-spectrum handler). Disabled here to avoid
-                // two Listeners competing for the same pointer-signal event.
-                child: CtrlScrollZoom(
-                  onDelta: null,
-                  child: RepaintBoundary(
-                    child: StableLayoutBuilder<int>(
-                      layoutValue: (constraints) {
-                        final maxZoom = GridZoomConstraints.maxGridSize(
-                          availableWidth: constraints.maxWidth,
-                          mode: GridSizeMode.referenceWidth,
-                          spacing: _gridSpacing,
-                          referenceWidth: _gridReferenceWidth,
-                          minValue: UserPreferences.minGridZoomLevel,
-                          maxValue: UserPreferences.maxGridZoomLevel,
+    return DragSelectionRegion(
+      controller: dragSelectionController,
+      enabled: isDesktopPlatform,
+      child: FluentBackground(
+        blurAmount: 8.0,
+        opacity: 0.0,
+        backgroundColor: Colors.transparent,
+        enableBlur: false,
+        child: BlocBuilder<SelectionBloc, SelectionState>(
+          builder: (context, selectionState) {
+            return GestureDetector(
+              key: const ValueKey<String>(
+                'file-browser-background-context-target',
+              ),
+              onTap: () {
+                if (selectionState.isSelectionMode) {
+                  clearSelection();
+                }
+              },
+              onSecondaryTapUp: (details) {
+                showContextMenu(context, details.globalPosition);
+              },
+              onLongPressStart: !isDesktopPlatform
+                  ? (details) {
+                      HapticFeedback.mediumImpact();
+                      showContextMenu(context, details.globalPosition);
+                    }
+                  : null,
+              behavior: HitTestBehavior.translucent,
+              // Ctrl+scroll is handled by an outer CtrlScrollZoom wrapper
+              // (the unified view-spectrum handler). Disabled here to avoid
+              // two Listeners competing for the same pointer-signal event.
+              child: CtrlScrollZoom(
+                onDelta: null,
+                child: RepaintBoundary(
+                  child: StableLayoutBuilder<int>(
+                    layoutValue: (constraints) {
+                      final maxZoom = GridZoomConstraints.maxGridSize(
+                        availableWidth: constraints.maxWidth,
+                        mode: GridSizeMode.referenceWidth,
+                        spacing: _gridSpacing,
+                        referenceWidth: _gridReferenceWidth,
+                        minValue: UserPreferences.minGridZoomLevel,
+                        maxValue: UserPreferences.maxGridZoomLevel,
+                      );
+                      final effectiveZoom = state.gridZoomLevel
+                          .clamp(UserPreferences.minGridZoomLevel, maxZoom)
+                          .toInt();
+                      return effectiveZoom;
+                    },
+                    builder: (context, zoom) {
+                      final itemWidth = _gridItemWidthForZoom(zoom);
+                      final itemHeight = itemWidth / _gridAspectRatio;
+                      onGridItemMainAxisExtentChanged?.call(
+                        itemHeight + _gridSpacing,
+                      );
+                      final folderIndexByPath = <String, int>{
+                        for (var i = 0; i < state.folders.length; i++)
+                          state.folders[i].path: i,
+                      };
+                      final fileIndexByPath = <String, int>{
+                        for (var i = 0; i < state.files.length; i++)
+                          state.files[i].path: i,
+                      };
+
+                      final shouldUseMasonry = isMasonryLayout;
+
+                      Widget buildGridItem(BuildContext context, int index) {
+                        final String itemPath = index < state.folders.length
+                            ? state.folders[index].path
+                            : state.files[index - state.folders.length].path;
+                        final String itemKey = index < state.folders.length
+                            ? 'folder-grid-$itemPath'
+                            : 'file-grid-$itemPath';
+
+                        final bool isSelected = selectionState.isPathSelected(
+                          itemPath,
                         );
-                        final effectiveZoom = state.gridZoomLevel
-                            .clamp(UserPreferences.minGridZoomLevel, maxZoom)
-                            .toInt();
-                        return effectiveZoom;
-                      },
-                      builder: (context, zoom) {
-                        final itemWidth = _gridItemWidthForZoom(zoom);
-                        final itemHeight = itemWidth / _gridAspectRatio;
-                        onGridItemMainAxisExtentChanged?.call(
-                          itemHeight + _gridSpacing,
-                        );
-                        final folderIndexByPath = <String, int>{
-                          for (var i = 0; i < state.folders.length; i++)
-                            state.folders[i].path: i,
-                        };
-                        final fileIndexByPath = <String, int>{
-                          for (var i = 0; i < state.files.length; i++)
-                            state.files[i].path: i,
-                        };
 
-                        final shouldUseMasonry = isMasonryLayout;
-
-                        Widget buildGridItem(BuildContext context, int index) {
-                          final String itemPath = index < state.folders.length
-                              ? state.folders[index].path
-                              : state.files[index - state.folders.length].path;
-                          final String itemKey = index < state.folders.length
-                              ? 'folder-grid-$itemPath'
-                              : 'file-grid-$itemPath';
-
-                          final bool isSelected = selectionState.isPathSelected(
-                            itemPath,
-                          );
-
-                          Widget buildContent() {
-                            if (index < state.folders.length) {
-                              final folder = state.folders[index] as Directory;
-                              return _wrapFileDragDrop(
-                                isDesktopPlatform: isDesktopPlatform,
-                                isFolder: true,
-                                path: folder.path,
-                                selectionState: selectionState,
-                                onStartFileDrag: onStartFileDrag,
-                                onMoveItemsToFolder: onMoveItemsToFolder,
-                                child: Align(
-                                  alignment: Alignment.topCenter,
-                                  child: SizedBox(
-                                    width: itemWidth,
-                                    height: itemHeight,
-                                    child: RepaintBoundary(
-                                      child:
-                                          folder_list_components.FolderGridItem(
-                                            key: ValueKey(
-                                              'folder-grid-item-${folder.path}',
-                                            ),
-                                            folder: folder,
-                                            onNavigate: onNavigateToPath,
-                                            isSelected: isSelected,
-                                            toggleFolderSelection:
-                                                toggleFolderSelection,
-                                            isDesktopMode: isDesktopPlatform,
-                                            lastSelectedPath:
-                                                selectionState.lastSelectedPath,
-                                            clearSelectionMode: clearSelection,
-                                            immediateSelectionListenable:
-                                                immediateSelectionForPath?.call(
-                                                  folder.path,
-                                                ),
+                        Widget buildContent() {
+                          if (index < state.folders.length) {
+                            final folder = state.folders[index] as Directory;
+                            return _wrapFileDragDrop(
+                              isDesktopPlatform: isDesktopPlatform,
+                              isFolder: true,
+                              path: folder.path,
+                              selectionState: selectionState,
+                              onStartFileDrag: onStartFileDrag,
+                              onMoveItemsToFolder: onMoveItemsToFolder,
+                              child: Align(
+                                alignment: Alignment.topCenter,
+                                child: SizedBox(
+                                  width: itemWidth,
+                                  height: itemHeight,
+                                  child: RepaintBoundary(
+                                    child:
+                                        folder_list_components.FolderGridItem(
+                                          key: ValueKey(
+                                            'folder-grid-item-${folder.path}',
                                           ),
-                                    ),
+                                          folder: folder,
+                                          onNavigate: onNavigateToPath,
+                                          isSelected: isSelected,
+                                          toggleFolderSelection:
+                                              toggleFolderSelection,
+                                          isDesktopMode: isDesktopPlatform,
+                                          lastSelectedPath:
+                                              selectionState.lastSelectedPath,
+                                          clearSelectionMode: clearSelection,
+                                          immediateSelectionListenable:
+                                              immediateSelectionForPath?.call(
+                                                folder.path,
+                                              ),
+                                        ),
                                   ),
                                 ),
-                              );
-                            } else {
-                              final file =
-                                  state.files[index - state.folders.length]
-                                      as File;
-                              final masonryHeight = shouldUseMasonry
-                                  ? itemHeight * _masonryHeightFactor(file.path)
-                                  : itemHeight;
-                              return _wrapFileDragDrop(
-                                isDesktopPlatform: isDesktopPlatform,
-                                isFolder: false,
-                                path: file.path,
-                                selectionState: selectionState,
-                                onStartFileDrag: onStartFileDrag,
-                                child: Align(
-                                  alignment: Alignment.topCenter,
-                                  child: SizedBox(
-                                    width: itemWidth,
-                                    height: masonryHeight,
-                                    child: RepaintBoundary(
-                                      child:
-                                          folder_list_components.FileGridItem(
-                                            key: ValueKey(
-                                              'file-grid-item-${file.path}',
-                                            ),
-                                            file: file,
-                                            state: state,
-                                            isSelectionMode: itemSelectionMode,
-                                            isSelected: isSelected,
-                                            toggleFileSelection:
-                                                toggleFileSelection,
-                                            toggleSelectionMode:
-                                                toggleSelectionMode,
-                                            onFileTap: onFileTap,
-                                            isDesktopMode: isDesktopPlatform,
-                                            lastSelectedPath:
-                                                selectionState.lastSelectedPath,
-                                            showDeleteTagDialog:
-                                                showDeleteTagDialog,
-                                            showAddTagToFileDialog:
-                                                showAddTagToFileDialog,
-                                            onDeleteFile: onDeleteFile,
-                                            onDeleteFiles: onDeleteFiles,
-                                            showFileTags: showFileTags,
-                                            immediateSelectionListenable:
-                                                immediateSelectionForPath?.call(
-                                                  file.path,
-                                                ),
-                                          ),
-                                    ),
-                                  ),
-                                ),
-                              );
-                            }
-                          }
-
-                          return Container(
-                            key: itemKeyForPath?.call(itemPath),
-                            child: KeyedSubtree(
-                              key: ValueKey(itemKey),
-                              child: _MeasuredGridItem(
-                                path: itemPath,
-                                controller: isDesktopPlatform
-                                    ? dragSelectionController
-                                    : null,
-                                child: buildContent(),
                               ),
-                            ),
-                          );
+                            );
+                          } else {
+                            final file =
+                                state.files[index - state.folders.length]
+                                    as File;
+                            final masonryHeight = shouldUseMasonry
+                                ? itemHeight * _masonryHeightFactor(file.path)
+                                : itemHeight;
+                            return _wrapFileDragDrop(
+                              isDesktopPlatform: isDesktopPlatform,
+                              isFolder: false,
+                              path: file.path,
+                              selectionState: selectionState,
+                              onStartFileDrag: onStartFileDrag,
+                              child: Align(
+                                alignment: Alignment.topCenter,
+                                child: SizedBox(
+                                  width: itemWidth,
+                                  height: masonryHeight,
+                                  child: RepaintBoundary(
+                                    child: folder_list_components.FileGridItem(
+                                      key: ValueKey(
+                                        'file-grid-item-${file.path}',
+                                      ),
+                                      file: file,
+                                      state: state,
+                                      isSelectionMode: itemSelectionMode,
+                                      isSelected: isSelected,
+                                      toggleFileSelection: toggleFileSelection,
+                                      toggleSelectionMode: toggleSelectionMode,
+                                      onFileTap: onFileTap,
+                                      isDesktopMode: isDesktopPlatform,
+                                      lastSelectedPath:
+                                          selectionState.lastSelectedPath,
+                                      showDeleteTagDialog: showDeleteTagDialog,
+                                      showAddTagToFileDialog:
+                                          showAddTagToFileDialog,
+                                      onDeleteFile: onDeleteFile,
+                                      onDeleteFiles: onDeleteFiles,
+                                      showFileTags: showFileTags,
+                                      immediateSelectionListenable:
+                                          immediateSelectionForPath?.call(
+                                            file.path,
+                                          ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          }
                         }
 
-                        // Keep the item delegate identical even when a divider
-                        // crosses a column boundary. Only the grid geometry
-                        // changes; loaded video/folder subtrees stay intact.
-                        final childrenDelegate = SliverChildBuilderDelegate(
-                          buildGridItem,
-                          childCount: state.folders.length + state.files.length,
-                          addSemanticIndexes: false,
-                          findChildIndexCallback: (Key key) {
-                            if (key is! ValueKey<String>) return null;
-                            final value = key.value;
-                            if (value.startsWith('folder-grid-')) {
-                              final folderPath = value.substring(
-                                'folder-grid-'.length,
-                              );
-                              final index = folderIndexByPath[folderPath];
-                              return index;
-                            }
-                            if (value.startsWith('file-grid-')) {
-                              final filePath = value.substring(
-                                'file-grid-'.length,
-                              );
-                              final index = fileIndexByPath[filePath];
-                              if (index == null) return null;
-                              return state.folders.length + index;
-                            }
-                            return null;
-                          },
-                        );
-                        return StableLayoutBuilder<int>(
-                          layoutValue: (constraints) => _gridCrossAxisCount(
-                            math.max(
-                              0.0,
-                              constraints.maxWidth - _gridSpacing * 2,
+                        return Container(
+                          key: itemKeyForPath?.call(itemPath),
+                          child: KeyedSubtree(
+                            key: ValueKey(itemKey),
+                            child: SelectionGeometryItem(
+                              path: itemPath,
+                              isFolder: index < state.folders.length,
+                              controller: isDesktopPlatform
+                                  ? dragSelectionController
+                                  : null,
+                              child: buildContent(),
                             ),
-                            itemWidth,
                           ),
-                          builder: (context, crossAxisCount) {
-                            onGridCrossAxisCountChanged?.call(crossAxisCount);
-                            if (shouldUseMasonry) {
-                              return ScrollVelocityListener(
-                                child: MasonryGridView.custom(
-                                  controller: scrollController,
-                                  padding: const EdgeInsets.all(8.0),
-                                  physics: const ClampingScrollPhysics(),
-                                  cacheExtent: 400,
-                                  gridDelegate:
-                                      SliverSimpleGridDelegateWithFixedCrossAxisCount(
-                                        crossAxisCount: crossAxisCount,
-                                      ),
-                                  crossAxisSpacing: _gridSpacing,
-                                  mainAxisSpacing: _gridSpacing,
-                                  childrenDelegate: childrenDelegate,
-                                ),
-                              );
-                            }
+                        );
+                      }
+
+                      // Keep the item delegate identical even when a divider
+                      // crosses a column boundary. Only the grid geometry
+                      // changes; loaded video/folder subtrees stay intact.
+                      final childrenDelegate = SliverChildBuilderDelegate(
+                        buildGridItem,
+                        childCount: state.folders.length + state.files.length,
+                        addSemanticIndexes: false,
+                        findChildIndexCallback: (Key key) {
+                          if (key is! ValueKey<String>) return null;
+                          final value = key.value;
+                          if (value.startsWith('folder-grid-')) {
+                            final folderPath = value.substring(
+                              'folder-grid-'.length,
+                            );
+                            final index = folderIndexByPath[folderPath];
+                            return index;
+                          }
+                          if (value.startsWith('file-grid-')) {
+                            final filePath = value.substring(
+                              'file-grid-'.length,
+                            );
+                            final index = fileIndexByPath[filePath];
+                            if (index == null) return null;
+                            return state.folders.length + index;
+                          }
+                          return null;
+                        },
+                      );
+                      return StableLayoutBuilder<int>(
+                        layoutValue: (constraints) => _gridCrossAxisCount(
+                          math.max(
+                            0.0,
+                            constraints.maxWidth - _gridSpacing * 2,
+                          ),
+                          itemWidth,
+                        ),
+                        builder: (context, crossAxisCount) {
+                          onGridCrossAxisCountChanged?.call(crossAxisCount);
+                          if (shouldUseMasonry) {
                             return ScrollVelocityListener(
-                              child: GridView.custom(
+                              child: MasonryGridView.custom(
                                 controller: scrollController,
                                 padding: const EdgeInsets.all(8.0),
                                 physics: const ClampingScrollPhysics(),
-                                cacheExtent: isDesktopPlatform ? 600 : 400,
+                                cacheExtent: 400,
                                 gridDelegate:
-                                    SliverGridDelegateWithFixedCrossAxisCount(
+                                    SliverSimpleGridDelegateWithFixedCrossAxisCount(
                                       crossAxisCount: crossAxisCount,
-                                      crossAxisSpacing: _gridSpacing,
-                                      mainAxisSpacing: _gridSpacing,
-                                      mainAxisExtent: itemHeight,
                                     ),
+                                crossAxisSpacing: _gridSpacing,
+                                mainAxisSpacing: _gridSpacing,
                                 childrenDelegate: childrenDelegate,
                               ),
                             );
-                          },
-                        );
-                      },
-                    ),
+                          }
+                          return ScrollVelocityListener(
+                            child: GridView.custom(
+                              controller: scrollController,
+                              padding: const EdgeInsets.all(8.0),
+                              physics: const ClampingScrollPhysics(),
+                              cacheExtent: isDesktopPlatform ? 600 : 400,
+                              gridDelegate:
+                                  SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: crossAxisCount,
+                                    crossAxisSpacing: _gridSpacing,
+                                    mainAxisSpacing: _gridSpacing,
+                                    mainAxisExtent: itemHeight,
+                                  ),
+                              childrenDelegate: childrenDelegate,
+                            ),
+                          );
+                        },
+                      );
+                    },
                   ),
                 ),
-              );
-            },
-          ),
+              ),
+            );
+          },
         ),
-        dragSelectionController.buildOverlay(),
-      ],
+      ),
     );
   }
 
@@ -676,101 +642,68 @@ class FileListViewBuilder {
   }) {
     final itemSelectionMode =
         selectionState.isSelectionMode && !isDesktopPlatform;
-    return Stack(
-      key: dragSelectionController.stackKey,
-      clipBehavior: Clip.none,
-      children: [
-        FluentBackground(
-          blurAmount: 8.0,
-          opacity: 0.0,
-          backgroundColor: Colors.transparent,
-          enableBlur: false,
-          child: BlocBuilder<SelectionBloc, SelectionState>(
-            builder: (context, selectionState) {
-              return GestureDetector(
-                key: const ValueKey<String>(
-                  'file-browser-background-context-target',
+    return DragSelectionRegion(
+      controller: dragSelectionController,
+      enabled: isDesktopPlatform,
+      child: FluentBackground(
+        blurAmount: 8.0,
+        opacity: 0.0,
+        backgroundColor: Colors.transparent,
+        enableBlur: false,
+        child: BlocBuilder<SelectionBloc, SelectionState>(
+          builder: (context, selectionState) {
+            return GestureDetector(
+              key: const ValueKey<String>(
+                'file-browser-background-context-target',
+              ),
+              onTap: () {
+                if (selectionState.isSelectionMode) {
+                  clearSelection();
+                }
+              },
+              onSecondaryTapUp: (details) {
+                showContextMenu(context, details.globalPosition);
+              },
+              onLongPressStart: !isDesktopPlatform
+                  ? (details) {
+                      HapticFeedback.mediumImpact();
+                      showContextMenu(context, details.globalPosition);
+                    }
+                  : null,
+              behavior: HitTestBehavior.translucent,
+              child: RepaintBoundary(
+                child: folder_list_components.FileView(
+                  files: state.files.whereType<File>().toList(),
+                  folders: state.folders.whereType<Directory>().toList(),
+                  state: state,
+                  isSelectionMode: itemSelectionMode,
+                  isGridView: false,
+                  selectedFiles: selectionState.allSelectedPaths,
+                  toggleFileSelection: toggleFileSelection,
+                  toggleSelectionMode: toggleSelectionMode,
+                  showDeleteTagDialog: showDeleteTagDialog,
+                  showAddTagToFileDialog: showAddTagToFileDialog,
+                  onDeleteFile: onDeleteFile,
+                  onDeleteFiles: onDeleteFiles,
+                  onFolderTap: onNavigateToPath,
+                  onFileTap: onFileTap,
+                  isDesktopMode: isDesktopPlatform,
+                  lastSelectedPath: selectionState.lastSelectedPath,
+                  columnVisibility: columnVisibility,
+                  onColumnVisibilityChanged: onColumnVisibilityChanged,
+                  onSortOptionSelected: onSortOptionSelected,
+                  showFileTags: showFileTags,
+                  scrollController: scrollController,
+                  itemKeyForPath: itemKeyForPath,
+                  dragSelectionController: dragSelectionController,
+                  onStartFileDrag: onStartFileDrag,
+                  onMoveItemsToFolder: onMoveItemsToFolder,
                 ),
-                onTap: () {
-                  if (selectionState.isSelectionMode) {
-                    clearSelection();
-                  }
-                },
-                onSecondaryTapUp: (details) {
-                  showContextMenu(context, details.globalPosition);
-                },
-                onLongPressStart: !isDesktopPlatform
-                    ? (details) {
-                        HapticFeedback.mediumImpact();
-                        showContextMenu(context, details.globalPosition);
-                      }
-                    : null,
-                onPanStart: isDesktopPlatform
-                    ? (details) {
-                        // Don't start drag selection if user is editing text (inline rename)
-                        final focused = FocusManager.instance.primaryFocus;
-                        final focusedContext = focused?.context;
-                        if (focusedContext != null) {
-                          final isEditableText =
-                              focusedContext.widget is EditableText ||
-                              focusedContext
-                                      .findAncestorWidgetOfExactType<
-                                        EditableText
-                                      >() !=
-                                  null;
-                          if (isEditableText) {
-                            return; // Don't start drag selection
-                          }
-                        }
-                        dragSelectionController.start(details.localPosition);
-                      }
-                    : null,
-                onPanUpdate: isDesktopPlatform
-                    ? (details) {
-                        dragSelectionController.update(details.localPosition);
-                      }
-                    : null,
-                onPanEnd: isDesktopPlatform
-                    ? (details) {
-                        dragSelectionController.end();
-                      }
-                    : null,
-                behavior: HitTestBehavior.translucent,
-                child: RepaintBoundary(
-                  child: folder_list_components.FileView(
-                    files: state.files.whereType<File>().toList(),
-                    folders: state.folders.whereType<Directory>().toList(),
-                    state: state,
-                    isSelectionMode: itemSelectionMode,
-                    isGridView: false,
-                    selectedFiles: selectionState.allSelectedPaths,
-                    toggleFileSelection: toggleFileSelection,
-                    toggleSelectionMode: toggleSelectionMode,
-                    showDeleteTagDialog: showDeleteTagDialog,
-                    showAddTagToFileDialog: showAddTagToFileDialog,
-                    onDeleteFile: onDeleteFile,
-                    onDeleteFiles: onDeleteFiles,
-                    onFolderTap: onNavigateToPath,
-                    onFileTap: onFileTap,
-                    isDesktopMode: isDesktopPlatform,
-                    lastSelectedPath: selectionState.lastSelectedPath,
-                    columnVisibility: columnVisibility,
-                    onColumnVisibilityChanged: onColumnVisibilityChanged,
-                    onSortOptionSelected: onSortOptionSelected,
-                    showFileTags: showFileTags,
-                    scrollController: scrollController,
-                    itemKeyForPath: itemKeyForPath,
-                    dragSelectionController: dragSelectionController,
-                    onStartFileDrag: onStartFileDrag,
-                    onMoveItemsToFolder: onMoveItemsToFolder,
-                  ),
-                ),
-              );
-            },
-          ),
+              ),
+            );
+          },
         ),
-        dragSelectionController.buildOverlay(),
-      ],
+      ),
     );
   }
 
@@ -803,225 +736,153 @@ class FileListViewBuilder {
   }) {
     final itemSelectionMode =
         selectionState.isSelectionMode && !isDesktopPlatform;
-    return Stack(
-      key: dragSelectionController.stackKey,
-      clipBehavior: Clip.none,
-      children: [
-        FluentBackground(
-          blurAmount: 8.0,
-          opacity: 0.0,
-          backgroundColor: Colors.transparent,
-          enableBlur: false,
-          child: BlocBuilder<SelectionBloc, SelectionState>(
-            builder: (context, selectionState) {
-              return GestureDetector(
-                key: const ValueKey<String>(
-                  'file-browser-background-context-target',
-                ),
-                onTap: () {
-                  if (selectionState.isSelectionMode) {
-                    clearSelection();
-                  }
-                },
-                onSecondaryTapUp: (details) {
-                  showContextMenu(context, details.globalPosition);
-                },
-                onLongPressStart: !isDesktopPlatform
-                    ? (details) {
-                        HapticFeedback.mediumImpact();
-                        showContextMenu(context, details.globalPosition);
-                      }
-                    : null,
-                onPanStart: isDesktopPlatform
-                    ? (details) {
-                        // Don't start drag selection if user is editing text (inline rename)
-                        final focused = FocusManager.instance.primaryFocus;
-                        final focusedContext = focused?.context;
-                        if (focusedContext != null) {
-                          final isEditableText =
-                              focusedContext.widget is EditableText ||
-                              focusedContext
-                                      .findAncestorWidgetOfExactType<
-                                        EditableText
-                                      >() !=
-                                  null;
-                          if (isEditableText) {
-                            return; // Don't start drag selection
-                          }
-                        }
-                        dragSelectionController.start(details.localPosition);
-                      }
-                    : null,
-                onPanUpdate: isDesktopPlatform
-                    ? (details) {
-                        dragSelectionController.update(details.localPosition);
-                      }
-                    : null,
-                onPanEnd: isDesktopPlatform
-                    ? (details) {
-                        dragSelectionController.end();
-                      }
-                    : null,
-                behavior: HitTestBehavior.translucent,
-                child: RepaintBoundary(
-                  child: AdaptiveFileList(
-                    isDesktop: isDesktopPlatform,
-                    controller: scrollController,
-                    onCrossAxisCountChanged: onGridCrossAxisCountChanged,
-                    onItemMainAxisExtentChanged:
-                        onGridItemMainAxisExtentChanged,
-                    itemCount: state.folders.length + state.files.length,
-                    itemBuilder: (context, index) {
-                      final String itemPath = index < state.folders.length
-                          ? state.folders[index].path
-                          : state.files[index - state.folders.length].path;
+    return DragSelectionRegion(
+      controller: dragSelectionController,
+      enabled: isDesktopPlatform,
+      child: FluentBackground(
+        blurAmount: 8.0,
+        opacity: 0.0,
+        backgroundColor: Colors.transparent,
+        enableBlur: false,
+        child: BlocBuilder<SelectionBloc, SelectionState>(
+          builder: (context, selectionState) {
+            return GestureDetector(
+              key: const ValueKey<String>(
+                'file-browser-background-context-target',
+              ),
+              onTap: () {
+                if (selectionState.isSelectionMode) {
+                  clearSelection();
+                }
+              },
+              onSecondaryTapUp: (details) {
+                showContextMenu(context, details.globalPosition);
+              },
+              onLongPressStart: !isDesktopPlatform
+                  ? (details) {
+                      HapticFeedback.mediumImpact();
+                      showContextMenu(context, details.globalPosition);
+                    }
+                  : null,
+              behavior: HitTestBehavior.translucent,
+              child: RepaintBoundary(
+                child: AdaptiveFileList(
+                  isDesktop: isDesktopPlatform,
+                  controller: scrollController,
+                  onCrossAxisCountChanged: onGridCrossAxisCountChanged,
+                  onItemMainAxisExtentChanged: onGridItemMainAxisExtentChanged,
+                  itemCount: state.folders.length + state.files.length,
+                  itemBuilder: (context, index) {
+                    final String itemPath = index < state.folders.length
+                        ? state.folders[index].path
+                        : state.files[index - state.folders.length].path;
 
-                      final bool isSelected = selectionState.isPathSelected(
-                        itemPath,
-                      );
+                    final bool isSelected = selectionState.isPathSelected(
+                      itemPath,
+                    );
 
-                      return LayoutBuilder(
-                        builder:
-                            (BuildContext context, BoxConstraints constraints) {
-                              if (isDesktopPlatform) {
-                                WidgetsBinding.instance.addPostFrameCallback((
-                                  _,
-                                ) {
-                                  try {
-                                    final RenderBox? renderBox =
-                                        context.findRenderObject()
-                                            as RenderBox?;
-                                    if (renderBox != null &&
-                                        renderBox.hasSize &&
-                                        renderBox.attached) {
-                                      final position = renderBox.localToGlobal(
-                                        Offset.zero,
-                                      );
-                                      dragSelectionController
-                                          .registerItemPosition(
-                                            itemPath,
-                                            Rect.fromLTWH(
-                                              position.dx,
-                                              position.dy,
-                                              renderBox.size.width,
-                                              renderBox.size.height,
-                                            ),
-                                          );
-                                    }
-                                  } catch (e) {
-                                    debugPrint('Layout error in list view: $e');
-                                  }
-                                });
-                              }
-
-                              if (index < state.folders.length) {
-                                final folder =
-                                    state.folders[index] as Directory;
-                                return _wrapFileDragDrop(
-                                  isDesktopPlatform: isDesktopPlatform,
-                                  isFolder: true,
-                                  path: folder.path,
-                                  selectionState: selectionState,
-                                  onStartFileDrag: onStartFileDrag,
-                                  onMoveItemsToFolder: onMoveItemsToFolder,
-                                  child: Container(
-                                    key: itemKeyForPath?.call(folder.path),
-                                    child: KeyedSubtree(
-                                      key: ValueKey("folder-${folder.path}"),
-                                      child: FluentBackground(
-                                        enableBlur: false,
-                                        blurAmount: 3.0,
-                                        opacity: 0.0,
-                                        backgroundColor: Colors.transparent,
-                                        borderRadius: BorderRadius.zero,
-                                        child: RepaintBoundary(
-                                          child:
-                                              folder_list_components.FolderItem(
-                                                key: ValueKey(
-                                                  "folder-item-${folder.path}",
-                                                ),
-                                                folder: folder,
-                                                onTap: onNavigateToPath,
-                                                isSelected: isSelected,
-                                                toggleFolderSelection:
-                                                    toggleFolderSelection,
-                                                isDesktopMode:
-                                                    isDesktopPlatform,
-                                                lastSelectedPath: selectionState
-                                                    .lastSelectedPath,
-                                                showItemBackground: false,
-                                                compact: isDesktopPlatform,
-                                              ),
-                                        ),
-                                      ),
-                                    ),
+                    Widget buildContent() {
+                      if (index < state.folders.length) {
+                        final folder = state.folders[index] as Directory;
+                        return _wrapFileDragDrop(
+                          isDesktopPlatform: isDesktopPlatform,
+                          isFolder: true,
+                          path: folder.path,
+                          selectionState: selectionState,
+                          onStartFileDrag: onStartFileDrag,
+                          onMoveItemsToFolder: onMoveItemsToFolder,
+                          child: Container(
+                            key: itemKeyForPath?.call(folder.path),
+                            child: KeyedSubtree(
+                              key: ValueKey("folder-${folder.path}"),
+                              child: FluentBackground(
+                                enableBlur: false,
+                                blurAmount: 3.0,
+                                opacity: 0.0,
+                                backgroundColor: Colors.transparent,
+                                borderRadius: BorderRadius.zero,
+                                child: RepaintBoundary(
+                                  child: folder_list_components.FolderItem(
+                                    key: ValueKey("folder-item-${folder.path}"),
+                                    folder: folder,
+                                    onTap: onNavigateToPath,
+                                    isSelected: isSelected,
+                                    toggleFolderSelection:
+                                        toggleFolderSelection,
+                                    isDesktopMode: isDesktopPlatform,
+                                    lastSelectedPath:
+                                        selectionState.lastSelectedPath,
+                                    showItemBackground: false,
+                                    compact: isDesktopPlatform,
                                   ),
-                                );
-                              } else {
-                                final file =
-                                    state.files[index - state.folders.length]
-                                        as File;
-                                return _wrapFileDragDrop(
-                                  isDesktopPlatform: isDesktopPlatform,
-                                  isFolder: false,
-                                  path: file.path,
-                                  selectionState: selectionState,
-                                  onStartFileDrag: onStartFileDrag,
-                                  child: Container(
-                                    key: itemKeyForPath?.call(file.path),
-                                    child: KeyedSubtree(
-                                      key: ValueKey("file-${file.path}"),
-                                      child: FluentBackground(
-                                        enableBlur: false,
-                                        blurAmount: 3.0,
-                                        opacity: 0.0,
-                                        backgroundColor: Colors.transparent,
-                                        borderRadius: BorderRadius.zero,
-                                        child: RepaintBoundary(
-                                          child:
-                                              folder_list_components.FileItem(
-                                                key: ValueKey(
-                                                  "file-item-${file.path}",
-                                                ),
-                                                file: file,
-                                                state: state,
-                                                isSelectionMode:
-                                                    itemSelectionMode,
-                                                isSelected: isSelected,
-                                                toggleFileSelection:
-                                                    toggleFileSelection,
-                                                showDeleteTagDialog:
-                                                    showDeleteTagDialog,
-                                                showAddTagToFileDialog:
-                                                    showAddTagToFileDialog,
-                                                onDeleteFile: onDeleteFile,
-                                                onDeleteFiles: onDeleteFiles,
-                                                onFileTap: onFileTap,
-                                                isDesktopMode:
-                                                    isDesktopPlatform,
-                                                lastSelectedPath: selectionState
-                                                    .lastSelectedPath,
-                                                showFileTags: showFileTags,
-                                                showItemBackground: false,
-                                                compact: isDesktopPlatform,
-                                              ),
-                                        ),
-                                      ),
-                                    ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      } else {
+                        final file =
+                            state.files[index - state.folders.length] as File;
+                        return _wrapFileDragDrop(
+                          isDesktopPlatform: isDesktopPlatform,
+                          isFolder: false,
+                          path: file.path,
+                          selectionState: selectionState,
+                          onStartFileDrag: onStartFileDrag,
+                          child: Container(
+                            key: itemKeyForPath?.call(file.path),
+                            child: KeyedSubtree(
+                              key: ValueKey("file-${file.path}"),
+                              child: FluentBackground(
+                                enableBlur: false,
+                                blurAmount: 3.0,
+                                opacity: 0.0,
+                                backgroundColor: Colors.transparent,
+                                borderRadius: BorderRadius.zero,
+                                child: RepaintBoundary(
+                                  child: folder_list_components.FileItem(
+                                    key: ValueKey("file-item-${file.path}"),
+                                    file: file,
+                                    state: state,
+                                    isSelectionMode: itemSelectionMode,
+                                    isSelected: isSelected,
+                                    toggleFileSelection: toggleFileSelection,
+                                    showDeleteTagDialog: showDeleteTagDialog,
+                                    showAddTagToFileDialog:
+                                        showAddTagToFileDialog,
+                                    onDeleteFile: onDeleteFile,
+                                    onDeleteFiles: onDeleteFiles,
+                                    onFileTap: onFileTap,
+                                    isDesktopMode: isDesktopPlatform,
+                                    lastSelectedPath:
+                                        selectionState.lastSelectedPath,
+                                    showFileTags: showFileTags,
+                                    showItemBackground: false,
+                                    compact: isDesktopPlatform,
                                   ),
-                                );
-                              }
-                            },
-                      );
-                    },
-                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }
+                    }
+
+                    return SelectionGeometryItem(
+                      path: itemPath,
+                      isFolder: index < state.folders.length,
+                      controller: isDesktopPlatform
+                          ? dragSelectionController
+                          : null,
+                      child: buildContent(),
+                    );
+                  },
                 ),
-              );
-            },
-          ),
+              ),
+            );
+          },
         ),
-        dragSelectionController.buildOverlay(),
-      ],
+      ),
     );
   }
 
@@ -1055,232 +916,168 @@ class FileListViewBuilder {
   }) {
     final itemSelectionMode =
         selectionState.isSelectionMode && !isDesktopPlatform;
-    return Stack(
-      key: dragSelectionController.stackKey,
-      clipBehavior: Clip.none,
-      children: [
-        FluentBackground(
-          blurAmount: 8.0,
-          opacity: 0.0,
-          backgroundColor: Colors.transparent,
-          enableBlur: false,
-          child: BlocBuilder<SelectionBloc, SelectionState>(
-            builder: (context, selectionState) {
-              return GestureDetector(
-                key: const ValueKey<String>(
-                  'file-browser-background-context-target',
-                ),
-                onTap: () {
-                  if (selectionState.isSelectionMode) {
-                    clearSelection();
-                  }
-                },
-                onSecondaryTapUp: (details) {
-                  showContextMenu(context, details.globalPosition);
-                },
-                onLongPressStart: !isDesktopPlatform
-                    ? (details) {
-                        HapticFeedback.mediumImpact();
-                        showContextMenu(context, details.globalPosition);
-                      }
-                    : null,
-                onPanStart: isDesktopPlatform
-                    ? (details) {
-                        final focused = FocusManager.instance.primaryFocus;
-                        final focusedContext = focused?.context;
-                        if (focusedContext != null) {
-                          final isEditableText =
-                              focusedContext.widget is EditableText ||
-                              focusedContext
-                                      .findAncestorWidgetOfExactType<
-                                        EditableText
-                                      >() !=
-                                  null;
-                          if (isEditableText) {
-                            return;
-                          }
-                        }
-                        dragSelectionController.start(details.localPosition);
-                      }
-                    : null,
-                onPanUpdate: isDesktopPlatform
-                    ? (details) {
-                        dragSelectionController.update(details.localPosition);
-                      }
-                    : null,
-                onPanEnd: isDesktopPlatform
-                    ? (details) {
-                        dragSelectionController.end();
-                      }
-                    : null,
-                behavior: HitTestBehavior.translucent,
-                child: RepaintBoundary(
-                  child: StableLayoutBuilder<int>(
-                    layoutValue: (constraints) {
-                      final availableWidth = math.max(
-                        0.0,
-                        constraints.maxWidth - _tilesSpacing * 2,
-                      );
-                      return math.max(
-                        1,
-                        ((availableWidth + _tilesSpacing) /
-                                (_tilesMaxCrossAxisExtent + _tilesSpacing))
-                            .floor(),
-                      );
-                    },
-                    builder: (context, crossAxisCount) {
-                      onGridCrossAxisCountChanged?.call(crossAxisCount);
-                      onGridItemMainAxisExtentChanged?.call(
-                        _tilesMainAxisExtent + _tilesSpacing,
-                      );
+    return DragSelectionRegion(
+      controller: dragSelectionController,
+      enabled: isDesktopPlatform,
+      child: FluentBackground(
+        blurAmount: 8.0,
+        opacity: 0.0,
+        backgroundColor: Colors.transparent,
+        enableBlur: false,
+        child: BlocBuilder<SelectionBloc, SelectionState>(
+          builder: (context, selectionState) {
+            return GestureDetector(
+              key: const ValueKey<String>(
+                'file-browser-background-context-target',
+              ),
+              onTap: () {
+                if (selectionState.isSelectionMode) {
+                  clearSelection();
+                }
+              },
+              onSecondaryTapUp: (details) {
+                showContextMenu(context, details.globalPosition);
+              },
+              onLongPressStart: !isDesktopPlatform
+                  ? (details) {
+                      HapticFeedback.mediumImpact();
+                      showContextMenu(context, details.globalPosition);
+                    }
+                  : null,
+              behavior: HitTestBehavior.translucent,
+              child: RepaintBoundary(
+                child: StableLayoutBuilder<int>(
+                  layoutValue: (constraints) {
+                    final availableWidth = math.max(
+                      0.0,
+                      constraints.maxWidth - _tilesSpacing * 2,
+                    );
+                    return math.max(
+                      1,
+                      ((availableWidth + _tilesSpacing) /
+                              (_tilesMaxCrossAxisExtent + _tilesSpacing))
+                          .floor(),
+                    );
+                  },
+                  builder: (context, crossAxisCount) {
+                    onGridCrossAxisCountChanged?.call(crossAxisCount);
+                    onGridItemMainAxisExtentChanged?.call(
+                      _tilesMainAxisExtent + _tilesSpacing,
+                    );
 
-                      return GridView.builder(
-                        controller: scrollController,
-                        physics: const ClampingScrollPhysics(),
-                        cacheExtent: 800,
-                        padding: const EdgeInsets.all(_tilesSpacing),
-                        gridDelegate:
-                            const SliverGridDelegateWithMaxCrossAxisExtent(
-                              maxCrossAxisExtent: _tilesMaxCrossAxisExtent,
-                              mainAxisExtent: _tilesMainAxisExtent,
-                              crossAxisSpacing: _tilesSpacing,
-                              mainAxisSpacing: _tilesSpacing,
-                            ),
-                        itemCount: state.folders.length + state.files.length,
-                        itemBuilder: (context, index) {
-                          final String itemPath = index < state.folders.length
-                              ? state.folders[index].path
-                              : state.files[index - state.folders.length].path;
-                          final bool isSelected = selectionState.isPathSelected(
-                            itemPath,
-                          );
+                    return GridView.builder(
+                      controller: scrollController,
+                      physics: const ClampingScrollPhysics(),
+                      cacheExtent: 800,
+                      padding: const EdgeInsets.all(_tilesSpacing),
+                      gridDelegate:
+                          const SliverGridDelegateWithMaxCrossAxisExtent(
+                            maxCrossAxisExtent: _tilesMaxCrossAxisExtent,
+                            mainAxisExtent: _tilesMainAxisExtent,
+                            crossAxisSpacing: _tilesSpacing,
+                            mainAxisSpacing: _tilesSpacing,
+                          ),
+                      itemCount: state.folders.length + state.files.length,
+                      itemBuilder: (context, index) {
+                        final String itemPath = index < state.folders.length
+                            ? state.folders[index].path
+                            : state.files[index - state.folders.length].path;
+                        final bool isSelected = selectionState.isPathSelected(
+                          itemPath,
+                        );
 
-                          return LayoutBuilder(
-                            builder: (context, constraints) {
-                              if (isDesktopPlatform) {
-                                WidgetsBinding.instance.addPostFrameCallback((
-                                  _,
-                                ) {
-                                  try {
-                                    final RenderBox? renderBox =
-                                        context.findRenderObject()
-                                            as RenderBox?;
-                                    if (renderBox != null &&
-                                        renderBox.hasSize &&
-                                        renderBox.attached) {
-                                      final position = renderBox.localToGlobal(
-                                        Offset.zero,
-                                      );
-                                      dragSelectionController
-                                          .registerItemPosition(
-                                            itemPath,
-                                            Rect.fromLTWH(
-                                              position.dx,
-                                              position.dy,
-                                              renderBox.size.width,
-                                              renderBox.size.height,
-                                            ),
-                                          );
-                                    }
-                                  } catch (e) {
-                                    debugPrint(
-                                      'Layout error in tiles view: $e',
-                                    );
-                                  }
-                                });
-                              }
-
-                              if (index < state.folders.length) {
-                                final folder =
-                                    state.folders[index] as Directory;
-                                return _wrapFileDragDrop(
-                                  isDesktopPlatform: isDesktopPlatform,
-                                  isFolder: true,
-                                  path: folder.path,
-                                  selectionState: selectionState,
-                                  onStartFileDrag: onStartFileDrag,
-                                  onMoveItemsToFolder: onMoveItemsToFolder,
-                                  child: Container(
-                                    key: itemKeyForPath?.call(folder.path),
-                                    child: KeyedSubtree(
+                        Widget buildContent() {
+                          if (index < state.folders.length) {
+                            final folder = state.folders[index] as Directory;
+                            return _wrapFileDragDrop(
+                              isDesktopPlatform: isDesktopPlatform,
+                              isFolder: true,
+                              path: folder.path,
+                              selectionState: selectionState,
+                              onStartFileDrag: onStartFileDrag,
+                              onMoveItemsToFolder: onMoveItemsToFolder,
+                              child: Container(
+                                key: itemKeyForPath?.call(folder.path),
+                                child: KeyedSubtree(
+                                  key: ValueKey('folder-tile-${folder.path}'),
+                                  child: RepaintBoundary(
+                                    child: folder_list_components.FolderItem(
                                       key: ValueKey(
-                                        'folder-tile-${folder.path}',
+                                        'folder-tile-item-${folder.path}',
                                       ),
-                                      child: RepaintBoundary(
-                                        child: folder_list_components.FolderItem(
-                                          key: ValueKey(
-                                            'folder-tile-item-${folder.path}',
-                                          ),
-                                          folder: folder,
-                                          onTap: onNavigateToPath,
-                                          isSelected: isSelected,
-                                          toggleFolderSelection:
-                                              toggleFolderSelection,
-                                          isDesktopMode: isDesktopPlatform,
-                                          lastSelectedPath:
-                                              selectionState.lastSelectedPath,
-                                          showItemBackground: true,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              }
-
-                              final file =
-                                  state.files[index - state.folders.length]
-                                      as File;
-                              return _wrapFileDragDrop(
-                                isDesktopPlatform: isDesktopPlatform,
-                                isFolder: false,
-                                path: file.path,
-                                selectionState: selectionState,
-                                onStartFileDrag: onStartFileDrag,
-                                child: Container(
-                                  key: itemKeyForPath?.call(file.path),
-                                  child: KeyedSubtree(
-                                    key: ValueKey('file-tile-${file.path}'),
-                                    child: RepaintBoundary(
-                                      child: folder_list_components.FileItem(
-                                        key: ValueKey(
-                                          'file-tile-item-${file.path}',
-                                        ),
-                                        file: file,
-                                        state: state,
-                                        isSelectionMode: itemSelectionMode,
-                                        isSelected: isSelected,
-                                        toggleFileSelection:
-                                            toggleFileSelection,
-                                        showDeleteTagDialog:
-                                            showDeleteTagDialog,
-                                        showAddTagToFileDialog:
-                                            showAddTagToFileDialog,
-                                        onDeleteFile: onDeleteFile,
-                                        onDeleteFiles: onDeleteFiles,
-                                        onFileTap: onFileTap,
-                                        isDesktopMode: isDesktopPlatform,
-                                        lastSelectedPath:
-                                            selectionState.lastSelectedPath,
-                                        showFileTags: showFileTags,
-                                        showItemBackground: true,
-                                      ),
+                                      folder: folder,
+                                      onTap: onNavigateToPath,
+                                      isSelected: isSelected,
+                                      toggleFolderSelection:
+                                          toggleFolderSelection,
+                                      isDesktopMode: isDesktopPlatform,
+                                      lastSelectedPath:
+                                          selectionState.lastSelectedPath,
+                                      showItemBackground: true,
                                     ),
                                   ),
                                 ),
-                              );
-                            },
+                              ),
+                            );
+                          }
+
+                          final file =
+                              state.files[index - state.folders.length] as File;
+                          return _wrapFileDragDrop(
+                            isDesktopPlatform: isDesktopPlatform,
+                            isFolder: false,
+                            path: file.path,
+                            selectionState: selectionState,
+                            onStartFileDrag: onStartFileDrag,
+                            child: Container(
+                              key: itemKeyForPath?.call(file.path),
+                              child: KeyedSubtree(
+                                key: ValueKey('file-tile-${file.path}'),
+                                child: RepaintBoundary(
+                                  child: folder_list_components.FileItem(
+                                    key: ValueKey(
+                                      'file-tile-item-${file.path}',
+                                    ),
+                                    file: file,
+                                    state: state,
+                                    isSelectionMode: itemSelectionMode,
+                                    isSelected: isSelected,
+                                    toggleFileSelection: toggleFileSelection,
+                                    showDeleteTagDialog: showDeleteTagDialog,
+                                    showAddTagToFileDialog:
+                                        showAddTagToFileDialog,
+                                    onDeleteFile: onDeleteFile,
+                                    onDeleteFiles: onDeleteFiles,
+                                    onFileTap: onFileTap,
+                                    isDesktopMode: isDesktopPlatform,
+                                    lastSelectedPath:
+                                        selectionState.lastSelectedPath,
+                                    showFileTags: showFileTags,
+                                    showItemBackground: true,
+                                  ),
+                                ),
+                              ),
+                            ),
                           );
-                        },
-                      );
-                    },
-                  ),
+                        }
+
+                        return SelectionGeometryItem(
+                          path: itemPath,
+                          isFolder: index < state.folders.length,
+                          controller: isDesktopPlatform
+                              ? dragSelectionController
+                              : null,
+                          child: buildContent(),
+                        );
+                      },
+                    );
+                  },
                 ),
-              );
-            },
-          ),
+              ),
+            );
+          },
         ),
-        dragSelectionController.buildOverlay(),
-      ],
+      ),
     );
   }
 
@@ -1331,58 +1128,6 @@ class FileListViewBuilder {
         );
       },
     );
-  }
-}
-
-/// Registers geometry without rebuilding or measuring each tile every frame.
-class _MeasuredGridItem extends SingleChildRenderObjectWidget {
-  const _MeasuredGridItem({
-    required this.path,
-    required this.controller,
-    required super.child,
-  });
-  final String path;
-  final TabbedFolderDragSelectionController? controller;
-
-  @override
-  RenderObject createRenderObject(BuildContext context) =>
-      _GridItemGeometry(path, controller);
-
-  @override
-  void updateRenderObject(
-    BuildContext context,
-    _GridItemGeometry renderObject,
-  ) {
-    renderObject.updateRegistration(path, controller);
-  }
-}
-
-class _GridItemGeometry extends RenderProxyBox {
-  _GridItemGeometry(this._path, this._controller);
-  String _path;
-  TabbedFolderDragSelectionController? _controller;
-
-  void updateRegistration(
-    String path,
-    TabbedFolderDragSelectionController? controller,
-  ) {
-    if (_path == path && identical(_controller, controller)) return;
-    if (attached) _controller?.unregisterItemRenderBox(_path, this);
-    _path = path;
-    _controller = controller;
-    if (attached) _controller?.registerItemRenderBox(_path, this);
-  }
-
-  @override
-  void attach(PipelineOwner owner) {
-    super.attach(owner);
-    _controller?.registerItemRenderBox(_path, this);
-  }
-
-  @override
-  void detach() {
-    _controller?.unregisterItemRenderBox(_path, this);
-    super.detach();
   }
 }
 

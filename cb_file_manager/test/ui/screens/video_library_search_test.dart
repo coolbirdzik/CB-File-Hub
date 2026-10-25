@@ -13,6 +13,7 @@ import 'package:cb_file_manager/ui/screens/video_library/video_hub_screen.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_data.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';
 import 'package:cb_file_manager/ui/components/common/browser_like_file_surface.dart';
+import 'package:cb_file_manager/ui/components/common/item_shell.dart';
 import 'package:cb_file_manager/ui/controllers/operation_progress_controller.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:cb_file_manager/ui/screens/video_library/video_library_files_screen.dart';
@@ -21,6 +22,7 @@ import 'package:cb_file_manager/ui/tab_manager/components/search_bar.dart'
 import 'package:cb_file_manager/services/windowing/window_startup_payload.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_window_transfer.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -153,6 +155,73 @@ void main() {
         );
         await tester.pump(const Duration(milliseconds: 100));
       }
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'desktop video libraries select on click and open on double click',
+    (tester) async {
+      final tabs = TabManagerBloc();
+      addTearDown(tabs.close);
+      tabs.add(AddTab(path: '#video'));
+      await tester.pump();
+      final id = tabs.state.activeTabId!;
+      final libraries = [
+        VideoLibrary(name: 'First collection')..id = 95001,
+        VideoLibrary(name: 'Second collection')..id = 95002,
+      ];
+      TabWindowTransfer.restore(
+        WindowTabPayload(
+          path: '#video',
+          session: {
+            'id': id,
+            'view': {
+              'libraries': [
+                for (final library in libraries) library.toDatabaseMap(),
+              ],
+              'counts': {'95001': 2, '95002': 3},
+            },
+          },
+        ),
+      );
+      addTearDown(() => TabWindowTransfer.forget(id));
+      await tester.pumpWidget(
+        host(
+          BlocProvider.value(
+            value: tabs,
+            child: Material(child: VideoHubScreen(tabId: id)),
+          ),
+        ),
+      );
+      await tester.pump();
+      Finder shell(int index) => find.descendant(
+        of: find.byKey(ValueKey('video-library-${libraries[index].id}')),
+        matching: find.byType(GridItemShell),
+      );
+      for (var index = 0; index < libraries.length; index++) {
+        await tester.tap(
+          find.text(libraries[index].name),
+          kind: PointerDeviceKind.mouse,
+        );
+        await tester.pump(const Duration(milliseconds: 350));
+        expect(tabs.state.activeTab!.path, '#video');
+        expect(tester.widget<GridItemShell>(shell(index)).isSelected, isTrue);
+      }
+      expect(tester.widget<GridItemShell>(shell(0)).isSelected, isFalse);
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pump();
+      expect(tester.widget<GridItemShell>(shell(1)).isSelected, isFalse);
+
+      // Open via the cover as well as the library name's shared interaction area.
+      final point = tester.getTopLeft(shell(1)) + const Offset(30, 30);
+      await tester.tapAt(point, kind: PointerDeviceKind.mouse);
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.tapAt(point, kind: PointerDeviceKind.mouse);
+      await tester.pump();
+      await tester.pump();
+      expect(tabs.state.activeTab!.path, '#video-library/95002');
+      await tester.pumpWidget(const SizedBox.shrink());
       expect(tester.takeException(), isNull);
     },
   );

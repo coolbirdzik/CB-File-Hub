@@ -4624,115 +4624,7 @@ class TurkishLocalizations implements AppLocalizations {
   String get cleanerAppsUtilityDescription =>
       'Büyük veya nadiren kullanılan uygulamaları bulun ve verilerini inceleyin';
 
-  // Cleaner - cleanup suggestions
-  @override
-  String get cleanerSuggestionsTitle => 'Temizlik önerileri';
-  @override
-  String get cleanerSuggestionsUtilityDescription =>
-      'Bu sürücüde temizlemeye değer şeyleri tarayın';
-  @override
-  String get cleanerSuggestionsIntro =>
-      'Gereksiz dosyaları, artakalan yükleyicileri, eski büyük dosyaları ve '
-      'sistemin geri kazanabileceği alanı bulur ve her birinin neden '
-      'önerildiğini açıklar. Siz onaylamadan hiçbir şey silinmez ve '
-      'dosyalar Geri Dönüşüm Kutusu\'na gider.';
-  @override
-  String get cleanerSuggestionsScan => 'Önerileri tara';
-  @override
-  String get cleanerSuggestionsStepJunk =>
-      'Önbellekler ve geçici dosyalar denetleniyor...';
-  @override
-  String get cleanerSuggestionsStepDownloads =>
-      'İndirilenler klasörü denetleniyor...';
-  @override
-  String get cleanerSuggestionsStepSystem =>
-      'Windows sistem dosyaları denetleniyor...';
-  @override
-  String get cleanerSuggestionsStepDiskScan =>
-      'Disk kullanımı sonuçları gözden geçiriliyor...';
-  @override
-  String cleanerSuggestionsFoundItems(int count) => '$count öğe bulundu';
-  @override
-  String cleanerSuggestionsFoundSize(String size) => '$size bulundu';
-  @override
-  String get cleanerSuggestionsSourcesTitle => 'Denetlenen kaynaklar';
-  @override
-  String get cleanerSuggestionsSourceDownloads => 'İndirilenler klasörü';
-  @override
-  String get cleanerSuggestionsSourceSystem => 'Windows sistem dosyaları';
-  @override
-  String get cleanerSuggestionsSourceDiskScan => 'Disk kullanımı sonuçları';
-  @override
-  String get cleanerSuggestionsTierClean => 'Temizlemesi güvenli';
-  @override
-  String get cleanerSuggestionsTierCleanHint =>
-      'Sistem veya uygulamalar tarafından otomatik olarak yeniden oluşturulur.';
-  @override
-  String get cleanerSuggestionsTierReview => 'Temizlemeden önce gözden geçir';
-  @override
-  String get cleanerSuggestionsTierReviewHint =>
-      'Genellikle kaldırılabilir, ancak artık gerekmediğinden emin olun.';
-  @override
-  String get cleanerSuggestionsTierGuided => 'Windows araçlarıyla yer aç';
-  @override
-  String get cleanerSuggestionsTierGuidedHint =>
-      'Bunları doğrudan silmeyin; bunun yerine önerilen aracı kullanın.';
-  @override
-  String cleanerSuggestionsReclaimable(String size) =>
-      '$size\'a kadar yer açılabilir';
-  @override
-  String cleanerSuggestionsSelected(String size, int count) =>
-      'Seçilen: $count öğede $size';
-  @override
-  String get cleanerSuggestionsNothing =>
-      'Bu sürücüde temizlemeye değer bir şey bulunamadı.';
-  @override
-  String get cleanerSuggestionsDiskScanHint =>
-      'Kullanılmayan büyük dosyaları, node_modules klasörlerini ve sanal '
-      'diskleri de bulmak için bu sürücüde bir Disk kullanımı taraması çalıştırın.';
-  @override
-  String get cleanerSuggestionsConfirmTitle =>
-      'Geri Dönüşüm Kutusu\'na taşınsın mı?';
-  @override
-  String cleanerSuggestionsConfirmBody(int count, String size) =>
-      '$count öğe ($size) Geri Dönüşüm Kutusu\'na taşınacak. Oradan geri '
-      'yükleyebilirsiniz.';
-  @override
-  String cleanerSuggestionsConfirmPersonal(int count) =>
-      'Bunların $count tanesi gereksiz değil, kendi dosyalarınız. Artık '
-      'gerekmediğinden emin olun.';
-  @override
-  String cleanerSuggestionsConfirmRecycleBin(int count) =>
-      'Geri Dönüşüm Kutusu\'ndaki $count öğe kalıcı olarak silinecek.';
-  @override
-  String cleanerSuggestionsCleaned(String size) =>
-      '$size temizlendi. Geri Dönüşüm Kutusu\'na taşınan dosyalar, kutu '
-      'boşaltılana kadar yer kaplamaya devam eder.';
-  @override
-  String get cleanerSuggestionsCopyCommand => 'Komutu kopyala';
-  @override
-  String cleanerSuggestionsCommandCopied(String command) =>
-      '"$command" kopyalandı. Terminal\'de (Yönetici) çalıştırın.';
-  @override
-  String get cleanerSuggestionsOpenSettings => 'Windows ayarlarını aç';
-  @override
-  String cleanerSuggestionsShowItems(int count) => '$count öğeyi göster';
-  @override
-  String get cleanerSuggestionsHideItems => 'Öğeleri gizle';
-  @override
-  String cleanerSuggestionsAtLeast(String size) => 'en az $size';
-  @override
-  String cleanerSuggestionsMoreItems(int count) => '... ve $count tane daha';
-  @override
-  String cleanerSuggestionsScanFailed(String error) =>
-      'Öneriler taranamadı: $error';
-  @override
-  String get cleanerSuggestionsJunkScanBusy =>
-      'Başka bir gereksiz dosya taraması çalışıyor (Hızlı temizlik veya CB Agent), '
-      'bu yüzden önbellekler ve geçici dosyalar atlandı. Bittiğinde yeniden tarayın.';
-  @override
-  String cleanerSuggestionsPartialScan(String error) =>
-      'Taramanın bir kısmı başarısız oldu, bu yüzden bazı öneriler eksik olabilir: $error';
+  // Cleaner - space usage causes (Disk usage dashboard)
   @override
   String cleanerSuggestionTitle(String id) => switch (id) {
     'downloads_leftovers' => 'İndirilenler\'deki eski yükleyiciler ve arşivler',
@@ -4946,6 +4838,121 @@ class TurkishLocalizations implements AppLocalizations {
   String get cleanerAppsStorageUnknown => 'Diğer depolama';
   @override
   String get cleanerAppsCleanableBadge => 'Temizlenebilir';
+
+  // Cleaner - leftover app data
+  @override
+  String get cleanerLeftoversTitle => 'Kalan uygulama verileri';
+  @override
+  String get cleanerLeftoversUtilityDescription =>
+      'Kaldırılmış veya eski uygulamalardan kalan klasörleri bulun';
+  @override
+  String get cleanerLeftoversLoading =>
+      'Yüklü uygulamalar ve uygulama veri klasörleri okunuyor...';
+  @override
+  String get cleanerLeftoversIntro =>
+      'Bu klasörler yüklü hiçbir uygulamayla eşleşmiyor. Taşınabilir uygulamalar ve komut satırı araçları yüklü olarak görünmeyebilir; silmeden önce her klasörü kontrol edin.';
+  @override
+  String get cleanerLeftoversInventoryUnavailable =>
+      'Yüklü uygulama listesi okunamadı, bu yüzden kalan veriler belirlenemiyor.';
+  @override
+  String get cleanerLeftoversPartialBanner =>
+      'Uygulama listesi veya disk taraması eksik. Bazı klasörler hâlâ kullanılıyor olabilir.';
+  @override
+  String get cleanerLeftoversSearchHint => 'Klasör ara';
+  @override
+  String get cleanerLeftoversInactiveLabel => 'Şu süredir değişmedi';
+  @override
+  String get cleanerLeftoversInactiveAny => 'Herhangi bir zaman';
+  @override
+  String cleanerLeftoversInactiveDays(int days) => '$days+ gün';
+  @override
+  String cleanerLeftoversHiddenRecent(int count) =>
+      'Yakın zamanda kullanılan $count klasör gizlendi';
+  @override
+  String get cleanerLeftoversEmpty => 'Kalan klasör bulunamadı.';
+  @override
+  String cleanerLeftoversReasonOlderVersion(String app) =>
+      '$app uygulamasının eski sürümü';
+  @override
+  String cleanerLeftoversLastModified(String date) => 'Son değişiklik $date';
+  @override
+  String get cleanerLeftoversActivityUnknown => 'Son değişiklik bilinmiyor';
+  @override
+  String get cleanerLeftoversPartialSize => 'Kısmen ölçüldü';
+  @override
+  String get cleanerLeftoversLocationLocal => 'Local AppData';
+  @override
+  String get cleanerLeftoversLocationRoaming => 'Roaming AppData';
+  @override
+  String get cleanerLeftoversLocationLocalLow => 'LocalLow';
+  @override
+  String get cleanerLeftoversLocationProgramData => 'ProgramData';
+  @override
+  String get cleanerLeftoversLocationUserPrograms => 'Kullanıcı programları';
+  @override
+  String get cleanerLeftoversLocationProgramFiles => 'Program Files';
+  @override
+  String cleanerLeftoversScanProgress(int done, int total) =>
+      '$total klasörden $done tanesi kontrol edildi';
+  @override
+  String get cleanerLeftoversConfirmWarning =>
+      'Bu klasörler artık yüklü olmayan uygulamaların ayarlarını, kayıtlarını veya oturum bilgilerini içerebilir. Onları hâlâ kullanan uygulamalar sıfırdan başlar.';
+  @override
+  String get cleanerLeftoversScan => 'Kalıntıları bul';
+  @override
+  String get cleanerLeftoversMeasuring => 'Kalan klasörler ölçülüyor...';
+  @override
+  String cleanerLeftoversReclaimable(String size) =>
+      'En fazla $size boşaltılabilir';
+  @override
+  String cleanerLeftoversFound(String size) => 'Şimdiye kadar $size bulundu';
+  @override
+  String cleanerLeftoversSelected(String size, int count) =>
+      '$size seçildi ($count klasör)';
+  @override
+  String get cleanerLeftoversTierNoApp => 'Artık yüklü olmayan uygulamalar';
+  @override
+  String get cleanerLeftoversTierNoAppHint =>
+      'Bu klasörlerle eşleşen yüklü bir uygulama veya yayıncı yok.';
+  @override
+  String get cleanerLeftoversTierOlder => 'Eski sürümler';
+  @override
+  String get cleanerLeftoversTierOlderHint =>
+      'Aynı uygulamanın daha yeni bir sürümü yüklü.';
+  @override
+  String cleanerLeftoversFolderCount(int count) => '$count klasör';
+  @override
+  String cleanerLeftoversMoveTo(int count, String size, String destination) =>
+      '$count klasörü $destination konumuna taşı ($size)';
+  @override
+  String cleanerLeftoversConfirmTitle(String destination) =>
+      '$destination konumuna taşınsın mı?';
+  @override
+  String cleanerLeftoversConfirmBody(
+    int count,
+    String size,
+    String destination,
+  ) =>
+      '$count klasör ($size) $destination konumuna taşınacak. Oradan geri yükleyebilirsiniz.';
+  @override
+  String cleanerLeftoversCleaned(String size, String destination) =>
+      '$size $destination konumuna taşındı. Boşaltana kadar yer kaplamaya devam eder.';
+  @override
+  String get cleanerLeftoversSelectAll => 'Tümünü seç';
+  @override
+  String get cleanerLeftoversColumnFolder => 'Klasör';
+  @override
+  String get cleanerLeftoversColumnChanged => 'Son değişiklik';
+  @override
+  String get cleanerLeftoversColumnSize => 'Boyut';
+  @override
+  String cleanerLeftoversDaysAgo(int days) => '$days gün önce';
+  @override
+  String cleanerLeftoversNewestFile(String path) =>
+      'İçindeki en yeni dosya: $path';
+  @override
+  String get cleanerLeftoversChangedInFolder =>
+      'Klasörün kendisinde değişiklik oldu, örneğin bir dosya silindi veya yeniden adlandırıldı';
 
   @override
   String get aiThinking0 => 'Düşünüyor...';

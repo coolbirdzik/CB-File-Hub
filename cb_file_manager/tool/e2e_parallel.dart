@@ -202,12 +202,19 @@ Future<void> main(List<String> args) async {
   }
   await workersDir.create(recursive: true);
 
-  // Torrent checks native restore/focus through real IPC. Other app windows
-  // starting concurrently could steal foreground focus during those asserts.
+  // Flutter rewrites windows/flutter/ephemeral/generated_config.cmake with
+  // each integration test's listener.dart entrypoint. Separate build directories
+  // do not isolate that file: concurrent builds of different test files can
+  // compile another worker's tests and report "No tests match". Keep the app
+  // suites parallel, then build/run the other Windows entrypoints one at a time.
+  // Torrent also needs exclusive foreground focus for its native IPC asserts.
   final exclusiveGroups = groups
-      .where((group) => group == _kTorrentLibraryGroup)
+      .where(
+        (group) =>
+            requiresExclusiveDesktopRun(group, isWindows: Platform.isWindows),
+      )
       .toList();
-  groups = groups.where((group) => group != _kTorrentLibraryGroup).toList();
+  groups = groups.where((group) => !exclusiveGroups.contains(group)).toList();
 
   // ---- Warmup build cache, then launch workers in parallel ----
   //
@@ -282,7 +289,9 @@ Future<void> main(List<String> args) async {
   }
 
   for (final group in exclusiveGroups) {
-    print('[Parallel E2E] Running "$group" with exclusive desktop focus.');
+    print(
+      '[Parallel E2E] Running "$group" with an exclusive desktop build/run.',
+    );
     results[group] = await _runWorker(
       group,
       fullStartup: fullStartup,
@@ -562,6 +571,11 @@ String _testFileForGroup(String group) {
       return _kAppE2ETestFile;
   }
 }
+
+/// Whether a suite needs isolation from the other desktop workers.
+bool requiresExclusiveDesktopRun(String group, {required bool isWindows}) =>
+    group == _kTorrentLibraryGroup ||
+    (isWindows && _testFileForGroup(group) != _kAppE2ETestFile);
 
 Future<void> _drain(Stream<List<int>> input, List<IOSink> sinks) async {
   await for (final chunk in input) {

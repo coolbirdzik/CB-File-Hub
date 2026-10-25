@@ -5,6 +5,10 @@ https://github.com/TerminalStudio/xterm.dart. Its MIT license is in `LICENSE`.
 Only runtime sources and package metadata are vendored. Runtime sources are
 formatted with the workspace's Dart SDK.
 
+The unused `equatable` runtime dependency was removed: none of the vendored
+sources import it. This allows the app to adopt Equatable 3 without adding an
+unnecessary compatibility constraint to the terminal.
+
 ## 4.0.0+cb.1 — Flutter 3.47.2 Windows text input
 
 `lib/src/ui/custom_text_edit.dart` now passes `View.of(context).viewId` to

@@ -275,11 +275,13 @@ impl DiskScan {
 
     /// Cancels and drops buffered records once the owner stopped polling.
     fn check_abandoned(&self) {
-        let idle = self.elapsed_ms()
-            - self
-                .last_poll_ms
-                .load(Ordering::Relaxed)
-                .min(self.elapsed_ms());
+        self.check_abandoned_at(self.elapsed_ms());
+    }
+
+    fn check_abandoned_at(&self, now_ms: u64) {
+        // A concurrent poll may update last_poll_ms after now_ms was captured.
+        // Clamping to a second elapsed_ms() reading still allows underflow.
+        let idle = now_ms.saturating_sub(self.last_poll_ms.load(Ordering::Relaxed));
         if idle > ABANDON_AFTER_MS && !self.cancelled.load(Ordering::Relaxed) {
             self.cancel();
             *lock(&self.records) = Vec::new();
@@ -327,14 +329,30 @@ impl DiskScan {
 
             let _active = ActiveGuard(self);
             self.check_abandoned();
+            if self.cancelled.load(Ordering::Acquire) {
+                continue;
+            }
             let (record, children) = self.scan_directory(task);
             // The record goes out before the children are queued, so Dart
             // always sees a parent before any of its subdirectories.
-            lock(&self.records).extend_from_slice(&record);
+            if !self.publish_record(&record) {
+                continue;
+            }
             if !children.is_empty() {
                 lock(&self.queue).tasks.extend(children);
             }
         }
+    }
+
+    fn publish_record(&self, record: &[u8]) -> bool {
+        let mut records = lock(&self.records);
+        // Abandonment discards the buffered parents. A worker returning from
+        // filesystem IO must not publish their children after that discard.
+        if self.cancelled.load(Ordering::Acquire) {
+            return false;
+        }
+        records.extend_from_slice(record);
+        true
     }
 
     fn scan_directory(&self, task: Task) -> (Vec<u8>, Vec<Task>) {
@@ -700,11 +718,18 @@ mod tests {
         let config = Config::decode(&config_bytes.into_bytes()).unwrap();
 
         let scan = DiskScan::start(config);
+        // Model a poll that lands after a worker captures its clock reading.
+        // It must not wrap the idle time and cancel an actively polled scan.
+        scan.last_poll_ms.store(101, Ordering::Relaxed);
+        scan.check_abandoned_at(100);
+        assert!(!scan.cancelled.load(Ordering::Relaxed));
         lock(&scan.records).extend_from_slice(&[1, 2, 3]);
         scan.last_poll_ms.store(0, Ordering::Relaxed);
         thread::sleep(std::time::Duration::from_millis(ABANDON_AFTER_MS + 50));
         scan.check_abandoned();
         assert!(scan.cancelled.load(Ordering::Relaxed));
+        assert!(lock(&scan.records).is_empty());
+        assert!(!scan.publish_record(&[4, 5, 6]));
         assert!(lock(&scan.records).is_empty());
         fs::remove_dir_all(&root).unwrap();
     }

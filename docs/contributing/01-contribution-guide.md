@@ -1,6 +1,6 @@
 # Contribution Guide
 
-- **Setup** Follow the [development setup](04-development-setup.md) for Flutter 3.47.2, workspace commands, and the Windows, macOS, Linux, or Android toolchain.
+- **Setup** Follow the [development setup](04-development-setup.md) for Flutter 3.47.8, workspace commands, and the Windows, macOS, Linux, or Android toolchain.
 - **Branches** Work off feature branches (`feat/<topic>`). Never push directly to `main`.
 - **Before PR** Run `flutter test`, fix lints, attach screenshots for UI changes.
 - **Standards** Follow `docs/contributing/02-coding-standards.md` and theme/i18n rules in `docs/coding-rules/`.

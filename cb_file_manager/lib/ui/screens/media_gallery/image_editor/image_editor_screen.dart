@@ -339,8 +339,6 @@ class ImageEditorScreenState extends State<ImageEditorScreen> {
             '$extension',
         bytes: bytes,
         initialDirectory: pathlib.dirname(widget.file.path),
-        type: FileType.custom,
-        allowedExtensions: <String>[extension.substring(1)],
       );
       if (!mounted || uri == null) return;
       setState(() => _savedIndex = _historyIndex);
