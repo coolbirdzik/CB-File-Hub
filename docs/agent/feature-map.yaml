@@ -82,6 +82,17 @@ features:
       - cb_file_manager/lib/services/disk_cleaner/disk_tree_selection.dart
       - cb_file_manager/lib/helpers/files/trash_manager.dart
       - cb_file_manager/lib/helpers/files/windows_file_operations.dart
+    smart_clean:
+      - cb_file_manager/lib/ui/screens/cb_agent_cleaner/cleaner_smart_clean_view.dart
+      - cb_file_manager/lib/bloc/cleaner_smart_clean/cleaner_smart_clean_cubit.dart
+      - cb_file_manager/lib/services/disk_cleaner/cleaner_quick_clean.dart
+      - cb_file_manager/lib/services/disk_cleaner/cleaner_cache_rules.dart
+      - cb_file_manager/lib/services/disk_cleaner/cleaner_xcode_cache.dart
+      - cb_file_manager/lib/services/disk_cleaner/cleaner_review_candidates.dart
+      - cb_file_manager/lib/ui/screens/cb_agent_cleaner/cleaner_old_files_panel.dart
+      - cb_file_manager/lib/services/disk_cleaner/cleaner_item_origin.dart
+      - cb_file_manager/lib/services/disk_cleaner/cleaner_installed_apps.dart
+      - cb_file_manager/lib/ui/screens/cb_agent_cleaner/installed_app_icon.dart
     app_insights:
       - cb_file_manager/lib/ui/screens/cb_agent_cleaner/cleaner_apps_view.dart
       - cb_file_manager/lib/bloc/cleaner_app_insights/cleaner_app_insights_cubit.dart
@@ -97,6 +108,15 @@ features:
       - cb_file_manager/test/helpers/files/trash_manager_test.dart
       - cb_file_manager/test/helpers/files/windows_file_operations_test.dart
       - cb_file_manager/test/bloc/cleaner_app_insights_cubit_test.dart
+      - cb_file_manager/test/bloc/cleaner_smart_clean_cubit_test.dart
+      - cb_file_manager/test/services/disk_cleaner/cleaner_quick_clean_test.dart
+      - cb_file_manager/test/services/disk_cleaner/cleaner_cache_rules_test.dart
+      - cb_file_manager/test/services/disk_cleaner/cleaner_xcode_cache_test.dart
+      - cb_file_manager/test/services/disk_cleaner/cleaner_review_candidates_test.dart
+      - cb_file_manager/test/services/disk_cleaner/cleaner_item_origin_test.dart
+      - cb_file_manager/test/services/disk_cleaner/cleaner_installed_apps_test.dart
+      - cb_file_manager/test/services/disk_cleaner/recycle_bin_scan_test.dart
+      - cb_file_manager/test/ui/screens/cb_agent_cleaner/cleaner_smart_clean_view_test.dart
       - cb_file_manager/test/services/app_insights/app_storage_analyzer_test.dart
       - cb_file_manager/test/ui/screens/cb_agent_cleaner/cb_agent_cleaner_app_mode_safety_test.dart
     invariants:
@@ -105,6 +125,10 @@ features:
       - "Directory cleanup selection stores canonical top-level targets without eagerly selecting every descendant."
       - "Cleaner junk aggregates may be cached only for a stable tree and must be invalidated after metadata or structure changes."
       - "Deletion requires an exact target set and explicit user approval."
+      - "Smart Clean only takes CleanerQuickClean-eligible items; Recycle Bin entries are a separate, unchecked group because emptying them is permanent."
+      - "Smart Clean package rules include only download caches, never installed libraries; Electron rules include explicit regenerable subfolders, never whole profiles or persistent storage."
+      - "Xcode cleanup expands only known generated output roots and keeps SourcePackages, archives and dSYMs; review-only old downloads never become cleanup targets or deletion allowlist entries."
+      - "Smart Clean's per-item origin (app and kind, CleanerItemOrigins) is display-only and derived from the path after the scan; it never widens what can be cleaned."
       - "An elevated retry is limited to the approved paths that failed direct deletion and must remain a separate user action."
       - "Folder growth compares only completed scans of the same drive; cancelled or in-progress scans never replace the persisted baseline."
       - "Folder growth is informational and never selects deletion targets."
@@ -246,18 +270,23 @@ features:
   cleaner_app_insights:
     entrypoints:
       - cb_file_manager/lib/ui/screens/cb_agent_cleaner/cleaner_apps_view.dart
+      - cb_file_manager/lib/ui/screens/cb_agent_cleaner/cleaner_app_files_dialog.dart
+      - cb_file_manager/lib/services/app_insights/app_storage_file_browser.dart
       - cb_file_manager/lib/bloc/cleaner_app_insights/cleaner_app_insights_cubit.dart
       - cb_file_manager/lib/services/app_insights/windows_app_inventory_service.dart
       - cb_file_manager/lib/services/app_insights/app_storage_analyzer.dart
     parent: cb_agent_cleaner
     tests:
       - cb_file_manager/test/services/app_insights/app_storage_analyzer_test.dart
+      - cb_file_manager/test/services/app_insights/app_storage_file_browser_test.dart
+      - cb_file_manager/test/ui/screens/cb_agent_cleaner/cleaner_app_files_dialog_test.dart
       - cb_file_manager/test/bloc/cleaner_app_insights_cubit_test.dart
       - cb_file_manager/test/18_app_storage_tool_test.dart
     invariants:
       - "Installation folders and user data are analysis evidence, not automatic junk."
       - "Unknown application activity remains unknown and must not be treated as stale."
       - "Shared or unattributed storage is never automatically assigned to one app."
+      - "App file previews list one directory at a time without changing cleanup selection; review uses only the inspected confirmed rule-backed root."
 
   cleaner_app_leftovers:
     entrypoints:

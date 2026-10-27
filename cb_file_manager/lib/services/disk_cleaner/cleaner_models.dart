@@ -78,9 +78,12 @@ class PathSource {
   }
 }
 
+enum CleanerRuleScope { tree, xcodeBuildOutputs, folderSummary }
+
 /// A single rule describing a directory tree to scan and how to filter it.
 class CleanerPathRule {
   final PathSource source;
+  final CleanerRuleScope scope;
 
   /// Glob-style filename patterns (case-insensitive). If null, all files
   /// match. Matched against the file basename only.
@@ -115,6 +118,7 @@ class CleanerPathRule {
 
   const CleanerPathRule({
     required this.source,
+    this.scope = CleanerRuleScope.tree,
     this.includeGlobs,
     this.excludeGlobs,
     this.minAge,
@@ -150,6 +154,9 @@ class CleanerCategory {
   /// delete. The scanner reports this in `warnings` if it fails to read.
   final bool requiresAdmin;
 
+  /// Evidence for manual inspection only. Never a cleanup target or allowlist.
+  final bool reviewOnly;
+
   const CleanerCategory({
     required this.id,
     required this.displayName,
@@ -158,6 +165,7 @@ class CleanerCategory {
     required this.rules,
     this.defaultEnabled = false,
     this.requiresAdmin = false,
+    this.reviewOnly = false,
   });
 }
 

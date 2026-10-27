@@ -25,6 +25,10 @@ void main() {
       'app_cache',
       'crash_dumps_logs',
       'dev_cache',
+      'package_download_cache',
+      'electron_cache',
+      'xcode_build_cache',
+      'old_downloads_review',
     ]);
     const env = {'HOME': '/Users/test'};
     for (final category in categories) {
@@ -33,7 +37,7 @@ void main() {
         expect(base, startsWith('/Users/test/'));
         expect(
           CleanerPathSafety.isMacosPathSafeToDelete('$base/item', env),
-          isTrue,
+          category.reviewOnly ? isFalse : isTrue,
         );
       }
     }

@@ -4240,20 +4240,137 @@ class ChineseLocalizations implements AppLocalizations {
   String diskCleanerTimeMonthsAgo(int months) =>
       months <= 1 ? '1 个月前' : '$months 个月前';
   @override
-  String get diskCleanerQuickCleanHint => '临时文件、缓存和回收站。应用会在需要时重新生成这些内容。';
+  String get diskCleanerQuickCleanHint =>
+      '旧的临时文件、浏览器和应用缓存、崩溃报告。应用会在需要时重新生成这些内容。';
   @override
   String get diskCleanerQuickCleanButton => '快速清理';
   @override
-  String get diskCleanerQuickCleanScanning => '正在查找安全的项目...';
-  @override
   String get diskCleanerQuickCleanNothing => '目前没有可安全清理的内容';
   @override
-  String get diskCleanerQuickCleanReviewTitle => '查看快速清理';
-  @override
-  String diskCleanerQuickCleanReviewSubtitle(int count, String size) =>
-      '这些分组中共有 $count 个项目，合计 $size。';
-  @override
   String get diskCleanerQuickCleanRecycleNote => '所有内容都会移到回收站，您可以从那里恢复。';
+  @override
+  String get diskCleanerQuickCleanSafetyNote =>
+      '仅包含一天内未修改的文件；临时文件、着色器和软件包缓存需一周。请先关闭应用并等待安装和构建完成。锁定文件会被跳过。';
+  @override
+  String get cleanerSmartCleanTitle => '智能清理';
+  @override
+  String get cleanerSmartCleanUtilityDescription => '一键清理安全的垃圾文件';
+  @override
+  String get cleanerSmartCleanIntro =>
+      '查找旧临时文件、系统与 Electron 缓存、软件包下载和崩溃报告。显示需重建或重新下载的内容，保留文档、设置和已安装的库。';
+  @override
+  String get cleanerSmartCleanScan => '扫描';
+  @override
+  String cleanerSmartCleanScanningCategory(String category) =>
+      '正在检查$category...';
+  @override
+  String get cleanerSmartCleanPreparing => '正在准备...';
+  @override
+  String cleanerSmartCleanItemCount(int count) => '$count 个项目';
+  @override
+  String cleanerSmartCleanCleanButton(String size) => '清理 $size';
+  @override
+  String get cleanerSmartCleanAllCleanTitle => '您的设备很整洁';
+  @override
+  String get cleanerSmartCleanPermanentBadge => '永久删除';
+  @override
+  String get cleanerSmartCleanRecycleBinWarning => '默认不选中。回收站中的项目将被永久删除，无法恢复。';
+  @override
+  String cleanerSmartCleanMoreItems(int count) => '还有 $count 项';
+  @override
+  String get cleanerSmartCleanDoneTitle => '清理完成';
+  @override
+  String cleanerSmartCleanDoneMoved(String size, String destination) =>
+      '已将 $size 移到$destination';
+  @override
+  String cleanerSmartCleanDonePermanent(String size) => '已从回收站永久删除 $size';
+  @override
+  String cleanerSmartCleanDoneSkipped(int count) => '已跳过 $count 个正在使用或无法删除的项目。';
+  @override
+  String cleanerSmartCleanDoneHint(String destination) =>
+      '清空$destination后才会真正释放磁盘空间。';
+  @override
+  String get cleanerSmartCleanBusy => '另一项扫描正在进行。请在其完成后重试。';
+  @override
+  String get cleanerSmartCleanPermanentConfirmTitle => '清空回收站？';
+  @override
+  String cleanerSmartCleanPermanentConfirmBody(String size) =>
+      '回收站中的 $size 将被永久删除。其他选中的项目仍会照常移到回收站。';
+  @override
+  String get cleanerSmartCleanConfirmClean => '清理';
+  @override
+  String cleanerSmartCleanReclaimable(String size) => '找到 $size 安全垃圾';
+  @override
+  String cleanerSmartCleanSelected(String size, int count) =>
+      '已选择 $size（$count 项）';
+  @override
+  String get cleanerSmartCleanChecksLabel => '检查范围';
+  @override
+  String cleanerSmartCleanMostlyFrom(String apps) => '主要来自 $apps';
+  @override
+  String get cleanerSmartCleanUnknownApp => '未知应用';
+  @override
+  String cleanerSmartCleanFolderSource(String folder) => '文件夹“$folder”';
+  @override
+  String cleanerSmartCleanOtherSources(int count) => '其他 $count 个来源';
+  @override
+  String get cleanerSmartCleanKindWebCache => '网页缓存';
+  @override
+  String get cleanerSmartCleanKindCodeCache => '已编译脚本缓存';
+  @override
+  String get cleanerSmartCleanKindGpuCache => 'GPU 着色器缓存';
+  @override
+  String get cleanerSmartCleanKindAppCache => '应用缓存';
+  @override
+  String get cleanerSmartCleanKindThumbnailCache => '缩略图数据库';
+  @override
+  String get cleanerSmartCleanKindTempFile => '临时文件';
+  @override
+  String get cleanerSmartCleanKindInstaller => '安装程序残留';
+  @override
+  String get cleanerSmartCleanKindLog => '日志';
+  @override
+  String get cleanerSmartCleanKindCrashReport => '崩溃报告';
+  @override
+  String get cleanerSmartCleanKindDeletedFile => '已删除的文件';
+  @override
+  String get cleanerSmartCleanKindOther => '其他文件';
+  @override
+  String get cleanerSmartCleanKindWebCacheInfo =>
+      '已下载的网页、图片和媒体。需要时会重新下载，网站首次打开可能稍慢。';
+  @override
+  String get cleanerSmartCleanKindCodeCacheInfo => '应用预先编译的脚本。下次打开应用时会重新编译。';
+  @override
+  String get cleanerSmartCleanKindGpuCacheInfo => '为显卡编译的图形着色器。下次启动时重建。';
+  @override
+  String get cleanerSmartCleanKindAppCacheInfo =>
+      '应用为加快启动或加载而保留的数据。需要时应用会重新下载或重建。';
+  @override
+  String get cleanerSmartCleanKindThumbnailCacheInfo =>
+      '文件资源管理器为图片和视频显示的预览。打开文件夹时 Windows 会重新生成。';
+  @override
+  String get cleanerSmartCleanKindTempFileInfo => '应用运行结束后遗留的临时文件，不会再被读取。';
+  @override
+  String get cleanerSmartCleanKindInstallerInfo => '安装或更新时解压的安装包。重新安装时会再次下载。';
+  @override
+  String get cleanerSmartCleanKindLogInfo => '应用的运行记录，仅在排查问题时有用。';
+  @override
+  String get cleanerSmartCleanKindCrashReportInfo =>
+      '应用崩溃或卡死时保存。只有打算发送给开发者时才需要保留。';
+  @override
+  String get cleanerSmartCleanKindDeletedFileInfo => '你之前删除的文件。清空回收站会永久删除它们。';
+  @override
+  String get cleanerSmartCleanKindOtherInfo => '来自多个应用的少量文件，各自太小，不单独列出。';
+  @override
+  String get cleanerSmartCleanImpactRebuilt => '会自动重建';
+  @override
+  String get cleanerSmartCleanImpactLeftover => '已不再使用';
+  @override
+  String get cleanerSmartCleanImpactDiagnostic => '仅用于排查问题';
+  @override
+  String get cleanerSmartCleanImpactPermanent => '无法恢复';
+  @override
+  String get cleanerSmartCleanInstalledBadge => '已安装';
   @override
   String get diskCleanerCategoryWindowsTemp => 'Windows 临时文件';
   @override
@@ -4274,6 +4391,39 @@ class ChineseLocalizations implements AppLocalizations {
   String get diskCleanerCategoryDeliveryOptimization => '传递优化文件';
   @override
   String get diskCleanerCategoryDevCache => '开发者缓存';
+  @override
+  String get diskCleanerCategorySystemCache => 'Windows 着色器缓存';
+  @override
+  String get diskCleanerCategoryPackageDownloads => '软件包下载缓存';
+  @override
+  String get diskCleanerCategoryElectronCache => 'Electron 应用缓存';
+  @override
+  String get diskCleanerReasonSystemCache =>
+      '一周前的 DirectX 着色器缓存。重新编译着色器时游戏可能变慢或卡顿。清理前请关闭游戏。';
+  @override
+  String get diskCleanerReasonPackageDownloads =>
+      '一周前的 npm、pip、Cargo、NuGet HTTP 和 Composer 下载缓存。下次安装可能需要联网重新下载或构建。保留已安装的库。请等待安装和构建完成后再清理。';
+  @override
+  String get diskCleanerReasonElectronCache =>
+      '受支持 Electron 应用的网页、JavaScript 和 GPU 缓存。请先关闭应用。缓存会重建；保留密码、设置、IndexedDB 和服务工作线程离线数据。';
+  @override
+  String get cleanerSmartCleanImpactRedownload => '可能需要重新下载';
+  @override
+  String get diskCleanerCategoryXcodeBuild => '旧 Xcode 构建文件';
+  @override
+  String get diskCleanerReasonXcodeBuild =>
+      '至少 7 天未修改的构建产物、中间文件、索引和模块缓存。请先关闭 Xcode 并停止构建。保留源码、软件包检出、归档和 dSYM。下次构建和索引可能更慢。';
+  @override
+  String get cleanerOldFilesTitle => '旧下载文件 — 仅供检查';
+  @override
+  String get cleanerOldFilesDescription =>
+      '默认 Downloads 中至少 90 天未修改的最大 200 个文件。修改时间不等于打开时间，也不能证明文件未使用。这些文件不会被选中清理，请打开文件夹检查。';
+  @override
+  String cleanerOldFilesCount(int count) => '$count 个待检查文件';
+  @override
+  String cleanerOldFilesModified(String date) => '最后修改：$date';
+  @override
+  String get cleanerOldFilesShowMore => '显示更多文件';
   @override
   String get diskCleanerReasonWindowsTemp => '由应用遗留下来的文件。可以安全删除，没有任何程序依赖它们。';
   @override
@@ -4464,6 +4614,17 @@ class ChineseLocalizations implements AppLocalizations {
       '这些文件夹不归属于某一个应用，也不会被选中进行清理。';
   @override
   String get cleanerAppsOpenFolder => '打开文件夹';
+  @override
+  String get cleanerAppsViewFiles => '查看文件';
+  @override
+  String get cleanerAppsFilesDescription => '查看与此应用关联位置中的文件。应用数据可能包含设置和个人文件。';
+  @override
+  String get cleanerAppsCleanableFilesHint =>
+      '此位置符合垃圾清理规则。查看可清理的数据将打开整个位置的清理预览。';
+  @override
+  String get cleanerAppsDataFilesHint => '这些文件未被识别为可清理的垃圾。打开文件夹可手动管理。';
+  @override
+  String cleanerAppsFilesLoadFailed(String error) => '无法读取此文件夹：$error';
   @override
   String get cleanerAppsManageInWindows => '在 Windows 中管理';
   @override
@@ -5876,4 +6037,44 @@ class ChineseLocalizations implements AppLocalizations {
   String get vlNameHint => '我的电影';
   @override
   String get vlDescriptionHint => '个人电影收藏';
+
+  @override
+  String get cleanerReviewSectionsTitle => '清理前检查';
+  @override
+  String cleanerScanWarnings(int count) => '扫描警告（$count）';
+  @override
+  String cleanerReviewTitle(String name) => '$name（仅供检查）';
+  @override
+  String cleanerReviewSummary(int count, String size) => '$count 项 · $size';
+  @override
+  String get cleanerDeveloperAnalysisTitle => '开发工具分析和构建缓存';
+  @override
+  String get cleanerDeveloperAnalysisReason =>
+      '至少 7 天未更改的 Dart 分析、C/C++ 预编译头和 Go 构建缓存。请先关闭编辑器、语言服务器并停止构建。下次分析或构建可能需要更长时间。';
+  @override
+  String get cleanerDeveloperDownloadsTitle => '开发工具下载缓存';
+  @override
+  String get cleanerDeveloperDownloadsReason =>
+      '至少 7 天未更改的开发工具下载缓存。请先完成安装、更新和构建。下次安装可能需要联网；已安装的扩展、环境和模型将保留。';
+  @override
+  String get cleanerElectronCrashTitle => 'Electron 崩溃报告';
+  @override
+  String get cleanerElectronCrashReason =>
+      '至少 7 天未更改的 Crashpad 小型转储文件。请保留排查问题所需的报告，并先关闭相关应用。';
+  @override
+  String get cleanerCppDatabaseReason =>
+      'C/C++ 代码数据库。仅供检查；重建可能需要时间。这些文件绝不会被选中清理。';
+  @override
+  String get cleanerVcpkgReason =>
+      'vcpkg 构建文件、下载内容和软件包。仅供检查；当前构建或离线安装可能需要这些文件。绝不会被选中清理。';
+  @override
+  String get cleanerNvidiaReason => 'NVIDIA 着色器缓存。仅供检查；重建着色器可能导致卡顿。绝不会被选中清理。';
+  @override
+  String get cleanerUnrealReason =>
+      'Unreal Zen 和派生数据缓存。仅供检查；重建项目数据可能需要时间。绝不会被选中清理。';
+  @override
+  String get cleanerPikPakReason => 'PikPak 播放器缓存。仅供检查；可能包含播放所需的媒体。绝不会被选中清理。';
+  @override
+  String get cleanerInstallerReason =>
+      'Visual Studio 和 Windows 安装包。仅供检查；修复、更新或卸载软件时可能需要这些文件。绝不会被选中清理。';
 }

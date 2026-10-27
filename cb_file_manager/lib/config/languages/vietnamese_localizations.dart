@@ -4466,22 +4466,151 @@ class VietnameseLocalizations implements AppLocalizations {
   String diskCleanerTimeMonthsAgo(int months) => '$months tháng trước';
   @override
   String get diskCleanerQuickCleanHint =>
-      'Tệp tạm, bộ nhớ đệm và Thùng rác. Ứng dụng sẽ tự tạo lại khi cần.';
+      'Tệp tạm cũ, bộ nhớ đệm của trình duyệt và ứng dụng, báo cáo lỗi. Ứng dụng sẽ tự tạo lại khi cần.';
   @override
   String get diskCleanerQuickCleanButton => 'Dọn nhanh';
-  @override
-  String get diskCleanerQuickCleanScanning => 'Đang tìm mục an toàn...';
   @override
   String get diskCleanerQuickCleanNothing =>
       'Hiện không có mục nào an toàn để dọn';
   @override
-  String get diskCleanerQuickCleanReviewTitle => 'Xem lại trước khi dọn nhanh';
-  @override
-  String diskCleanerQuickCleanReviewSubtitle(int count, String size) =>
-      '$count mục trong các nhóm này, tổng cộng $size.';
-  @override
   String get diskCleanerQuickCleanRecycleNote =>
       'Tất cả sẽ được chuyển vào Thùng rác, bạn có thể khôi phục từ đó.';
+  @override
+  String get diskCleanerQuickCleanSafetyNote =>
+      'Chỉ gồm file không thay đổi trong 1 ngày; file tạm, cache shader và tải gói cần đủ 1 tuần. Đóng app, chờ cài gói và build xong trước khi dọn. File bị khóa sẽ được bỏ qua.';
+  @override
+  String get cleanerSmartCleanTitle => 'Dọn dẹp thông minh';
+  @override
+  String get cleanerSmartCleanUtilityDescription =>
+      'Dọn rác an toàn chỉ với một lần bấm';
+  @override
+  String get cleanerSmartCleanIntro =>
+      'Tìm file tạm cũ, cache hệ thống và Electron, cache tải gói và báo cáo lỗi. Cho biết phần nào sẽ tạo hoặc tải lại. Giữ nguyên tài liệu, cài đặt và thư viện đã cài.';
+  @override
+  String get cleanerSmartCleanScan => 'Quét';
+  @override
+  String cleanerSmartCleanScanningCategory(String category) =>
+      'Đang kiểm tra $category...';
+  @override
+  String get cleanerSmartCleanPreparing => 'Đang chuẩn bị...';
+  @override
+  String cleanerSmartCleanItemCount(int count) => '$count mục';
+  @override
+  String cleanerSmartCleanCleanButton(String size) => 'Dọn $size';
+  @override
+  String get cleanerSmartCleanAllCleanTitle => 'Máy của bạn đang gọn gàng';
+  @override
+  String get cleanerSmartCleanPermanentBadge => 'Xóa vĩnh viễn';
+  @override
+  String get cleanerSmartCleanRecycleBinWarning =>
+      'Không được chọn sẵn. Các mục trong Thùng rác sẽ bị xóa vĩnh viễn và không thể khôi phục.';
+  @override
+  String cleanerSmartCleanMoreItems(int count) => 'và $count mục khác';
+  @override
+  String get cleanerSmartCleanDoneTitle => 'Đã dọn xong';
+  @override
+  String cleanerSmartCleanDoneMoved(String size, String destination) =>
+      'Đã chuyển $size vào $destination';
+  @override
+  String cleanerSmartCleanDonePermanent(String size) =>
+      'Đã xóa vĩnh viễn $size khỏi Thùng rác';
+  @override
+  String cleanerSmartCleanDoneSkipped(int count) =>
+      'Đã bỏ qua $count mục đang được dùng hoặc không xóa được.';
+  @override
+  String cleanerSmartCleanDoneHint(String destination) =>
+      'Dung lượng chỉ được giải phóng hẳn khi bạn làm trống $destination.';
+  @override
+  String get cleanerSmartCleanBusy =>
+      'Đang có một lần quét khác. Hãy thử lại khi nó hoàn tất.';
+  @override
+  String get cleanerSmartCleanPermanentConfirmTitle => 'Làm trống Thùng rác?';
+  @override
+  String cleanerSmartCleanPermanentConfirmBody(String size) =>
+      '$size trong Thùng rác sẽ bị xóa vĩnh viễn. Các mục đã chọn khác vẫn được chuyển vào Thùng rác như bình thường.';
+  @override
+  String get cleanerSmartCleanConfirmClean => 'Dọn';
+  @override
+  String cleanerSmartCleanReclaimable(String size) =>
+      'Tìm thấy $size rác an toàn';
+  @override
+  String cleanerSmartCleanSelected(String size, int count) =>
+      'Đã chọn $size ($count mục)';
+  @override
+  String get cleanerSmartCleanChecksLabel => 'Sẽ kiểm tra';
+  @override
+  String cleanerSmartCleanMostlyFrom(String apps) => 'Chủ yếu từ $apps';
+  @override
+  String get cleanerSmartCleanUnknownApp => 'Không rõ ứng dụng';
+  @override
+  String cleanerSmartCleanFolderSource(String folder) => 'Thư mục "$folder"';
+  @override
+  String cleanerSmartCleanOtherSources(int count) => '$count nguồn khác';
+  @override
+  String get cleanerSmartCleanKindWebCache => 'Bộ nhớ đệm web';
+  @override
+  String get cleanerSmartCleanKindCodeCache => 'Bộ nhớ đệm mã đã biên dịch';
+  @override
+  String get cleanerSmartCleanKindGpuCache => 'Bộ nhớ đệm shader GPU';
+  @override
+  String get cleanerSmartCleanKindAppCache => 'Bộ nhớ đệm ứng dụng';
+  @override
+  String get cleanerSmartCleanKindThumbnailCache => 'Cơ sở dữ liệu ảnh thu nhỏ';
+  @override
+  String get cleanerSmartCleanKindTempFile => 'Tệp tạm';
+  @override
+  String get cleanerSmartCleanKindInstaller => 'Bộ cài còn sót';
+  @override
+  String get cleanerSmartCleanKindLog => 'Nhật ký (log)';
+  @override
+  String get cleanerSmartCleanKindCrashReport => 'Báo cáo sự cố';
+  @override
+  String get cleanerSmartCleanKindDeletedFile => 'Tệp đã xóa';
+  @override
+  String get cleanerSmartCleanKindOther => 'Tệp khác';
+  @override
+  String get cleanerSmartCleanKindWebCacheInfo =>
+      'Trang, hình ảnh và media đã tải về. Sẽ được tải lại khi cần, nên trang web có thể mở chậm hơn một chút lúc đầu.';
+  @override
+  String get cleanerSmartCleanKindCodeCacheInfo =>
+      'Mã script ứng dụng biên dịch sẵn. Sẽ được biên dịch lại ở lần mở ứng dụng tiếp theo.';
+  @override
+  String get cleanerSmartCleanKindGpuCacheInfo =>
+      'Shader đồ họa đã biên dịch cho GPU. Sẽ tạo lại ở lần khởi động tiếp theo.';
+  @override
+  String get cleanerSmartCleanKindAppCacheInfo =>
+      'Dữ liệu ứng dụng giữ lại để mở hoặc tải nhanh hơn. Ứng dụng tự tải lại hoặc tạo lại khi cần.';
+  @override
+  String get cleanerSmartCleanKindThumbnailCacheInfo =>
+      'Ảnh xem trước File Explorer hiển thị cho ảnh và video. Windows tạo lại khi bạn mở thư mục.';
+  @override
+  String get cleanerSmartCleanKindTempFileInfo =>
+      'Tệp nháp ứng dụng bỏ lại sau khi chạy xong. Không còn gì dùng đến chúng.';
+  @override
+  String get cleanerSmartCleanKindInstallerInfo =>
+      'Gói cài đặt được giải nén trong lúc cài hoặc cập nhật. Nếu cài lại sẽ tải lại.';
+  @override
+  String get cleanerSmartCleanKindLogInfo =>
+      'Bản ghi hoạt động của ứng dụng. Chỉ cần khi đang khắc phục sự cố.';
+  @override
+  String get cleanerSmartCleanKindCrashReportInfo =>
+      'Được lưu khi ứng dụng bị lỗi hoặc treo. Chỉ giữ lại nếu bạn định gửi cho nhà phát triển.';
+  @override
+  String get cleanerSmartCleanKindDeletedFileInfo =>
+      'Các tệp bạn đã xóa trước đó. Dọn Thùng rác sẽ xóa vĩnh viễn.';
+  @override
+  String get cleanerSmartCleanKindOtherInfo =>
+      'Phần nhỏ từ nhiều ứng dụng, mỗi phần quá nhỏ để liệt kê riêng.';
+  @override
+  String get cleanerSmartCleanImpactRebuilt => 'Tự tạo lại';
+  @override
+  String get cleanerSmartCleanImpactLeftover => 'Không còn dùng';
+  @override
+  String get cleanerSmartCleanImpactDiagnostic => 'Chỉ để chẩn đoán lỗi';
+  @override
+  String get cleanerSmartCleanImpactPermanent => 'Không thể khôi phục';
+  @override
+  String get cleanerSmartCleanInstalledBadge => 'Đã cài';
   @override
   String get diskCleanerCategoryWindowsTemp => 'Tệp tạm của Windows';
   @override
@@ -4503,6 +4632,39 @@ class VietnameseLocalizations implements AppLocalizations {
       'Tệp Delivery Optimization';
   @override
   String get diskCleanerCategoryDevCache => 'Bộ nhớ đệm lập trình';
+  @override
+  String get diskCleanerCategorySystemCache => 'Cache shader Windows';
+  @override
+  String get diskCleanerCategoryPackageDownloads => 'Cache tải gói lập trình';
+  @override
+  String get diskCleanerCategoryElectronCache => 'Cache ứng dụng Electron';
+  @override
+  String get diskCleanerReasonSystemCache =>
+      'Cache shader DirectX cũ hơn 1 tuần. Game có thể mở chậm hoặc khựng khi biên dịch lại shader. Đóng game trước khi dọn.';
+  @override
+  String get diskCleanerReasonPackageDownloads =>
+      'Cache tải gói npm, pip, Cargo, NuGet HTTP và Composer cũ hơn 1 tuần. Lần cài sau có thể phải tải hoặc build lại và cần internet. Giữ nguyên thư viện đã cài. Chờ cài gói và build xong trước khi dọn.';
+  @override
+  String get diskCleanerReasonElectronCache =>
+      'Cache web, JavaScript và GPU của các app Electron được hỗ trợ. Đóng app trước khi dọn. Cache sẽ tạo lại; giữ nguyên mật khẩu, cài đặt, IndexedDB và dữ liệu ngoại tuyến của service worker.';
+  @override
+  String get cleanerSmartCleanImpactRedownload => 'Có thể phải tải lại';
+  @override
+  String get diskCleanerCategoryXcodeBuild => 'File build Xcode cũ';
+  @override
+  String get diskCleanerReasonXcodeBuild =>
+      'Build output, file trung gian, chỉ mục và cache module không thay đổi ít nhất 7 ngày. Đóng Xcode và dừng build trước khi dọn. Giữ nguyên source, package checkout, archive và dSYM. Lần build và lập chỉ mục sau có thể lâu hơn.';
+  @override
+  String get cleanerOldFilesTitle => 'File tải về cũ — chỉ xem lại';
+  @override
+  String get cleanerOldFilesDescription =>
+      'Tối đa 200 file lớn nhất trong thư mục Downloads mặc định không thay đổi ít nhất 90 ngày. Lần sửa đổi không phải lần mở gần nhất và không chứng minh file không còn dùng. Các file này không được chọn để dọn. Mở thư mục để kiểm tra.';
+  @override
+  String cleanerOldFilesCount(int count) => '$count file cần xem lại';
+  @override
+  String cleanerOldFilesModified(String date) => 'Sửa đổi lần cuối: $date';
+  @override
+  String get cleanerOldFilesShowMore => 'Xem thêm file';
   @override
   String get diskCleanerReasonWindowsTemp =>
       'Do ứng dụng để lại. Xóa an toàn, không có gì phụ thuộc vào chúng.';
@@ -4732,6 +4894,20 @@ class VietnameseLocalizations implements AppLocalizations {
       'Các thư mục này không được gán cho riêng một ứng dụng và không bao giờ được chọn để dọn.';
   @override
   String get cleanerAppsOpenFolder => 'Mở thư mục';
+  @override
+  String get cleanerAppsViewFiles => 'Xem file';
+  @override
+  String get cleanerAppsFilesDescription =>
+      'Xem file tại các vị trí liên quan đến ứng dụng. Dữ liệu ứng dụng có thể gồm cài đặt và file cá nhân.';
+  @override
+  String get cleanerAppsCleanableFilesHint =>
+      'Vị trí này khớp quy tắc nhận diện rác. Bấm xem dữ liệu có thể dọn để xem lại toàn bộ vị trí này trước khi dọn.';
+  @override
+  String get cleanerAppsDataFilesHint =>
+      'Các file này chưa được xác định là rác có thể dọn. Mở thư mục để quản lý thủ công.';
+  @override
+  String cleanerAppsFilesLoadFailed(String error) =>
+      'Không đọc được thư mục này: $error';
   @override
   String get cleanerAppsManageInWindows => 'Quản lý trong Windows';
   @override
@@ -6227,4 +6403,48 @@ class VietnameseLocalizations implements AppLocalizations {
   String get vlNameHint => 'Phim của tôi';
   @override
   String get vlDescriptionHint => 'Bộ sưu tập phim cá nhân';
+
+  @override
+  String get cleanerReviewSectionsTitle => 'Xem xét trước khi dọn';
+  @override
+  String cleanerScanWarnings(int count) => 'Cảnh báo khi quét ($count)';
+  @override
+  String cleanerReviewTitle(String name) => '$name (chỉ xem xét)';
+  @override
+  String cleanerReviewSummary(int count, String size) => '$count mục · $size';
+  @override
+  String get cleanerDeveloperAnalysisTitle =>
+      'Bộ nhớ đệm phân tích và biên dịch';
+  @override
+  String get cleanerDeveloperAnalysisReason =>
+      'Bộ nhớ đệm phân tích Dart, header biên dịch sẵn C/C++ và bản dựng Go không thay đổi ít nhất 7 ngày. Đóng trình soạn thảo, máy chủ ngôn ngữ và dừng biên dịch trước. Lần phân tích hoặc biên dịch tiếp theo có thể lâu hơn.';
+  @override
+  String get cleanerDeveloperDownloadsTitle =>
+      'Tệp tải về của công cụ lập trình';
+  @override
+  String get cleanerDeveloperDownloadsReason =>
+      'Tệp tải về được lưu đệm của công cụ lập trình không thay đổi ít nhất 7 ngày. Hoàn tất cài đặt, cập nhật và biên dịch trước. Lần cài sau có thể cần Internet; tiện ích đã cài, môi trường và mô hình được giữ lại.';
+  @override
+  String get cleanerElectronCrashTitle => 'Báo cáo sự cố Electron';
+  @override
+  String get cleanerElectronCrashReason =>
+      'Tệp minidump Crashpad không thay đổi ít nhất 7 ngày. Giữ báo cáo còn cần để chẩn đoán và đóng ứng dụng liên quan trước.';
+  @override
+  String get cleanerCppDatabaseReason =>
+      'Cơ sở dữ liệu mã C/C++. Chỉ xem xét; tạo lại có thể mất thời gian. Các tệp này không bao giờ được chọn để dọn.';
+  @override
+  String get cleanerVcpkgReason =>
+      'Tệp biên dịch, tệp tải về và gói vcpkg. Chỉ xem xét; có thể cần cho bản dựng hiện tại hoặc cài đặt ngoại tuyến. Không bao giờ được chọn để dọn.';
+  @override
+  String get cleanerNvidiaReason =>
+      'Bộ nhớ đệm shader NVIDIA. Chỉ xem xét; tạo lại shader có thể gây giật. Không bao giờ được chọn để dọn.';
+  @override
+  String get cleanerUnrealReason =>
+      'Bộ nhớ đệm Zen và dữ liệu dẫn xuất Unreal. Chỉ xem xét; tạo lại dữ liệu dự án có thể mất thời gian. Không bao giờ được chọn để dọn.';
+  @override
+  String get cleanerPikPakReason =>
+      'Bộ nhớ đệm trình phát PikPak. Chỉ xem xét; có thể chứa nội dung cần để phát. Không bao giờ được chọn để dọn.';
+  @override
+  String get cleanerInstallerReason =>
+      'Gói cài đặt Visual Studio và Windows. Chỉ xem xét; có thể cần để sửa chữa, cập nhật hoặc gỡ phần mềm. Không bao giờ được chọn để dọn.';
 }

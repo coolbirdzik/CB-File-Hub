@@ -4512,22 +4512,152 @@ class TurkishLocalizations implements AppLocalizations {
       months <= 1 ? 'bir ay önce' : '$months ay önce';
   @override
   String get diskCleanerQuickCleanHint =>
-      'Geçici dosyalar, önbellekler ve Geri Dönüşüm Kutusu. Uygulamalar bunları gerektiğinde yeniden oluşturur.';
+      'Eski geçici dosyalar, tarayıcı ve uygulama önbellekleri, çökme raporları. Uygulamalar bunları gerektiğinde yeniden oluşturur.';
   @override
   String get diskCleanerQuickCleanButton => 'Hızlı temizlik';
-  @override
-  String get diskCleanerQuickCleanScanning => 'Güvenli öğeler bulunuyor...';
   @override
   String get diskCleanerQuickCleanNothing =>
       'Şu anda temizlenecek güvenli bir şey yok';
   @override
-  String get diskCleanerQuickCleanReviewTitle => 'Hızlı temizliği gözden geçir';
-  @override
-  String diskCleanerQuickCleanReviewSubtitle(int count, String size) =>
-      'Bu gruplarda $count öğe, toplam $size.';
-  @override
   String get diskCleanerQuickCleanRecycleNote =>
       'Her şey Geri Dönüşüm Kutusu\'na gider, böylece oradan geri yükleyebilirsiniz.';
+  @override
+  String get diskCleanerQuickCleanSafetyNote =>
+      'Yalnızca bir gündür değişmeyen dosyalar; geçici dosyalar, gölgelendirici ve paket önbellekleri için bir hafta. Önce uygulamaları kapatıp kurulum ve derlemeleri bitirin. Kilitli dosyalar atlanır.';
+  @override
+  String get cleanerSmartCleanTitle => 'Akıllı Temizlik';
+  @override
+  String get cleanerSmartCleanUtilityDescription =>
+      'Tek tıkla güvenli gereksiz dosyalar';
+  @override
+  String get cleanerSmartCleanIntro =>
+      'Eski geçici dosyaları, sistem ve Electron önbelleklerini, paket indirmelerini ve çökme raporlarını bulur. Yeniden oluşturulacak veya indirilecekleri gösterir. Belgeler, ayarlar ve kurulu kitaplıklar korunur.';
+  @override
+  String get cleanerSmartCleanScan => 'Tara';
+  @override
+  String cleanerSmartCleanScanningCategory(String category) =>
+      '$category denetleniyor...';
+  @override
+  String get cleanerSmartCleanPreparing => 'Hazırlanıyor...';
+  @override
+  String cleanerSmartCleanItemCount(int count) => '$count öğe';
+  @override
+  String cleanerSmartCleanCleanButton(String size) => '$size temizle';
+  @override
+  String get cleanerSmartCleanAllCleanTitle => 'Cihazınız düzenli';
+  @override
+  String get cleanerSmartCleanPermanentBadge => 'Kalıcı';
+  @override
+  String get cleanerSmartCleanRecycleBinWarning =>
+      "Varsayılan olarak seçili değil. Geri Dönüşüm Kutusu'ndaki öğeler kalıcı olarak silinir ve geri yüklenemez.";
+  @override
+  String cleanerSmartCleanMoreItems(int count) => 've $count öğe daha';
+  @override
+  String get cleanerSmartCleanDoneTitle => 'Temizlik tamamlandı';
+  @override
+  String cleanerSmartCleanDoneMoved(String size, String destination) =>
+      '$size, $destination konumuna taşındı';
+  @override
+  String cleanerSmartCleanDonePermanent(String size) =>
+      "Geri Dönüşüm Kutusu'ndan $size kalıcı olarak silindi";
+  @override
+  String cleanerSmartCleanDoneSkipped(int count) =>
+      'Kullanımda olan veya kaldırılamayan $count öğe atlandı.';
+  @override
+  String cleanerSmartCleanDoneHint(String destination) =>
+      '$destination boşaltıldığında disk alanı tamamen boşalır.';
+  @override
+  String get cleanerSmartCleanBusy =>
+      'Başka bir tarama sürüyor. Bittiğinde yeniden deneyin.';
+  @override
+  String get cleanerSmartCleanPermanentConfirmTitle =>
+      'Geri Dönüşüm Kutusu boşaltılsın mı?';
+  @override
+  String cleanerSmartCleanPermanentConfirmBody(String size) =>
+      "Geri Dönüşüm Kutusu'ndaki $size kalıcı olarak silinecek. Seçilen diğer öğeler her zamanki gibi Geri Dönüşüm Kutusu'na taşınır.";
+  @override
+  String get cleanerSmartCleanConfirmClean => 'Temizle';
+  @override
+  String cleanerSmartCleanReclaimable(String size) =>
+      '$size güvenli gereksiz dosya bulundu';
+  @override
+  String cleanerSmartCleanSelected(String size, int count) =>
+      '$size seçildi ($count öğe)';
+  @override
+  String get cleanerSmartCleanChecksLabel => 'Denetlenenler';
+  @override
+  String cleanerSmartCleanMostlyFrom(String apps) => 'Çoğu $apps kaynaklı';
+  @override
+  String get cleanerSmartCleanUnknownApp => 'Bilinmeyen uygulama';
+  @override
+  String cleanerSmartCleanFolderSource(String folder) => '"$folder" klasörü';
+  @override
+  String cleanerSmartCleanOtherSources(int count) => '$count diğer kaynak';
+  @override
+  String get cleanerSmartCleanKindWebCache => 'Web önbelleği';
+  @override
+  String get cleanerSmartCleanKindCodeCache => 'Derlenmiş betik önbelleği';
+  @override
+  String get cleanerSmartCleanKindGpuCache => 'GPU gölgelendirici önbelleği';
+  @override
+  String get cleanerSmartCleanKindAppCache => 'Uygulama önbelleği';
+  @override
+  String get cleanerSmartCleanKindThumbnailCache => 'Küçük resim veritabanı';
+  @override
+  String get cleanerSmartCleanKindTempFile => 'Geçici dosyalar';
+  @override
+  String get cleanerSmartCleanKindInstaller => 'Yükleyici artıkları';
+  @override
+  String get cleanerSmartCleanKindLog => 'Günlükler';
+  @override
+  String get cleanerSmartCleanKindCrashReport => 'Çökme raporları';
+  @override
+  String get cleanerSmartCleanKindDeletedFile => 'Silinmiş dosyalar';
+  @override
+  String get cleanerSmartCleanKindOther => 'Diğer dosyalar';
+  @override
+  String get cleanerSmartCleanKindWebCacheInfo =>
+      'Önceden indirilmiş sayfalar, görseller ve medya. Gerektiğinde yeniden indirilir; siteler ilk açılışta biraz yavaş yüklenebilir.';
+  @override
+  String get cleanerSmartCleanKindCodeCacheInfo =>
+      'Uygulamanın önceden derlediği betikler. Uygulama bir sonraki açılışta yeniden derler.';
+  @override
+  String get cleanerSmartCleanKindGpuCacheInfo =>
+      'GPU için derlenmiş grafik gölgelendiricileri. Bir sonraki açılışta yeniden oluşturulur.';
+  @override
+  String get cleanerSmartCleanKindAppCacheInfo =>
+      'Uygulamanın daha hızlı açılmak için tuttuğu veriler. Gerektiğinde yeniden indirir veya oluşturur.';
+  @override
+  String get cleanerSmartCleanKindThumbnailCacheInfo =>
+      'Dosya Gezgini’nin resim ve videolar için gösterdiği önizlemeler. Klasörleri açtıkça Windows yeniden oluşturur.';
+  @override
+  String get cleanerSmartCleanKindTempFileInfo =>
+      'Uygulamanın işi bitince bıraktığı geçici dosyalar. Artık hiçbir şey bunları okumaz.';
+  @override
+  String get cleanerSmartCleanKindInstallerInfo =>
+      'Kurulum veya güncelleme sırasında açılan paketler. Yeniden kurulumda tekrar indirilir.';
+  @override
+  String get cleanerSmartCleanKindLogInfo =>
+      'Uygulamanın yaptıklarının kaydı. Yalnızca bir sorunu giderirken işe yarar.';
+  @override
+  String get cleanerSmartCleanKindCrashReportInfo =>
+      'Uygulama çöktüğünde veya donduğunda kaydedilir. Yalnızca geliştiriciye göndermeyi planlıyorsanız saklayın.';
+  @override
+  String get cleanerSmartCleanKindDeletedFileInfo =>
+      'Daha önce sildiğiniz dosyalar. Geri Dönüşüm Kutusu’nu boşaltmak onları kalıcı olarak kaldırır.';
+  @override
+  String get cleanerSmartCleanKindOtherInfo =>
+      'Birçok uygulamadan küçük miktarlar; her biri ayrı listelenemeyecek kadar küçük.';
+  @override
+  String get cleanerSmartCleanImpactRebuilt => 'Kendiliğinden yeniden oluşur';
+  @override
+  String get cleanerSmartCleanImpactLeftover => 'Artık kullanılmıyor';
+  @override
+  String get cleanerSmartCleanImpactDiagnostic => 'Yalnızca sorun giderme için';
+  @override
+  String get cleanerSmartCleanImpactPermanent => 'Geri yüklenemez';
+  @override
+  String get cleanerSmartCleanInstalledBadge => 'Yüklü';
   @override
   String get diskCleanerCategoryWindowsTemp => 'Windows geçici dosyaları';
   @override
@@ -4549,6 +4679,42 @@ class TurkishLocalizations implements AppLocalizations {
       'Teslim Optimizasyonu dosyaları';
   @override
   String get diskCleanerCategoryDevCache => 'Geliştirici önbellekleri';
+  @override
+  String get diskCleanerCategorySystemCache =>
+      'Windows gölgelendirici önbelleği';
+  @override
+  String get diskCleanerCategoryPackageDownloads =>
+      'Paket indirme önbellekleri';
+  @override
+  String get diskCleanerCategoryElectronCache =>
+      'Electron uygulama önbellekleri';
+  @override
+  String get diskCleanerReasonSystemCache =>
+      'Bir haftadan eski DirectX gölgelendirici önbelleği. Yeniden derleme sırasında oyunlar yavaşlayabilir. Temizlemeden önce oyunları kapatın.';
+  @override
+  String get diskCleanerReasonPackageDownloads =>
+      'Bir haftadan eski npm, pip, Cargo, NuGet HTTP ve Composer indirme önbellekleri. Sonraki kurulumda internet ve yeniden indirme/derleme gerekebilir. Kurulu kitaplıklar korunur. Önce kurulum ve derlemelerin bitmesini bekleyin.';
+  @override
+  String get diskCleanerReasonElectronCache =>
+      'Desteklenen Electron uygulamalarının web, JavaScript ve GPU önbellekleri. Önce uygulamaları kapatın. Parolalar, ayarlar, IndexedDB ve çevrimdışı veriler korunur.';
+  @override
+  String get cleanerSmartCleanImpactRedownload => 'Yeniden indirebilir';
+  @override
+  String get diskCleanerCategoryXcodeBuild => 'Eski Xcode derleme dosyaları';
+  @override
+  String get diskCleanerReasonXcodeBuild =>
+      'En az 7 gündür değişmeyen derleme çıktıları, ara dosyalar, indeksler ve modül önbellekleri. Önce Xcode uygulamasını kapatıp derlemeleri durdurun. Kaynaklar, paketler, arşivler ve dSYM korunur. Sonraki derleme ve indeksleme uzayabilir.';
+  @override
+  String get cleanerOldFilesTitle => 'Eski indirmeler — yalnızca inceleme';
+  @override
+  String get cleanerOldFilesDescription =>
+      'Varsayılan Downloads klasöründe en az 90 gündür değişmeyen en büyük 200 dosya. Değişiklik tarihi son açılış değildir ve kullanılmadığını kanıtlamaz. Bu dosyalar temizlik için seçilmez. İncelemek için klasörü açın.';
+  @override
+  String cleanerOldFilesCount(int count) => 'İncelenecek $count dosya';
+  @override
+  String cleanerOldFilesModified(String date) => 'Son değişiklik: $date';
+  @override
+  String get cleanerOldFilesShowMore => 'Daha fazla dosya göster';
   @override
   String get diskCleanerReasonWindowsTemp =>
       'Uygulamalar tarafından geride bırakıldı. Kaldırmak güvenlidir; hiçbir şey buna bağlı değildir.';
@@ -4781,6 +4947,20 @@ class TurkishLocalizations implements AppLocalizations {
       'Bu klasörler tek bir uygulamaya atanmamıştır ve temizlik için asla seçilmez.';
   @override
   String get cleanerAppsOpenFolder => 'Klasörü aç';
+  @override
+  String get cleanerAppsViewFiles => 'Dosyaları görüntüle';
+  @override
+  String get cleanerAppsFilesDescription =>
+      'Bu uygulamayla ilişkili konumlardaki dosyaları inceleyin. Uygulama verileri ayarları ve kişisel dosyaları içerebilir.';
+  @override
+  String get cleanerAppsCleanableFilesHint =>
+      'Bu konum bir temizlik kuralıyla eşleşiyor. İnceleme, konumun tamamı için temizlik önizlemesini açar.';
+  @override
+  String get cleanerAppsDataFilesHint =>
+      'Bu dosyalar temizlenebilir çöp olarak tanımlanmamıştır. Elle yönetmek için klasörü açın.';
+  @override
+  String cleanerAppsFilesLoadFailed(String error) =>
+      'Bu klasör okunamadı: $error';
   @override
   String get cleanerAppsManageInWindows => 'Windows\'ta yönet';
   @override
@@ -6287,4 +6467,48 @@ class TurkishLocalizations implements AppLocalizations {
   String get vlNameHint => 'Filmlerim';
   @override
   String get vlDescriptionHint => 'Kişisel film koleksiyonu';
+
+  @override
+  String get cleanerReviewSectionsTitle => 'Temizlemeden önce inceleyin';
+  @override
+  String cleanerScanWarnings(int count) => 'Tarama uyarıları ($count)';
+  @override
+  String cleanerReviewTitle(String name) => '$name (yalnızca inceleme)';
+  @override
+  String cleanerReviewSummary(int count, String size) => '$count öğe · $size';
+  @override
+  String get cleanerDeveloperAnalysisTitle =>
+      'Geliştirici analiz ve derleme önbellekleri';
+  @override
+  String get cleanerDeveloperAnalysisReason =>
+      'En az 7 gündür değişmeyen Dart analiz, C/C++ önceden derlenmiş başlık ve Go derleme önbellekleri. Önce düzenleyicileri, dil sunucularını ve derlemeleri kapatın. Sonraki analiz veya derleme daha uzun sürebilir.';
+  @override
+  String get cleanerDeveloperDownloadsTitle =>
+      'Geliştirici araçlarının indirmeleri';
+  @override
+  String get cleanerDeveloperDownloadsReason =>
+      'En az 7 gündür değişmeyen geliştirici aracı indirme önbellekleri. Önce kurulumları, güncellemeleri ve derlemeleri tamamlayın. Sonraki kurulumlar internet gerektirebilir; yüklü eklentiler, ortamlar ve modeller korunur.';
+  @override
+  String get cleanerElectronCrashTitle => 'Electron çökme raporları';
+  @override
+  String get cleanerElectronCrashReason =>
+      'En az 7 gündür değişmeyen Crashpad minidump dosyaları. Sorun giderme için gereken raporları saklayın ve önce ilgili uygulamaları kapatın.';
+  @override
+  String get cleanerCppDatabaseReason =>
+      'C/C++ kod veritabanları. Yalnızca inceleme; yeniden oluşturmak zaman alabilir. Bu dosyalar temizlik için asla seçilmez.';
+  @override
+  String get cleanerVcpkgReason =>
+      'vcpkg derleme dosyaları, indirmeler ve paketler. Yalnızca inceleme; mevcut derlemeler veya çevrimdışı kurulumlar için gerekli olabilir. Temizlik için asla seçilmez.';
+  @override
+  String get cleanerNvidiaReason =>
+      'NVIDIA gölgelendirici önbellekleri. Yalnızca inceleme; yeniden oluşturmak takılmalara neden olabilir. Temizlik için asla seçilmez.';
+  @override
+  String get cleanerUnrealReason =>
+      'Unreal Zen ve türetilmiş veri önbellekleri. Yalnızca inceleme; proje verilerini yeniden oluşturmak zaman alabilir. Temizlik için asla seçilmez.';
+  @override
+  String get cleanerPikPakReason =>
+      'PikPak oynatıcı önbelleği. Yalnızca inceleme; oynatma için gerekli medya içerebilir. Temizlik için asla seçilmez.';
+  @override
+  String get cleanerInstallerReason =>
+      'Visual Studio ve Windows kurulum paketleri. Yalnızca inceleme; yazılımı onarmak, güncellemek veya kaldırmak için gerekli olabilir. Temizlik için asla seçilmez.';
 }

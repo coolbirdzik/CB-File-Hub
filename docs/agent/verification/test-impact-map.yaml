@@ -61,11 +61,14 @@ features:
       - cb_file_manager/lib/services/app_insights/
       - cb_file_manager/lib/bloc/cleaner_app_insights/
       - cb_file_manager/lib/ui/screens/cb_agent_cleaner/cleaner_apps_view.dart
+      - cb_file_manager/lib/ui/screens/cb_agent_cleaner/cleaner_app_files_dialog.dart
     focused_tests:
       - "flutter test test/services/app_insights/windows_app_inventory_service_test.dart"
       - "flutter test test/services/app_insights/app_storage_analyzer_test.dart"
       - "flutter test test/bloc/cleaner_app_insights_cubit_test.dart"
       - "flutter test test/ui/screens/cb_agent_cleaner/cleaner_apps_view_test.dart"
+      - "flutter test test/services/app_insights/app_storage_file_browser_test.dart"
+      - "flutter test test/ui/screens/cb_agent_cleaner/cleaner_app_files_dialog_test.dart"
       - "flutter test test/18_app_storage_tool_test.dart"
     windows_build_required_for_native_changes: true
 
@@ -85,6 +88,32 @@ features:
       - "flutter test test/services/app_insights/posix_app_inventory_test.dart"
       - "flutter test test/bloc/cleaner_app_leftovers_cubit_test.dart"
       - "flutter test test/ui/screens/cb_agent_cleaner/cleaner_leftovers_view_test.dart"
+
+  cleaner_smart_clean:
+    paths:
+      - cb_file_manager/lib/services/disk_cleaner/cleaner_quick_clean.dart
+      - cb_file_manager/lib/services/disk_cleaner/cleaner_cache_rules.dart
+      - cb_file_manager/lib/services/disk_cleaner/cleaner_xcode_cache.dart
+      - cb_file_manager/lib/services/disk_cleaner/cleaner_review_candidates.dart
+      - cb_file_manager/lib/services/disk_cleaner/cleaner_models.dart
+      - cb_file_manager/lib/services/disk_cleaner/cleaner_safety.dart
+      - cb_file_manager/lib/services/disk_cleaner/cleaner_categories.dart
+      - cb_file_manager/lib/services/disk_cleaner/cleaner_item_origin.dart
+      - cb_file_manager/lib/services/disk_cleaner/cleaner_installed_apps.dart
+      - cb_file_manager/lib/bloc/cleaner_smart_clean/
+      - cb_file_manager/lib/ui/screens/cb_agent_cleaner/cleaner_smart_clean_view.dart
+      - cb_file_manager/lib/ui/screens/cb_agent_cleaner/cleaner_old_files_panel.dart
+    focused_tests:
+      - "flutter test test/services/disk_cleaner/cleaner_quick_clean_test.dart"
+      - "flutter test test/services/disk_cleaner/cleaner_cache_rules_test.dart"
+      - "flutter test test/services/disk_cleaner/cleaner_xcode_cache_test.dart"
+      - "flutter test test/services/disk_cleaner/cleaner_review_candidates_test.dart"
+      - "flutter test test/services/disk_cleaner/cleaner_admin_retry_test.dart"
+      - "flutter test test/services/disk_cleaner/cleaner_item_origin_test.dart"
+      - "flutter test test/services/disk_cleaner/cleaner_installed_apps_test.dart"
+      - "flutter test test/services/disk_cleaner/recycle_bin_scan_test.dart"
+      - "flutter test test/bloc/cleaner_smart_clean_cubit_test.dart"
+      - "flutter test test/ui/screens/cb_agent_cleaner/cleaner_smart_clean_view_test.dart"
 
   windows_shell_context_menu:
     paths:

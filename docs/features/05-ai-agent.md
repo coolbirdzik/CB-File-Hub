@@ -167,6 +167,17 @@ After a fresh Disk usage scan, **Quick review** explains what the data appears t
 
 The interactive walkthrough uses `inspect_cleaner_scan_item` to expand, scroll to and highlight a real scanned row before analyzing it. `set_cleaner_scan_item_analysis` then displays a CLEAN/REVIEW/KEEP badge on that row and a reason in the adjacent CB Agent analysis pane. Assessments can be clicked to reveal their row again without changing checks. Only scanner-marked safe junk can be labelled CLEAN and automatically checked; focus alone never selects a cleanup target. Each interaction returns a fresh `scan_id` for the next step. Changing the scan invalidates earlier inspections and assessments. Completion, failure or Stop clears the live inspecting indicator.
 
+In **Apps**, **View files** opens the storage locations linked to the selected
+application; the same action beside a storage location opens it directly.
+The preview lists real filenames, paths and file sizes, with folder navigation,
+Back, refresh and visible read errors with Retry. It lists one directory at a
+time on Rust threads or a Dart isolate, including hidden/config files and
+omitting links. Directory sizes are not recursively recalculated. Locations
+retain their confirmed/possible/shared attribution; application data is not
+automatically junk. Only a confirmed cleanable location offers **Review cleanable
+data**, which passes that exact rule-backed root to the existing cleanup preview
+and confirmation flow. Browsing does not select deletion targets.
+
 Cleaner deletion runs in a background isolate. Permanent deletion uses the
 optional `cb_native` `deletion.rs` job with up to eight Rust workers and one
 outcome per approved path, including the OS error on failure; missing native
@@ -174,6 +185,111 @@ support keeps the asynchronous Dart implementation. Recycle Bin moves continue
 through Windows Shell. Progress is throttled and never moves backwards within
 a batch. After deletion, the scan tree is updated in short work slices and
 dashboard diagnosis is prepared in an isolate before returning to the results.
+
+**Smart Clean** is the Cleaner's start page on Windows and macOS. One scan
+checks regenerable junk (`CleanerQuickClean`,
+`lib/services/disk_cleaner/cleaner_quick_clean.dart`): temporary files untouched
+for a week, browser and app caches inside folders named as caches, thumbnail
+caches and crash dumps/error reports untouched for a day, plus the narrowly
+scoped caches in `CleanerCacheRules` (`cleaner_cache_rules.dart`). It skips the
+AppData-wide `*.log` rules (LevelDB and IndexedDB use `*.log` files) and
+database and service-worker storage folders. Results are grouped by category with checkboxes, and the
+selection is moved to the Recycle Bin (Trash) in one click.
+
+The additional categories are:
+
+| Category | Scope | Effect of cleaning |
+| --- | --- | --- |
+| Windows shader cache | `%LOCALAPPDATA%/D3DSCache`, files unchanged for at least seven days | Shaders compile again; a game may launch more slowly or stutter initially. No Windows Update, WinSxS, installer cache, driver files or Prefetch is added to Smart Clean. |
+| Package download caches | Default npm `_cacache`, pip cache, Cargo `registry/cache`, NuGet HTTP `v3-cache`, Composer `files`; unchanged for at least seven days | Later installs/restores may need internet or rebuild wheels. Installed libraries and source trees stay in place. |
+| Electron app caches | Explicit cache subfolders in the default profiles of Discord/stable/PTB/Canary, Slack, VS Code/stable/Insiders, Cursor, Windsurf, Notion, Obsidian, Postman, Figma, Signal and GitHub Desktop; unchanged for at least one day | HTTP, compiled JavaScript and GPU caches rebuild. Cookies, preferences, Local/Session Storage, IndexedDB, Service Worker and CacheStorage remain outside the rules. |
+| Old Xcode build files (macOS) | Generated build products/intermediates, `Index.noindex` and shared module/compilation/SDK/symbol caches inside the default DerivedData; unchanged for at least seven days | Build and indexing may take longer. Close Xcode and stop builds first. Sources, `SourcePackages`, `.xcarchive` and `.dSYM` files are kept. |
+
+The Xcode rule uses a scoped discovery pass on the scan isolate. It enumerates
+only immediate DerivedData project folders and known output locations; it never
+turns the whole DerivedData root into a Smart Clean target. Both the native and
+Dart scan paths reject archives, dSYMs and package checkout paths, and cleanup
+rechecks those exclusions. Other scanners do not reinterpret the scoped rule as
+a whole-tree rule. Custom DerivedData locations, simulator data, device support
+and archives are not included. Apple documents that
+[DerivedData can be recreated from sources](https://help.apple.com/xcode/mac/current/en.lproj/deva52afe8a4.html)
+and that [distribution dSYMs should be retained](https://developer.apple.com/documentation/xcode/building-your-app-to-include-debugging-information).
+
+**Old downloads — review only** is a separate inspection panel on Windows and
+macOS. The same scan lists the default Downloads folder's files unchanged for
+at least 90 days, retaining at most the 200 largest unique candidates. It shows
+the exact path, size and last-modified date, and can open the containing folder.
+Last-modified time is explicitly not evidence of when a file was last opened or
+whether it is unused. These typed review candidates never enter cleanup groups,
+selection counts or clean callbacks, and remain available after cleanup. Their
+category is `reviewOnly`: it cannot add deletion allowlist prefixes or mark disk
+tree nodes as junk, and the cleanup service rejects it even if an item is forged
+as a user selection. This panel has no checkbox or delete action.
+
+Package downloads and Electron caches are supported on Windows and macOS.
+The rules use default cache locations; custom locations and Electron session
+partitions are left alone. Electron scanning never walks an entire profile or
+all of AppData. Editor `CachedData` is included for the VS Code family. Lock
+files are excluded, and selection deduplicates paths across categories.
+Users must close the affected apps/games and finish package installs or builds
+before cleaning; age checks alone cannot prove a cache is idle. The existing
+cleanup pipeline skips locked files. The source rows distinguish caches that
+rebuild from package archives that may need downloading again.
+
+The cache contracts come from the upstream documentation:
+[npm cache](https://docs.npmjs.com/cli/v11/commands/npm-cache/),
+[pip caching](https://pip.pypa.io/en/stable/topics/caching/),
+[Cargo home](https://doc.rust-lang.org/cargo/guide/cargo-home.html),
+[NuGet cache folders](https://learn.microsoft.com/en-us/nuget/consume-packages/managing-the-global-packages-and-cache-folders),
+[Composer cache configuration](https://getcomposer.org/doc/06-config.md#cache-files-dir),
+[Electron session cache versus storage](https://www.electronjs.org/docs/latest/api/session#sesclearcache),
+and [Microsoft's D3DSCache specification](https://microsoft.github.io/DirectX-Specs/d3d/ShaderCache.html).
+In particular, NuGet's global packages are used directly by PackageReference
+projects, while its HTTP cache contains download responses. Smart Clean keeps
+`.nuget/packages`, `node_modules`, pnpm/Yarn stores, pub cache, virtualenvs,
+`site-packages`, Cargo sources/bin, Gradle caches and Maven's repository out of
+its selection. The broader opt-in `dev_cache` category is not enabled for Smart
+Clean.
+
+Each category is split into sources: the app that made the files and what they
+are (`CleanerItemOrigins`, `lib/services/disk_cleaner/cleaner_item_origin.dart`).
+The app comes from the executable a crash dump or WER report names, the owner
+hint of the cleaner rule the path falls under, a known vendor folder (Firefox,
+other Chrome profiles, macOS bundle IDs) or a known `%TEMP%` scratch-folder
+prefix. Then the apps installed on the machine (the same Win32/MSIX or macOS
+inventory as App Insights, read once per Cleaner screen alongside the scan,
+waited for at most 3 s) name the rest through `CleanerInstalledApps`
+(`lib/services/disk_cleaner/cleaner_installed_apps.dart`): an install folder
+holding the file, then an exact folder or file name (`TeraBox`,
+`IDM_Setup_Temp` by acronym, `…WarpSetup.exe` by a camelCase word). Matching is
+deliberately exact, unlike App Insights' leftover `AppTokenIndex`: each app
+contributes one brand word, names two apps share are dropped, generic folder
+words never match, executable names match only whole names, and file names only
+count directly under a %TEMP% top folder. Names the classifier already knows are
+linked to the installed entry through their executables. Matched sources show
+the app's own icon and an "Installed" tag; not being matched never means
+uninstalled, since the inventory misses portable and CLI tools. Otherwise the
+folder name is shown as a folder, and random names (GUIDs, hex IDs, `tmpXXXX`)
+stay "unknown app" rather than being guessed. The kind (web,
+compiled-script or GPU cache, temp file, installer leftover, log, crash report,
+thumbnail database) comes with what removing it costs: rebuilt automatically,
+no longer used, only for troubleshooting, or cannot be restored. Each source has
+its own checkbox and file list; a category's checkbox is tristate. Past ten
+sources the smallest are folded into one row. Origins are display-only and are
+derived from the path after the scan, so the scan, the Rust rules and
+`CleanerQuickClean` eligibility are unchanged.
+
+The Recycle Bin is read while the rule scan runs, from the `$I` metadata files
+(`streamRecycleBinEntries`), not through Shell COM: Shell materialises the
+whole bin first (over 14 s just to count a 12k-item bin), the direct read takes
+about 0.3-1.7 s. Shell is only used when the direct read finds nothing. The
+Rust junk scan widens the walk pool to every base thread, since each rule
+group is a single walk; a %TEMP% with ~9k folders went from 3.4-7.8 s to
+0.8-1.8 s. Locked files are
+skipped without prompting. On Windows the Recycle Bin is listed as an extra,
+unchecked group; including it asks for confirmation because it is deleted
+permanently. State lives in `CleanerSmartCleanCubit`
+(`lib/bloc/cleaner_smart_clean/`).
 
 Cleaner is also available on macOS. Its volume picker uses local writable
 volumes and prefers the APFS Data mount, avoiding duplicate System/Data scans.

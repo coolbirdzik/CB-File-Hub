@@ -5,6 +5,7 @@ import '../../../config/languages/app_localizations.dart';
 import '../../../services/disk_cleaner/cleaner_agent_review.dart';
 import '../../../services/disk_cleaner/cleaner_review_summary.dart';
 import '../../../services/disk_cleaner/disk_tree_node.dart';
+import 'cleaner_audit_labels.dart';
 
 /// Visual review of one completed scan. Navigation never selects for deletion.
 class CleanerReviewOverview extends StatefulWidget {
@@ -424,6 +425,12 @@ class _CleanerReviewOverviewState extends State<CleanerReviewOverview> {
         'prefetch' => l.diskCleanerCategoryPrefetch,
         'delivery_optimization' => l.diskCleanerCategoryDeliveryOptimization,
         'dev_cache' => l.diskCleanerCategoryDevCache,
-        _ => group.representative.name,
+        'system_cache' => l.diskCleanerCategorySystemCache,
+        'package_download_cache' => l.diskCleanerCategoryPackageDownloads,
+        'electron_cache' => l.diskCleanerCategoryElectronCache,
+        'xcode_build_cache' => l.diskCleanerCategoryXcodeBuild,
+        _ =>
+          CleanerAuditLabels.title(l, group.categoryId) ??
+              group.representative.name,
       };
 }

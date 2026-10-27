@@ -1,6 +1,5 @@
 import 'package:cb_file_manager/ui/components/common/search_text_field.dart';
 import 'dart:async';
-import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:cb_file_manager/design_system/cb_design_system.dart';
@@ -8,14 +7,17 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../bloc/cleaner_app_insights/cleaner_app_insights.dart';
 import '../../../config/languages/app_localizations.dart';
-import '../../../helpers/files/windows_app_icon.dart';
 import '../../../services/app_insights/app_insights_models.dart';
 import '../../utils/format_utils.dart';
+import 'cleaner_app_files_dialog.dart';
+import 'installed_app_icon.dart';
 
 typedef AppStorageEntryAction = FutureOr<void> Function(AppStorageEntry entry);
 typedef InstalledAppAction = FutureOr<void> Function(InstalledAppInfo app);
 typedef AppStorageProfileAction =
     FutureOr<void> Function(AppStorageProfile profile);
+typedef _AppFilesAction =
+    void Function(AppStorageProfile profile, AppStorageEntry? entry);
 
 class CleanerAppsView extends StatefulWidget {
   final CleanerAppInsightsCubit cubit;
@@ -84,6 +86,18 @@ class _CleanerAppsViewState extends State<CleanerAppsView> {
     _searchController.value = TextEditingValue(
       text: query,
       selection: TextSelection.collapsed(offset: query.length),
+    );
+  }
+
+  void _viewAppFiles(AppStorageProfile profile, AppStorageEntry? entry) {
+    showDialog<void>(
+      context: context,
+      builder: (_) => CleanerAppFilesDialog(
+        profile: profile,
+        initialEntry: entry,
+        onOpenFolder: widget.onOpenFolder,
+        onReviewCleanable: widget.onReviewCleanable,
+      ),
     );
   }
 
@@ -202,6 +216,7 @@ class _CleanerAppsViewState extends State<CleanerAppsView> {
           flex: 5,
           child: _AppDetailsPanel(
             profile: state.selectedProfile,
+            onViewFiles: _viewAppFiles,
             onOpenFolder: widget.onOpenFolder,
             onManageApp: widget.onManageApp,
             onReviewCleanable: widget.onReviewCleanable,
@@ -270,6 +285,7 @@ class _CleanerAppsViewState extends State<CleanerAppsView> {
                   padding: const EdgeInsets.only(bottom: 10),
                   child: _AppDetailsPanel(
                     profile: profile,
+                    onViewFiles: _viewAppFiles,
                     onOpenFolder: widget.onOpenFolder,
                     onManageApp: widget.onManageApp,
                     onReviewCleanable: widget.onReviewCleanable,
@@ -911,7 +927,7 @@ class _AppRow extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
               ],
-              _InstalledAppIcon(app: app, size: 36),
+              InstalledAppIcon(app: app, size: 36),
               const SizedBox(width: 11),
               Expanded(
                 child: Column(
@@ -992,6 +1008,7 @@ class _AppRow extends StatelessWidget {
 
 class _AppDetailsPanel extends StatelessWidget {
   final AppStorageProfile? profile;
+  final _AppFilesAction onViewFiles;
   final AppStorageEntryAction? onOpenFolder;
   final InstalledAppAction? onManageApp;
   final AppStorageProfileAction? onReviewCleanable;
@@ -1002,6 +1019,7 @@ class _AppDetailsPanel extends StatelessWidget {
 
   const _AppDetailsPanel({
     required this.profile,
+    required this.onViewFiles,
     required this.onOpenFolder,
     required this.onManageApp,
     required this.onReviewCleanable,
@@ -1039,6 +1057,7 @@ class _AppDetailsPanel extends StatelessWidget {
           const SizedBox(height: 12),
           _DetailsActions(
             profile: current,
+            onViewFiles: () => onViewFiles(current, null),
             onManageApp: onManageApp,
             onReviewCleanable: onReviewCleanable,
             onAskAgent: onAskAgent,
@@ -1065,6 +1084,7 @@ class _AppDetailsPanel extends StatelessWidget {
                     'cleaner-app-entry-${current.app.id}-${entry.path}',
                   ),
                   entry: entry,
+                  onViewFiles: () => onViewFiles(current, entry),
                   onOpenFolder: onOpenFolder,
                 ),
               ),
@@ -1090,7 +1110,7 @@ class _DetailsHeader extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _InstalledAppIcon(app: app, size: 48),
+        InstalledAppIcon(app: app, size: 48),
         const SizedBox(width: 12),
         Expanded(
           child: Column(
@@ -1226,12 +1246,14 @@ class _CompactMetric extends StatelessWidget {
 
 class _DetailsActions extends StatelessWidget {
   final AppStorageProfile profile;
+  final VoidCallback onViewFiles;
   final InstalledAppAction? onManageApp;
   final AppStorageProfileAction? onReviewCleanable;
   final AppStorageProfileAction? onAskAgent;
 
   const _DetailsActions({
     required this.profile,
+    required this.onViewFiles,
     required this.onManageApp,
     required this.onReviewCleanable,
     required this.onAskAgent,
@@ -1245,6 +1267,14 @@ class _DetailsActions extends StatelessWidget {
       spacing: 8,
       runSpacing: 8,
       children: [
+        if (profile.entries.isNotEmpty)
+          OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(shape: buttonShape),
+            key: ValueKey<String>('cleaner-app-view-files-${profile.app.id}'),
+            onPressed: onViewFiles,
+            icon: const Icon(Icons.folder_copy_outlined, size: 17),
+            label: Text(l10n.cleanerAppsViewFiles),
+          ),
         if (profile.app.canManage && onManageApp != null)
           OutlinedButton.icon(
             style: OutlinedButton.styleFrom(shape: buttonShape),
@@ -1277,11 +1307,13 @@ class _DetailsActions extends StatelessWidget {
 class _StorageEntryTile extends StatelessWidget {
   final AppStorageEntry entry;
   final AppStorageEntryAction? onOpenFolder;
+  final VoidCallback? onViewFiles;
 
   const _StorageEntryTile({
     super.key,
     required this.entry,
     required this.onOpenFolder,
+    this.onViewFiles,
   });
 
   @override
@@ -1336,7 +1368,7 @@ class _StorageEntryTile extends StatelessWidget {
               ],
             ),
           ),
-          if (entry.isCleanable)
+          if (entry.isCleanable && entry.isConfirmed)
             Padding(
               padding: const EdgeInsets.only(left: 6),
               child: Icon(
@@ -1344,6 +1376,14 @@ class _StorageEntryTile extends StatelessWidget {
                 size: 17,
                 color: Colors.teal.shade700,
               ),
+            ),
+          if (onViewFiles != null)
+            IconButton(
+              key: ValueKey<String>('cleaner-app-view-files-${entry.path}'),
+              tooltip: l10n.cleanerAppsViewFiles,
+              onPressed: onViewFiles,
+              icon: const Icon(Icons.list_alt_outlined, size: 18),
+              visualDensity: VisualDensity.compact,
             ),
           if (onOpenFolder != null)
             IconButton(
@@ -1436,84 +1476,6 @@ class _MetaBadge extends StatelessWidget {
       ),
     );
   }
-}
-
-class _InstalledAppIcon extends StatefulWidget {
-  final InstalledAppInfo app;
-  final double size;
-
-  const _InstalledAppIcon({required this.app, required this.size});
-
-  @override
-  State<_InstalledAppIcon> createState() => _InstalledAppIconState();
-}
-
-class _InstalledAppIconState extends State<_InstalledAppIcon> {
-  Future<ui.Image?>? _iconFuture;
-  String? _iconPath;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadIcon();
-  }
-
-  @override
-  void didUpdateWidget(_InstalledAppIcon oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    final nextPath = _resolveIconPath(widget.app);
-    if (nextPath != _iconPath) _loadIcon();
-  }
-
-  void _loadIcon() {
-    _iconPath = _resolveIconPath(widget.app);
-    _iconFuture = _iconPath == null
-        ? Future<ui.Image?>.value(null)
-        : WindowsAppIcon.extractIconFromFile(_iconPath!);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      width: widget.size,
-      height: widget.size,
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(widget.size * 0.22),
-      ),
-      child: FutureBuilder<ui.Image?>(
-        future: _iconFuture,
-        builder: (context, snapshot) {
-          final image = snapshot.data;
-          if (image != null) {
-            return RawImage(
-              image: image,
-              width: widget.size,
-              height: widget.size,
-              fit: BoxFit.contain,
-              filterQuality: FilterQuality.medium,
-            );
-          }
-          return Icon(
-            widget.app.source == InstalledAppSource.msix
-                ? Icons.window_rounded
-                : Icons.apps_rounded,
-            size: widget.size * 0.58,
-            color: theme.colorScheme.onSurfaceVariant,
-          );
-        },
-      ),
-    );
-  }
-}
-
-String? _resolveIconPath(InstalledAppInfo app) {
-  final displayIcon = app.displayIconPath?.trim();
-  if (displayIcon != null && displayIcon.isNotEmpty) return displayIcon;
-  if (app.executablePaths.isNotEmpty) return app.executablePaths.first;
-  return null;
 }
 
 String _filterLabel(AppLocalizations l10n, CleanerAppFilter filter) {

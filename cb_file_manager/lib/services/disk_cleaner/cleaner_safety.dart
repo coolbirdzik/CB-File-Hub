@@ -102,6 +102,7 @@ class CleanerPathSafety {
       return false;
     }
     for (final category in CleanerCategories.all(operatingSystem: 'macos')) {
+      if (category.reviewOnly) continue;
       for (final rule in category.rules) {
         final base = WindowsKnownFolders.resolvePosix(rule.source, environment);
         if (base != null && CleanerPaths.contains(base, path)) return true;
@@ -117,6 +118,7 @@ class CleanerPathSafety {
 
     final prefixes = <String>{};
     for (final category in CleanerCategories.all()) {
+      if (category.reviewOnly) continue;
       for (final rule in category.rules) {
         if (rule.source.kind == PathSourceKind.recycleBin) continue;
         final resolved = WindowsKnownFolders.resolve(rule.source);

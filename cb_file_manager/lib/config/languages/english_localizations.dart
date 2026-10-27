@@ -4478,21 +4478,149 @@ class EnglishLocalizations implements AppLocalizations {
       months <= 1 ? 'a month ago' : '$months months ago';
   @override
   String get diskCleanerQuickCleanHint =>
-      'Temporary files, caches and the Recycle Bin. Apps rebuild these on demand.';
+      'Old temporary files, browser and app caches, crash reports. Apps rebuild these on demand.';
   @override
   String get diskCleanerQuickCleanButton => 'Quick clean';
   @override
-  String get diskCleanerQuickCleanScanning => 'Finding safe items...';
-  @override
   String get diskCleanerQuickCleanNothing => 'Nothing safe to clean right now';
-  @override
-  String get diskCleanerQuickCleanReviewTitle => 'Review quick clean';
-  @override
-  String diskCleanerQuickCleanReviewSubtitle(int count, String size) =>
-      '$count items in these groups, $size in total.';
   @override
   String get diskCleanerQuickCleanRecycleNote =>
       'Everything goes to the Recycle Bin, so you can restore it from there.';
+  @override
+  String get diskCleanerQuickCleanSafetyNote =>
+      'Only files unchanged for a day are included; temporary files, shader and package caches need a week. Close apps and finish installs/builds before cleaning. Locked files are skipped.';
+  @override
+  String get cleanerSmartCleanTitle => 'Smart Clean';
+  @override
+  String get cleanerSmartCleanUtilityDescription => 'Safe junk in one click';
+  @override
+  String get cleanerSmartCleanIntro =>
+      'Finds old temporary files, system and Electron caches, package downloads and crash reports. Shows what must be rebuilt or downloaded again. Documents, settings and installed libraries are kept.';
+  @override
+  String get cleanerSmartCleanScan => 'Scan';
+  @override
+  String cleanerSmartCleanScanningCategory(String category) =>
+      'Checking $category...';
+  @override
+  String get cleanerSmartCleanPreparing => 'Getting ready...';
+  @override
+  String cleanerSmartCleanItemCount(int count) => '$count items';
+  @override
+  String cleanerSmartCleanCleanButton(String size) => 'Clean $size';
+  @override
+  String get cleanerSmartCleanAllCleanTitle => 'Your device is tidy';
+  @override
+  String get cleanerSmartCleanPermanentBadge => 'Permanent';
+  @override
+  String get cleanerSmartCleanRecycleBinWarning =>
+      'Not selected by default. Items in the Recycle Bin are deleted permanently and cannot be restored.';
+  @override
+  String cleanerSmartCleanMoreItems(int count) => 'and $count more';
+  @override
+  String get cleanerSmartCleanDoneTitle => 'Clean complete';
+  @override
+  String cleanerSmartCleanDoneMoved(String size, String destination) =>
+      'Moved $size to the $destination';
+  @override
+  String cleanerSmartCleanDonePermanent(String size) =>
+      'Permanently deleted $size from the Recycle Bin';
+  @override
+  String cleanerSmartCleanDoneSkipped(int count) =>
+      '$count items were skipped because they are in use or could not be removed.';
+  @override
+  String cleanerSmartCleanDoneHint(String destination) =>
+      'Disk space is fully freed once you empty the $destination.';
+  @override
+  String get cleanerSmartCleanBusy =>
+      'Another scan is running. Try again when it finishes.';
+  @override
+  String get cleanerSmartCleanPermanentConfirmTitle => 'Empty the Recycle Bin?';
+  @override
+  String cleanerSmartCleanPermanentConfirmBody(String size) =>
+      '$size in the Recycle Bin will be deleted permanently. The other selected items go to the Recycle Bin as usual.';
+  @override
+  String get cleanerSmartCleanConfirmClean => 'Clean';
+  @override
+  String cleanerSmartCleanReclaimable(String size) =>
+      'Found $size of safe junk';
+  @override
+  String cleanerSmartCleanSelected(String size, int count) =>
+      'Selected $size ($count items)';
+  @override
+  String get cleanerSmartCleanChecksLabel => 'What gets checked';
+  @override
+  String cleanerSmartCleanMostlyFrom(String apps) => 'Mostly from $apps';
+  @override
+  String get cleanerSmartCleanUnknownApp => 'Unknown app';
+  @override
+  String cleanerSmartCleanFolderSource(String folder) => 'Folder "$folder"';
+  @override
+  String cleanerSmartCleanOtherSources(int count) => '$count other sources';
+  @override
+  String get cleanerSmartCleanKindWebCache => 'Web cache';
+  @override
+  String get cleanerSmartCleanKindCodeCache => 'Compiled script cache';
+  @override
+  String get cleanerSmartCleanKindGpuCache => 'GPU shader cache';
+  @override
+  String get cleanerSmartCleanKindAppCache => 'App cache';
+  @override
+  String get cleanerSmartCleanKindThumbnailCache => 'Thumbnail database';
+  @override
+  String get cleanerSmartCleanKindTempFile => 'Temporary files';
+  @override
+  String get cleanerSmartCleanKindInstaller => 'Installer leftovers';
+  @override
+  String get cleanerSmartCleanKindLog => 'Logs';
+  @override
+  String get cleanerSmartCleanKindCrashReport => 'Crash reports';
+  @override
+  String get cleanerSmartCleanKindDeletedFile => 'Deleted files';
+  @override
+  String get cleanerSmartCleanKindOther => 'Other files';
+  @override
+  String get cleanerSmartCleanKindWebCacheInfo =>
+      'Pages, images and media already downloaded. They are downloaded again when needed, so sites may load a little slower at first.';
+  @override
+  String get cleanerSmartCleanKindCodeCacheInfo =>
+      'Scripts the app compiled ahead of time. They are compiled again the next time the app opens.';
+  @override
+  String get cleanerSmartCleanKindGpuCacheInfo =>
+      'Graphics shaders compiled for your GPU. Rebuilt on the next launch.';
+  @override
+  String get cleanerSmartCleanKindAppCacheInfo =>
+      'Data the app keeps to start or load faster. The app downloads or rebuilds it when needed.';
+  @override
+  String get cleanerSmartCleanKindThumbnailCacheInfo =>
+      'Previews File Explorer shows for pictures and videos. Windows recreates them as you open folders.';
+  @override
+  String get cleanerSmartCleanKindTempFileInfo =>
+      'Scratch files the app left behind after it finished. Nothing reads them again.';
+  @override
+  String get cleanerSmartCleanKindInstallerInfo =>
+      'Setup packages unpacked during an install or update. Reinstalling downloads them again.';
+  @override
+  String get cleanerSmartCleanKindLogInfo =>
+      'Records of what the app did. Only useful while troubleshooting a problem.';
+  @override
+  String get cleanerSmartCleanKindCrashReportInfo =>
+      'Saved when the app crashed or froze. Keep them only if you plan to send them to the developer.';
+  @override
+  String get cleanerSmartCleanKindDeletedFileInfo =>
+      'Files you deleted earlier. Emptying the Recycle Bin removes them for good.';
+  @override
+  String get cleanerSmartCleanKindOtherInfo =>
+      'Small amounts from several apps, each too small to list on its own.';
+  @override
+  String get cleanerSmartCleanImpactRebuilt => 'Rebuilt automatically';
+  @override
+  String get cleanerSmartCleanImpactLeftover => 'No longer used';
+  @override
+  String get cleanerSmartCleanImpactDiagnostic => 'Only for troubleshooting';
+  @override
+  String get cleanerSmartCleanImpactPermanent => 'Cannot be restored';
+  @override
+  String get cleanerSmartCleanInstalledBadge => 'Installed';
   @override
   String get diskCleanerCategoryWindowsTemp => 'Windows temporary files';
   @override
@@ -4514,6 +4642,39 @@ class EnglishLocalizations implements AppLocalizations {
       'Delivery Optimization files';
   @override
   String get diskCleanerCategoryDevCache => 'Developer caches';
+  @override
+  String get diskCleanerCategorySystemCache => 'Windows shader cache';
+  @override
+  String get diskCleanerCategoryPackageDownloads => 'Package download caches';
+  @override
+  String get diskCleanerCategoryElectronCache => 'Electron app caches';
+  @override
+  String get diskCleanerReasonSystemCache =>
+      'DirectX shader cache older than a week. Games may take longer or stutter while shaders compile again. Close games before cleaning.';
+  @override
+  String get diskCleanerReasonPackageDownloads =>
+      'npm, pip, Cargo, NuGet HTTP and Composer download caches older than a week. Future installs may download or build packages again and need internet. Installed libraries are kept. Finish package installs and builds before cleaning.';
+  @override
+  String get diskCleanerReasonElectronCache =>
+      'Web, JavaScript and GPU caches in supported Electron apps. Close the apps before cleaning. Caches rebuild; passwords, settings, IndexedDB and offline service-worker data are kept.';
+  @override
+  String get cleanerSmartCleanImpactRedownload => 'May download again';
+  @override
+  String get diskCleanerCategoryXcodeBuild => 'Old Xcode build files';
+  @override
+  String get diskCleanerReasonXcodeBuild =>
+      'Generated build products, intermediates, indexes and module caches unchanged for at least 7 days. Close Xcode and stop builds first. Sources, package checkouts, archives and dSYMs are kept. The next build and indexing may take longer.';
+  @override
+  String get cleanerOldFilesTitle => 'Old downloads — review only';
+  @override
+  String get cleanerOldFilesDescription =>
+      'Up to 200 of the largest files in the default Downloads folder unchanged for at least 90 days. Last modified is not last opened and does not prove a file is unused. These files are never selected for cleanup. Open their folder to inspect them.';
+  @override
+  String cleanerOldFilesCount(int count) => '$count files to inspect';
+  @override
+  String cleanerOldFilesModified(String date) => 'Last modified: $date';
+  @override
+  String get cleanerOldFilesShowMore => 'Show more files';
   @override
   String get diskCleanerReasonWindowsTemp =>
       'Left behind by apps. Safe to remove; nothing depends on it.';
@@ -4742,6 +4903,20 @@ class EnglishLocalizations implements AppLocalizations {
       'These folders are not assigned to one app and are never selected for cleanup.';
   @override
   String get cleanerAppsOpenFolder => 'Open folder';
+  @override
+  String get cleanerAppsViewFiles => 'View files';
+  @override
+  String get cleanerAppsFilesDescription =>
+      'Inspect files in locations linked to this app. App data can include settings and personal files.';
+  @override
+  String get cleanerAppsCleanableFilesHint =>
+      'This location matches a Cleaner junk rule. Review opens the cleanup preview for this whole location.';
+  @override
+  String get cleanerAppsDataFilesHint =>
+      'These files are not identified as cleanable junk. Open the folder to manage them manually.';
+  @override
+  String cleanerAppsFilesLoadFailed(String error) =>
+      'Could not read this folder: $error';
   @override
   String get cleanerAppsManageInWindows => 'Manage in Windows';
   @override
@@ -6237,4 +6412,47 @@ class EnglishLocalizations implements AppLocalizations {
   String get vlNameHint => 'My Movies';
   @override
   String get vlDescriptionHint => 'Personal movie collection';
+
+  @override
+  String get cleanerReviewSectionsTitle => 'Review before cleaning';
+  @override
+  String cleanerScanWarnings(int count) => 'Scan warnings ($count)';
+  @override
+  String cleanerReviewTitle(String name) => '$name (review only)';
+  @override
+  String cleanerReviewSummary(int count, String size) => '$count items · $size';
+  @override
+  String get cleanerDeveloperAnalysisTitle =>
+      'Developer analysis and build caches';
+  @override
+  String get cleanerDeveloperAnalysisReason =>
+      'Dart analysis, C/C++ precompiled headers and Go build caches unchanged for at least 7 days. Close editors, language servers and builds first. The next analysis or build may take longer.';
+  @override
+  String get cleanerDeveloperDownloadsTitle => 'Developer tool downloads';
+  @override
+  String get cleanerDeveloperDownloadsReason =>
+      'Cached developer tool downloads unchanged for at least 7 days. Finish installs, updates and builds first. Later installs may need internet; installed extensions, environments and models are kept.';
+  @override
+  String get cleanerElectronCrashTitle => 'Electron crash reports';
+  @override
+  String get cleanerElectronCrashReason =>
+      'Crashpad minidumps unchanged for at least 7 days. Keep reports needed for troubleshooting and close the affected apps first.';
+  @override
+  String get cleanerCppDatabaseReason =>
+      'C/C++ code databases. Review only; rebuilding them can take time. These files are never selected for cleanup.';
+  @override
+  String get cleanerVcpkgReason =>
+      'vcpkg build files, downloads and packages. Review only; they may be needed by current builds or offline installs. Never selected for cleanup.';
+  @override
+  String get cleanerNvidiaReason =>
+      'NVIDIA shader caches. Review only; rebuilding shaders can cause stutter. Never selected for cleanup.';
+  @override
+  String get cleanerUnrealReason =>
+      'Unreal Zen and derived data caches. Review only; rebuilding project data can take time. Never selected for cleanup.';
+  @override
+  String get cleanerPikPakReason =>
+      'PikPak player cache. Review only; it may contain media needed for playback. Never selected for cleanup.';
+  @override
+  String get cleanerInstallerReason =>
+      'Visual Studio and Windows installer packages. Review only; they may be needed to repair, update or uninstall software. Never selected for cleanup.';
 }

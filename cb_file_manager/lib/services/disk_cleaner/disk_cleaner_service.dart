@@ -11,6 +11,7 @@ import 'package:win32/win32.dart' as win32;
 
 import '../../helpers/core/filesystem_utils.dart';
 import '../../helpers/core/io_extensions.dart';
+import '../../helpers/files/recycle_bin_reader.dart';
 import '../../helpers/files/trash_manager.dart';
 import '../app_insights/app_insights_models.dart';
 import '../../utils/app_logger.dart';
@@ -20,6 +21,9 @@ import 'cleaner_models.dart';
 import 'cleaner_safety.dart';
 import 'cleaner_system_protection.dart';
 import 'cleaner_paths.dart';
+import 'cleaner_xcode_cache.dart';
+import 'cleaner_audited_rules.dart';
+import 'cleaner_quick_clean.dart';
 import 'macos_cleaner_platform.dart';
 import 'disk_cleaner_isolate.dart';
 import 'disk_tree_node.dart';
@@ -301,18 +305,24 @@ int _countCleanableNodes(DiskTreeNode root) {
 class DiskCleanerService {
   DiskCleanerService._({FullDiskScanSpawner? fullDiskScanSpawner})
     : _fullDiskScanSpawner = fullDiskScanSpawner ?? spawnFullDiskScan,
-      _trashForTesting = null;
+      _trashForTesting = null,
+      _readRecycleBin = streamRecycleBinEntries;
 
   @visibleForTesting
   DiskCleanerService.forTesting({
     required this._fullDiskScanSpawner,
     TrashManager? trashManager,
-  }) : _trashForTesting = trashManager;
+    Stream<SystemTrashItem> Function()? recycleBinReader,
+  }) : _trashForTesting = trashManager,
+       _readRecycleBin = recycleBinReader ?? streamRecycleBinEntries;
 
   static final DiskCleanerService instance = DiskCleanerService._();
 
   final FullDiskScanSpawner _fullDiskScanSpawner;
   final TrashManager? _trashForTesting;
+
+  /// Reads `$Recycle.Bin\<SID>\$I*` directly; see [scanRecycleBin].
+  final Stream<SystemTrashItem> Function() _readRecycleBin;
 
   final StreamController<DiskCleanerAgentActivity> _agentActivityController =
       StreamController<DiskCleanerAgentActivity>.broadcast();
@@ -797,21 +807,33 @@ class DiskCleanerService {
   /// target every drive.
   ///
   /// [categoryIds] empty/null → all categories with `defaultEnabled: true`.
+  /// [ruleFilter], when given, skips the rules it rejects.
   ///
   /// Throws [StateError] if a scan is already in progress.
   Future<ScanReport> scanJunk({
     required List<String> drivePaths,
     required List<String> categoryIds,
     void Function(ScanProgress)? onProgress,
+    bool Function(String categoryId, CleanerPathRule rule)? ruleFilter,
   }) async {
-    final handle = await _beginScan(drivePaths, categoryIds);
+    final handle = await _beginScan(
+      drivePaths,
+      categoryIds,
+      ruleFilter: ruleFilter,
+    );
+    // Read the bin alongside the rule scan rather than after it. It never
+    // throws, so a cancelled scan can leave it to finish unobserved.
+    final binFuture = categoryIds.isEmpty || categoryIds.contains('recycle_bin')
+        ? scanRecycleBin()
+        : null;
     final progressSub = onProgress == null
         ? null
         : handle.progress.listen(onProgress);
     try {
       final report = await handle.future;
-      if (categoryIds.isEmpty || categoryIds.contains('recycle_bin')) {
-        final bin = await _scanRecycleBin();
+      if (handle.isCancelled) return report;
+      if (binFuture != null) {
+        final bin = await binFuture;
         if (bin.isNotEmpty) {
           final merged = Map<String, List<JunkItem>>.from(
             report.itemsByCategory,
@@ -828,7 +850,8 @@ class DiskCleanerService {
       return report;
     } finally {
       await progressSub?.cancel();
-      _activeScan = null;
+      // A scan started after this one was cancelled owns the slot now.
+      if (identical(_activeScan, handle)) _activeScan = null;
     }
   }
 
@@ -842,12 +865,15 @@ class DiskCleanerService {
   }) async {
     final handle = await _beginScan(drivePaths, categoryIds);
     final completer = Completer<ScanReport>();
+    final binFuture = categoryIds.isEmpty || categoryIds.contains('recycle_bin')
+        ? scanRecycleBin()
+        : null;
 
     handle.future
         .then((report) async {
           try {
-            if (categoryIds.isEmpty || categoryIds.contains('recycle_bin')) {
-              final bin = await _scanRecycleBin();
+            if (binFuture != null) {
+              final bin = await binFuture;
               if (bin.isNotEmpty) {
                 final merged = Map<String, List<JunkItem>>.from(
                   report.itemsByCategory,
@@ -1054,7 +1080,19 @@ class DiskCleanerService {
     onProgress?.call(0, 0, null);
     final eligibleItems = <JunkItem>[];
     for (final item in items) {
-      if (CleanerSystemProtection.isProtected(item.path)) {
+      if (CleanerCategories.byId(item.categoryId)?.reviewOnly == true ||
+          (CleanerAuditedRules.cleanableIds.contains(item.categoryId) &&
+              !(item.isContainerOnly
+                  ? CleanerAuditedRules.matchesCleanablePath(
+                      item.categoryId,
+                      item.path,
+                    )
+                  : _auditedCleanupFile(item))) ||
+          (item.categoryId == CleanerXcodeCache.categoryId &&
+              (!CleanerXcodeCache.isGeneratedFile(item.path) ||
+                  FileSystemEntity.typeSync(item.path, followLinks: false) !=
+                      FileSystemEntityType.file)) ||
+          CleanerSystemProtection.isProtected(item.path)) {
         skippedUnsafe.add(item.path);
       } else {
         eligibleItems.add(item);
@@ -1089,6 +1127,10 @@ class DiskCleanerService {
       // Allow paths the user explicitly selected from the disk tree. Keep the
       // stricter allowlist for scanner rules and AI-driven cleanup.
       if (CleanerSystemProtection.isProtected(item.path) ||
+          (CleanerAuditedRules.cleanableIds.contains(item.categoryId) &&
+              !_auditedCleanupFile(item)) ||
+          (item.categoryId == CleanerXcodeCache.categoryId &&
+              !CleanerXcodeCache.isGeneratedFile(item.path)) ||
           (!safeByRule && !item.isUserSelected)) {
         skippedUnsafe.add(item.path);
         continue;
@@ -1677,6 +1719,27 @@ class DiskCleanerService {
     return expanded;
   }
 
+  bool _auditedCleanupFile(JunkItem item) {
+    try {
+      if (FileSystemEntity.typeSync(item.path, followLinks: false) !=
+          FileSystemEntityType.file) {
+        return false;
+      }
+      final stat = File(item.path).statSync();
+      return CleanerQuickClean.isEligible(
+        JunkItem(
+          path: item.path,
+          sizeBytes: stat.size,
+          lastModified: stat.modified,
+          categoryId: item.categoryId,
+        ),
+        DateTime.now(),
+      );
+    } on FileSystemException {
+      return false;
+    }
+  }
+
   static const String _fileInUseFailure =
       'Skipped because the file is currently in use';
 
@@ -2181,7 +2244,9 @@ class DiskCleanerService {
     final globFilteredJunk = <_GlobRule>[];
 
     for (final cat in categories) {
+      if (cat.reviewOnly) continue;
       for (final rule in cat.rules) {
+        if (rule.scope != CleanerRuleScope.tree) continue;
         if (rule.source.kind == PathSourceKind.recycleBin) continue;
         final resolved = WindowsKnownFolders.resolve(rule.source);
         if (resolved == null || resolved.isEmpty) continue;
@@ -2219,7 +2284,9 @@ class DiskCleanerService {
   List<FullDiskJunkRule> _fullDiskJunkRules() {
     final rules = <FullDiskJunkRule>[];
     for (final category in CleanerCategories.all()) {
+      if (category.reviewOnly) continue;
       for (final rule in category.rules) {
+        if (rule.scope != CleanerRuleScope.tree) continue;
         if (rule.source.kind == PathSourceKind.recycleBin) continue;
         final resolved = WindowsKnownFolders.resolve(rule.source);
         if (resolved == null || resolved.isEmpty) continue;
@@ -2346,8 +2413,9 @@ class DiskCleanerService {
 
   Future<CleanerScanHandle> _beginScan(
     List<String> drivePaths,
-    List<String> categoryIds,
-  ) async {
+    List<String> categoryIds, {
+    bool Function(String categoryId, CleanerPathRule rule)? ruleFilter,
+  }) async {
     if (_activeScan != null) throw CleanerScanBusyError();
     if (!CleanerPaths.isSupported) {
       throw StateError('DiskCleanerService is supported on Windows and macOS.');
@@ -2358,6 +2426,7 @@ class DiskCleanerService {
     for (final cat in selected) {
       for (final rule in cat.rules) {
         if (rule.source.kind == PathSourceKind.recycleBin) continue;
+        if (ruleFilter != null && !ruleFilter(cat.id, rule)) continue;
         final base = WindowsKnownFolders.resolve(rule.source);
         if (base == null || base.isEmpty) continue;
         resolvedRules.add(
@@ -2369,6 +2438,7 @@ class DiskCleanerService {
             minAge: rule.minAge,
             emptyOnly: rule.emptyOnly,
             recursive: rule.recursive,
+            scope: rule.scope,
           ),
         );
       }
@@ -2398,10 +2468,27 @@ class DiskCleanerService {
     return out;
   }
 
-  Future<List<JunkItem>> _scanRecycleBin() async {
+  /// Recycle Bin entries as junk items. Never throws.
+  ///
+  /// Reads the `$I` metadata files directly first: Shell enumeration
+  /// materialises the whole bin before returning anything and took over 14 s
+  /// for a 12k-item bin, where the direct read takes well under 2 s. Shell
+  /// is only asked when the direct read finds nothing, which is also cheap
+  /// for a bin that really is empty.
+  @visibleForTesting
+  Future<List<JunkItem>> scanRecycleBin() async {
     if (!Platform.isWindows) return const [];
+    var items = <SystemTrashItem>[];
     try {
-      final items = await TrashManager().getWindowsRecycleBinItems();
+      items = await _readRecycleBin().toList();
+    } catch (e) {
+      AppLogger.warning('[DiskCleaner] Direct Recycle Bin read failed: $e');
+    }
+    try {
+      if (items.isEmpty) {
+        items = await (_trashForTesting ?? TrashManager())
+            .getWindowsRecycleBinItems();
+      }
       return [
         for (final item in items)
           JunkItem(

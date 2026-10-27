@@ -5,6 +5,7 @@ import 'dart:isolate';
 import 'package:cb_native/cb_native.dart';
 
 import 'cleaner_models.dart';
+import 'cleaner_xcode_cache.dart';
 
 const Duration _defaultRootOpenTimeout = Duration(milliseconds: 800);
 
@@ -18,6 +19,7 @@ class ResolvedRule {
   final Duration? minAge;
   final bool emptyOnly;
   final bool recursive;
+  final CleanerRuleScope scope;
 
   const ResolvedRule({
     required this.categoryId,
@@ -27,6 +29,7 @@ class ResolvedRule {
     this.minAge,
     this.emptyOnly = true,
     this.recursive = true,
+    this.scope = CleanerRuleScope.tree,
   });
 
   int get minAgeMs => minAge?.inMilliseconds ?? 0;
@@ -92,12 +95,14 @@ Future<CleanerScanHandle> spawnScanWithResolvedRules({
   /// seam that forces the first-entry timeout after directory existence is
   /// checked; production callers should use the default.
   Duration rootOpenTimeout = _defaultRootOpenTimeout,
+  bool useNativeScanner = true,
 }) async {
   final receivePort = ReceivePort();
   final args = _SpawnArgs(
     sendPort: receivePort.sendPort,
     rules: rules,
     rootOpenTimeout: rootOpenTimeout,
+    useNativeScanner: useNativeScanner,
   );
 
   final isolate = await Isolate.spawn(_scanWorker, args);
@@ -150,8 +155,55 @@ void _scanWorker(_SpawnArgs args) async {
   final warnings = <String>[];
 
   final compiledRules = <_CompiledRule>[];
-  for (var i = 0; i < args.rules.length; i++) {
-    final rule = args.rules[i];
+  final expandedRules = <ResolvedRule>[];
+  final summarized = <String>{};
+  for (final rule in args.rules) {
+    if (rule.scope == CleanerRuleScope.folderSummary) {
+      if (!summarized.add('${rule.categoryId}:${_pathKey(rule.basePath)}')) {
+        continue;
+      }
+      sendPort.send(
+        _ProgressMsg(
+          currentPath: rule.basePath,
+          itemsFound: 0,
+          bytesFound: 0,
+          categoryId: rule.categoryId,
+          fraction: null,
+        ),
+      );
+      final item = await _folderSummary(
+        rule,
+        warnings,
+        useNative: args.useNativeScanner,
+      );
+      if (item != null) {
+        results.putIfAbsent(rule.categoryId, () => []).add(item);
+      }
+      continue;
+    }
+    if (rule.scope != CleanerRuleScope.xcodeBuildOutputs) {
+      expandedRules.add(rule);
+      continue;
+    }
+    for (final root in CleanerXcodeCache.discoverRoots(
+      rule.basePath,
+      warnings,
+    )) {
+      expandedRules.add(
+        ResolvedRule(
+          categoryId: rule.categoryId,
+          basePath: root,
+          includeGlobs: rule.includeGlobs,
+          excludeGlobs: rule.excludeGlobs,
+          minAge: rule.minAge,
+          emptyOnly: rule.emptyOnly,
+          recursive: rule.recursive,
+        ),
+      );
+    }
+  }
+  for (var i = 0; i < expandedRules.length; i++) {
+    final rule = expandedRules[i];
     if (rule.basePath.isEmpty) continue;
     compiledRules.add(_CompiledRule(rule, i));
   }
@@ -177,8 +229,10 @@ void _scanWorker(_SpawnArgs args) async {
   final groups = _buildScanGroups(existingRules);
   final seenByCategory = <String, Set<String>>{};
 
-  int totalItems = 0;
-  int totalBytes = 0;
+  int totalItems = results.values.fold(0, (sum, items) => sum + items.length);
+  int totalBytes = results.values
+      .expand((items) => items)
+      .fold(0, (sum, item) => sum + item.sizeBytes);
   DateTime lastFlush = DateTime.now();
   String currentCategory = '';
   final progress = JunkScanFraction(groups.map((group) => group.scanPath));
@@ -218,7 +272,7 @@ void _scanWorker(_SpawnArgs args) async {
     // Rust walks the group when package:cb_native is built: no async stat
     // per file and no RegExp per name, with the same rules and results.
     // Duration.zero is the test seam for the Dart first-entry timeout below.
-    if (args.rootOpenTimeout != Duration.zero) {
+    if (args.useNativeScanner && args.rootOpenTimeout != Duration.zero) {
       final baseItems = totalItems;
       final baseBytes = totalBytes;
       final elapsed = Stopwatch()..start();
@@ -274,6 +328,10 @@ void _scanWorker(_SpawnArgs args) async {
           final modified = DateTime.fromMillisecondsSinceEpoch(hit.modifiedMs);
           for (final index in hit.ruleIndices) {
             final categoryId = group.rules[index].source.categoryId;
+            if (categoryId == CleanerXcodeCache.categoryId &&
+                !CleanerXcodeCache.isGeneratedFile(hit.path)) {
+              continue;
+            }
             final seen = seenByCategory.putIfAbsent(
               categoryId,
               () => <String>{},
@@ -341,6 +399,10 @@ void _scanWorker(_SpawnArgs args) async {
           final fileName = _basename(entity.path);
           matchingRules.clear();
           for (final candidate in group.rules) {
+            if (candidate.source.categoryId == CleanerXcodeCache.categoryId &&
+                !CleanerXcodeCache.isGeneratedFile(entity.path)) {
+              continue;
+            }
             if (_matchesRule(candidate, entityPath, fileName)) {
               matchingRules.add(candidate);
             }
@@ -408,6 +470,67 @@ void _scanWorker(_SpawnArgs args) async {
   progress.finish();
   maybeFlush('', force: true);
   sendPort.send(_DoneMsg(itemsByCategory: results, warnings: warnings));
+}
+
+/// Metadata only, on the scan isolate; never reads file contents or follows links.
+Future<JunkItem?> _folderSummary(
+  ResolvedRule rule,
+  List<String> warnings, {
+  required bool useNative,
+}) async {
+  final root = rule.basePath;
+  try {
+    if (FileSystemEntity.typeSync(root, followLinks: false) !=
+        FileSystemEntityType.directory) {
+      return null;
+    }
+    var bytes = 0;
+    final native = useNative
+        ? await NativeFs.directorySize(directories: [root])
+        : null;
+    if (native != null) {
+      bytes = native.bytes;
+      if (native.unreadable > 0) {
+        warnings.add(
+          '${rule.categoryId}: ${native.unreadable} unreadable entries; size is partial ($root)',
+        );
+      }
+    } else {
+      final pending = [root];
+      while (pending.isNotEmpty) {
+        final directory = pending.removeLast();
+        try {
+          for (final entry in Directory(
+            directory,
+          ).listSync(followLinks: false)) {
+            if (entry is Directory) pending.add(entry.path);
+            if (entry is File) {
+              try {
+                bytes += entry.lengthSync();
+              } on FileSystemException catch (error) {
+                warnings.add(
+                  '${rule.categoryId}: ${error.message} (${entry.path})',
+                );
+              }
+            }
+          }
+        } on FileSystemException catch (error) {
+          warnings.add('${rule.categoryId}: ${error.message} ($directory)');
+        }
+      }
+    }
+    if (bytes <= 0) return null;
+    return JunkItem(
+      path: root,
+      sizeBytes: bytes,
+      categoryId: rule.categoryId,
+      isContainerOnly: true,
+      lastModified: Directory(root).statSync().modified,
+    );
+  } on FileSystemException catch (error) {
+    warnings.add('${rule.categoryId}: ${error.message} ($root)');
+    return null;
+  }
 }
 
 enum _DirectoryCheck { exists, missing, timedOut }
@@ -628,10 +751,12 @@ class _SpawnArgs {
   final SendPort sendPort;
   final List<ResolvedRule> rules;
   final Duration rootOpenTimeout;
+  final bool useNativeScanner;
   const _SpawnArgs({
     required this.sendPort,
     required this.rules,
     required this.rootOpenTimeout,
+    required this.useNativeScanner,
   });
 }
 
@@ -640,7 +765,7 @@ class _ProgressMsg {
   final int itemsFound;
   final int bytesFound;
   final String categoryId;
-  final double fraction;
+  final double? fraction;
   const _ProgressMsg({
     required this.currentPath,
     required this.itemsFound,

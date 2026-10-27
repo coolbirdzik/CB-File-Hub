@@ -225,6 +225,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      await _openDiskUsage(tester);
       await tester.tap(find.byKey(const ValueKey('cleaner-scan-cta')));
       await tester.pumpAndSettle();
 
@@ -551,6 +552,7 @@ void _toolbarTests() {
         ),
       );
       await tester.pumpAndSettle();
+      await _openDiskUsage(tester);
       await tester.tap(find.byKey(const ValueKey('cleaner-scan-cta')));
       await tester.pumpAndSettle();
 
@@ -565,6 +567,7 @@ void _toolbarTests() {
       // offers a fresh scan instead of silently disabled entries.
       await tester.tap(find.byKey(const ValueKey('cleaner-select-drives')));
       await tester.pumpAndSettle();
+      await _openDiskUsage(tester);
       await tester.tap(find.byKey(const ValueKey('cleaner-scan-cta')));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('cleaner-agent-review-menu')));
@@ -611,4 +614,10 @@ void _toolbarTests() {
       );
     });
   }
+}
+
+/// The Cleaner opens on Smart Clean; these tests drive Disk usage.
+Future<void> _openDiskUsage(WidgetTester tester) async {
+  await tester.tap(find.byKey(const ValueKey('cleaner-utility-diskCleaner')));
+  await tester.pumpAndSettle();
 }

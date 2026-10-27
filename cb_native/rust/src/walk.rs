@@ -244,8 +244,8 @@ impl Pool {
     }
 }
 
-/// Lets one walk whose tasks are CPU-bound (the content search) run on
-/// every base pool thread. Other walks keep growing the pool one thread per
+/// Lets one walk whose tasks are CPU-bound (the content search) or that is
+/// the only walk running (a junk scan) run on every base pool thread. Other walks keep growing the pool one thread per
 /// submitted walk.
 pub(crate) fn widen_pool() {
     pool().widen();
@@ -783,7 +783,12 @@ pub fn start_junk_scan(port: i64, config: &[u8]) -> Option<Arc<Job>> {
         rules,
         reported_error: AtomicBool::new(false),
     };
-    Some(start(port, vec![Task::dir(scan_path, 0)], Box::new(kind)))
+    let job = start(port, vec![Task::dir(scan_path, 0)], Box::new(kind));
+    // One walk per rule group, often a %TEMP% with thousands of folders. On
+    // the single thread a lone walk gets, a ~9k-folder %TEMP% took 3.4-7.8 s
+    // instead of 0.8-1.8 s.
+    widen_pool();
+    Some(job)
 }
 
 #[cfg(test)]

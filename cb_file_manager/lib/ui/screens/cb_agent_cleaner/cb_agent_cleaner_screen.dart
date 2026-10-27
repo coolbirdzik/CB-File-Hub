@@ -29,6 +29,7 @@ import '../../../bloc/ai_agent/ai_agent_state.dart';
 import '../../../bloc/cleaner_app_insights/cleaner_app_insights_cubit.dart';
 import '../../../bloc/cleaner_app_insights/cleaner_app_insights_state.dart';
 import '../../../bloc/cleaner_app_leftovers/cleaner_app_leftovers.dart';
+import '../../../bloc/cleaner_smart_clean/cleaner_smart_clean.dart';
 import '../../../config/languages/app_localizations.dart';
 import '../../../helpers/files/external_app_helper.dart';
 import '../../../helpers/files/windows_shell_context_menu.dart';
@@ -46,11 +47,13 @@ import '../../../services/app_insights/app_insights_models.dart';
 import '../../../services/app_insights/app_leftover_finder.dart';
 import '../../../services/app_insights/app_leftover_scanner.dart';
 import '../../../services/app_insights/posix_app_inventory.dart';
+import '../../../utils/app_logger.dart';
 import '../../../services/app_insights/app_storage_analyzer.dart';
 import '../../../services/app_insights/windows_app_inventory_service.dart';
 import '../../../services/disk_cleaner/cleaner_categories.dart';
 import '../../../services/disk_cleaner/cleaner_models.dart';
 import '../../../services/disk_cleaner/cleaner_paths.dart';
+import '../../../services/disk_cleaner/cleaner_quick_clean.dart';
 import '../../../services/disk_cleaner/macos_cleaner_platform.dart';
 import '../../../services/disk_cleaner/cleaner_tree_cleanup.dart';
 import '../../../services/disk_cleaner/cleaner_growth_history_service.dart';
@@ -68,6 +71,8 @@ import '../../widgets/app_progress_indicator.dart';
 import '../ai_chat/ai_panel_controller.dart';
 import 'cleaner_apps_view.dart';
 import 'cleaner_leftovers_view.dart';
+import 'cleaner_smart_clean_view.dart';
+import 'cleaner_audit_labels.dart';
 import 'cleaner_utilities_shell.dart';
 import 'package:cb_file_manager/config/translation_helper.dart';
 
@@ -153,7 +158,7 @@ enum _CleanDeleteMode { recycleBin, permanent }
 /// about reclaiming space, instead of requiring them to walk the hierarchy.
 enum _TreePreset { none, largeFiles, logsAndCaches, installers }
 
-enum _CleanerSubFeature { diskCleaner, appInsights, appLeftovers }
+enum _CleanerSubFeature { smartClean, diskCleaner, appInsights, appLeftovers }
 
 /// Disk usage and App Insights need the Windows/macOS scanners; Linux only
 /// has the leftover app data page.
@@ -164,7 +169,7 @@ bool get _hasAppInsights =>
     defaultTargetPlatform != TargetPlatform.linux;
 
 _CleanerSubFeature get _initialSubFeature => _hasDiskTools
-    ? _CleanerSubFeature.diskCleaner
+    ? _CleanerSubFeature.smartClean
     : _CleanerSubFeature.appLeftovers;
 
 class _AppInsightsEvidence {
@@ -277,7 +282,6 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
 
   // Cleanup progress
   bool _isCleaningJunk = false;
-  bool _isQuickCleaning = false;
   // Hot progress data lives in a ValueNotifier so only the progress bar
   // rebuilds during cleanup. Calling setState on every progress tick used
   // to rebuild the entire 2900-line screen — including the disk tree and
@@ -374,6 +378,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     'app_cache',
     'crash_dumps_logs',
     'dev_cache',
+    'system_cache',
+    'package_download_cache',
+    'electron_cache',
   };
   bool _showGrowthOnly = false;
   bool _reviewMode = false; // when true, tree shows only selected items
@@ -383,6 +390,50 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
   StreamSubscription<CleanerAppInsightsState>? _appInsightsStateSub;
   final CleanerAppLeftoversCubit _appLeftoversCubit =
       CleanerAppLeftoversCubit();
+  late final CleanerSmartCleanCubit _smartCleanCubit = CleanerSmartCleanCubit(
+    scan: (onProgress) => _service.scanJunk(
+      // The rules are per-user folders, not tied to a drive.
+      drivePaths: const <String>[],
+      categoryIds: _smartCleanCategoryIds,
+      ruleFilter: (id, rule) =>
+          CleanerCategories.byId(id)?.reviewOnly == true ||
+          CleanerQuickClean.includesRule(id, rule),
+      onProgress: onProgress,
+    ),
+    // Browsers and Explorer keep some caches open; skip those instead of
+    // asking about each one. The done screen reports the skipped count.
+    clean: (items, onProgress) =>
+        _cleanSelectedItems(items, onProgress, autoSkipFailures: true),
+    cancelScan: _service.cancelActiveScan,
+    installedApps: _smartCleanInstalledApps,
+  );
+
+  /// Installed apps for Smart Clean's "made by" labels, read once per screen.
+  Future<List<InstalledAppInfo>>? _smartCleanAppsFuture;
+
+  Future<List<InstalledAppInfo>> _smartCleanInstalledApps() =>
+      _smartCleanAppsFuture ??= () async {
+        if (kCbE2E) return const <InstalledAppInfo>[];
+        final stopwatch = Stopwatch()..start();
+        final List<InstalledAppInfo> apps;
+        if (Platform.isWindows) {
+          apps = (await _loadInstalledAppInventory()).apps;
+        } else if (Platform.isMacOS) {
+          apps = (await PosixAppInventoryLoader(
+            environment: Map<String, String>.from(Platform.environment),
+            operatingSystem: Platform.operatingSystem,
+          ).load()).apps;
+        } else {
+          apps = const <InstalledAppInfo>[];
+        }
+        AppLogger.info(
+          '[SmartClean] Installed apps loaded | count=${apps.length} | '
+          'elapsedMs=${stopwatch.elapsedMilliseconds}',
+        );
+        // A failed read is retried on the next scan rather than kept.
+        if (apps.isEmpty) _smartCleanAppsFuture = null;
+        return apps;
+      }();
   int _appLeftoversGeneration = 0;
   AppLeftoverMeasureJob? _appLeftoversJob;
   AppStorageReport? _appStorageReport;
@@ -444,6 +495,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
   final FocusNode _leftoversFocusNode = FocusNode(
     debugLabel: 'cbCleanerLeftovers',
   );
+  final FocusNode _smartCleanFocusNode = FocusNode(
+    debugLabel: 'cbCleanerSmartClean',
+  );
 
   bool get _showsAppInsightsData =>
       _activeSubFeature == _CleanerSubFeature.appInsights;
@@ -462,6 +516,8 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       _publishCleanerScanContext();
     });
     _loadSetup();
+    // Read ahead so Smart Clean's scan never waits on the registry.
+    if (_hasDiskTools) unawaited(_smartCleanInstalledApps());
     _agentActivitySub = _service.agentActivityStream.listen(_onAgentActivity);
   }
 
@@ -480,6 +536,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     _appInsightsStateSub?.cancel();
     _appInsightsCubit.close();
     _appLeftoversCubit.close();
+    _smartCleanCubit.close();
     if (_publishedCleanerContextTabId != null) {
       _service.clearCleanerScanContext(_publishedCleanerContextTabId!);
     }
@@ -495,6 +552,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     _resultsFocusNode.dispose();
     _appsFocusNode.dispose();
     _leftoversFocusNode.dispose();
+    _smartCleanFocusNode.dispose();
     super.dispose();
   }
 
@@ -2117,6 +2175,14 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
           final destinations = <CleanerUtilityDestination>[
             if (_hasDiskTools)
               CleanerUtilityDestination(
+                id: _CleanerSubFeature.smartClean.name,
+                title: l.cleanerSmartCleanTitle,
+                description: l.cleanerSmartCleanUtilityDescription,
+                group: l.cleanerUtilitiesStorageGroup,
+                icon: PhosphorIconsLight.sparkle,
+              ),
+            if (_hasDiskTools)
+              CleanerUtilityDestination(
                 id: _CleanerSubFeature.diskCleaner.name,
                 title: l.cleanerDiskUsageTitle,
                 description: l.cleanerDiskUtilityDescription,
@@ -2157,6 +2223,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
                 _CleanerSubFeature.diskCleaner => 0,
                 _CleanerSubFeature.appInsights => 1,
                 _CleanerSubFeature.appLeftovers => 2,
+                _CleanerSubFeature.smartClean => 3,
               },
               children: [
                 RepaintBoundary(
@@ -2177,6 +2244,12 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
                 RepaintBoundary(
                   key: const ValueKey<String>('cleaner-leftovers-pane'),
                   child: _buildLeftoversFeature(),
+                ),
+                RepaintBoundary(
+                  key: const ValueKey<String>('cleaner-smart-clean-pane'),
+                  child: _hasDiskTools
+                      ? _buildSmartCleanFeature(l)
+                      : const SizedBox.shrink(),
                 ),
               ],
             ),
@@ -2374,12 +2447,12 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     );
   }
 
-  /// Shows what the previous scan of the selected drive found, plus a
-  /// one-tap "quick clean" for the categories classified as safe. Most users
-  /// only want that — the tree and pie chart are the advanced path.
+  /// Shortcut to Smart Clean, plus what the previous scan of the selected
+  /// drive found when there is one. Most users only want that — the tree and
+  /// pie chart are the advanced path. Smart Clean needs no prior scan, so the
+  /// card shows on first use too.
   Widget _buildLastScanCard(ThemeData theme, AppLocalizations l) {
     final summary = _lastScanFor(_selectedDrive);
-    if (summary == null) return const SizedBox.shrink();
 
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 520),
@@ -2390,26 +2463,28 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Icon(
-                  PhosphorIconsLight.clockCounterClockwise,
-                  size: 16,
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    l.diskCleanerLastScanFound(
-                      _relativeTimeLabel(l, summary.scannedAt),
-                      _fmt(summary.junkBytes),
-                    ),
-                    style: theme.textTheme.bodyMedium,
+            if (summary != null) ...[
+              Row(
+                children: [
+                  Icon(
+                    PhosphorIconsLight.clockCounterClockwise,
+                    size: 16,
+                    color: theme.colorScheme.onSurfaceVariant,
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      l.diskCleanerLastScanFound(
+                        _relativeTimeLabel(l, summary.scannedAt),
+                        _fmt(summary.junkBytes),
+                      ),
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+            ],
             Row(
               children: [
                 Expanded(
@@ -2422,20 +2497,11 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
                 ),
                 const SizedBox(width: 12),
                 FilledButton.tonalIcon(
+                  key: const ValueKey<String>('cleaner-open-smart-clean'),
                   style: FilledButton.styleFrom(shape: _cleanerButtonShape),
-                  onPressed: _isQuickCleaning ? null : _startQuickClean,
-                  icon: _isQuickCleaning
-                      ? const SizedBox(
-                          width: 14,
-                          height: 14,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(PhosphorIconsLight.broom, size: 16),
-                  label: Text(
-                    _isQuickCleaning
-                        ? l.diskCleanerQuickCleanScanning
-                        : l.diskCleanerQuickCleanButton,
-                  ),
+                  onPressed: _isCleaningJunk ? null : _openSmartClean,
+                  icon: const Icon(PhosphorIconsLight.sparkle, size: 16),
+                  label: Text(l.cleanerSmartCleanTitle),
                 ),
               ],
             ),
@@ -3152,6 +3218,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       }
     } else if (feature == _CleanerSubFeature.diskCleaner) {
       _resultsFocusNode.requestFocus();
+    } else if (feature == _CleanerSubFeature.smartClean) {
+      // Keeps Delete and Ctrl+A away from the hidden Disk Usage tree.
+      _smartCleanFocusNode.requestFocus();
     }
     _publishCleanerScanContext();
   }
@@ -3327,6 +3396,44 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
         ],
       ),
     );
+  }
+
+  /// Smart Clean scans the safest junk categories, plus the Recycle Bin on
+  /// Windows as an unchecked, clearly permanent extra.
+  static List<String> get _smartCleanCategoryIds => <String>[
+    ...CleanerQuickClean.categoryIds(),
+    for (final category in CleanerCategories.all())
+      if (category.reviewOnly) category.id,
+    if (Platform.isWindows) 'recycle_bin',
+  ];
+
+  Widget _buildSmartCleanFeature(AppLocalizations l) {
+    return Focus(
+      focusNode: _smartCleanFocusNode,
+      child: CleanerSmartCleanView(
+        cubit: _smartCleanCubit,
+        categoryIds: _smartCleanCategoryIds,
+        categoryTitle: (id) => _junkCategoryTitle(l, id),
+        categoryReason: (id) => _junkReason(l, id),
+        enabled: !_isCleaningJunk,
+        usesTrash: !Platform.isWindows,
+        onOpenReviewFile: (path) => EntityOpenActions.openInNewTab(
+          context,
+          sourcePath: path,
+          openContainingFolder: !Directory(path).existsSync(),
+        ),
+      ),
+    );
+  }
+
+  /// Shortcut from the Disk usage start screen.
+  void _openSmartClean() {
+    _setSubFeature(_CleanerSubFeature.smartClean);
+    final status = _smartCleanCubit.state.status;
+    if (status == CleanerSmartCleanStatus.idle ||
+        status == CleanerSmartCleanStatus.failure) {
+      unawaited(_smartCleanCubit.scan());
+    }
   }
 
   Widget _buildLeftoversFeature() {
@@ -4961,8 +5068,20 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
         return l.diskCleanerCategoryDeliveryOptimization;
       case 'dev_cache':
         return l.diskCleanerCategoryDevCache;
+      case 'system_cache':
+        return l.diskCleanerCategorySystemCache;
+      case 'package_download_cache':
+        return l.diskCleanerCategoryPackageDownloads;
+      case 'electron_cache':
+        return l.diskCleanerCategoryElectronCache;
+      case 'xcode_build_cache':
+        return l.diskCleanerCategoryXcodeBuild;
+      case 'old_downloads_review':
+        return l.cleanerOldFilesTitle;
       default:
-        return CleanerCategories.byId(categoryId)?.displayName ?? categoryId;
+        return CleanerAuditLabels.title(l, categoryId) ??
+            CleanerCategories.byId(categoryId)?.displayName ??
+            categoryId;
     }
   }
 
@@ -4990,195 +5109,20 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
         return l.diskCleanerReasonDeliveryOptimization;
       case 'dev_cache':
         return l.diskCleanerReasonDevCache;
+      case 'system_cache':
+        return l.diskCleanerReasonSystemCache;
+      case 'package_download_cache':
+        return l.diskCleanerReasonPackageDownloads;
+      case 'electron_cache':
+        return l.diskCleanerReasonElectronCache;
+      case 'xcode_build_cache':
+        return l.diskCleanerReasonXcodeBuild;
+      case 'old_downloads_review':
+        return l.cleanerOldFilesDescription;
       default:
-        return l.diskCleanerReasonGeneric;
+        return CleanerAuditLabels.reason(l, categoryId) ??
+            l.diskCleanerReasonGeneric;
     }
-  }
-
-  /// Category IDs that the cleaner classifies as safe to remove without the
-  /// user auditing individual paths. Derived from the declarative category
-  /// table so a new safe category is picked up automatically.
-  static List<String> _quickCleanCategoryIds() => CleanerCategories.all()
-      .where(
-        (c) =>
-            c.safety == CleanerSafety.safe &&
-            c.defaultEnabled &&
-            !c.requiresAdmin,
-      )
-      .map((c) => c.id)
-      .toList(growable: false);
-
-  /// One-tap cleanup of the safe categories. Scans, shows a grouped preview so
-  /// the user still sees exactly what will go, then reuses the normal
-  /// [_cleanJunk] pipeline (Recycle Bin, never permanent).
-  Future<void> _startQuickClean() async {
-    if (_isQuickCleaning || _isCleaningJunk || _isScanningFullDisk) return;
-    final drive = _selectedDrive;
-    if (drive == null) return;
-
-    setState(() => _isQuickCleaning = true);
-    ScanReport report;
-    try {
-      report = await _service.scanJunk(
-        drivePaths: <String>[drive],
-        categoryIds: _quickCleanCategoryIds(),
-      );
-    } catch (error) {
-      if (!mounted) return;
-      setState(() => _isQuickCleaning = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            AppLocalizations.of(context)!.diskCleanerScanFailedMsg('$error'),
-          ),
-        ),
-      );
-      return;
-    }
-    if (!mounted) return;
-    setState(() => _isQuickCleaning = false);
-
-    final items = report.allItems;
-    if (items.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            AppLocalizations.of(context)!.diskCleanerQuickCleanNothing,
-          ),
-        ),
-      );
-      return;
-    }
-
-    final confirmed = await _showQuickCleanPreviewDialog(report);
-    if (confirmed != true || !mounted) return;
-
-    final totalBytes = items.fold<int>(0, (sum, i) => sum + i.sizeBytes);
-    setState(() {
-      _pendingCleanItems = items;
-      _pendingCleanBytes = totalBytes;
-      _selectedCleanMode = _CleanDeleteMode.recycleBin;
-    });
-    await _cleanJunk(permanent: false);
-  }
-
-  /// Grouped "here is what will be deleted" sheet shown before a quick clean.
-  /// Each row is a category with its item count, size, and the plain-language
-  /// reason it is considered junk.
-  Future<bool?> _showQuickCleanPreviewDialog(ScanReport report) {
-    final l = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
-    final entries =
-        report.itemsByCategory.entries
-            .where((e) => e.value.isNotEmpty)
-            .toList(growable: false)
-          ..sort((a, b) {
-            final aBytes = a.value.fold<int>(0, (s, i) => s + i.sizeBytes);
-            final bBytes = b.value.fold<int>(0, (s, i) => s + i.sizeBytes);
-            return bBytes.compareTo(aBytes);
-          });
-
-    return showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(l.diskCleanerQuickCleanReviewTitle),
-        content: SizedBox(
-          width: 460,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                l.diskCleanerQuickCleanReviewSubtitle(
-                  report.totalCount,
-                  _fmt(report.totalBytes),
-                ),
-                style: theme.textTheme.bodyMedium,
-              ),
-              const SizedBox(height: 12),
-              Flexible(
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  itemCount: entries.length,
-                  separatorBuilder: (_, _) => const Divider(height: 12),
-                  itemBuilder: (_, index) {
-                    final entry = entries[index];
-                    final bytes = entry.value.fold<int>(
-                      0,
-                      (s, i) => s + i.sizeBytes,
-                    );
-                    return Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                _junkCategoryTitle(l, entry.key),
-                                style: theme.textTheme.titleSmall?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                _junkReason(l, entry.key),
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: theme.colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          _fmt(bytes),
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Icon(
-                    PhosphorIconsLight.recycle,
-                    size: 15,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      l.diskCleanerQuickCleanRecycleNote,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            style: TextButton.styleFrom(shape: _cleanerButtonShape),
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(l.cancel),
-          ),
-          FilledButton(
-            autofocus: true,
-            style: FilledButton.styleFrom(shape: _cleanerButtonShape),
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(_trashActionWithSize(l, _fmt(report.totalBytes))),
-          ),
-        ],
-      ),
-    );
   }
 
   Future<void> _confirmCleanFromReview() async {
@@ -5362,10 +5306,12 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
   /// the Recycle Bin / Trash through the same guarded pipeline.
   Future<CleanReport?> _cleanSelectedItems(
     List<JunkItem> items,
-    void Function(int done, int total, String? path) onProgress,
-  ) async {
+    void Function(int done, int total, String? path) onProgress, {
+    bool autoSkipFailures = false,
+  }) async {
     if (_isCleaningJunk || items.isEmpty) return null;
     setState(() => _isCleaningJunk = true);
+    _skipAllDeleteFailures = autoSkipFailures;
     try {
       final result = await _service.cleanJunk(
         items: items,
@@ -5407,6 +5353,8 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       }
       return null;
     } finally {
+      // Later deletes must prompt again.
+      _skipAllDeleteFailures = false;
       if (mounted) setState(() => _isCleaningJunk = false);
     }
   }
@@ -7082,8 +7030,17 @@ class _TreeRowState extends State<_TreeRow> {
         return context.tr.jlDelivery;
       case 'dev_cache':
         return context.tr.jlDevCache;
+      case 'system_cache':
+        return context.tr.diskCleanerCategorySystemCache;
+      case 'package_download_cache':
+        return context.tr.diskCleanerCategoryPackageDownloads;
+      case 'electron_cache':
+        return context.tr.diskCleanerCategoryElectronCache;
+      case 'xcode_build_cache':
+        return context.tr.diskCleanerCategoryXcodeBuild;
       default:
-        return context.tr.jlJunk;
+        return CleanerAuditLabels.title(context.tr, categoryId) ??
+            context.tr.jlJunk;
     }
   }
 }
@@ -7618,8 +7575,17 @@ class _FlatTreeRowWidgetState extends State<_FlatTreeRowWidget> {
         return context.tr.jlDelivery;
       case 'dev_cache':
         return context.tr.jlDevCache;
+      case 'system_cache':
+        return context.tr.diskCleanerCategorySystemCache;
+      case 'package_download_cache':
+        return context.tr.diskCleanerCategoryPackageDownloads;
+      case 'electron_cache':
+        return context.tr.diskCleanerCategoryElectronCache;
+      case 'xcode_build_cache':
+        return context.tr.diskCleanerCategoryXcodeBuild;
       default:
-        return context.tr.jlJunk;
+        return CleanerAuditLabels.title(context.tr, categoryId) ??
+            context.tr.jlJunk;
     }
   }
 }

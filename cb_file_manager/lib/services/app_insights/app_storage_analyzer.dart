@@ -108,7 +108,9 @@ class AppStorageAnalyzer {
     // Cleaner paths become confirmed app storage only when their owner hints
     // identify exactly one inventory entry. Ambiguous rules stay unattributed.
     for (final category in CleanerCategories.all()) {
+      if (category.reviewOnly) continue;
       for (final rule in category.rules) {
+        if (rule.scope != CleanerRuleScope.tree) continue;
         if (rule.appOwnerHints.isEmpty ||
             rule.source.kind == PathSourceKind.recycleBin) {
           continue;
@@ -373,6 +375,9 @@ class AppStorageAnalyzer {
       if (category == null) continue;
       CleanerPathRule? exactRule;
       for (final rule in category.rules) {
+        if (category.reviewOnly || rule.scope != CleanerRuleScope.tree) {
+          continue;
+        }
         if (rule.appOwnerHints.isEmpty) continue;
         final resolved = _resolveSource(rule.source, env);
         if (resolved == normalizedPath) {

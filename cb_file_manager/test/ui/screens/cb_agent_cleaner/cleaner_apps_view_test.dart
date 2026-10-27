@@ -159,6 +159,26 @@ void main() {
     expect(find.byType(Checkbox), findsNothing);
 
     await tester.tap(
+      find.byKey(const ValueKey<String>('cleaner-app-view-files-alpha')),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey<String>('cleaner-app-files-dialog')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(
+        const ValueKey<String>(
+          'cleaner-app-files-root-C:\\Users\\Test\\AppData\\Local\\Alpha\\Cache',
+        ),
+      ),
+      findsOneWidget,
+    );
+    expect(reviewed, isNull);
+    await tester.tap(find.text('Close'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(
       find.byKey(const ValueKey<String>('cleaner-app-manage-alpha')),
     );
     await tester.tap(

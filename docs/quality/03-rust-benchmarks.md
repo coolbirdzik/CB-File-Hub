@@ -96,7 +96,7 @@ flutter build windows --release --target=tool/bench_cleaner_ui.dart
 .\build\windows\x64\runner\Release\cb_file_hub.exe "$PWD\build\benchmarks\corpus" "$PWD\build\benchmarks\cb-completion.json"
 ```
 
-In the CB window, perform the first scan. Open the same corpus in TreeSize, select **Size** and **Values in Byte**, keep **Home** visible, and verify the totals. Install `pywin32` and `comtypes` in your Python environment if needed. Find the PIDs of these specific windows with `Get-Process cb_file_hub,TreeSizeFree`, then run the driver from an elevated terminal so it can observe elevated TreeSize:
+In the CB window, open **Disk usage** (the Cleaner starts on Smart Clean) and perform the first scan. Open the same corpus in TreeSize, select **Size** and **Values in Byte**, keep **Home** visible, and verify the totals. Install `pywin32` and `comtypes` in your Python environment if needed. Find the PIDs of these specific windows with `Get-Process cb_file_hub,TreeSizeFree`, then run the driver from an elevated terminal so it can observe elevated TreeSize:
 
 ```powershell
 # Replace these example PIDs with the two intended windows' process IDs.

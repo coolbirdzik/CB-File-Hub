@@ -93,6 +93,7 @@ void main() {
         find.byKey(const ValueKey('cleaner-utility-appLeftovers')),
         findsOneWidget,
       );
+      await _openDiskUsage(tester);
       await tester.tap(find.byKey(const ValueKey('cleaner-scan-cta')));
       await tester.pumpAndSettle();
       expect(cleaner.scannedPath, '/System/Volumes/Data');
@@ -111,4 +112,10 @@ void main() {
     },
     variant: TargetPlatformVariant.only(TargetPlatform.macOS),
   );
+}
+
+/// The Cleaner opens on Smart Clean; these tests drive Disk usage.
+Future<void> _openDiskUsage(WidgetTester tester) async {
+  await tester.tap(find.byKey(const ValueKey('cleaner-utility-diskCleaner')));
+  await tester.pumpAndSettle();
 }

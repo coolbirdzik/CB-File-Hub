@@ -1,6 +1,10 @@
 import 'dart:io';
 import '../app_insights/app_insights_models.dart';
 import 'cleaner_models.dart';
+import 'cleaner_cache_rules.dart';
+import 'cleaner_xcode_cache.dart';
+import 'cleaner_review_candidates.dart';
+import 'cleaner_audited_rules.dart';
 
 /// Declarative table of all junk categories the cleaner knows about.
 ///
@@ -28,7 +32,7 @@ class CleanerCategories {
     return null;
   }
 
-  static const _macos = <CleanerCategory>[
+  static final _macos = <CleanerCategory>[
     CleanerCategory(
       id: 'browser_cache',
       displayName: 'Browser cache',
@@ -90,6 +94,9 @@ class CleanerCategories {
         CleanerPathRule(source: PathSource.env('HOME', 'Library/Caches/pip')),
       ],
     ),
+    ...CleanerCacheRules.macos,
+    CleanerXcodeCache.category,
+    CleanerReviewCandidates.category(isMacOS: true),
   ];
 
   static final List<CleanerCategory> _all = [
@@ -449,5 +456,8 @@ class CleanerCategories {
         ),
       ],
     ),
+    ...CleanerCacheRules.windows,
+    ...CleanerAuditedRules.windows,
+    CleanerReviewCandidates.category(isMacOS: false),
   ];
 }

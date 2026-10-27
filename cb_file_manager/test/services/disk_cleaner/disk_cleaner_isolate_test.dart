@@ -1,10 +1,56 @@
 import 'dart:io';
 
+import 'package:cb_file_manager/services/disk_cleaner/cleaner_models.dart';
 import 'package:cb_file_manager/services/disk_cleaner/disk_cleaner_isolate.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 
 void main() {
+  test(
+    'folder summaries emit indeterminate progress and one size total',
+    () async {
+      final root = await Directory.systemTemp.createTemp('cb-cleaner-summary-');
+      try {
+        final nested = await Directory(p.join(root.path, 'nested')).create();
+        await File(
+          p.join(root.path, 'root.dat'),
+        ).writeAsBytes(List.filled(7, 1));
+        await File(
+          p.join(nested.path, 'child.dat'),
+        ).writeAsBytes(List.filled(11, 1));
+        final handle = await spawnScanWithResolvedRules(
+          drivesScanned: [root.path],
+          useNativeScanner: false,
+          rules: [
+            ResolvedRule(
+              categoryId: 'summary_review',
+              basePath: root.path,
+              scope: CleanerRuleScope.folderSummary,
+            ),
+          ],
+        );
+        final progressFuture = handle.progress.toList();
+        final report = await handle.future;
+        final progress = (await progressFuture)
+            .where((event) => event.categoryId == 'summary_review')
+            .toList();
+
+        expect(progress, hasLength(1));
+        expect(progress.single.currentPath, root.path);
+        expect(progress.single.categoryId, 'summary_review');
+        expect(progress.single.fraction, isNull);
+        expect(report.warnings, isEmpty);
+        final items = report.itemsByCategory['summary_review']!;
+        expect(items, hasLength(1));
+        expect(items.single.path, root.path);
+        expect(items.single.sizeBytes, 18);
+        expect(items.single.isContainerOnly, isTrue);
+      } finally {
+        await root.delete(recursive: true);
+      }
+    },
+  );
+
   test('overlapping rules scan physical files once per category', () async {
     final root = await Directory.systemTemp.createTemp('cb-cleaner-worker-');
     try {

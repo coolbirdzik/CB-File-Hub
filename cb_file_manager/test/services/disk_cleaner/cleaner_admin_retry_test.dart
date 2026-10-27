@@ -80,6 +80,62 @@ JunkItem _item(String name) => JunkItem(
 );
 
 void main() {
+  test(
+    'review-only evidence and protected Xcode files cannot reach the trash pipeline',
+    () async {
+      final root = await Directory.systemTemp.createTemp(
+        'cb-cleaner-review-only-',
+      );
+      addTearDown(() => root.delete(recursive: true));
+      final download = File('${root.path}/personal.zip');
+      final symbols = File(
+        '${root.path}/Library/Developer/Xcode/DerivedData/Project/Build/Products/Debug/App.dSYM/Contents/symbols',
+      );
+      await download.writeAsString('personal file');
+      await symbols.parent.create(recursive: true);
+      await symbols.writeAsString('debug symbols');
+      final trash = _Trash();
+      final service = DiskCleanerService.forTesting(
+        fullDiskScanSpawner: spawnFullDiskScan,
+        trashManager: trash,
+      );
+      final result = await service.cleanJunk(
+        items: [
+          JunkItem(
+            path: download.path,
+            sizeBytes: 13,
+            categoryId: 'old_downloads_review',
+            isUserSelected: true,
+          ),
+          JunkItem(
+            path: symbols.path,
+            sizeBytes: 13,
+            categoryId: 'xcode_build_cache',
+            isUserSelected: true,
+          ),
+          JunkItem(
+            path: symbols.parent.parent.parent.path,
+            sizeBytes: 13,
+            categoryId: 'xcode_build_cache',
+            isUserSelected: true,
+          ),
+        ],
+        permanent: false,
+      );
+      expect(
+        result.skippedUnsafe,
+        unorderedEquals([
+          download.path,
+          symbols.path,
+          symbols.parent.parent.parent.path,
+        ]),
+      );
+      expect(trash.attempts, isEmpty);
+      expect(await download.readAsString(), 'personal file');
+      expect(await symbols.readAsString(), 'debug symbols');
+    },
+  );
+
   for (final permanent in [false, true]) {
     test(
       'system protection cannot be bypassed by manual selection or admin retry ($permanent)',

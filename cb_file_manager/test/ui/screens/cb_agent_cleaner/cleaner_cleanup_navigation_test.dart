@@ -159,6 +159,7 @@ Future<void> _pumpCleaner(
     ),
   );
   await tester.pumpAndSettle();
+  await _openDiskUsage(tester);
   await tester.tap(find.byKey(const ValueKey('cleaner-scan-cta')));
   await tester.pumpAndSettle();
 }
@@ -412,4 +413,10 @@ void main() {
     expect(cleaner.root.fileCount, 1);
     expect(cleaner.scans, 1);
   });
+}
+
+/// The Cleaner opens on Smart Clean; these tests drive Disk usage.
+Future<void> _openDiskUsage(WidgetTester tester) async {
+  await tester.tap(find.byKey(const ValueKey('cleaner-utility-diskCleaner')));
+  await tester.pumpAndSettle();
 }
