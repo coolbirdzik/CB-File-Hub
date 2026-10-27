@@ -115,15 +115,17 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
   }
 
   @override
-  Future<void> close() {
-    _navSubscription?.cancel();
-    _opsSubscription?.cancel();
-    _tagSubscription?.cancel();
-    _tagChangeSubscription?.cancel();
-    _navigationBloc.close();
-    _operationsBloc.close();
-    _tagSearchBloc.close();
-    return super.close();
+  Future<void> close() async {
+    await Future.wait<void>([
+      super.close(),
+      if (_navSubscription != null) _navSubscription!.cancel(),
+      if (_opsSubscription != null) _opsSubscription!.cancel(),
+      if (_tagSubscription != null) _tagSubscription!.cancel(),
+      if (_tagChangeSubscription != null) _tagChangeSubscription!.cancel(),
+      _navigationBloc.close(),
+      _operationsBloc.close(),
+      _tagSearchBloc.close(),
+    ]);
   }
 
   /// Pause the underlying directory watcher subscription. Used by the tab

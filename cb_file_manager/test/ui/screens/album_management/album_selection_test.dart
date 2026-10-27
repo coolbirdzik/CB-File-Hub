@@ -83,6 +83,20 @@ void main() {
     }
   }
 
+  Future<void> waitForWidget(WidgetTester tester, Finder finder) async {
+    final elapsed = Stopwatch()..start();
+    while (finder.evaluate().isEmpty &&
+        elapsed.elapsed < const Duration(seconds: 10)) {
+      // Database, filesystem and native job completions use real time, whereas
+      // pumpAndSettle alone only advances the widget test's fake clock.
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 20)),
+      );
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    expect(finder, findsOneWidget);
+  }
+
   Future<void> selectCollectionView(WidgetTester tester, ViewMode mode) async {
     final menu = tester.widget<PopupMenuButton<ViewMode>>(
       find.byKey(const ValueKey('shared-view-mode-menu')),
@@ -566,7 +580,7 @@ void main() {
     viewToggle.onSelected!(ViewMode.grid);
     await flush(tester);
     final imageTile = find.byKey(ValueKey('album-grid-${image.path}'));
-    expect(imageTile, findsOneWidget);
+    await waitForWidget(tester, imageTile);
     await tester.tap(
       imageTile,
       kind: PointerDeviceKind.mouse,

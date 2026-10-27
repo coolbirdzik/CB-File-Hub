@@ -39,6 +39,11 @@ class DirectoryWatcherService {
   // Stream subscription for the directory watcher
   StreamSubscription<FileSystemEvent>? _watchSubscription;
 
+  // A stop invalidates starts that are still checking their directory. Every
+  // caller also waits for any previous native handle cancellation to finish.
+  Future<void>? _watchCancellation;
+  int _watchRequest = 0;
+
   // Debounce timer to avoid too many refresh calls
   Timer? _debounceTimer;
 
@@ -75,17 +80,20 @@ class DirectoryWatcherService {
   /// 2. Battery/Resource: Watching only current directory saves resources
   /// 3. UX: Users only need to see changes in the folder they're viewing
   Future<void> startWatching(String path) async {
+    final request = ++_watchRequest;
     // Don't restart if already watching the same path
     if (_currentWatchPath == path && _watchSubscription != null) {
       return;
     }
 
-    // Stop any existing watcher FIRST — synchronous, cancels the native handle.
-    await stopWatching();
+    await _stopWatching();
+    if (request != _watchRequest) return;
 
     try {
       final directory = Directory(path);
-      if (!await directory.exists()) {
+      final exists = await directory.exists();
+      if (request != _watchRequest) return;
+      if (!exists) {
         AppLogger.warning(
           'DirectoryWatcherService: Directory does not exist: $path',
         );
@@ -200,19 +208,38 @@ class DirectoryWatcherService {
 
   /// Stop watching the current directory.
   ///
-  /// This is a synchronous cancellation of the native OS handle (ReadDirectoryChangesW
-  /// on Windows). No I/O is performed — the handle is closed immediately.
-  Future<void> stopWatching() async {
+  /// Completes after pending starts are invalidated and the native watch handle
+  /// (ReadDirectoryChangesW on Windows) has finished cancelling.
+  Future<void> stopWatching() {
+    ++_watchRequest;
+    return _stopWatching();
+  }
+
+  Future<void> _stopWatching() async {
     _debounceTimer?.cancel();
     _debounceTimer = null;
 
-    await _watchSubscription?.cancel();
+    final subscription = _watchSubscription;
     _watchSubscription = null;
 
     final previousPath = _currentWatchPath;
     _currentWatchPath = null;
     _pendingEvents.clear();
     _suppressedRefreshUntil.clear();
+
+    // Detach synchronously before awaiting: another stop must wait for this
+    // same cancellation, and must not clear a newer watch after it completes.
+    final cancellation = subscription?.cancel() ?? _watchCancellation;
+    if (cancellation != null) {
+      // Retain only the actual native cleanup future. An extra continuation
+      // created in a widget's fake async zone may never run after that widget
+      // test finishes, leaving a later teardown waiting forever.
+      _watchCancellation = cancellation;
+      await cancellation;
+      if (identical(_watchCancellation, cancellation)) {
+        _watchCancellation = null;
+      }
+    }
 
     if (previousPath != null) {
       AppLogger.info('DirectoryWatcherService: Stopped watching $previousPath');

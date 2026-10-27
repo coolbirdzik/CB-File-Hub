@@ -91,5 +91,6 @@ Future<Map<String, Type>> _runSearch(
     };
   } finally {
     await bloc.close();
+    expect(DirectoryWatcherService.instance.isWatching, isFalse);
   }
 }

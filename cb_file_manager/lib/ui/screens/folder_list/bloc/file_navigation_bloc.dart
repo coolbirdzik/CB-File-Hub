@@ -125,11 +125,17 @@ class FileNavigationBloc
   }
 
   @override
-  Future<void> close() {
+  Future<void> close() async {
     _searchRequests.dispose();
-    _directoryWatcherSubscription?.cancel();
-    _directoryWatcher.stopWatching();
-    return super.close();
+    // Mark the bloc closed before awaiting I/O so a pending listing cannot
+    // start a new watch while the old watch is being released.
+    final closing = super.close();
+    await Future.wait<void>([
+      if (_directoryWatcherSubscription != null)
+        _directoryWatcherSubscription!.cancel(),
+      _directoryWatcher.stopWatching(),
+      closing,
+    ]);
   }
 
   /// Pause directory watching for this bloc.
