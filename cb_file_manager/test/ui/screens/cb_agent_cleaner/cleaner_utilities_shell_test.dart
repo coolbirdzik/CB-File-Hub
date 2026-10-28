@@ -66,7 +66,7 @@ void main() {
       find.byKey(const ValueKey<String>('cleaner-utility-appInsights')),
       findsOneWidget,
     );
-    expect(find.text('STORAGE'), findsOneWidget);
+    expect(find.text('Storage'), findsOneWidget);
     expect(
       find.byKey(const ValueKey<String>('utility-content')),
       findsOneWidget,

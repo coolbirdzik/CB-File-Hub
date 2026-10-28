@@ -25,15 +25,6 @@ const double _wideFooterBreakpoint = 560;
 
 const double _checkboxColumnWidth = 40;
 
-/// Matches the Cleaner's primary call to action: the design system pins
-/// button height, so padding alone would clip the label.
-final ButtonStyle _primaryButtonStyle = FilledButton.styleFrom(
-  fixedSize: const Size.fromHeight(40),
-  minimumSize: const Size(0, 40),
-  padding: const EdgeInsets.symmetric(horizontal: 20),
-  shape: const RoundedRectangleBorder(borderRadius: CbRadii.buttonAll),
-);
-
 /// Smart Clean, laid out like the other Cleaner pages: a header with the
 /// page's state, the body, and a footer with the selection and the action.
 /// All scanning and cleaning goes through [cubit].
@@ -104,7 +95,7 @@ class _CleanerSmartCleanViewState extends State<CleanerSmartCleanView> {
               subtitle: _subtitle(l, state),
               action: _headerAction(l, state),
             ),
-            const Divider(height: 1),
+            const SizedBox(height: CbSpacing.xs),
             Expanded(
               child: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 280),
@@ -179,23 +170,23 @@ class _CleanerSmartCleanViewState extends State<CleanerSmartCleanView> {
   Widget? _headerAction(AppLocalizations l, CleanerSmartCleanState state) {
     switch (state.status) {
       case CleanerSmartCleanStatus.scanning:
-        return OutlinedButton.icon(
+        return CbButton(
           key: const ValueKey<String>('cleaner-smart-clean-cancel'),
           onPressed: _cubit.cancelScan,
-          icon: const Icon(Icons.stop_rounded, size: 18),
-          label: Text(l.diskCleanerCancel),
+          icon: PhosphorIconsLight.stop,
+          label: l.diskCleanerCancel,
         );
       case CleanerSmartCleanStatus.ready:
       case CleanerSmartCleanStatus.cleaning:
       case CleanerSmartCleanStatus.done:
-        return OutlinedButton.icon(
+        return CbButton(
           key: const ValueKey<String>('cleaner-smart-clean-rescan'),
           onPressed:
               widget.enabled && state.status != CleanerSmartCleanStatus.cleaning
               ? _cubit.scan
               : null,
-          icon: const Icon(Icons.refresh_rounded, size: 18),
-          label: Text(l.diskCleanerScanAgain),
+          icon: PhosphorIconsLight.arrowClockwise,
+          label: l.diskCleanerScanAgain,
         );
       case CleanerSmartCleanStatus.idle:
       case CleanerSmartCleanStatus.failure:
@@ -245,8 +236,7 @@ class _CleanerSmartCleanViewState extends State<CleanerSmartCleanView> {
   // ---------------------------------------------------------------------------
 
   Widget _buildStart(AppLocalizations l, CleanerSmartCleanState state) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
+    final c = context.cbColors;
     final error = switch (state.error) {
       CleanerSmartCleanError.busy => l.cleanerSmartCleanBusy,
       CleanerSmartCleanError.failed => l.diskCleanerScanFailedMsg(
@@ -254,12 +244,13 @@ class _CleanerSmartCleanViewState extends State<CleanerSmartCleanView> {
       ),
       null => null,
     };
-    final scanButton = FilledButton.icon(
+    final scanButton = CbButton(
       key: const ValueKey<String>('cleaner-smart-clean-scan'),
-      style: _primaryButtonStyle,
+      variant: CbButtonVariant.primary,
+      size: CbButtonSize.lg,
       onPressed: widget.enabled ? _cubit.scan : null,
-      icon: const Icon(PhosphorIconsLight.magnifyingGlass, size: 18),
-      label: Text(l.cleanerSmartCleanScan),
+      icon: PhosphorIconsLight.magnifyingGlass,
+      label: l.cleanerSmartCleanScan,
     );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -270,18 +261,15 @@ class _CleanerSmartCleanViewState extends State<CleanerSmartCleanView> {
             const _IconTile(icon: PhosphorIconsLight.broom, size: 44),
             const SizedBox(width: 14),
             Expanded(
-              child: Text(
-                l.cleanerSmartCleanIntro,
-                style: theme.textTheme.bodyMedium,
-              ),
+              child: Text(l.cleanerSmartCleanIntro, style: CbTypography.body),
             ),
           ],
         ),
         const SizedBox(height: 18),
         Text(
           l.cleanerSmartCleanChecksLabel,
-          style: theme.textTheme.labelMedium?.copyWith(
-            color: scheme.onSurfaceVariant,
+          style: CbTypography.labelSm.copyWith(
+            color: c.textSecondary,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -311,7 +299,7 @@ class _CleanerSmartCleanViewState extends State<CleanerSmartCleanView> {
                             widget.categoryTitle(id),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.bodyMedium,
+                            style: CbTypography.body,
                           ),
                         ),
                       ],
@@ -324,13 +312,13 @@ class _CleanerSmartCleanViewState extends State<CleanerSmartCleanView> {
         if (error != null) ...[
           const SizedBox(height: 16),
           _Banner(
-            icon: Icons.error_outline_rounded,
+            icon: PhosphorIconsLight.warningCircle,
             text: error,
-            color: scheme.error,
+            color: c.status.danger,
           ),
         ],
         const SizedBox(height: 16),
-        const Divider(height: 1),
+        const SizedBox(height: CbSpacing.xs),
         const SizedBox(height: 14),
         LayoutBuilder(
           builder: (context, constraints) {
@@ -366,7 +354,7 @@ class _CleanerSmartCleanViewState extends State<CleanerSmartCleanView> {
   // ---------------------------------------------------------------------------
 
   Widget _buildScanning(AppLocalizations l, CleanerSmartCleanState state) {
-    final theme = Theme.of(context);
+    final c = context.cbColors;
     final id = state.scanCategoryId;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -390,17 +378,15 @@ class _CleanerSmartCleanViewState extends State<CleanerSmartCleanView> {
                         : l.cleanerSmartCleanScanningCategory(
                             widget.categoryTitle(id),
                           ),
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
+                    style: CbTypography.headingSm.copyWith(
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                   Text(
                     state.scanPath,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
+                    style: CbTypography.bodySm.copyWith(color: c.textSecondary),
                   ),
                 ],
               ),
@@ -410,9 +396,12 @@ class _CleanerSmartCleanViewState extends State<CleanerSmartCleanView> {
         const SizedBox(height: 14),
         ClipRRect(
           borderRadius: BorderRadius.circular(999),
-          child: LinearProgressIndicator(
+          child: AppProgressIndicator(
             value: state.scanFraction,
-            minHeight: 8,
+            height: 3,
+            backgroundColor: c.fill,
+            valueColor: c.accent.base,
+            showGlow: false,
           ),
         ),
       ],
@@ -434,7 +423,7 @@ class _CleanerSmartCleanViewState extends State<CleanerSmartCleanView> {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
         _Banner(
-          icon: Icons.info_outline_rounded,
+          icon: PhosphorIconsLight.info,
           text: state.groups.isEmpty
               ? l.diskCleanerQuickCleanNothing
               : '${l.diskCleanerQuickCleanSafetyNote}\n$recycleNote',
@@ -443,14 +432,13 @@ class _CleanerSmartCleanViewState extends State<CleanerSmartCleanView> {
         if (state.groups.isNotEmpty)
           CleanerStaggeredEntrance(
             index: 0,
-            child: Container(
-              clipBehavior: Clip.antiAlias,
-              decoration: CbDecorations.card(context, radius: 12),
+            child: CbSurface(
+              clip: true,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   for (final (index, group) in state.groups.indexed) ...[
-                    if (index > 0) const Divider(height: 1),
+                    if (index > 0) const SizedBox(height: CbSpacing.xs),
                     _GroupRow(
                       group: group,
                       selection: state.groupSelection(group.categoryId),
@@ -501,31 +489,26 @@ class _CleanerSmartCleanViewState extends State<CleanerSmartCleanView> {
   }
 
   Widget _buildFooter(AppLocalizations l, CleanerSmartCleanState state) {
-    final theme = Theme.of(context);
+    final c = context.cbColors;
     final cleaning = state.status == CleanerSmartCleanStatus.cleaning;
     final size = FormatUtils.formatFileSize(state.selectedBytes);
     final summary = Text(
       l.cleanerSmartCleanSelected(size, state.selectedCount),
       key: const ValueKey<String>('cleaner-smart-clean-summary'),
-      style: theme.textTheme.titleSmall,
+      style: CbTypography.headingSm.copyWith(color: c.textPrimary),
     );
-    final cleanButton = FilledButton.icon(
+    final cleanButton = CbButton(
       key: const ValueKey<String>('cleaner-smart-clean-clean'),
-      style: _primaryButtonStyle,
+      variant: CbButtonVariant.primary,
+      size: CbButtonSize.lg,
       onPressed: widget.enabled && !cleaning && state.selectedCount > 0
           ? () => _clean(state)
           : null,
-      icon: const Icon(PhosphorIconsLight.broom, size: 18),
-      label: Text(
-        l.cleanerSmartCleanCleanButton(size),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
+      icon: PhosphorIconsLight.broom,
+      label: l.cleanerSmartCleanCleanButton(size),
     );
     return Container(
-      decoration: BoxDecoration(
-        border: Border(top: BorderSide(color: theme.dividerColor)),
-      ),
+      decoration: CbDecorations.bar(context),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -570,12 +553,11 @@ class _CleanerSmartCleanViewState extends State<CleanerSmartCleanView> {
     }
     return [
       if (state.scanWarnings.isNotEmpty)
-        Material(
-          type: MaterialType.transparency,
-          child: ExpansionTile(
+        CbSurface(
+          child: CbExpander(
             key: const ValueKey('cleaner-scan-warnings'),
             title: Text(l.cleanerScanWarnings(state.scanWarnings.length)),
-            leading: const Icon(Icons.warning_amber_rounded),
+            leading: const Icon(PhosphorIconsLight.warning),
             children: [
               for (final warning in state.scanWarnings)
                 Padding(
@@ -604,32 +586,33 @@ class _CleanerSmartCleanViewState extends State<CleanerSmartCleanView> {
   Future<void> _clean(CleanerSmartCleanState state) async {
     if (state.selectedIncludesPermanent) {
       final l = AppLocalizations.of(context)!;
-      final scheme = Theme.of(context).colorScheme;
       final permanentBytes = state.selectedPermanentBytes;
-      final confirmed = await showDialog<bool>(
+      final confirmed = await CbDialog.show<bool>(
         context: context,
-        builder: (context) => AlertDialog(
-          title: Text(l.cleanerSmartCleanPermanentConfirmTitle),
+        dialog: CbDialog(
+          title: l.cleanerSmartCleanPermanentConfirmTitle,
+          icon: PhosphorIconsLight.trash,
+          destructive: true,
+          showCloseButton: false,
           content: Text(
             l.cleanerSmartCleanPermanentConfirmBody(
               FormatUtils.formatFileSize(permanentBytes),
             ),
           ),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: Text(l.cancel),
+            CbButton(
+              onPressed: () =>
+                  Navigator.of(context, rootNavigator: true).pop(false),
+              label: l.cancel,
             ),
-            FilledButton(
+            CbButton(
               key: const ValueKey<String>(
                 'cleaner-smart-clean-confirm-permanent',
               ),
-              style: FilledButton.styleFrom(
-                backgroundColor: scheme.error,
-                foregroundColor: scheme.onError,
-              ),
-              onPressed: () => Navigator.of(context).pop(true),
-              child: Text(l.cleanerSmartCleanConfirmClean),
+              variant: CbButtonVariant.danger,
+              onPressed: () =>
+                  Navigator.of(context, rootNavigator: true).pop(true),
+              label: l.cleanerSmartCleanConfirmClean,
             ),
           ],
         ),
@@ -644,7 +627,7 @@ class _CleanerSmartCleanViewState extends State<CleanerSmartCleanView> {
   // ---------------------------------------------------------------------------
 
   Widget _buildDone(AppLocalizations l, CleanerSmartCleanState state) {
-    final theme = Theme.of(context);
+    final c = context.cbColors;
     final result = state.result ?? const CleanerSmartCleanResult();
     final lines = <String>[
       if (result.movedCount > 0)
@@ -671,27 +654,26 @@ class _CleanerSmartCleanViewState extends State<CleanerSmartCleanView> {
             padding: const EdgeInsets.only(left: 58),
             child: Text(
               l.cleanerSmartCleanDoneSkipped(result.skippedCount),
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
+              style: CbTypography.bodySm.copyWith(color: c.textSecondary),
             ),
           ),
         ],
         if (result.movedCount > 0) ...[
           const SizedBox(height: 14),
           _Banner(
-            icon: Icons.info_outline_rounded,
+            icon: PhosphorIconsLight.info,
             text: l.cleanerSmartCleanDoneHint(_destination(l)),
           ),
         ],
         const SizedBox(height: 16),
         Align(
           alignment: Alignment.centerRight,
-          child: FilledButton(
+          child: CbButton(
             key: const ValueKey<String>('cleaner-smart-clean-done'),
-            style: _primaryButtonStyle,
+            variant: CbButtonVariant.primary,
+            size: CbButtonSize.lg,
             onPressed: _cubit.reset,
-            child: Text(l.done),
+            label: l.done,
           ),
         ),
       ],
@@ -727,7 +709,7 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final c = context.cbColors;
     final l = AppLocalizations.of(context)!;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -736,11 +718,7 @@ class _Header extends StatelessWidget {
         constraints: const BoxConstraints(minHeight: 36),
         child: Row(
           children: [
-            Icon(
-              PhosphorIconsLight.sparkle,
-              size: 19,
-              color: theme.colorScheme.primary,
-            ),
+            Icon(PhosphorIconsLight.sparkle, size: 19, color: c.accent.base),
             const SizedBox(width: 9),
             Expanded(
               child: Column(
@@ -748,8 +726,8 @@ class _Header extends StatelessWidget {
                 children: [
                   Text(
                     l.cleanerSmartCleanTitle,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
+                    style: CbTypography.headingSm.copyWith(
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                   Text(
@@ -757,9 +735,7 @@ class _Header extends StatelessWidget {
                     key: const ValueKey<String>('cleaner-smart-clean-subtitle'),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
+                    style: CbTypography.bodySm.copyWith(color: c.textSecondary),
                   ),
                 ],
               ),
@@ -785,9 +761,8 @@ class _CenteredCard extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: _cardMaxWidth),
-          child: Container(
-            padding: const EdgeInsets.all(20),
-            decoration: CbDecorations.card(context, radius: 12),
+          child: CbSurface(
+            padding: const EdgeInsets.all(CbSpacing.xxl),
             child: child,
           ),
         ),
@@ -810,15 +785,13 @@ class _IconTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final color = danger ? scheme.error : scheme.primary;
-    final dark = theme.brightness == Brightness.dark;
+    final c = context.cbColors;
+    final color = danger ? c.status.danger : c.icon;
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: color.withValues(alpha: dark ? 0.2 : 0.12),
+        color: danger ? c.status.dangerSurface : c.fill,
         borderRadius: BorderRadius.circular(size >= 40 ? 12 : 8),
       ),
       child: Icon(icon, size: size * 0.5, color: color),
@@ -836,7 +809,7 @@ class _Message extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final c = context.cbColors;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -848,13 +821,11 @@ class _Message extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+                style: CbTypography.headingMd.copyWith(color: c.textPrimary),
               ),
               if (body.isNotEmpty) ...[
                 const SizedBox(height: 4),
-                Text(body, style: theme.textTheme.bodyMedium),
+                Text(body, style: CbTypography.body),
               ],
             ],
           ),
@@ -872,8 +843,8 @@ class _Note extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final color = theme.colorScheme.onSurfaceVariant;
+    final c = context.cbColors;
+    final color = c.textSecondary;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -883,10 +854,7 @@ class _Note extends StatelessWidget {
         ),
         const SizedBox(width: 8),
         Expanded(
-          child: Text(
-            text,
-            style: theme.textTheme.bodySmall?.copyWith(color: color),
-          ),
+          child: Text(text, style: CbTypography.bodySm.copyWith(color: color)),
         ),
       ],
     );
@@ -903,29 +871,124 @@ class _Banner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
+    final c = context.cbColors;
     final accent = color;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: accent == null
-            ? scheme.surfaceContainerHighest.withValues(alpha: 0.5)
-            : accent.withValues(alpha: 0.08),
+        color: accent == null ? c.fillSubtle : accent.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 18, color: accent ?? scheme.onSurfaceVariant),
+          Icon(icon, size: 18, color: accent ?? c.textSecondary),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               text,
-              style: theme.textTheme.bodySmall?.copyWith(color: accent),
+              style: CbTypography.bodySm.copyWith(color: accent),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Pointer feedback for a selectable row. Its checkbox and disclosure retain
+/// separate keyboard stops, so opening details never changes the selection.
+class _SelectableRow extends StatelessWidget {
+  final bool selected;
+  final VoidCallback? onPressed;
+  final Widget child;
+
+  const _SelectableRow({
+    required this.selected,
+    required this.onPressed,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) => CbPressable(
+    onPressed: onPressed,
+    canRequestFocus: false,
+    descendantsAreFocusable: true,
+    builder: (context, state) => AnimatedContainer(
+      duration: CbDurations.fast,
+      decoration: CbDecorations.card(
+        context,
+        selected: selected,
+        hovered: state.hovered,
+        pressed: state.pressed,
+      ),
+      child: child,
+    ),
+  );
+}
+
+/// Three-state selection using the app's fill, focus and pointer conventions.
+class _SelectionCheckbox extends StatelessWidget {
+  final bool? value;
+  final String label;
+  final ValueChanged<bool>? onChanged;
+
+  const _SelectionCheckbox({
+    super.key,
+    required this.value,
+    required this.label,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.cbColors;
+    final enabled = onChanged != null;
+    void toggle() => onChanged?.call(value != true);
+    return Semantics(
+      label: label,
+      checked: value == true,
+      mixed: value == null,
+      enabled: enabled,
+      onTap: enabled ? toggle : null,
+      child: ExcludeSemantics(
+        child: CbPressable(
+          onPressed: enabled ? toggle : null,
+          builder: (context, state) => Center(
+            child: AnimatedContainer(
+              duration: CbDurations.instant,
+              width: 18,
+              height: 18,
+              decoration: BoxDecoration(
+                color: !enabled
+                    ? c.fillSubtle
+                    : value != false
+                    ? c.accent.base
+                    : CbDecorations.controlFill(
+                        c,
+                        hovered: state.hovered,
+                        pressed: state.pressed,
+                      ),
+                borderRadius: CbRadii.all(CbRadii.sm),
+                border: value == false
+                    ? Border.all(
+                        color: enabled ? c.strokeStrong : c.strokeSubtle,
+                      )
+                    : null,
+                boxShadow: state.focused ? CbDecorations.focusRing(c) : null,
+              ),
+              child: value == false
+                  ? null
+                  : Icon(
+                      value == null
+                          ? PhosphorIconsLight.minus
+                          : PhosphorIconsLight.check,
+                      size: 13,
+                      color: enabled ? c.accent.onBase : c.textDisabled,
+                    ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -974,156 +1037,146 @@ class _GroupRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final c = context.cbColors;
     final l = AppLocalizations.of(context)!;
-    final scheme = theme.colorScheme;
-    final muted = scheme.onSurfaceVariant;
-    final accent = group.isPermanent ? scheme.error : scheme.primary;
+    final muted = c.textSecondary;
+    final accent = group.isPermanent ? c.status.danger : c.accent.base;
 
     return Column(
       key: ValueKey<String>('cleaner-smart-clean-group-${group.categoryId}'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Material(
-          color: selection != false
-              ? scheme.primary.withValues(alpha: 0.05)
-              : Colors.transparent,
-          child: InkWell(
-            onTap: enabled ? onToggle : null,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(4, 10, 6, 10),
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: _checkboxColumnWidth,
-                    height: _checkboxColumnWidth,
-                    child: Checkbox(
-                      key: ValueKey<String>(
-                        'cleaner-smart-clean-toggle-${group.categoryId}',
-                      ),
-                      value: selection,
-                      tristate: true,
-                      onChanged: enabled ? (_) => onToggle() : null,
+        _SelectableRow(
+          selected: selection != false,
+          onPressed: enabled ? onToggle : null,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(4, 10, 6, 10),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: _checkboxColumnWidth,
+                  height: _checkboxColumnWidth,
+                  child: _SelectionCheckbox(
+                    key: ValueKey<String>(
+                      'cleaner-smart-clean-toggle-${group.categoryId}',
                     ),
+                    value: selection,
+                    label: title,
+                    onChanged: enabled ? (_) => onToggle() : null,
                   ),
-                  _IconTile(icon: icon, size: 32, danger: group.isPermanent),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Flexible(
+                ),
+                _IconTile(icon: icon, size: 32, danger: group.isPermanent),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: CbTypography.body.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          if (group.isPermanent) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 1,
+                              ),
+                              decoration: BoxDecoration(
+                                color: c.status.danger.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
                               child: Text(
-                                title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.bodyMedium?.copyWith(
+                                l.cleanerSmartCleanPermanentBadge,
+                                style: CbTypography.labelXs.copyWith(
+                                  color: c.status.danger,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
                             ),
-                            if (group.isPermanent) ...[
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 1,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: scheme.error.withValues(alpha: 0.12),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  l.cleanerSmartCleanPermanentBadge,
-                                  style: theme.textTheme.labelSmall?.copyWith(
-                                    color: scheme.error,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ],
                           ],
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        reason,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: CbTypography.bodySm.copyWith(
+                          color: group.isPermanent ? c.status.danger : muted,
                         ),
+                      ),
+                      if (apps.isNotEmpty) ...[
                         const SizedBox(height: 2),
                         Text(
-                          reason,
-                          maxLines: 2,
+                          l.cleanerSmartCleanMostlyFrom(apps.join(', ')),
+                          key: ValueKey<String>(
+                            'cleaner-smart-clean-apps-${group.categoryId}',
+                          ),
+                          maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: group.isPermanent ? scheme.error : muted,
-                          ),
-                        ),
-                        if (apps.isNotEmpty) ...[
-                          const SizedBox(height: 2),
-                          Text(
-                            l.cleanerSmartCleanMostlyFrom(apps.join(', ')),
-                            key: ValueKey<String>(
-                              'cleaner-smart-clean-apps-${group.categoryId}',
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: scheme.onSurface,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                        const SizedBox(height: 6),
-                        _ShareBar(share: share, color: accent),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  SizedBox(
-                    width: 84,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          FormatUtils.formatFileSize(group.bytes),
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        Text(
-                          l.cleanerSmartCleanItemCount(group.items.length),
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: muted,
+                          style: CbTypography.bodySm.copyWith(
+                            color: c.textPrimary,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                       ],
-                    ),
+                      const SizedBox(height: 6),
+                      _ShareBar(share: share, color: accent),
+                    ],
                   ),
-                  const SizedBox(width: 4),
-                  IconButton(
-                    key: ValueKey<String>(
-                      'cleaner-smart-clean-expand-${group.categoryId}',
-                    ),
-                    onPressed: onExpand,
-                    icon: Icon(
-                      expanded
-                          ? Icons.expand_less_rounded
-                          : Icons.expand_more_rounded,
-                      size: 22,
-                      color: muted,
-                    ),
+                ),
+                const SizedBox(width: 16),
+                SizedBox(
+                  width: 84,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        FormatUtils.formatFileSize(group.bytes),
+                        style: CbTypography.headingSm.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        l.cleanerSmartCleanItemCount(group.items.length),
+                        style: CbTypography.bodySm.copyWith(color: muted),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(width: 4),
+                CbButton.icon(
+                  key: ValueKey<String>(
+                    'cleaner-smart-clean-expand-${group.categoryId}',
+                  ),
+                  onPressed: onExpand,
+                  tooltip: l.viewDetails,
+                  icon: expanded
+                      ? PhosphorIconsLight.caretUp
+                      : PhosphorIconsLight.caretDown,
+                ),
+              ],
             ),
           ),
         ),
         if (expanded)
           Container(
-            color: scheme.surfaceContainerHighest.withValues(alpha: 0.35),
+            color: c.fillSubtle,
             padding: const EdgeInsets.fromLTRB(_checkboxColumnWidth, 2, 6, 4),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 for (final (index, source) in group.sources.indexed) ...[
-                  if (index > 0) const Divider(height: 1),
+                  if (index > 0) const SizedBox(height: CbSpacing.xs),
                   _SourceRow(
                     categoryId: group.categoryId,
                     source: source,
@@ -1165,16 +1218,15 @@ class _SourceRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final c = context.cbColors;
     final l = AppLocalizations.of(context)!;
-    final scheme = theme.colorScheme;
-    final muted = scheme.onSurfaceVariant;
+    final muted = c.textSecondary;
     final origin = source.origin;
     final impactColor = switch (origin.impact) {
-      CleanerItemImpact.rebuilt || CleanerItemImpact.leftover => scheme.primary,
-      CleanerItemImpact.redownload => scheme.tertiary,
-      CleanerItemImpact.diagnostic => scheme.tertiary,
-      CleanerItemImpact.permanent => scheme.error,
+      CleanerItemImpact.rebuilt || CleanerItemImpact.leftover => c.accent.base,
+      CleanerItemImpact.redownload => c.textSecondary,
+      CleanerItemImpact.diagnostic => c.textSecondary,
+      CleanerItemImpact.permanent => c.status.danger,
     };
     final id = CleanerSmartCleanState.sourceId(categoryId, source.key);
     final hidden = source.items.length - _maxListedItems;
@@ -1184,8 +1236,9 @@ class _SourceRow extends StatelessWidget {
       key: ValueKey<String>('cleaner-smart-clean-source-$id'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        InkWell(
-          onTap: enabled ? onToggle : null,
+        _SelectableRow(
+          selected: selected,
+          onPressed: enabled ? onToggle : null,
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 6),
             child: Row(
@@ -1194,11 +1247,12 @@ class _SourceRow extends StatelessWidget {
                 SizedBox(
                   width: _checkboxColumnWidth,
                   height: _checkboxColumnWidth,
-                  child: Checkbox(
+                  child: _SelectionCheckbox(
                     key: ValueKey<String>(
                       'cleaner-smart-clean-source-toggle-$id',
                     ),
                     value: selected,
+                    label: _sourceTitle(l, source),
                     onChanged: enabled ? (_) => onToggle() : null,
                   ),
                 ),
@@ -1230,7 +1284,7 @@ class _SourceRow extends StatelessWidget {
                           _sourceTitle(l, source),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodyMedium?.copyWith(
+                          style: CbTypography.body.copyWith(
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -1250,16 +1304,14 @@ class _SourceRow extends StatelessWidget {
                             if (installed != null)
                               _Tag(
                                 text: l.cleanerSmartCleanInstalledBadge,
-                                color: scheme.secondary,
+                                color: c.textSecondary,
                               ),
                           ],
                         ),
                         const SizedBox(height: 4),
                         Text(
                           _kindInfo(l, origin.kind),
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: muted,
-                          ),
+                          style: CbTypography.bodySm.copyWith(color: muted),
                         ),
                       ],
                     ),
@@ -1275,33 +1327,28 @@ class _SourceRow extends StatelessWidget {
                       children: [
                         Text(
                           FormatUtils.formatFileSize(source.bytes),
-                          style: theme.textTheme.bodyMedium?.copyWith(
+                          style: CbTypography.body.copyWith(
                             fontWeight: FontWeight.w600,
                           ),
                         ),
                         Text(
                           l.cleanerSmartCleanItemCount(source.items.length),
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: muted,
-                          ),
+                          style: CbTypography.bodySm.copyWith(color: muted),
                         ),
                       ],
                     ),
                   ),
                 ),
                 const SizedBox(width: 4),
-                IconButton(
+                CbButton.icon(
                   key: ValueKey<String>(
                     'cleaner-smart-clean-source-expand-$id',
                   ),
                   onPressed: onExpand,
-                  icon: Icon(
-                    expanded
-                        ? Icons.expand_less_rounded
-                        : Icons.expand_more_rounded,
-                    size: 20,
-                    color: muted,
-                  ),
+                  tooltip: l.viewDetails,
+                  icon: expanded
+                      ? PhosphorIconsLight.caretUp
+                      : PhosphorIconsLight.caretDown,
                 ),
               ],
             ),
@@ -1330,16 +1377,14 @@ class _SourceRow extends StatelessWidget {
                               item.originalPath ?? item.path,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.bodySmall,
+                              style: CbTypography.monoSm,
                             ),
                           ),
                         ),
                         const SizedBox(width: 12),
                         Text(
                           FormatUtils.formatFileSize(item.sizeBytes),
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: muted,
-                          ),
+                          style: CbTypography.bodySm.copyWith(color: muted),
                         ),
                       ],
                     ),
@@ -1349,7 +1394,7 @@ class _SourceRow extends StatelessWidget {
                     padding: const EdgeInsets.only(top: 4),
                     child: Text(
                       l.cleanerSmartCleanMoreItems(hidden),
-                      style: theme.textTheme.bodySmall?.copyWith(color: muted),
+                      style: CbTypography.bodySm.copyWith(color: muted),
                     ),
                   ),
               ],
@@ -1369,16 +1414,12 @@ class _Tag extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(6),
-      ),
+      decoration: CbDecorations.tint(context, color),
       child: Text(
         text,
-        style: theme.textTheme.labelSmall?.copyWith(
+        style: CbTypography.labelXs.copyWith(
           color: color,
           fontWeight: FontWeight.w600,
         ),
@@ -1470,9 +1511,7 @@ class _ShareBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final track = Theme.of(
-      context,
-    ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.8);
+    final track = context.cbColors.fill;
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 260),
       child: Container(
@@ -1510,7 +1549,7 @@ class _CleanProgress extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final c = context.cbColors;
     final l = AppLocalizations.of(context)!;
     return Padding(
       key: const ValueKey<String>('cleaner-smart-clean-progress'),
@@ -1520,14 +1559,14 @@ class _CleanProgress extends StatelessWidget {
         children: [
           Row(
             children: [
-              AppWaveLoader(size: 18, color: theme.colorScheme.primary),
+              AppWaveLoader(size: 18, color: c.accent.base),
               const SizedBox(width: 8),
               Text(
                 total > 0
                     ? l.diskCleanerProcessedCount(done, total)
                     : l.diskCleanerPreparingFiles,
-                style: theme.textTheme.labelMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
+                style: CbTypography.labelSm.copyWith(
+                  fontWeight: FontWeight.w600,
                 ),
               ),
               const SizedBox(width: 10),
@@ -1536,9 +1575,7 @@ class _CleanProgress extends StatelessWidget {
                   path,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
+                  style: CbTypography.bodySm.copyWith(color: c.textSecondary),
                 ),
               ),
             ],
@@ -1546,9 +1583,12 @@ class _CleanProgress extends StatelessWidget {
           const SizedBox(height: 8),
           ClipRRect(
             borderRadius: BorderRadius.circular(999),
-            child: LinearProgressIndicator(
+            child: AppProgressIndicator(
               value: total > 0 ? (done / total).clamp(0.0, 1.0) : null,
-              minHeight: 8,
+              height: 3,
+              backgroundColor: c.fill,
+              valueColor: c.accent.base,
+              showGlow: false,
             ),
           ),
         ],

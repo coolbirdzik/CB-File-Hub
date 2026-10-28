@@ -1,3 +1,5 @@
+import 'package:cb_file_manager/design_system/cb_design_system.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:flutter/material.dart';
 
 class CleanerUtilityDestination {
@@ -52,7 +54,7 @@ class CleanerUtilitiesShell extends StatelessWidget {
                 enabled: navigationEnabled,
                 onSelected: onSelected,
               ),
-              const Divider(height: 1),
+              const SizedBox(height: CbSpacing.xs),
               Expanded(child: child),
             ],
           );
@@ -71,7 +73,7 @@ class CleanerUtilitiesShell extends StatelessWidget {
                 onSelected: onSelected,
               ),
             ),
-            const VerticalDivider(width: 1),
+            const SizedBox(width: CbSpacing.sm),
             Expanded(child: child),
           ],
         );
@@ -99,7 +101,7 @@ class _UtilitySidebar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final c = context.cbColors;
     final children = <Widget>[
       Padding(
         padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
@@ -110,14 +112,10 @@ class _UtilitySidebar extends StatelessWidget {
               width: 38,
               height: 38,
               decoration: BoxDecoration(
-                color: theme.colorScheme.primaryContainer,
+                color: c.fill,
                 borderRadius: BorderRadius.circular(11),
               ),
-              child: Icon(
-                Icons.auto_fix_high_rounded,
-                size: 21,
-                color: theme.colorScheme.onPrimaryContainer,
-              ),
+              child: Icon(PhosphorIconsLight.broom, size: 21, color: c.icon),
             ),
             const SizedBox(width: 11),
             Expanded(
@@ -126,16 +124,14 @@ class _UtilitySidebar extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
+                    style: CbTypography.headingMd.copyWith(
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     subtitle,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
+                    style: CbTypography.bodySm.copyWith(color: c.textSecondary),
                   ),
                 ],
               ),
@@ -153,11 +149,10 @@ class _UtilitySidebar extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(18, 10, 18, 7),
             child: Text(
-              currentGroup.toUpperCase(),
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.7,
+              currentGroup,
+              style: CbTypography.labelXs.copyWith(
+                color: c.textSecondary,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ),
@@ -175,7 +170,7 @@ class _UtilitySidebar extends StatelessWidget {
 
     return Container(
       key: const ValueKey<String>('cleaner-subfeature-selector'),
-      color: theme.colorScheme.surfaceContainerLow,
+      color: c.fillSubtle,
       child: ListView(
         key: const PageStorageKey<String>('cleaner-utilities-sidebar'),
         padding: const EdgeInsets.only(bottom: 16),
@@ -200,21 +195,17 @@ class _UtilityNavigationTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final foreground = selected
-        ? theme.colorScheme.onSecondaryContainer
-        : theme.colorScheme.onSurface;
+    final c = context.cbColors;
+    final foreground = selected ? c.accent.text : c.textPrimary;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-      child: Material(
-        color: selected
-            ? theme.colorScheme.secondaryContainer
-            : Colors.transparent,
-        borderRadius: BorderRadius.circular(10),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
+      child: Semantics(
+        selected: selected,
+        child: CbSurface(
           key: ValueKey<String>('cleaner-utility-${destination.id}'),
-          onTap: enabled ? onTap : null,
+          selected: selected,
+          onPressed: enabled ? onTap : null,
+          semanticLabel: destination.title,
           child: Padding(
             padding: const EdgeInsets.fromLTRB(12, 11, 10, 11),
             child: Row(
@@ -229,11 +220,11 @@ class _UtilityNavigationTile extends StatelessWidget {
                         destination.title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodyMedium?.copyWith(
+                        style: CbTypography.body.copyWith(
                           color: foreground,
                           fontWeight: selected
-                              ? FontWeight.w700
-                              : FontWeight.w600,
+                              ? CbTypography.semibold
+                              : CbTypography.medium,
                         ),
                       ),
                       const SizedBox(height: 2),
@@ -241,10 +232,10 @@ class _UtilityNavigationTile extends StatelessWidget {
                         destination.description,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodySmall?.copyWith(
+                        style: CbTypography.bodySm.copyWith(
                           color: selected
                               ? foreground.withValues(alpha: 0.78)
-                              : theme.colorScheme.onSurfaceVariant,
+                              : c.textSecondary,
                         ),
                       ),
                     ],
@@ -253,7 +244,7 @@ class _UtilityNavigationTile extends StatelessWidget {
                 if (selected) ...[
                   const SizedBox(width: 6),
                   Icon(
-                    Icons.chevron_right_rounded,
+                    PhosphorIconsLight.caretRight,
                     size: 18,
                     color: foreground,
                   ),
@@ -284,7 +275,7 @@ class _CompactUtilityNavigation extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final c = context.cbColors;
     final selected = destinations.firstWhere(
       (destination) => destination.id == selectedId,
       orElse: () => destinations.first,
@@ -292,88 +283,39 @@ class _CompactUtilityNavigation extends StatelessWidget {
     return Container(
       key: const ValueKey<String>('cleaner-subfeature-selector'),
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 9),
-      color: theme.colorScheme.surfaceContainerLow,
+      color: c.fillSubtle,
       child: Row(
         children: [
-          Icon(
-            Icons.auto_fix_high_rounded,
-            size: 20,
-            color: theme.colorScheme.primary,
-          ),
+          Icon(PhosphorIconsLight.broom, size: 20, color: c.accent.text),
           const SizedBox(width: 8),
           Flexible(
             child: Text(
               title,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w700,
+              style: CbTypography.headingSm.copyWith(
+                fontWeight: FontWeight.w600,
               ),
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: PopupMenuButton<String>(
+            child: CbSelect<String>(
               key: const ValueKey<String>('cleaner-utility-popup'),
+              value: selected.id,
               enabled: enabled,
-              onSelected: onSelected,
-              itemBuilder: (context) => destinations
-                  .map(
-                    (destination) => PopupMenuItem<String>(
-                      value: destination.id,
-                      child: Row(
-                        children: [
-                          Icon(destination.icon, size: 20),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(destination.title),
-                                Text(
-                                  destination.description,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: theme.colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
-                  .toList(growable: false),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 9,
-                ),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.secondaryContainer,
-                  borderRadius: BorderRadius.circular(9),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(selected.icon, size: 19),
-                    const SizedBox(width: 8),
-                    Flexible(
-                      child: Text(
-                        selected.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    const Icon(Icons.expand_more_rounded, size: 18),
-                  ],
-                ),
-              ),
+              expand: true,
+              tooltip: title,
+              onChanged: onSelected,
+              items: [
+                for (final destination in destinations)
+                  CbSelectItem(
+                    value: destination.id,
+                    label: destination.title,
+                    icon: destination.icon,
+                    keywords: destination.description,
+                  ),
+              ],
             ),
           ),
         ],

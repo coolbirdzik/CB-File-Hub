@@ -1,9 +1,13 @@
+import 'dart:ui' show CheckedState;
+
 import 'package:cb_file_manager/bloc/cleaner_smart_clean/cleaner_smart_clean.dart';
 import 'package:cb_file_manager/config/languages/app_localizations_delegate.dart';
+import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:cb_file_manager/services/app_insights/app_insights_models.dart';
 import 'package:cb_file_manager/services/disk_cleaner/cleaner_models.dart';
 import 'package:cb_file_manager/ui/screens/cb_agent_cleaner/cleaner_smart_clean_view.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -66,6 +70,8 @@ void main() {
     ScanReport? scanReport,
     ValueChanged<String>? onOpenReviewFile,
     Locale locale = const Locale('en'),
+    Brightness brightness = Brightness.light,
+    bool enabled = true,
   }) async {
     final cleaned = <List<JunkItem>>[];
     final cubit = CleanerSmartCleanCubit(
@@ -88,6 +94,10 @@ void main() {
     addTearDown(cubit.close);
     await tester.pumpWidget(
       MaterialApp(
+        theme: CbThemeBuilder.build(
+          brightness: brightness,
+          accent: const Color(0xFF0078D4),
+        ),
         locale: locale,
         localizationsDelegates: const [
           AppLocalizationsDelegate(),
@@ -103,6 +113,7 @@ void main() {
             categoryTitle: (id) => 'title:$id',
             categoryReason: (id) => 'reason:$id',
             onOpenReviewFile: onOpenReviewFile,
+            enabled: enabled,
           ),
         ),
       ),
@@ -110,6 +121,96 @@ void main() {
     await tester.pumpAndSettle();
     return (cubit, cleaned);
   }
+
+  for (final brightness in Brightness.values) {
+    testWidgets(
+      'CB controls preserve selection and keyboard use in $brightness',
+      (tester) async {
+        final (cubit, _) = await pump(
+          tester,
+          bySource: true,
+          brightness: brightness,
+        );
+        expect(
+          tester
+              .widget<CbButton>(
+                find.byKey(const ValueKey('cleaner-smart-clean-scan')),
+              )
+              .variant,
+          CbButtonVariant.primary,
+        );
+        await tester.tap(
+          find.byKey(const ValueKey('cleaner-smart-clean-scan')),
+        );
+        await tester.pumpAndSettle();
+        final bytesBeforeExpand = cubit.state.selectedBytes;
+        await tester.tap(
+          find.byKey(const ValueKey('cleaner-smart-clean-expand-windows_temp')),
+        );
+        await tester.pumpAndSettle();
+        expect(cubit.state.selectedBytes, bytesBeforeExpand);
+
+        final chrome = cubit.state.groups
+            .firstWhere((g) => g.categoryId == 'windows_temp')
+            .sources
+            .firstWhere((s) => s.origin.app == 'Google Chrome');
+        await tester.tap(
+          find.byKey(
+            ValueKey(
+              'cleaner-smart-clean-source-toggle-windows_temp/${chrome.key}',
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final group = find.byKey(
+          const ValueKey('cleaner-smart-clean-toggle-windows_temp'),
+        );
+        expect(
+          tester.getSemantics(group).flagsCollection.isChecked,
+          CheckedState.mixed,
+        );
+        final gesture = find.descendant(
+          of: group,
+          matching: find.byType(GestureDetector),
+        );
+        Focus.of(tester.element(gesture)).requestFocus();
+        await tester.pump();
+        await tester.sendKeyEvent(LogicalKeyboardKey.space);
+        await tester.pumpAndSettle();
+        expect(cubit.state.groupSelection('windows_temp'), isTrue);
+        expect(
+          tester.getSemantics(group).flagsCollection.isChecked,
+          CheckedState.isTrue,
+        );
+
+        for (final type in [
+          FilledButton,
+          OutlinedButton,
+          TextButton,
+          IconButton,
+          InkWell,
+          Checkbox,
+          ExpansionTile,
+        ]) {
+          expect(
+            find.descendant(
+              of: find.byType(CleanerSmartCleanView),
+              matching: find.byType(type),
+            ),
+            findsNothing,
+          );
+        }
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets('disabled scan stays idle', (tester) async {
+    final (cubit, _) = await pump(tester, enabled: false);
+    await tester.tap(find.byKey(const ValueKey('cleaner-smart-clean-scan')));
+    await tester.pumpAndSettle();
+    expect(cubit.state.status, CleanerSmartCleanStatus.idle);
+  });
 
   testWidgets('scan, review and clean only the checked groups', (tester) async {
     final (cubit, cleaned) = await pump(tester);
@@ -284,7 +385,7 @@ void main() {
       find.byKey(const ValueKey('cleaner-smart-clean-clean')),
       findsNothing,
     );
-    expect(find.byType(Checkbox), findsNothing);
+    expect(find.bySemanticsLabel('title:old_downloads_review'), findsNothing);
     await tester.tap(find.byKey(const ValueKey('cleaner-old-files-expand')));
     await tester.pumpAndSettle();
     expect(
@@ -386,6 +487,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Empty the Recycle Bin?'), findsOneWidget);
+    expect(find.byType(CbDialog), findsOneWidget);
+    expect(find.byType(AlertDialog), findsNothing);
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
     expect(cleaned, isEmpty);

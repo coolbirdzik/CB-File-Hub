@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/design_system/cb_design_system.dart';
 
 import '../../../config/languages/app_localizations.dart';
@@ -39,100 +40,123 @@ class _CleanerOldFilesPanelState extends State<CleanerOldFilesPanel> {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
-    return Container(
+    final c = context.cbColors;
+    return CbSurface(
       key: ValueKey(
         widget.categoryId == CleanerReviewCandidates.categoryId
             ? 'cleaner-old-files-panel'
             : 'cleaner-review-panel-${widget.categoryId}',
       ),
-      decoration: CbDecorations.card(context, radius: 12),
-      clipBehavior: Clip.antiAlias,
-      child: Material(
-        type: MaterialType.transparency,
-        child: ExpansionTile(
-          key: ValueKey(
-            widget.categoryId == CleanerReviewCandidates.categoryId
-                ? 'cleaner-old-files-expand'
-                : 'cleaner-review-expand-${widget.categoryId}',
-          ),
-          leading: const Icon(Icons.history_rounded),
-          title: Text(widget.title ?? l.cleanerOldFilesTitle),
-          subtitle: Text(
-            widget.categoryId == CleanerReviewCandidates.categoryId
-                ? l.cleanerOldFilesCount(widget.candidates.length)
-                : l.cleanerReviewSummary(
-                    widget.candidates.length,
-                    FormatUtils.formatFileSize(
-                      widget.candidates.fold(
-                        0,
-                        (sum, item) => sum + item.sizeBytes,
-                      ),
+      clip: true,
+      child: CbExpander(
+        key: ValueKey(
+          widget.categoryId == CleanerReviewCandidates.categoryId
+              ? 'cleaner-old-files-expand'
+              : 'cleaner-review-expand-${widget.categoryId}',
+        ),
+        leading: const Icon(PhosphorIconsLight.clockCounterClockwise),
+        title: Text(widget.title ?? l.cleanerOldFilesTitle),
+        subtitle: Text(
+          widget.categoryId == CleanerReviewCandidates.categoryId
+              ? l.cleanerOldFilesCount(widget.candidates.length)
+              : l.cleanerReviewSummary(
+                  widget.candidates.length,
+                  FormatUtils.formatFileSize(
+                    widget.candidates.fold(
+                      0,
+                      (sum, item) => sum + item.sizeBytes,
                     ),
                   ),
+                ),
+        ),
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: Text(widget.description ?? l.cleanerOldFilesDescription),
           ),
-          children: [
+          const SizedBox(height: CbSpacing.xs),
+          for (final item in widget.candidates.take(_visible))
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-              child: Text(widget.description ?? l.cleanerOldFilesDescription),
-            ),
-            const Divider(height: 1),
-            for (final item in widget.candidates.take(_visible))
-              ListTile(
-                key: ValueKey('cleaner-old-file-${item.path}'),
-                leading: Icon(
-                  item.isDirectory
-                      ? Icons.folder_outlined
-                      : Icons.insert_drive_file_outlined,
-                  size: 20,
-                ),
-                title: Text(
-                  item.path.replaceAll(r'\', '/').split('/').last,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Tooltip(
-                      message: item.path,
-                      child: Text(
-                        item.path,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+              key: ValueKey('cleaner-old-file-${item.path}'),
+              padding: const EdgeInsets.symmetric(
+                horizontal: CbSpacing.lg,
+                vertical: CbSpacing.sm,
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(top: CbSpacing.xs),
+                    child: Icon(
+                      item.isDirectory
+                          ? PhosphorIconsLight.folder
+                          : PhosphorIconsLight.file,
+                      size: 20,
+                      color: c.icon,
                     ),
-                    if (!item.isDirectory)
-                      Text(
-                        l.cleanerOldFilesModified(
-                          FormatUtils.formatDateLocalized(
-                            item.lastModified,
-                            context,
+                  ),
+                  const SizedBox(width: CbSpacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.path.replaceAll(r'\', '/').split('/').last,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: CbTypography.label.copyWith(
+                            color: c.textPrimary,
                           ),
                         ),
-                      ),
-                  ],
-                ),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(FormatUtils.formatFileSize(item.sizeBytes)),
-                    if (widget.onOpenFile != null)
-                      IconButton(
-                        key: ValueKey('cleaner-old-file-open-${item.path}'),
-                        tooltip: l.cleanerAppsOpenFolder,
-                        onPressed: () => widget.onOpenFile!(item.path),
-                        icon: const Icon(Icons.folder_open_outlined, size: 18),
-                      ),
-                  ],
-                ),
+                        CbTooltip(
+                          message: item.path,
+                          child: Text(
+                            item.path,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: CbTypography.bodySm.copyWith(
+                              color: c.textSecondary,
+                            ),
+                          ),
+                        ),
+                        if (!item.isDirectory)
+                          Text(
+                            l.cleanerOldFilesModified(
+                              FormatUtils.formatDateLocalized(
+                                item.lastModified,
+                                context,
+                              ),
+                            ),
+                            style: CbTypography.bodySm.copyWith(
+                              color: c.textSecondary,
+                            ),
+                          ),
+                        Text(
+                          FormatUtils.formatFileSize(item.sizeBytes),
+                          style: CbTypography.monoSm.copyWith(
+                            color: c.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (widget.onOpenFile != null)
+                    CbButton.icon(
+                      key: ValueKey('cleaner-old-file-open-${item.path}'),
+                      tooltip: l.cleanerAppsOpenFolder,
+                      onPressed: () => widget.onOpenFile!(item.path),
+                      icon: PhosphorIconsLight.folderOpen,
+                    ),
+                ],
               ),
-            if (widget.candidates.length > _visible)
-              TextButton(
-                onPressed: () => setState(() => _visible += 20),
-                child: Text(l.cleanerOldFilesShowMore),
-              ),
-          ],
-        ),
+            ),
+          if (widget.candidates.length > _visible)
+            CbButton(
+              variant: CbButtonVariant.ghost,
+              onPressed: () => setState(() => _visible += 20),
+              label: l.cleanerOldFilesShowMore,
+            ),
+        ],
       ),
     );
   }
