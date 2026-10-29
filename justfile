@@ -91,16 +91,16 @@ lint:
 
 # Format code
 format:
-    cd {{project_dir}} && dart format .
+    bash scripts/format_dart.sh
 
 # Verify code quality (format check + analyze)
 verify:
-    cd {{project_dir}} && dart format --output=none --set-exit-if-changed .
+    bash scripts/format_dart.sh --output=none --set-exit-if-changed
     cd {{project_dir}} && {{flutter}} analyze
 
 # Check format only
 verify-format:
-    cd {{project_dir}} && dart format --output=none --set-exit-if-changed .
+    bash scripts/format_dart.sh --output=none --set-exit-if-changed
 
 # =============================================================================
 # Testing

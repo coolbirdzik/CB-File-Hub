@@ -59,7 +59,7 @@ If applicable, add screenshots or videos to demonstrate the changes.
 - [ ] Any dependent changes have been merged and published
 - [ ] I have updated the CHANGELOG.md file under `[Unreleased]`
 - [ ] I have run `flutter analyze` with no issues
-- [ ] I have run `dart format .` to format the code
+- [ ] I have run `just format` to format the source code
 
 ## 📋 Additional Notes
 

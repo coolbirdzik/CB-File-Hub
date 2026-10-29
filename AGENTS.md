@@ -69,7 +69,7 @@ flutter pub get
 flutter test                           # unit/widget tests
 flutter test --reporter expanded       # verbose test output
 flutter analyze
-dart format --output=none --set-exit-if-changed .   # format check (CI uses this)
+bash ../scripts/format_dart.sh --output=none --set-exit-if-changed # source format check (CI uses this)
 flutter test integration_test -d windows --dart-define=CB_E2E=true  # E2E
 ```
 
@@ -87,7 +87,10 @@ on the first failure. Their unit/widget step prints only failed tests (error,
 stack and that test's own output, via `cb_file_manager/tool/unit_test_failures.dart`);
 the full event stream is in `cb_file_manager/build/unit_test_report.jsonl`. Use
 `just test` for the per-test expanded log. `just verify` runs only format check and static analysis;
-`just lint` runs only static analysis. Local checks use the host OS; the CI
+`just lint` runs only static analysis. All formatting recipes share
+`scripts/format_dart.sh`, which checks source roots and skips `build/`,
+`.dart_tool/` and platform caches. Add new source roots to that script when needed.
+Local checks use the host OS; the CI
 analyze job runs on Ubuntu, so platform-specific failures still need a Linux run.
 
 ## Architecture notes

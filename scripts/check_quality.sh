@@ -8,7 +8,7 @@ flutter="${1:-flutter}"
 echo '==> Install dependencies'
 "$flutter" pub get
 echo '==> Verify formatting'
-dart format --output=none --set-exit-if-changed .
+bash ../scripts/format_dart.sh --output=none --set-exit-if-changed
 echo '==> Analyze project'
 "$flutter" analyze
 echo '==> Run unit/widget tests (only failures are printed)'

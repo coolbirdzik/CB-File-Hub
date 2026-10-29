@@ -1113,7 +1113,7 @@ analyze_code() {
 format_code() {
     print_info "Formatting code..."
     cd "$PROJECT_DIR"
-    dart format .
+    bash "$SCRIPT_DIR/format_dart.sh"
     cd ..
     print_success "Code formatted!"
 }
