@@ -17,6 +17,7 @@ void main() {
 
     setUp(() async {
       SharedPreferences.setMockInitialValues({});
+      FlutterSecureStorage.setMockInitialValues({});
       prefs = await SharedPreferences.getInstance();
       service = LocalAiAdvisorService(
         secureStorage: const FlutterSecureStorage(),

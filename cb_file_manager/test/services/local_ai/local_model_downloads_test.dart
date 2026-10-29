@@ -9,6 +9,7 @@ import 'package:cb_file_manager/ui/screens/settings/local_ai_advisor_settings_se
 import 'package:cb_file_manager/ui/screens/settings/settings_navigation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get_it/get_it.dart';
 import 'package:http/http.dart' as http;
@@ -36,18 +37,35 @@ class _Server {
   });
 }
 
+/// Exercise a recommendation below the lazy list's initial viewport even on
+/// Windows, where the platform's normal recommendation happens to be first.
+class _TestLocalAiService extends LocalAiAdvisorService {
+  bool recommendLastModel = false;
+  _TestLocalAiService({
+    required super.prefs,
+    required super.httpClient,
+    required super.documentsDirectoryProvider,
+  });
+
+  @override
+  HuggingFaceModelEntry get pinnedModel => recommendLastModel
+      ? catalogEntryFor('litert-community/Qwen3.5-0.8B')!
+      : super.pinnedModel;
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   late Directory sandbox;
   late _Server server;
-  late LocalAiAdvisorService service;
+  late _TestLocalAiService service;
   late LocalModelDownloads downloads;
 
   setUp(() async {
     SharedPreferences.setMockInitialValues(<String, Object>{});
+    FlutterSecureStorage.setMockInitialValues({});
     sandbox = await Directory.systemTemp.createTemp('cb-model-downloads-');
     server = _Server();
-    service = LocalAiAdvisorService(
+    service = _TestLocalAiService(
       prefs: await SharedPreferences.getInstance(),
       httpClient: server.client,
       documentsDirectoryProvider: () async => sandbox,
@@ -121,78 +139,91 @@ void main() {
     await server.body.close();
   });
 
-  testWidgets('the setup guide lands on an installer that downloads in the '
-      'background', (tester) async {
-    GetIt.instance
-      ..registerSingleton<LocalAiAdvisorService>(service)
-      ..registerSingleton<LocalModelDownloads>(downloads);
-    pendingLocalModelInstaller.value = true;
-    addTearDown(() => pendingLocalModelInstaller.value = false);
+  for (final recommendLastModel in [false, true]) {
+    testWidgets('the setup guide lands on an installer that downloads in the '
+        'background (recommendation below fold=$recommendLastModel)', (
+      tester,
+    ) async {
+      service.recommendLastModel = recommendLastModel;
+      GetIt.instance
+        ..registerSingleton<LocalAiAdvisorService>(service)
+        ..registerSingleton<LocalModelDownloads>(downloads);
+      pendingLocalModelInstaller.value = true;
+      addTearDown(() => pendingLocalModelInstaller.value = false);
 
-    await tester.pumpWidget(
-      MaterialApp(
-        locale: const Locale('en'),
-        supportedLocales: const [Locale('en'), Locale('vi')],
-        localizationsDelegates: const [
-          AppLocalizationsDelegate(),
-          GlobalMaterialLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
-        ],
-        home: Scaffold(
-          body: SingleChildScrollView(
-            child: LocalAiAdvisorSettingsSection(
-              buildSectionCard:
-                  ({required title, required icon, required children}) =>
-                      Column(children: children),
-              buildCompactSettingTile:
-                  ({
-                    required title,
-                    required subtitle,
-                    required icon,
-                    trailing,
-                    onTap,
-                  }) => const SizedBox.shrink(),
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('en'),
+          supportedLocales: const [Locale('en'), Locale('vi')],
+          localizationsDelegates: const [
+            AppLocalizationsDelegate(),
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: LocalAiAdvisorSettingsSection(
+                buildSectionCard:
+                    ({required title, required icon, required children}) =>
+                        Column(children: children),
+                buildCompactSettingTile:
+                    ({
+                      required title,
+                      required subtitle,
+                      required icon,
+                      trailing,
+                      onTap,
+                    }) => const SizedBox.shrink(),
+              ),
             ),
           ),
         ),
-      ),
-    );
-    // Settings loads from disk and the catalog asynchronously; spinners keep
-    // animating meanwhile, so pump until the installer shows its models.
-    for (
-      var i = 0;
-      i < 200 && find.text('Recommended').evaluate().isEmpty;
-      i++
-    ) {
-      await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 10)),
       );
-      await tester.pump(const Duration(milliseconds: 50));
-    }
+      final catalog = find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(ListView),
+      );
+      // Wait for catalog loading, not for a badge that may be below the fold on
+      // Linux/macOS. The installer uses a lazy ListView.
+      for (var i = 0; i < 200 && catalog.evaluate().isEmpty; i++) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 10)),
+        );
+        await tester.pump(const Duration(milliseconds: 50));
+      }
 
-    // The installer opened by itself and the flag was consumed.
-    expect(find.byType(AlertDialog), findsOneWidget);
-    expect(pendingLocalModelInstaller.value, isFalse);
-    expect(find.text('Recommended'), findsOneWidget);
+      // The installer opened by itself and the flag was consumed.
+      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(pendingLocalModelInstaller.value, isFalse);
+      final pinned = service.pinnedModel;
+      final install = find.byKey(ValueKey('local-ai-install-${pinned.id}'));
+      await tester.scrollUntilVisible(
+        install,
+        200,
+        scrollable: find.descendant(
+          of: catalog,
+          matching: find.byType(Scrollable),
+        ),
+      );
+      expect(find.text('Recommended'), findsOneWidget);
+      await tester.tap(install);
+      await tester.pump();
+      expect(downloads.isDownloading(pinned.id), isTrue);
 
-    final pinned = service.pinnedModel;
-    await tester.tap(find.byKey(ValueKey('local-ai-install-${pinned.id}')));
-    await tester.pump();
-    expect(downloads.isDownloading(pinned.id), isTrue);
+      // Closing the installer leaves the download running under Installed models.
+      await tester.tap(find.text('Close'));
+      // The progress bar animates until bytes arrive, so pump instead of settle.
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.text('Downloading ${pinned.displayName}'), findsOneWidget);
+      expect(find.byType(LinearProgressIndicator), findsOneWidget);
 
-    // Closing the installer leaves the download running under Installed models.
-    await tester.tap(find.text('Close'));
-    // The progress bar animates until bytes arrive, so pump instead of settle.
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 500));
-    expect(find.byType(AlertDialog), findsNothing);
-    expect(find.text('Downloading ${pinned.displayName}'), findsOneWidget);
-    expect(find.byType(LinearProgressIndicator), findsOneWidget);
-
-    // Cancelling is covered above; here it only stops the pending request.
-    downloads.cancel(pinned.id);
-    // Nothing reads the body in this zone, so closing must not be awaited.
-    unawaited(server.body.close());
-  });
+      // Cancelling is covered above; here it only stops the pending request.
+      downloads.cancel(pinned.id);
+      // Nothing reads the body in this zone, so closing must not be awaited.
+      unawaited(server.body.close());
+    });
+  }
 }
