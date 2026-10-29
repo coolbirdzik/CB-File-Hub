@@ -10,6 +10,7 @@ import '../../../services/ssh/ssh_profile_store.dart';
 import '../../components/common/connection_form_row.dart';
 import '../../utils/route.dart';
 import 'ssh_key_dialog.dart';
+import 'ssh_proxy_dialog.dart';
 
 Future<bool> promptSshHostTrust(
   BuildContext context,
@@ -116,7 +117,7 @@ class _SshHostDialogState extends State<SshHostDialog> {
   bool _scanning = true;
 
   bool _keyAuth = false, _busy = false, _loaded = false, _save = true;
-  String? _keyId, _error;
+  String? _keyId, _proxyId, _error;
   @override
   void initState() {
     super.initState();
@@ -128,6 +129,7 @@ class _SshHostDialogState extends State<SshHostDialog> {
     _port.text = '${p?.port ?? 22}';
     _group.text = p?.group ?? '';
     _keyId = p?.keyId;
+    _proxyId = p?.proxyId;
     _keyAuth = _keyId != null;
     _load();
   }
@@ -250,6 +252,7 @@ class _SshHostDialogState extends State<SshHostDialog> {
       password: _keyAuth ? '' : _password.text,
       keyId: _keyAuth ? _keyId : null,
       group: _group.text.trim(),
+      proxyId: _proxyId,
     );
     try {
       if (widget.connectSftp) {
@@ -261,6 +264,7 @@ class _SshHostDialogState extends State<SshHostDialog> {
           port: p.port,
           additionalOptions: {
             'keyId': p.keyId,
+            'proxyId': p.proxyId,
             'trustPrompt':
                 (String h, int port, String type, String fp, String? old) =>
                     promptSshHostTrust(context, h, port, type, fp, old),
@@ -419,6 +423,64 @@ class _SshHostDialogState extends State<SshHostDialog> {
               ConnectionFormRow(
                 first: field(_name, tr.sshDisplayName),
                 second: field(_group, tr.sshGroup),
+              ),
+              heading(tr.sshProxy),
+              CbSelect<String>(
+                key: const ValueKey('ssh-proxy'),
+                label: tr.sshProxy,
+                value: _proxyId ?? '',
+                expand: true,
+                items: [
+                  CbSelectItem(value: '', label: tr.sshProxyNone),
+                  ..._store.proxies.map(
+                    (p) => CbSelectItem(
+                      value: p.id,
+                      label: '${p.name} · ${p.protocol}',
+                    ),
+                  ),
+                ],
+                onChanged: _busy || !_loaded
+                    ? null
+                    : (v) => setState(() => _proxyId = v.isEmpty ? null : v),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                children: [
+                  CbButton(
+                    label: tr.sshAddProxy,
+                    onPressed: _busy || !_loaded
+                        ? null
+                        : () async {
+                            final proxy = await showSshProxyDialog(
+                              context,
+                              _store,
+                            );
+                            if (proxy != null && mounted) {
+                              setState(() => _proxyId = proxy.id);
+                            }
+                          },
+                  ),
+                  if (_proxyId != null)
+                    CbButton(
+                      label: tr.sshEditProxy,
+                      onPressed: _busy
+                          ? null
+                          : () async {
+                              final current = _store.proxies
+                                  .where((p) => p.id == _proxyId)
+                                  .firstOrNull;
+                              if (current != null) {
+                                await showSshProxyDialog(
+                                  context,
+                                  _store,
+                                  proxy: current,
+                                );
+                                if (mounted) setState(() {});
+                              }
+                            },
+                    ),
+                ],
               ),
               heading(tr.sshAuthMethod),
               ConnectionFormRow(

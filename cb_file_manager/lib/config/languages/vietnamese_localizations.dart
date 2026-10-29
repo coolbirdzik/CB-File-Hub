@@ -2,6 +2,58 @@ import 'app_localizations.dart';
 
 class VietnameseLocalizations implements AppLocalizations {
   @override
+  String get sshProxy => 'Proxy';
+  @override
+  String get sshProxies => 'Proxy';
+  @override
+  String get sshAddProxy => 'Thêm proxy';
+  @override
+  String get sshEditProxy => 'Sửa proxy';
+  @override
+  String get sshProxyType => 'Giao thức proxy';
+  @override
+  String get sshProxyNone => 'Kết nối trực tiếp';
+  @override
+  String get sshProxyHint =>
+      'Thông tin proxy được lưu trong kho xác thực của hệ điều hành. HTTP hỗ trợ Basic; SOCKS5 hỗ trợ tài khoản/mật khẩu; SOCKS4a hỗ trợ user ID.';
+  @override
+  String get sshProxyInvalid =>
+      'Nhập địa chỉ proxy, cổng (1–65535) và thông tin xác thực hợp lệ.';
+  @override
+  String get sshProxyInUse =>
+      'Proxy đang được máy chủ đã lưu sử dụng. Đổi proxy của máy chủ đó trước khi xóa.';
+  @override
+  String get sshNoProxies => 'Thêm proxy hoặc nhập từ ứng dụng SSH khác.';
+  @override
+  String get sshImportProxyFailed =>
+      'Bỏ qua máy chủ: proxy bị thiếu, không hợp lệ hoặc chưa hỗ trợ. Nhập/cấu hình proxy trước khi kết nối.';
+  @override
+  String sshProxyImportSummary(
+    int hosts,
+    int keys,
+    int proxies,
+    int duplicates,
+  ) =>
+      'Đã nhập $hosts máy chủ, $keys key và $proxies proxy; bỏ qua $duplicates mục trùng.';
+  @override
+  String get sshImportScan => 'Quét ứng dụng đã cài';
+  @override
+  String get sshImportFileMode => 'Nhập từ file';
+  @override
+  String get sshImportScanHint =>
+      'Tự đọc máy chủ SSH và keychain từ các ứng dụng trên máy. Chọn nguồn và các mục rồi nhập. Giữ nguyên dữ liệu nguồn.';
+  @override
+  String get sshImportNotFound => 'Không tìm thấy trên máy này';
+  @override
+  String get sshImportVaultLocked =>
+      'Không mở khóa được dữ liệu Termius. Mở/mở khóa Termius bằng tài khoản hệ điều hành này rồi quét lại.';
+  @override
+  String get sshImportScanFailed =>
+      'Không đọc được nguồn này. Đóng ứng dụng SSH rồi quét lại.';
+  @override
+  String sshImportFound(int hosts, int keys) =>
+      'Tìm thấy $hosts máy chủ và $keys key.';
+  @override
   String get aiProviderKind => 'Loại nhà cung cấp';
   @override
   String get aiProviderCustom => 'Tùy chỉnh';
@@ -361,6 +413,56 @@ class VietnameseLocalizations implements AppLocalizations {
   String get sshGenerateKey => 'Tạo key Ed25519';
   @override
   String get sshImportKey => 'Nhập private key';
+  @override
+  String get sshImportFromApp => 'Nhập từ ứng dụng khác';
+  @override
+  String get sshImportAppHint =>
+      'Tự quét ứng dụng SSH trên máy để nhập máy chủ và keychain. Xem lại lựa chọn trước khi lưu.';
+  @override
+  String get sshImportSource => 'Định dạng nguồn';
+  @override
+  String get sshImportAuto => 'Tự nhận diện';
+  @override
+  String get sshImportChooseFiles => 'Thêm file xuất / private key';
+  @override
+  String get sshImportPaste => 'Dán dữ liệu đã xuất';
+  @override
+  String get sshImportPreview => 'Xem trước';
+  @override
+  String get sshImportSelected => 'Nhập mục đã chọn';
+  @override
+  String get sshImportTermiusHint =>
+      'Termius được đọc trực tiếp khi Quét ứng dụng đã cài. Nếu có bản xuất, thêm CSV / JSON / OpenSSH cùng các file private key tại đây. Hỗ trợ đọc trực tiếp key PPK v2/v3.';
+  @override
+  String get sshImportPassphraseHint =>
+      'Mật khẩu cho file key mã hóa (nếu có). Ưu tiên mật khẩu riêng của từng key trong bản xuất.';
+  @override
+  String get sshImportEmpty =>
+      'Không tìm thấy máy chủ hoặc private key có thể nhập.';
+  @override
+  String get sshImportMissingKey =>
+      'Bỏ qua máy chủ: thiếu private key hoặc trùng tên key. Thêm đúng file key rồi xem trước lại.';
+  @override
+  String get sshImportUnsupported =>
+      'Chưa nhập được jump host, chuyển tiếp cổng hoặc thiết lập có điều kiện. Kiểm tra máy chủ trước khi kết nối.';
+  @override
+  String get sshImportPasswordMissing =>
+      'Mật khẩu đã lưu bị mã hóa hoặc không có trong bản xuất. Điền lại trong phần sửa máy chủ sau khi nhập.';
+  @override
+  String get sshImportUnknownFormat =>
+      'Định dạng bản xuất không hỗ trợ hoặc không hợp lệ.';
+  @override
+  String get sshImportLimit =>
+      'Giới hạn: 128 file, 8 MB mỗi file, tổng 32 MB, 2.000 mục mỗi bản xuất.';
+  @override
+  String get sshImportReadFailed =>
+      'Không đọc được bản xuất. Kiểm tra định dạng, bảng mã và dung lượng file.';
+  @override
+  String get sshImportSaveFailed =>
+      'Không lưu được vào kho thông tin xác thực. Chưa nhập mục nào; thử lại khi kho hoạt động.';
+  @override
+  String sshImportSummary(int hosts, int keys, int duplicates) =>
+      'Đã nhập $hosts máy chủ và $keys key; bỏ qua $duplicates mục trùng.';
   @override
   String get sshOpenTerminal => 'Mở terminal';
   @override

@@ -21,6 +21,8 @@ import '../network_browsing/components/network_navigation_bar.dart';
 import '../system_screen.dart';
 import 'ssh_host_dialog.dart';
 import 'ssh_key_dialog.dart';
+import 'ssh_import_dialog.dart';
+import 'ssh_proxy_dialog.dart';
 
 class SshWorkspaceScreen extends StatefulWidget {
   final String tabId;
@@ -146,6 +148,7 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
         port: p.port,
         additionalOptions: {
           'keyId': p.keyId,
+          'proxyId': p.proxyId,
           'trustPrompt':
               (String h, int port, String type, String fp, String? old) =>
                   promptSshHostTrust(context, h, port, type, fp, old),
@@ -265,6 +268,11 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
                     selected: _section == 2,
                     onSelected: (_) => setState(() => _section = 2),
                   ),
+                  ChoiceChip(
+                    label: Text(tr.sshProxies),
+                    selected: _section == 3,
+                    onSelected: (_) => setState(() => _section = 3),
+                  ),
                 ] else
                   Text('SFTP', style: Theme.of(context).textTheme.titleLarge),
                 if (_section == 0)
@@ -273,6 +281,31 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
                     label: tr.sshAddHost,
                     onPressed: _loaded ? _edit : null,
                   ),
+                CbButton(
+                  icon: PhosphorIconsLight.downloadSimple,
+                  label: tr.sshImportFromApp,
+                  onPressed: !_loaded
+                      ? null
+                      : () => _run(() async {
+                          final summary = await showSshImportDialog(
+                            context,
+                            store,
+                          );
+                          if (!context.mounted || summary == null) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                context.tr.sshProxyImportSummary(
+                                  summary.hosts,
+                                  summary.keys,
+                                  summary.proxies,
+                                  summary.duplicates,
+                                ),
+                              ),
+                            ),
+                          );
+                        }),
+                ),
                 CbButton(
                   icon: PhosphorIconsLight.key,
                   label: tr.sshImportKey,
@@ -520,6 +553,50 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
                             ],
                           ),
                         ],
+                      ),
+                    ),
+                ],
+              ),
+            )
+          else if (_section == 3)
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.all(20),
+                children: [
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: CbButton(
+                      label: tr.sshAddProxy,
+                      onPressed: _loaded
+                          ? () => showSshProxyDialog(context, store)
+                          : null,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  if (store.proxies.isEmpty) Text(tr.sshNoProxies),
+                  for (final proxy in store.proxies)
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(proxy.name),
+                      subtitle: Text(
+                        '${proxy.protocol} · ${proxy.host}:${proxy.port}',
+                      ),
+                      onTap: () =>
+                          showSshProxyDialog(context, store, proxy: proxy),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.delete_outline),
+                        tooltip: tr.delete,
+                        onPressed: () => _run(() async {
+                          if (store.profiles.any(
+                            (p) => p.proxyId == proxy.id,
+                          )) {
+                            setState(() => _error = tr.sshProxyInUse);
+                            return;
+                          }
+                          if (await _confirm(proxy.name)) {
+                            await store.deleteProxy(proxy.id);
+                          }
+                        }),
                       ),
                     ),
                 ],

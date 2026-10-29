@@ -79,6 +79,136 @@ provider supports listing, streaming, download/upload, mkdir, rename and delete.
 Directory deletion is non-recursive, so non-empty directories produce a server
 error rather than silently deleting their contents.
 
+## SSH proxies
+
+Use **SSH → Proxies → Add proxy**, then choose that proxy in the host editor.
+Proxies can be edited and shared by several hosts. A referenced proxy cannot be
+deleted until its hosts select another route. Endpoints and proxy credentials
+are stored in the same OS credential vault as SSH profiles; older saved profiles
+continue to connect directly.
+
+Supported upstream protocols are HTTP CONNECT (optional Basic authentication),
+SOCKS5 (anonymous or username/password), and SOCKS4a (optional user ID). Both the
+terminal and SFTP use the shared connector and saved `proxyId`. Hostname targets
+are sent to the proxy for DNS resolution. Handshakes have bounded responses and
+timeouts; failure closes the socket and never retries a direct connection. SSH
+server fingerprint verification still applies to the final destination. SSH
+jump hosts/host chains, HTTPS proxies and NTLM/Digest proxy authentication are not
+implemented.
+
+## Import SSH hosts and keychains
+
+Open **SSH → Import from another app** (also available in SFTP). It automatically
+scans known per-user application locations, reads the local host/keychain data,
+and shows sources and discovered hosts/keys. Select the desired items and import.
+**Scan installed apps** refreshes the results, including after entering a private
+key passphrase. **Import a file** remains available for portable backups. Parsing,
+decryption and key decoding run in a worker isolate; scanning never writes to the
+source application or CB's vault.
+
+Automatic discovery reads:
+
+- Termius: `%APPDATA%/Termius`, Linux `.config/Termius` and snap profiles, macOS
+  Application Support and App Store containers. Its encrypted IndexedDB LevelDB
+  tables are read directly, using the current manifest, active SST/WAL files,
+  checksums, sequence numbers and deletion tombstones. A bounded Snappy/V8 reader
+  decodes the records; unsupported versions/blob records fail visibly.
+- Termius's named `localKey` from Windows Credential Manager (`CredReadW`), macOS
+  Keychain (`security`), or Linux Secret Service (`secret-tool`). XSalsa20-Poly1305
+  authenticates a candidate before it is used. This imports private keys, including
+  unattached keys, passwords and host → config → identity → key references. Group
+  inheritance, local/server IDs, newer identity join tables and logical deletion
+  are handled. Decrypted data stays in memory.
+- OpenSSH: `~/.ssh/config`, Includes and local private keys through the shared
+  discovery service.
+- PuTTY and WinSCP: their current-user Windows registry sessions; WinSCP also
+  checks its per-user INI. Registry access is read-only.
+- SecureCRT: session INIs in default per-user VanDyke directories.
+- Tabby: per-user `config.yaml` in AppData, `.config`, or Application Support.
+
+Referenced private key files in installed configurations are read automatically
+within the user's home. UNC paths and symbolic links are excluded. Portable
+installations outside these default locations can use file import. Scans retain
+per-source not-found/read-error/key-unavailable states; one failed source does not
+hide the other applications. macOS/Linux discovery is implemented but was not
+validated against live installations in this Windows session.
+
+Supported portable formats:
+
+| Client | Input | Credentials |
+| --- | --- | --- |
+| Termius | Decrypted host CSV, JSON, or OpenSSH export | Plaintext exported passwords, inline OpenSSH/PEM keys, or explicitly selected key files |
+| OpenSSH | `config` / `sshconfig` | Explicitly selected `IdentityFile` keys |
+| PuTTY | Export of `HKCU\Software\SimonTatham\PuTTY\Sessions` as `.reg` | OpenSSH/PEM or PPK v2/v3 private keys |
+| WinSCP | Tools → Export/Backup Configuration, `.ini` | SFTP/SCP sessions; encrypted saved passwords must be entered again |
+| SecureCRT | SSH session `.ini` files | Host, username, hexadecimal SSH port and identity file; encrypted passwords must be entered again |
+| Tabby | `config.yaml`, profile-list YAML, or JSON with `profiles` | SSH profiles, inline passwords if present, and explicitly selected private key files |
+
+Automatic Termius discovery needs no export, external runtime, cloud login or
+third-party extraction script. For a portable backup instead, the normalized
+`export.json` and key files produced by
+[termius-export](https://github.com/y01and3/termius-export) are supported: add
+`export.json` together with the referenced files from `keys/` and `keys-unlinked/`.
+Its per-key passphrases are honored when present. The older official
+[Termius CLI](https://github.com/termius/termius-cli) can produce an OpenSSH
+`sshconfig`; its repository is archived, so availability depends on the version.
+
+Termius CSV uses the columns `Groups`, `Label`, `Hostname`, `Protocol`, `Port`,
+`Username`, `Password`, with optional `IdentityFile`/`KeyLabel` and `KeyPassphrase`.
+Only SSH/SFTP rows are imported. Quoted commas, quotes and newlines are retained.
+JSON accepts the following portable structure (private keys must contain real
+OpenSSH/PEM data, with newlines encoded as JSON `\n`):
+
+```json
+{
+  "keys": [{"id": "work-key", "label": "Work", "private_key": "<OpenSSH/PEM>", "passphrase": ""}],
+  "identities": [{"id": "deploy", "username": "deploy", "ssh_key_id": "work-key"}],
+  "hosts": [{"label": "Web", "address": "web.example.test", "port": 22, "group": "Work", "identity_id": "deploy"}]
+}
+```
+
+`keychain` and `ssh_keys` are accepted instead of `keys`; keys may also use
+`name`/`pem`. Keychain-only exports import unattached private keys. Normalized
+exports can use `keys[].file` and `hosts[].identity_file` instead of inline keys.
+References match files by full path, then by an unambiguous basename. In manual
+file mode the importer only reads explicitly selected files. Missing, invalid or
+ambiguous keys skip their hosts and explain why in the preview. A shared
+passphrase field handles encrypted key files; exported per-key passphrases take
+precedence. PPK v2/v3 RSA, Ed25519 and ECDSA are decoded directly, with MAC
+verification; encrypted PPK uses AES-CBC and SHA-1 or bounded Argon2 derivation.
+Hardware keys and SSH agents are not supported.
+
+Termius scans read the `proxies` table, resolve proxy → identity credentials and
+host/group configuration → proxy references, and include unattached proxies in
+the selection. Portable JSON accepts `proxies` plus `hosts[].proxy_id`, or an
+inline `hosts[].proxy` with `type`/`kind`, `host`/`hostname`, `port`, `username` and
+`password`. CSV supports `ProxyType`, `ProxyHost`, `ProxyPort`, `ProxyUsername`
+and `ProxyPassword`. PuTTY/WinSCP proxy methods 1/2/3 map to SOCKS4a/SOCKS5/HTTP;
+encrypted WinSCP proxy passwords must be entered again. Tabby HTTP/SOCKS proxy
+endpoints are also retained. Missing/invalid/unsupported proxies skip their
+dependent hosts rather than silently importing a direct route. Proxy previews
+show only names, protocols and endpoints; attached proxies are selected together
+with their hosts. Matching proxy connection settings and credentials are reused
+without overwriting existing entries.
+
+Jump-host, forwarding and conditional settings are reported for manual review.
+Manual-file Includes are never followed and commands are never executed. Imported
+data never adds trusted server fingerprints. Duplicate keys are reused by
+fingerprint, and duplicate hosts (name, group, hostname, port, username, proxy route) are
+skipped without replacing existing credentials. The selected batch is saved in
+one credential-vault write, with in-memory rollback on failure. No intermediate
+plaintext files are created. Preview rows display host metadata and key
+fingerprints, never passwords or private key material.
+
+Limits: 128 configuration/key files, 8 MiB per file, 32 MiB total, and 2,000 parsed hosts
+or keys per batch. Export files must be UTF-8; UTF-16LE with BOM is also accepted
+for Windows registry exports. Unit tests cover formats, key linking, encrypted
+keys, duplicate handling and rollback; widget tests cover selection and preview
+invalidation on narrow/wide English and Vietnamese dialogs. Binary fixtures cover
+current manifests, inactive tables, WAL fragments, tombstones and corruption.
+`CB_SSH_LOCAL_SCAN=true` enables a read-only local Termius smoke test which logs
+counts only; it never imports live credentials into CB's vault.
+
 ## FTPS desktop
 
 The existing FTP connection form offers plain FTP, Explicit TLS (default port

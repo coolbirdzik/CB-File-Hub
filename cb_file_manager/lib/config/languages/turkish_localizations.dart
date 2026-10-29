@@ -2,6 +2,111 @@ import 'app_localizations.dart';
 
 class TurkishLocalizations implements AppLocalizations {
   @override
+  String get sshProxy => 'Vekil sunucu';
+  @override
+  String get sshProxies => 'Vekil sunucular';
+  @override
+  String get sshAddProxy => 'Vekil sunucu ekle';
+  @override
+  String get sshEditProxy => 'Vekil sunucuyu düzenle';
+  @override
+  String get sshProxyType => 'Vekil sunucu protokolü';
+  @override
+  String get sshProxyNone => 'Doğrudan bağlantı';
+  @override
+  String get sshProxyHint =>
+      'Vekil sunucu bilgileri işletim sistemi kasasında saklanır. HTTP Basic, SOCKS5 kullanıcı adı/parola, SOCKS4a kullanıcı kimliği destekler.';
+  @override
+  String get sshProxyInvalid =>
+      'Geçerli bir vekil sunucu adresi, port (1–65535) ve kimlik bilgileri girin.';
+  @override
+  String get sshProxyInUse =>
+      'Kayıtlı bir sunucu bu vekili kullanıyor. Silmeden önce sunucuyu değiştirin.';
+  @override
+  String get sshNoProxies =>
+      'Vekil sunucu ekleyin veya başka bir SSH uygulamasından içe aktarın.';
+  @override
+  String get sshImportProxyFailed =>
+      'Sunucu atlandı: vekil sunucu eksik, geçersiz veya desteklenmiyor. Bağlanmadan önce vekili yapılandırın.';
+  @override
+  String sshProxyImportSummary(
+    int hosts,
+    int keys,
+    int proxies,
+    int duplicates,
+  ) =>
+      '$hosts sunucu, $keys anahtar ve $proxies vekil içe aktarıldı; $duplicates tekrar atlandı.';
+  @override
+  String get sshImportScan => 'Yüklü uygulamaları tara';
+  @override
+  String get sshImportFileMode => 'Dosyadan içe aktar';
+  @override
+  String get sshImportScanHint =>
+      'Yüklü SSH uygulamalarındaki yerel sunucuları ve anahtarları otomatik okur. Kaynakları ve öğeleri seçip içe aktarın. Kaynak veriler korunur.';
+  @override
+  String get sshImportNotFound => 'Bu bilgisayarda bulunamadı';
+  @override
+  String get sshImportVaultLocked =>
+      'Termius verileri açılamadı. Bu işletim sistemi hesabıyla Termius kilidini açıp yeniden tarayın.';
+  @override
+  String get sshImportScanFailed =>
+      'Bu kaynak okunamadı. SSH istemcisini kapatıp yeniden tarayın.';
+  @override
+  String sshImportFound(int hosts, int keys) =>
+      '$hosts sunucu ve $keys anahtar bulundu.';
+  @override
+  String get sshImportFromApp => 'Başka uygulamadan içe aktar';
+  @override
+  String get sshImportAppHint =>
+      'Yüklü SSH uygulamalarını otomatik tarayıp sunucuları ve anahtarları içe aktarın. Kaydetmeden önce seçimi inceleyin.';
+  @override
+  String get sshImportSource => 'Kaynak biçimi';
+  @override
+  String get sshImportAuto => 'Otomatik algıla';
+  @override
+  String get sshImportChooseFiles =>
+      'Dışa aktarma / özel anahtar dosyaları ekle';
+  @override
+  String get sshImportPaste => 'Dışa aktarılan veriyi yapıştır';
+  @override
+  String get sshImportPreview => 'Önizleme';
+  @override
+  String get sshImportSelected => 'Seçilenleri içe aktar';
+  @override
+  String get sshImportTermiusHint =>
+      'Yüklü uygulamaları tara seçeneği Termius verilerini doğrudan okur. Taşınabilir dışa aktarma için CSV / JSON / OpenSSH dosyaları ve özel anahtarları ekleyin. PPK v2/v3 anahtarları doğrudan desteklenir.';
+  @override
+  String get sshImportPassphraseHint =>
+      'Şifreli anahtar dosyaları için isteğe bağlı parola. Dışa aktarmadaki anahtara özel parolalar önceliklidir.';
+  @override
+  String get sshImportEmpty =>
+      'İçe aktarılabilir sunucu veya özel anahtar bulunamadı.';
+  @override
+  String get sshImportMissingKey =>
+      'Sunucu atlandı: özel anahtar eksik veya belirsiz. İlgili dosyayı ekleyip yeniden önizleyin.';
+  @override
+  String get sshImportUnsupported =>
+      'Atlama sunucusu, yönlendirme veya koşullu ayarlar aktarılamaz. Bağlanmadan önce sunucuyu inceleyin.';
+  @override
+  String get sshImportPasswordMissing =>
+      'Kayıtlı parola şifreli veya dışa aktarmada yok. İçe aktardıktan sonra sunucu düzenleyicisinde girin.';
+  @override
+  String get sshImportUnknownFormat =>
+      'Desteklenmeyen veya geçersiz dışa aktarma biçimi.';
+  @override
+  String get sshImportLimit =>
+      'Sınır: 128 dosya, dosya başına 8 MB, toplam 32 MB, belge başına 2.000 öğe.';
+  @override
+  String get sshImportReadFailed =>
+      'Dışa aktarma okunamadı. Biçimi, kodlamayı ve dosya boyutunu kontrol edin.';
+  @override
+  String get sshImportSaveFailed =>
+      'Kimlik bilgisi kasasına kaydedilemedi. Hiçbir öğe aktarılmadı; kasa kullanılabilir olduğunda yeniden deneyin.';
+  @override
+  String sshImportSummary(int hosts, int keys, int duplicates) =>
+      '$hosts sunucu ve $keys anahtar içe aktarıldı; $duplicates tekrar atlandı.';
+
+  @override
   String get aiProviderKind => 'Sağlayıcı türü';
   @override
   String get aiProviderCustom => 'Özel';

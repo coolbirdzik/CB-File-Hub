@@ -1,6 +1,49 @@
 import 'package:flutter/material.dart';
 
 abstract class AppLocalizations {
+  String get sshProxy;
+  String get sshProxies;
+  String get sshAddProxy;
+  String get sshEditProxy;
+  String get sshProxyType;
+  String get sshProxyNone;
+  String get sshProxyHint;
+  String get sshProxyInvalid;
+  String get sshProxyInUse;
+  String get sshNoProxies;
+  String get sshImportProxyFailed;
+  String sshProxyImportSummary(
+    int hosts,
+    int keys,
+    int proxies,
+    int duplicates,
+  );
+  String get sshImportScan;
+  String get sshImportFileMode;
+  String get sshImportScanHint;
+  String get sshImportNotFound;
+  String get sshImportVaultLocked;
+  String get sshImportScanFailed;
+  String sshImportFound(int hosts, int keys);
+  String get sshImportFromApp;
+  String get sshImportAppHint;
+  String get sshImportSource;
+  String get sshImportAuto;
+  String get sshImportChooseFiles;
+  String get sshImportPaste;
+  String get sshImportPreview;
+  String get sshImportSelected;
+  String get sshImportTermiusHint;
+  String get sshImportPassphraseHint;
+  String get sshImportEmpty;
+  String get sshImportMissingKey;
+  String get sshImportUnsupported;
+  String get sshImportPasswordMissing;
+  String get sshImportUnknownFormat;
+  String get sshImportLimit;
+  String get sshImportReadFailed;
+  String get sshImportSaveFailed;
+  String sshImportSummary(int hosts, int keys, int duplicates);
   String get torrents;
   String get torrentAddMagnet;
   String get torrentCopyMagnet;

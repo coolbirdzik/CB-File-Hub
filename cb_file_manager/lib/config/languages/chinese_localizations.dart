@@ -2,6 +2,93 @@ import 'app_localizations.dart';
 
 class ChineseLocalizations implements AppLocalizations {
   @override
+  String get sshProxy => '代理';
+  @override
+  String get sshProxies => '代理';
+  @override
+  String get sshAddProxy => '添加代理';
+  @override
+  String get sshEditProxy => '编辑代理';
+  @override
+  String get sshProxyType => '代理协议';
+  @override
+  String get sshProxyNone => '直接连接';
+  @override
+  String get sshProxyHint =>
+      '代理凭据保存在系统凭据库中。HTTP 支持 Basic 认证；SOCKS5 支持用户名/密码；SOCKS4a 支持用户 ID。';
+  @override
+  String get sshProxyInvalid => '请输入有效的代理主机、端口（1–65535）和凭据。';
+  @override
+  String get sshProxyInUse => '已保存的主机正在使用此代理。删除前请先修改主机设置。';
+  @override
+  String get sshNoProxies => '添加代理或从其他 SSH 应用导入。';
+  @override
+  String get sshImportProxyFailed => '已跳过主机：代理缺失、无效或不受支持。请先导入或配置代理。';
+  @override
+  String sshProxyImportSummary(
+    int hosts,
+    int keys,
+    int proxies,
+    int duplicates,
+  ) => '已导入 $hosts 个主机、$keys 个密钥和 $proxies 个代理；跳过 $duplicates 个重复项目。';
+  @override
+  String get sshImportScan => '扫描已安装的应用';
+  @override
+  String get sshImportFileMode => '从文件导入';
+  @override
+  String get sshImportScanHint => '自动读取本机 SSH 应用的主机和密钥。选择来源与项目后导入；不修改来源数据。';
+  @override
+  String get sshImportNotFound => '此计算机上未找到';
+  @override
+  String get sshImportVaultLocked =>
+      '无法解锁 Termius 数据。请使用当前系统账户打开并解锁 Termius，然后重新扫描。';
+  @override
+  String get sshImportScanFailed => '无法读取此来源。请关闭 SSH 客户端后重新扫描。';
+  @override
+  String sshImportFound(int hosts, int keys) => '找到 $hosts 个主机和 $keys 个密钥。';
+  @override
+  String get sshImportFromApp => '从其他应用导入';
+  @override
+  String get sshImportAppHint => '自动扫描已安装的 SSH 应用以导入主机和密钥。保存前检查所选项目。';
+  @override
+  String get sshImportSource => '来源格式';
+  @override
+  String get sshImportAuto => '自动检测';
+  @override
+  String get sshImportChooseFiles => '添加导出文件 / 私钥文件';
+  @override
+  String get sshImportPaste => '粘贴导出数据';
+  @override
+  String get sshImportPreview => '预览';
+  @override
+  String get sshImportSelected => '导入所选项目';
+  @override
+  String get sshImportTermiusHint =>
+      '扫描已安装的应用可直接读取 Termius。若有导出文件，可在此添加 CSV / JSON / OpenSSH 和对应私钥。支持直接读取 PPK v2/v3 密钥。';
+  @override
+  String get sshImportPassphraseHint => '加密密钥文件的可选密码。优先使用导出中每个密钥的独立密码。';
+  @override
+  String get sshImportEmpty => '未找到可导入的主机或私钥。';
+  @override
+  String get sshImportMissingKey => '已跳过主机：私钥缺失或名称有歧义。添加对应密钥文件后重新预览。';
+  @override
+  String get sshImportUnsupported => '无法导入跳板机、端口转发或条件设置。连接前请检查主机。';
+  @override
+  String get sshImportPasswordMissing => '保存的密码已加密或未导出。导入后请在主机编辑器中重新填写。';
+  @override
+  String get sshImportUnknownFormat => '导出格式不受支持或无效。';
+  @override
+  String get sshImportLimit =>
+      '导入限制：128 个文件，每个文件 8 MB，总计 32 MB，每份导出 2,000 个项目。';
+  @override
+  String get sshImportReadFailed => '无法读取导出。请检查格式、编码和文件大小。';
+  @override
+  String get sshImportSaveFailed => '无法保存到凭据库。未导入任何项目；凭据库恢复后请重试。';
+  @override
+  String sshImportSummary(int hosts, int keys, int duplicates) =>
+      '已导入 $hosts 个主机和 $keys 个密钥；跳过 $duplicates 个重复项目。';
+
+  @override
   String get aiProviderKind => '提供商类型';
   @override
   String get aiProviderCustom => '自定义';

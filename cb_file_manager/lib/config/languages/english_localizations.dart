@@ -2,6 +2,107 @@ import 'app_localizations.dart';
 
 class EnglishLocalizations implements AppLocalizations {
   @override
+  String get sshProxy => 'Proxy';
+  @override
+  String get sshProxies => 'Proxies';
+  @override
+  String get sshAddProxy => 'Add proxy';
+  @override
+  String get sshEditProxy => 'Edit proxy';
+  @override
+  String get sshProxyType => 'Proxy protocol';
+  @override
+  String get sshProxyNone => 'Direct connection';
+  @override
+  String get sshProxyHint =>
+      'Proxy credentials stay in the OS credential vault. HTTP supports Basic authentication; SOCKS5 supports username/password; SOCKS4a supports a user ID.';
+  @override
+  String get sshProxyInvalid =>
+      'Enter a valid proxy host, port (1–65535), and supported credentials.';
+  @override
+  String get sshProxyInUse =>
+      'This proxy is used by a saved host. Change that host before deleting it.';
+  @override
+  String get sshNoProxies => 'Add a proxy or import one from another SSH app.';
+  @override
+  String get sshImportProxyFailed =>
+      'Host skipped: its proxy is missing, invalid or unsupported. Import/configure the proxy before connecting.';
+  @override
+  String sshProxyImportSummary(
+    int hosts,
+    int keys,
+    int proxies,
+    int duplicates,
+  ) =>
+      'Imported $hosts hosts, $keys keys and $proxies proxies; skipped $duplicates duplicates.';
+  @override
+  String get sshImportScan => 'Scan installed apps';
+  @override
+  String get sshImportFileMode => 'Import a file';
+  @override
+  String get sshImportScanHint =>
+      'Automatically reads local SSH hosts and keychains from installed apps. Select sources and items, then import. Source data is kept unchanged.';
+  @override
+  String get sshImportNotFound => 'Not found on this computer';
+  @override
+  String get sshImportVaultLocked =>
+      'Cannot unlock Termius data. Open/unlock Termius with this OS account, then scan again.';
+  @override
+  String get sshImportScanFailed =>
+      'Cannot read this source. Close the SSH client and scan again.';
+  @override
+  String sshImportFound(int hosts, int keys) =>
+      'Found $hosts hosts and $keys keys.';
+  @override
+  String get sshImportFromApp => 'Import from another app';
+  @override
+  String get sshImportAppHint =>
+      'Automatically scan installed SSH apps and import hosts and keychains. Review the selection before saving.';
+  @override
+  String get sshImportSource => 'Source format';
+  @override
+  String get sshImportAuto => 'Detect automatically';
+  @override
+  String get sshImportChooseFiles => 'Add export / private key files';
+  @override
+  String get sshImportPaste => 'Paste exported data';
+  @override
+  String get sshImportPreview => 'Preview';
+  @override
+  String get sshImportSelected => 'Import selected';
+  @override
+  String get sshImportTermiusHint =>
+      'Termius is detected directly in Scan installed apps. For a portable export, add CSV / JSON / OpenSSH files and their private keys here. PPK v2/v3 keys are supported directly.';
+  @override
+  String get sshImportPassphraseHint =>
+      'Optional passphrase for encrypted key files. Exported per-key passphrases take precedence.';
+  @override
+  String get sshImportEmpty => 'No importable hosts or private keys found.';
+  @override
+  String get sshImportMissingKey =>
+      'Host skipped: its private key is missing or ambiguous. Add the matching key file and preview again.';
+  @override
+  String get sshImportUnsupported =>
+      'Jump host, forwarding or conditional settings cannot be imported. Review this host before connecting.';
+  @override
+  String get sshImportPasswordMissing =>
+      'The saved password was encrypted or omitted. Enter it in the host editor after importing.';
+  @override
+  String get sshImportUnknownFormat => 'Unsupported or invalid export format.';
+  @override
+  String get sshImportLimit =>
+      'Import limit: 128 files, 8 MB per file, 32 MB total, 2,000 items per document.';
+  @override
+  String get sshImportReadFailed =>
+      'Could not read the export. Check its format, encoding and file size.';
+  @override
+  String get sshImportSaveFailed =>
+      'Could not save the import to the credential vault. Nothing was imported; retry when the vault is available.';
+  @override
+  String sshImportSummary(int hosts, int keys, int duplicates) =>
+      'Imported $hosts hosts and $keys keys; skipped $duplicates duplicates.';
+
+  @override
   String get aiProviderKind => 'Provider type';
   @override
   String get aiProviderCustom => 'Custom';

@@ -58,6 +58,7 @@ class SFTPService extends NetworkServiceBase {
         password: password ?? '',
         port: port ?? 22,
         keyId: additionalOptions?['keyId'],
+        proxyId: additionalOptions?['proxyId'],
       );
       _ssh = await SshConnector().connect(
         profile,
