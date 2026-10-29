@@ -12,14 +12,16 @@ class BrowserLikeDisplayState {
         state.currentSearchQuery != null ||
         state.currentSearchTag != null ||
         currentSearchTagOverride != null;
-    if (hasSearch && state.searchResults.isNotEmpty) {
+    // An active search with no matches still owns the visible collection.
+    // Falling back to the directory here would expose unrelated items to actions.
+    if (hasSearch) {
       final folders = state.searchResults.whereType<Directory>().toList();
       final files = state.searchResults.whereType<File>().toList();
       return state.copyWith(folders: folders, files: files);
     }
 
     final hasFilter = currentFilter != null && currentFilter.isNotEmpty;
-    if (hasFilter && state.filteredFiles.isNotEmpty) {
+    if (hasFilter) {
       return state.copyWith(
         folders: const <FileSystemEntity>[],
         files: state.filteredFiles.whereType<File>().toList(),

@@ -1122,10 +1122,11 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
 
   void _handleSelectAll() {
     debugPrint('Select all triggered');
-    BrowserLikeActionHandlers.selectAll(
+    BrowserLikeActionHandlers.selectAllVisibleFolderItems(
       selectionBloc: _selectionBloc,
-      allFilePaths: _folderListBloc.state.files.map((f) => f.path),
-      allFolderPaths: _folderListBloc.state.folders.map((f) => f.path),
+      state: _folderListBloc.state,
+      currentFilter: _currentFilter,
+      currentSearchTagOverride: _currentSearchTag,
       ensureSelectionMode: () => _toggleSelectionMode(forceValue: true),
     );
   }
@@ -2016,7 +2017,9 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
           currentFilter: _currentFilter,
           currentSearchTagOverride: _currentSearchTag,
         );
-    if (searchDisplayState != null) {
+    if (searchDisplayState != null &&
+        (searchDisplayState.folders.isNotEmpty ||
+            searchDisplayState.files.isNotEmpty)) {
       return _buildFolderAndFileListContent(
         context,
         searchDisplayState,

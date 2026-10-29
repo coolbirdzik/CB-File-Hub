@@ -9,7 +9,9 @@ import 'package:cb_file_manager/ui/controllers/file_operations_handler.dart';
 import 'package:cb_file_manager/ui/controllers/inline_rename_controller.dart';
 import 'package:cb_file_manager/ui/dialogs/delete_confirmation_dialog.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_bloc.dart';
+import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:cb_file_manager/ui/components/common/app_toast.dart';
+import 'package:cb_file_manager/ui/components/common/browser_like_display_state.dart';
 import 'package:cb_file_manager/ui/components/common/delete_failure_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as path;
@@ -70,6 +72,28 @@ class BrowserLikeActionHandlers {
       permanent: permanent,
       onClearSelection: onClearSelection,
       onDeleteConfirmed: onDeleteConfirmed,
+    );
+  }
+
+  static void selectAllVisibleFolderItems({
+    required SelectionBloc selectionBloc,
+    required FolderListState state,
+    String? currentFilter,
+    String? currentSearchTagOverride,
+    VoidCallback? ensureSelectionMode,
+  }) {
+    final displayState =
+        BrowserLikeDisplayState.resolveSearchOrFilterDisplayState(
+          state: state,
+          currentFilter: currentFilter,
+          currentSearchTagOverride: currentSearchTagOverride,
+        ) ??
+        state;
+    selectAll(
+      selectionBloc: selectionBloc,
+      allFilePaths: displayState.files.map((file) => file.path),
+      allFolderPaths: displayState.folders.map((folder) => folder.path),
+      ensureSelectionMode: ensureSelectionMode,
     );
   }
 
