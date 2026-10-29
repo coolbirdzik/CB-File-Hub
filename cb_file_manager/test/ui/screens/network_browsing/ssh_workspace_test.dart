@@ -8,6 +8,7 @@ import 'package:flutter/rendering.dart';
 import 'package:cb_file_manager/services/ssh/ssh_profile_store.dart';
 import 'package:cb_file_manager/ui/screens/ssh/ssh_workspace_screen.dart';
 import 'package:cb_file_manager/ui/screens/ssh/ssh_host_list_item.dart';
+import 'package:cb_file_manager/ui/screens/ssh/ssh_host_sort.dart';
 import 'package:cb_file_manager/ui/screens/ssh/ssh_host_dialog.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';
 import 'package:flutter/material.dart';
@@ -82,6 +83,7 @@ void main() {
                       sftpOnly: sftp,
                       store: store,
                       viewController: GridListViewController(),
+                      sortController: SshHostSortController(),
                       discovery: FixtureSshDiscovery(
                         Future.value(const LocalSshSnapshot()),
                       ),
@@ -167,20 +169,12 @@ void main() {
             expect(find.text('Development server'), findsOneWidget);
             expect(tester.takeException(), isNull);
             if (!sftp) {
-              await tester.tap(
-                find.widgetWithText(
-                  ChoiceChip,
-                  language == 'vi' ? 'SSH key' : 'SSH keys',
-                ),
-              );
+              await tester.tap(find.byKey(const ValueKey('ssh-section-keys')));
               await tester.pumpAndSettle();
               expect(find.text('Work key'), findsOneWidget);
               expect(tester.takeException(), isNull);
               await tester.tap(
-                find.widgetWithText(
-                  ChoiceChip,
-                  language == 'vi' ? 'Máy chủ đã tin cậy' : 'Trusted hosts',
-                ),
+                find.byKey(const ValueKey('ssh-section-known-hosts')),
               );
               await tester.pumpAndSettle();
               expect(tester.takeException(), isNull);
@@ -222,6 +216,7 @@ void main() {
               store: store,
               discovery: discovery,
               viewController: GridListViewController(),
+              sortController: SshHostSortController(),
             ),
           ),
         ),
@@ -229,10 +224,13 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Local dev'), findsNothing);
       expect(
-        find.widgetWithText(CbButton, 'Import private key'),
+        // Secondary actions collapse to icon buttons at this width.
+        find.byWidgetPredicate(
+          (w) => w is CbButton && w.tooltip == 'Import private key',
+        ),
         findsOneWidget,
       );
-      await tester.tap(find.widgetWithText(ChoiceChip, 'SSH keys'));
+      await tester.tap(find.byKey(const ValueKey('ssh-section-keys')));
       await tester.pumpAndSettle();
       expect(find.text('dev_key'), findsOneWidget);
       expect(store.keys, isEmpty);
@@ -240,6 +238,88 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+  testWidgets('host sort menu orders naturally, flips and persists', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1200, 650);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final store = SshProfileStore();
+    for (final (id, name, group) in [
+      ('a', 'web10', 'Alpha'),
+      ('b', 'web2', 'Beta'),
+      ('c', 'db1', 'Gamma'),
+    ]) {
+      await store.saveProfile(
+        SshProfile(
+          id: id,
+          name: name,
+          host: '$name.example.test',
+          username: 'ops',
+          group: group,
+        ),
+      );
+    }
+    final saved = <String>[];
+    final sort = SshHostSortController(save: (value) async => saved.add(value));
+    final tabs = TabManagerBloc();
+    addTearDown(tabs.close);
+    final change = tabs.stream.first;
+    tabs.add(AddTab(path: '#ssh'));
+    await change;
+    await tester.pumpWidget(
+      BlocProvider.value(
+        value: tabs,
+        child: host(
+          SshWorkspaceScreen(
+            tabId: tabs.state.activeTabId!,
+            store: store,
+            discovery: FixtureSshDiscovery(
+              Future.value(const LocalSshSnapshot()),
+            ),
+            viewController: GridListViewController(),
+            sortController: sort,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    List<String> order() {
+      final names = ['web10', 'web2', 'db1'];
+      Offset at(String name) => tester.getTopLeft(find.text(name));
+      return names..sort((a, b) {
+        final (pa, pb) = (at(a), at(b));
+        return pa.dy != pb.dy ? pa.dy.compareTo(pb.dy) : pa.dx.compareTo(pb.dx);
+      });
+    }
+
+    // Default keeps the old group-then-name order.
+    expect(order(), ['web10', 'web2', 'db1']);
+    Future<void> pick(SshHostSortField field) async {
+      await tester.tap(find.byKey(const ValueKey('ssh-host-sort')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(ValueKey('ssh-host-sort-${field.name}')));
+      await tester.pumpAndSettle();
+    }
+
+    await pick(SshHostSortField.name);
+    expect(order(), ['db1', 'web2', 'web10']);
+    await pick(SshHostSortField.name);
+    expect(order(), ['web10', 'web2', 'db1']);
+    expect(saved, ['name:asc', 'name:desc']);
+    expect(tester.takeException(), isNull);
+  });
+  test('host sort restores a saved order and ignores unknown values', () async {
+    final restored = SshHostSortController(load: () async => 'host:desc');
+    await restored.initialize();
+    expect(restored.field, SshHostSortField.host);
+    expect(restored.ascending, isFalse);
+    final unknown = SshHostSortController(load: () async => 'size:asc');
+    await unknown.initialize();
+    expect(unknown.field, SshHostSortField.group);
+    expect(unknown.ascending, isTrue);
+  });
   testWidgets(
     'unknown or changed SSH fingerprint requires an explicit decision',
     (tester) async {

@@ -22,6 +22,38 @@ class TextUtils {
     return spelling != 0 ? spelling : a.compareTo(b);
   }
 
+  static final RegExp _naturalChunk = RegExp(r'\d+|\D+');
+
+  /// [compareAlphabetically], except that runs of digits compare by value, so
+  /// `web2` sorts before `web10` and `10.0.0.2` before `10.0.0.12`.
+  static int compareNatural(String a, String b) {
+    final left = _naturalChunk.allMatches(a).map((m) => m[0]!).toList();
+    final right = _naturalChunk.allMatches(b).map((m) => m[0]!).toList();
+    bool isDigits(String chunk) {
+      final unit = chunk.codeUnitAt(0);
+      return unit >= 0x30 && unit <= 0x39;
+    }
+
+    for (var i = 0; i < left.length && i < right.length; i++) {
+      final x = left[i], y = right[i];
+      int result;
+      if (isDigits(x) && isDigits(y)) {
+        // Compare by magnitude without parsing, so long runs cannot overflow.
+        final xs = x.replaceFirst(RegExp(r'^0+(?=.)'), '');
+        final ys = y.replaceFirst(RegExp(r'^0+(?=.)'), '');
+        result = xs.length != ys.length
+            ? xs.length.compareTo(ys.length)
+            : xs.compareTo(ys);
+      } else {
+        // Case and accents only break ties once every chunk is equal.
+        result = normalizeForSearch(x).compareTo(normalizeForSearch(y));
+      }
+      if (result != 0) return result;
+    }
+    final lengths = left.length.compareTo(right.length);
+    return lengths != 0 ? lengths : compareAlphabetically(a, b);
+  }
+
   /// Produces the canonical form used by every user-facing search.
   ///
   /// Accented and decomposed Unicode characters are folded to their base

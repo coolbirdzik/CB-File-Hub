@@ -965,6 +965,14 @@ class UserPreferences {
     await _savePreference<String>('collection_view_$collectionId', mode.name);
   }
 
+  /// Opaque sort token of a collection, owned by the collection's controller.
+  Future<String?> getCollectionSort(String collectionId) =>
+      _getPreference<String>('collection_sort_$collectionId');
+
+  Future<void> setCollectionSort(String collectionId, String sort) async {
+    await _savePreference<String>('collection_sort_$collectionId', sort);
+  }
+
   Future<bool> setNetworkBrowserViewMode(ViewMode viewMode) async {
     return await _savePreference<int>(
       _networkBrowserViewModeKey,

@@ -44,4 +44,10 @@ void main() {
     expect(tags, ['', 'Ảnh', 'Zebra', 'Русский', '日本語', '😀']);
     expect(tags.toSet(), original);
   });
+
+  test('natural order compares digit runs by value', () {
+    final hosts = ['web10', 'Web2', 'web1', '10.0.0.12', '10.0.0.2', 'web02a'];
+    hosts.sort(TextUtils.compareNatural);
+    expect(hosts, ['10.0.0.2', '10.0.0.12', 'web1', 'Web2', 'web02a', 'web10']);
+  });
 }
