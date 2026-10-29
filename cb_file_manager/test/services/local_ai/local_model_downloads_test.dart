@@ -40,7 +40,7 @@ class _Server {
 /// Exercise a recommendation below the lazy list's initial viewport even on
 /// Windows, where the platform's normal recommendation happens to be first.
 class _TestLocalAiService extends LocalAiAdvisorService {
-  bool recommendLastModel = false;
+  String? recommendedModelId;
   _TestLocalAiService({
     required super.prefs,
     required super.httpClient,
@@ -48,8 +48,8 @@ class _TestLocalAiService extends LocalAiAdvisorService {
   });
 
   @override
-  HuggingFaceModelEntry get pinnedModel => recommendLastModel
-      ? catalogEntryFor('litert-community/Qwen3.5-0.8B')!
+  HuggingFaceModelEntry get pinnedModel => recommendedModelId != null
+      ? catalogEntryFor(recommendedModelId!)!
       : super.pinnedModel;
 }
 
@@ -139,12 +139,16 @@ void main() {
     await server.body.close();
   });
 
-  for (final recommendLastModel in [false, true]) {
+  for (final recommendedModelId in [
+    null,
+    'litert-community/gemma-4-E2B-it-litert-lm',
+    'litert-community/Qwen3.5-0.8B',
+  ]) {
     testWidgets('the setup guide lands on an installer that downloads in the '
-        'background (recommendation below fold=$recommendLastModel)', (
+        'background (recommendation=${recommendedModelId ?? 'platform default'})', (
       tester,
     ) async {
-      service.recommendLastModel = recommendLastModel;
+      service.recommendedModelId = recommendedModelId;
       GetIt.instance
         ..registerSingleton<LocalAiAdvisorService>(service)
         ..registerSingleton<LocalModelDownloads>(downloads);
@@ -206,8 +210,13 @@ void main() {
           matching: find.byType(Scrollable),
         ),
       );
+      // ensureVisible changes the scroll offset synchronously, but layout is
+      // updated on the next frame. Without this pump the middle catalog entry
+      // can still report a position underneath the dialog's Close button.
+      await tester.pump();
       expect(find.text('Recommended'), findsOneWidget);
-      await tester.tap(install);
+      expect(install.hitTestable(), findsOneWidget);
+      await tester.tap(install.hitTestable());
       await tester.pump();
       expect(downloads.isDownloading(pinned.id), isTrue);
 

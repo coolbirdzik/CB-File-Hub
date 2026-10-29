@@ -214,5 +214,18 @@ void main() {
       );
       expect(await source.prepareTearOffWindow(moved), isNull);
     },
+    // Preparing a cloaked spare uses Win32 window handles and is deliberately
+    // unavailable on Linux/macOS. Generic window showing is covered above.
+    skip: !Platform.isWindows,
   );
+
+  test('non-Windows does not prepare a native tab-drag spare', () async {
+    final source = DesktopWindowingService.forTesting(registryPort: 0);
+    expect(
+      await source.prepareTearOffWindow(const [
+        WindowTabPayload(path: '#home', name: 'Home'),
+      ]),
+      isNull,
+    );
+  }, skip: Platform.isWindows);
 }
