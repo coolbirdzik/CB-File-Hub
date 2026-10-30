@@ -7,6 +7,7 @@ import 'package:cb_file_manager/services/directory_watcher_service.dart';
 import 'package:cb_file_manager/ui/controllers/operation_progress_controller.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_bloc.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_event.dart';
+import 'package:cb_file_manager/utils/app_logger.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
@@ -44,6 +45,9 @@ void main() {
     await DirectoryWatcherService.instance.stopWatching();
     await DatabaseManager.getInstance().close();
     await SqliteDatabaseProvider.closeSharedDatabase();
+    // Folder loads/searches also append performance logs asynchronously into
+    // root. Await their file closes before deleting it on Windows.
+    await AppLogger.flushPerfLogs();
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, null);
     await locator.reset();

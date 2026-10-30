@@ -20,6 +20,7 @@ import 'package:path_provider/path_provider.dart';
 /// ```
 class AppLogger {
   static final List<String> _recentLogs = <String>[];
+  static final Set<Future<void>> _pendingPerfLogs = {};
 
   static final Logger _logger = Logger(
     printer: PrettyPrinter(
@@ -86,7 +87,17 @@ class AppLogger {
 
     // Append to a persistent perf log file in debug/profile for offline analysis
     if (!kReleaseMode) {
-      _appendPerfLog(message);
+      final write = _appendPerfLog(message);
+      _pendingPerfLogs.add(write);
+      write.then((_) => _pendingPerfLogs.remove(write));
+    }
+  }
+
+  /// Waits for performance log writes to close their files before callers
+  /// remove the log directory. Logging itself remains non-blocking.
+  static Future<void> flushPerfLogs() async {
+    while (_pendingPerfLogs.isNotEmpty) {
+      await Future.wait(_pendingPerfLogs.toList());
     }
   }
 
