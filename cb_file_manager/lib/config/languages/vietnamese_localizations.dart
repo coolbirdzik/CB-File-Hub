@@ -75,6 +75,9 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get torrentBackgroundAdded => 'Đã nhận torrent';
   @override
+  String get torrentBackgroundAlreadyExists =>
+      'Đã nhận torrent (đã tồn tại trong thư viện)';
+  @override
   String get torrentBackgroundFailed => 'Không thể thêm torrent';
   @override
   String get torrentOpeningOptions => 'Khi mở torrent';

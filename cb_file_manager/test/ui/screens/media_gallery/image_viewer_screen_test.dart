@@ -1,9 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:cb_file_manager/config/languages/app_localizations_delegate.dart';
 import 'package:cb_file_manager/ui/screens/media_gallery/image_viewer_screen.dart';
 import 'package:cb_file_manager/ui/components/video/thumbnail_strip.dart';
 import 'package:cb_file_manager/ui/screens/media_gallery/widgets/image_viewer_chrome.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -51,6 +53,66 @@ void main() {
           .scaleFactor,
       500,
     );
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(milliseconds: 600));
+  });
+
+  testWidgets('right-click opens the image menu without toggling controls', (
+    tester,
+  ) async {
+    final root = Directory.systemTemp.createTempSync('cb-image-viewer-');
+    addTearDown(() {
+      if (root.existsSync()) root.deleteSync(recursive: true);
+    });
+    final png = base64Decode(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+    );
+    final files = <File>[
+      for (final name in <String>['a.png', 'b.png'])
+        File('${root.path}${Platform.pathSeparator}$name')
+          ..writeAsBytesSync(png),
+    ];
+
+    tester.view.physicalSize = const Size(1400, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    Future<void> settle() async {
+      for (var i = 0; i < 12; i++) {
+        await tester.pump(const Duration(milliseconds: 60));
+      }
+    }
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: const [AppLocalizationsDelegate()],
+        home: ImageViewerScreen(file: files.first, imageFiles: files),
+      ),
+    );
+    await settle();
+
+    Future<void> rightClick() async {
+      await tester.tapAt(
+        const Offset(700, 150),
+        kind: PointerDeviceKind.mouse,
+        buttons: kSecondaryMouseButton,
+      );
+      await settle();
+    }
+
+    await rightClick();
+    expect(find.text('Rotate left'), findsOneWidget);
+    expect(find.text('Copy file path'), findsOneWidget);
+    expect(find.text('Properties'), findsOneWidget);
+    // The picture was not tapped, so the controls stay.
+    expect(find.byType(ThumbnailStrip), findsOneWidget);
+
+    await tester.tap(find.text('Hide thumbnails'));
+    await settle();
+    expect(find.text('Rotate left'), findsNothing);
+    expect(find.byType(ThumbnailStrip), findsNothing);
+
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
     await tester.pump(const Duration(milliseconds: 600));

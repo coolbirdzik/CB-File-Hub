@@ -91,6 +91,21 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
   // column density on every screen.
   int _gridZoomLevel = UserPreferences.defaultGridZoomLevel;
   ViewMode _viewMode = ViewMode.grid;
+  static const _allowedSortOptions = {
+    SortOption.nameAsc,
+    SortOption.nameDesc,
+    SortOption.dateAsc,
+    SortOption.dateDesc,
+    SortOption.dateCreatedAsc,
+    SortOption.dateCreatedDesc,
+    SortOption.sizeAsc,
+    SortOption.sizeDesc,
+    SortOption.typeAsc,
+    SortOption.typeDesc,
+    SortOption.extensionAsc,
+    SortOption.extensionDesc,
+  };
+  String get _collectionId => 'album-detail-${widget.album.id}';
   String? _searchQuery;
   bool _showSearchBar = false;
   final _searchFocusNode = FocusNode(debugLabel: 'album detail search');
@@ -159,6 +174,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
 
   @override
   void dispose() {
+    if (_holdsListingGate) _openListingGate();
     _searchFocusNode.dispose();
     _selectionBloc.close();
     _dragController.dispose();
@@ -397,13 +413,22 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
       // stay in sync (same preference, same default, same range).
       final level = await _preferences.getGridZoomLevel();
       final viewMode = await _preferences.getGridListCollectionMode(
-        'album-detail-${widget.album.id}',
+        _collectionId,
         supportedModes: _supportedViewModes,
       );
+      final savedSort = await _preferences.getCollectionSort(_collectionId);
+      final sortOption = SortOption.values
+          .where((o) => o.name == savedSort && _allowedSortOptions.contains(o))
+          .firstOrNull;
       if (mounted) {
         setState(() {
           _gridZoomLevel = level;
           _viewMode = viewMode;
+          // Files may already be listed with the default order by now.
+          if (sortOption != null && sortOption != _sortOption) {
+            _sortOption = sortOption;
+            _applyFiltersAndOrder();
+          }
         });
       }
     } catch (_) {}
@@ -415,10 +440,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
     _dragController.clearItemPositions();
     _collectionDragController.clearItemPositions();
     try {
-      await _preferences.setGridListCollectionMode(
-        'album-detail-${widget.album.id}',
-        mode,
-      );
+      await _preferences.setGridListCollectionMode(_collectionId, mode);
     } catch (_) {}
   }
 
@@ -455,15 +477,29 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
     });
   }
 
+  /// The gate is app-wide, so whoever closes it must reopen it on every exit,
+  /// including when this screen is disposed mid-load.
+  bool _holdsListingGate = false;
+
+  void _closeListingGate() {
+    _holdsListingGate = true;
+    ThumbnailLoader.setListingReady(false);
+  }
+
+  void _openListingGate() {
+    _holdsListingGate = false;
+    ThumbnailLoader.setListingReady(true);
+  }
+
   Future<void> _loadAlbumFiles({bool initial = false}) async {
     if (initial || !_isLoading) setState(() => _isLoading = true);
     // Gate: pause thumbnail work while loading album file list.
-    ThumbnailLoader.setListingReady(false);
+    _closeListingGate();
     try {
       if (_isSmartAlbum) {
         if (_cachedFilesLoaded) {
           if (mounted) setState(() => _isLoading = false);
-          ThumbnailLoader.setListingReady(true);
+          _openListingGate();
           return;
         }
         await _scanSmartAlbumImages();
@@ -489,11 +525,11 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
         });
         _updateThumbnailPriorityMap();
       }
-      ThumbnailLoader.setListingReady(true);
+      _openListingGate();
     } catch (e) {
       debugPrint('Error loading album files: $e');
       if (mounted) setState(() => _isLoading = false);
-      ThumbnailLoader.setListingReady(true);
+      _openListingGate();
     }
   }
 
@@ -567,7 +603,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
     } finally {
       if (mounted && generation == _smartScanGeneration) {
         setState(() => _isBackgroundProcessing = false);
-        ThumbnailLoader.setListingReady(true);
+        _openListingGate();
       }
     }
   }
@@ -606,7 +642,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
           });
           _cachedFilesLoaded = true;
           _updateThumbnailPriorityMap();
-          ThumbnailLoader.setListingReady(true);
+          _openListingGate();
         }
       }
     } catch (_) {}
@@ -853,6 +889,11 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
       _isShuffled = false;
       _applyFiltersAndOrder();
     });
+    unawaited(
+      _preferences
+          .setCollectionSort(_collectionId, option.name)
+          .catchError((Object e) => debugPrint('Error saving album sort: $e')),
+    );
   }
 
   void _toggleSearchBar() => setState(() => _showSearchBar = !_showSearchBar);
@@ -961,20 +1002,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
       isSearchActive: _showSearchBar,
       onSortOptionSelected: _setSortOption,
       currentSortOption: _sortOption,
-      allowedSortOptions: const {
-        SortOption.nameAsc,
-        SortOption.nameDesc,
-        SortOption.dateAsc,
-        SortOption.dateDesc,
-        SortOption.dateCreatedAsc,
-        SortOption.dateCreatedDesc,
-        SortOption.sizeAsc,
-        SortOption.sizeDesc,
-        SortOption.typeAsc,
-        SortOption.typeDesc,
-        SortOption.extensionAsc,
-        SortOption.extensionDesc,
-      },
+      allowedSortOptions: _allowedSortOptions,
       viewMode: _viewMode,
       onViewModeToggled: () => unawaited(
         _setViewMode(

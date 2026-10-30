@@ -612,10 +612,8 @@ class TorrentService extends ChangeNotifier {
     return home == null ? null : p.join(home, 'Downloads');
   }
 
-  Future<TorrentEntry> _backgroundAction(
-    Future<TorrentEntry> Function() action,
-  ) {
-    final result = Completer<TorrentEntry>();
+  Future<T> _backgroundAction<T>(Future<T> Function() action) {
+    final result = Completer<T>();
     _backgroundImports = _backgroundImports.then((_) async {
       try {
         await initialize();
@@ -631,10 +629,17 @@ class TorrentService extends ChangeNotifier {
     return result.future;
   }
 
-  Future<TorrentEntry> openSourceInBackground(String source) =>
-      _backgroundAction(
-        () async => _downloadInBackground(await openSource(source)),
-      );
+  /// [existed] reports whether the library already held this torrent before
+  /// the source was received, so the notice can say so.
+  Future<({TorrentEntry entry, bool existed})> openSourceInBackground(
+    String source,
+  ) => _backgroundAction(() async {
+    final opened = await _openSource(source);
+    return (
+      entry: await _downloadInBackground(opened.entry),
+      existed: opened.existed,
+    );
+  });
 
   Future<TorrentEntry> downloadInBackground(TorrentEntry entry) =>
       _backgroundAction(() => _downloadInBackground(entry));
@@ -1159,16 +1164,27 @@ class TorrentService extends ChangeNotifier {
   Future<TorrentEntry> importMagnet(
     String uri, {
     TorrentMergeConfirmation? onDuplicate,
+  }) async => (await _importMagnet(uri, onDuplicate: onDuplicate)).entry;
+
+  Future<({TorrentEntry entry, bool existed})> _importMagnet(
+    String uri, {
+    TorrentMergeConfirmation? onDuplicate,
   }) async {
     await _ensureImportSchema();
     final link = MagnetLink.parse(uri);
     await _approveImport(link.hash, onDuplicate);
+    final existed = await repository.get(link.hash) != null;
     final entry = await repository.importMagnet(link, touch: true);
     notifyListeners();
-    return entry;
+    return (entry: entry, existed: existed);
   }
 
   Future<TorrentEntry> openSource(
+    String source, {
+    TorrentMergeConfirmation? onDuplicate,
+  }) async => (await _openSource(source, onDuplicate: onDuplicate)).entry;
+
+  Future<({TorrentEntry entry, bool existed})> _openSource(
     String source, {
     TorrentMergeConfirmation? onDuplicate,
   }) async {
@@ -1176,7 +1192,7 @@ class TorrentService extends ChangeNotifier {
       throw const FormatException('Invalid torrent source');
     }
     if (source.toLowerCase().startsWith('magnet:')) {
-      return importMagnet(source, onDuplicate: onDuplicate);
+      return _importMagnet(source, onDuplicate: onDuplicate);
     }
     final normalized = p.normalize(p.absolute(source));
     await _ensureImportSchema();
@@ -1184,7 +1200,7 @@ class TorrentService extends ChangeNotifier {
     // Opening a file must capture durable metainfo without deleting or relying
     // on the browser-owned source. Explicit imports/scans retain the selected
     // index/copy/move policy.
-    await _importFile(
+    final inserted = await _importFile(
       source,
       mode: 'copy',
       root: storageMode == 'index' || libraryDirectory == null
@@ -1202,7 +1218,7 @@ class TorrentService extends ChangeNotifier {
     );
     final entry = await repository.get(rows.single['hash'] as String);
     notifyListeners();
-    return entry!;
+    return (entry: entry!, existed: !inserted);
   }
 
   /// HTTP links fetch only metainfo. Payload transfer still requires the

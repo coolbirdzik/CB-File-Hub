@@ -113,7 +113,8 @@ namespace
 #define STATUS_SUCCESS (0x00000000)
 
   bool SetNativeSystemBackdrop(
-      HWND hwnd, HWND view, bool enabled, bool prefer_acrylic, bool is_dark_mode);
+      WindowBackdrop::State &state, HWND hwnd, HWND view, bool enabled,
+      bool prefer_acrylic, bool is_dark_mode);
   HWND GetMainWindow(flutter::PluginRegistrarWindows *registrar);
   HWND GetTopLevelWindow(flutter::PluginRegistrarWindows *registrar);
 
@@ -141,6 +142,7 @@ namespace
 
   void ReapplyBackdropForPluginInstance(
       flutter::PluginRegistrarWindows *registrar,
+      WindowBackdrop::State &state,
       HWND hwnd,
       bool active,
       bool prefer_acrylic,
@@ -156,7 +158,7 @@ namespace
     if (!target || ::IsIconic(target) || !::IsWindowVisible(target))
       return;
 
-    SetNativeSystemBackdrop(target, GetMainWindow(registrar), active,
+    SetNativeSystemBackdrop(state, target, GetMainWindow(registrar), active,
                             prefer_acrylic, dark_mode);
   }
 
@@ -177,10 +179,11 @@ namespace
   }
 
   bool SetNativeSystemBackdrop(
-      HWND hwnd, HWND view, bool enabled, bool prefer_acrylic, bool is_dark_mode)
+      WindowBackdrop::State &state, HWND hwnd, HWND view, bool enabled,
+      bool prefer_acrylic, bool is_dark_mode)
   {
-    return WindowBackdrop::ApplyToWindow(
-        hwnd, view, GetWindowsVersionInfo().dwBuildNumber,
+    return WindowBackdrop::Sync(
+        state, hwnd, view, GetWindowsVersionInfo().dwBuildNumber,
         enabled, prefer_acrylic, is_dark_mode);
   }
 
@@ -2257,14 +2260,28 @@ void WindowUtilsPlugin::EnsureWindowProcDelegateRegistered()
           break;
 
         case WM_SIZE:
+          // Only a size or state change can discard the material. A tab
+          // title's frame refresh repeats the same size and must not rebuild.
+          if (wparam != this->backdrop_size_type_ ||
+              lparam != this->backdrop_client_size_)
+          {
+            this->backdrop_state_.material_lost = true;
+          }
+          this->backdrop_size_type_ = wparam;
+          this->backdrop_client_size_ = lparam;
           if (wparam == SIZE_RESTORED || wparam == SIZE_MAXIMIZED)
           {
             ScheduleBackdropReapplyForPluginInstance(hwnd, this->backdrop_active_);
           }
           break;
 
-        case WM_EXITSIZEMOVE:
         case WM_SHOWWINDOW:
+          if (wparam)
+            this->backdrop_state_.material_lost = true;
+          ScheduleBackdropReapplyForPluginInstance(hwnd, this->backdrop_active_);
+          break;
+
+        case WM_EXITSIZEMOVE:
           ScheduleBackdropReapplyForPluginInstance(hwnd, this->backdrop_active_);
           break;
 
@@ -2272,9 +2289,12 @@ void WindowUtilsPlugin::EnsureWindowProcDelegateRegistered()
           if (wparam == 0xCBA0 || wparam == 0xCBA1 || wparam == 0xCBA2 || wparam == 0xCBA3)
           {
             ::KillTimer(hwnd, static_cast<UINT_PTR>(wparam));
+            // The first timer rebuilds a lost material; later ones only
+            // refresh, so a single event no longer flashes it four times.
             ReapplyBackdropForPluginInstance(
-                this->registrar_, hwnd, this->backdrop_active_,
-                this->backdrop_prefer_acrylic_, this->backdrop_dark_mode_);
+                this->registrar_, this->backdrop_state_, hwnd,
+                this->backdrop_active_, this->backdrop_prefer_acrylic_,
+                this->backdrop_dark_mode_);
           }
           break;
 
@@ -2282,6 +2302,7 @@ void WindowUtilsPlugin::EnsureWindowProcDelegateRegistered()
         case WM_DWMCOMPOSITIONCHANGED:
         {
           // Full re-apply on DWM composition/theme change events.
+          this->backdrop_state_.material_lost = true;
           ScheduleBackdropReapplyForPluginInstance(hwnd, this->backdrop_active_);
           break;
         }
@@ -3163,9 +3184,10 @@ void WindowUtilsPlugin::HandleMethodCall(
       return;
     }
 
+    // Dart repeats this request in bursts; only the first rebuilds.
     const bool ok =
-        SetNativeSystemBackdrop(hwnd, GetMainWindow(registrar_), enabled,
-                                prefer_acrylic, is_dark_mode);
+        SetNativeSystemBackdrop(backdrop_state_, hwnd, GetMainWindow(registrar_),
+                                enabled, prefer_acrylic, is_dark_mode);
     // Keep per-instance state in sync so the window proc delegate uses the
     // correct values for THIS window, not a shared/polluted global.
     backdrop_active_ = enabled;

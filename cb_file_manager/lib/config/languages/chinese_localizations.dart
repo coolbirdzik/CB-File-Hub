@@ -108,6 +108,8 @@ class ChineseLocalizations implements AppLocalizations {
   @override
   String get torrentBackgroundAdded => '已接收种子';
   @override
+  String get torrentBackgroundAlreadyExists => '已接收种子（已在库中）';
+  @override
   String get torrentBackgroundFailed => '无法添加种子';
   @override
   String get torrentOpeningOptions => '打开种子时';

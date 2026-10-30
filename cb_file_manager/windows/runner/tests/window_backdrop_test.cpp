@@ -9,7 +9,7 @@
 
 namespace {
 bool material_ok = true, accent_ok = true;
-int legacy_acrylic_calls = 0, legacy_blur_calls = 0;
+int legacy_acrylic_calls = 0, legacy_blur_calls = 0, transparent_calls = 0;
 std::map<HWND, BOOL> alpha;
 std::vector<int> materials;
 HRESULT WINAPI Attribute(HWND hwnd, DWORD id, LPCVOID value, DWORD) {
@@ -25,6 +25,7 @@ HRESULT WINAPI Attribute(HWND hwnd, DWORD id, LPCVOID value, DWORD) {
 BOOL WINAPI Accent(HWND, void* raw) {
   struct Composition { int attribute; void* data; SIZE_T size; };
   const int state = *static_cast<const int*>(static_cast<Composition*>(raw)->data);
+  if (state == 2) ++transparent_calls;
   if (state == 4) ++legacy_acrylic_calls;
   if (state == 3) ++legacy_blur_calls;
   return state == 0 || accent_ok;
@@ -75,6 +76,53 @@ int main() {
             "Restore reused the cached material enum without rebuilding it");
     }
 
+    // Each rebuild clears the material for a frame. Focus changes and Dart's
+    // repeated requests must keep it, re-asserting only the view's accent.
+    WindowBackdrop::State state;
+    materials.clear();
+    Check(WindowBackdrop::Sync(state, root, child, 26100, true, true, true) &&
+              !materials.empty() && materials[0] == 1,
+          "First sync did not build the material");
+    for (int i = 0; i < 32; ++i) {
+      materials.clear();
+      alpha[child] = FALSE;
+      const int transparent_before = transparent_calls;
+      Check(WindowBackdrop::Sync(state, root, child, 26100, true, true, true),
+            "Repeated sync failed");
+      Check(materials.empty(), "A repeated sync cleared the working material");
+      Check(alpha[child] && transparent_calls == transparent_before + 1,
+            "A repeated sync did not re-assert the Flutter view's accent");
+    }
+    // Minimize/resize marks the material lost: rebuild exactly once.
+    state.material_lost = true;
+    materials.clear();
+    Check(WindowBackdrop::Sync(state, root, child, 26100, true, true, true) &&
+              materials.size() == 2 && materials[0] == 1 && materials[1] == 3,
+          "A lost material was not rebuilt once");
+    materials.clear();
+    WindowBackdrop::Sync(state, root, child, 26100, true, true, true);
+    Check(materials.empty(), "A rebuilt material was rebuilt again");
+    materials.clear();
+    WindowBackdrop::Sync(state, root, child, 26100, true, true, false);
+    Check(!materials.empty() && materials[0] == 1,
+          "A theme change did not rebuild the material");
+    // Pre-22H2 accent backdrops are reset by activation: always reapply.
+    const int legacy_before = legacy_acrylic_calls;
+    WindowBackdrop::Sync(state, root, child, 19045, true, true, false);
+    WindowBackdrop::Sync(state, root, child, 19045, true, true, false);
+    Check(legacy_acrylic_calls == legacy_before + 2,
+          "A legacy accent backdrop was not reapplied");
+    // A rebuild that fails after a lost material is retried by the next sync.
+    state.material_lost = true;
+    material_ok = accent_ok = false;
+    Check(!WindowBackdrop::Sync(state, root, child, 26100, true, true, false),
+          "A failed sync reported success");
+    material_ok = accent_ok = true;
+    materials.clear();
+    Check(WindowBackdrop::Sync(state, root, child, 26100, true, true, false) &&
+              !materials.empty() && materials[0] == 1,
+          "A failed material was not retried");
+
     material_ok = accent_ok = false;
     Check(!WindowBackdrop::ApplyToWindow(root, child, 26100, true, true, false),
           "Missing material was incorrectly reported as successful");
@@ -97,7 +145,9 @@ int main() {
     Check(!alpha[root] && !alpha[child] && materials.back() == 1,
           "Disabled backdrop retained alpha or a material");
     DestroyWindow(root);
-    std::cout << "PASS: material fallback, 32 material rebuilds, failure-safe "
+    std::cout << "PASS: material fallback, 32 material rebuilds, 32 refreshes "
+                 "without clearing the material, one rebuild per lost "
+                 "material, failure-safe "
                  "root/child alpha, Mica fallback, recovery and disable\n";
     return 0;
   } catch (const std::exception& error) {

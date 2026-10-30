@@ -8,7 +8,8 @@ Push-Location -LiteralPath $output
 try {
     & cl.exe /nologo /std:c++17 /utf-8 /EHsc /W4 /WX /DNOMINMAX /DUNICODE /D_UNICODE `
         "$app/windows/runner/tests/custom_frame_message_test.cpp" `
-        /Fe:custom_frame_message_test.exe /link user32.lib
+        "$app/windows/runner/flutter_mouse_input_guard.cpp" `
+        /Fe:custom_frame_message_test.exe /link user32.lib dwmapi.lib comctl32.lib
     if ($LASTEXITCODE -ne 0) { throw 'Native frame test compilation failed.' }
     & ./custom_frame_message_test.exe
     if ($LASTEXITCODE -ne 0) { throw 'Native frame unit test failed.' }

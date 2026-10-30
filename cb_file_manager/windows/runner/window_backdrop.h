@@ -285,6 +285,41 @@ namespace WindowBackdrop {
     return applied;
   }
 
+  // What one window last applied. Every rebuild clears the material for a
+  // frame, so focus changes and repeated requests must not rebuild it.
+  struct State
+  {
+    bool applied = false;
+    bool enabled = false;
+    bool prefer_acrylic = false;
+    bool dark = false;
+    // Minimize and resize can discard the material while DWM keeps its enum.
+    bool material_lost = true;
+  };
+
+  // Rebuilds only for new settings, a lost material, a previous failure or a
+  // pre-22H2 accent backdrop, which Windows resets on activation. Otherwise
+  // re-asserts the Flutter view's accent without touching the root material.
+  inline bool Sync(State &state, HWND root, HWND view, DWORD build_number,
+                   bool enabled, bool prefer_acrylic, bool dark)
+  {
+    if (state.applied && !state.material_lost && build_number >= 22621 &&
+        state.enabled == enabled && state.prefer_acrylic == prefer_acrylic &&
+        state.dark == dark)
+    {
+      if (view && view != root && enabled && prefer_acrylic)
+      {
+        SetRedirectionBitmapAlpha(view, build_number, true);
+        ApplyAccentPolicy(view, ACCENT_ENABLE_TRANSPARENTGRADIENT);
+      }
+      return true;
+    }
+    const bool applied =
+        ApplyToWindow(root, view, build_number, enabled, prefer_acrylic, dark);
+    state = {applied, enabled, prefer_acrylic, dark, false};
+    return applied;
+  }
+
 }  // namespace WindowBackdrop
 
 #endif  // RUNNER_WINDOW_BACKDROP_H_

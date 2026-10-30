@@ -14,6 +14,8 @@ import 'package:share_plus/share_plus.dart'; // Add import for Share Plus
 import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/ui/components/common/app_toast.dart';
+import 'package:cb_file_manager/ui/components/common/shared_file_context_menu.dart';
+import 'package:cb_file_manager/ui/controllers/file_operations_handler.dart';
 import '../../utils/route.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:cb_file_manager/helpers/files/external_app_helper.dart';
@@ -678,6 +680,152 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
     }
   }
 
+  bool get _isDesktop =>
+      Platform.isWindows || Platform.isLinux || Platform.isMacOS;
+
+  /// Shows the file in the system file manager with the picture selected.
+  Future<void> _revealInSystem(File file) async {
+    try {
+      if (Platform.isWindows) {
+        // Explorer exits non-zero even when it opens the folder.
+        await Process.run('explorer.exe', <String>['/select,${file.path}']);
+      } else if (Platform.isMacOS) {
+        await Process.run('open', <String>['-R', file.path]);
+      } else if (Platform.isLinux) {
+        await Process.run('xdg-open', <String>[file.parent.path]);
+      }
+    } catch (e) {
+      debugPrint('Error revealing ${file.path}: $e');
+    }
+  }
+
+  /// Opens the system properties dialog, or the info panel where there is none.
+  Future<void> _showProperties(File file) async {
+    final opened =
+        Platform.isWindows &&
+        await WindowsShellContextMenu.invokeVerb(
+          paths: <String>[file.path],
+          verb: 'properties',
+        );
+    if (!opened && mounted && !_showInfo) _toggleInfo();
+  }
+
+  /// Right-click menu, modelled on the Windows photo viewer's.
+  Future<void> _showContextMenu(Offset globalPosition) async {
+    if (_isEditMode || !mounted) return;
+    // Every action targets the current picture, so it must not change while
+    // the menu is open.
+    if (_slideshowPlaying) _toggleSlideshow();
+    final file = _allImages[_currentIndex];
+    final l10n = context.tr;
+    final multiple = _allImages.length > 1;
+
+    await showContextMenuPopup(
+      context: context,
+      globalPosition: globalPosition,
+      sections: [
+        ContextMenuSection(
+          actions: [
+            ContextMenuAction(
+              id: 'copy',
+              label: l10n.copy,
+              icon: PhosphorIconsLight.copy,
+              onSelected: (ctx) => FileOperationsHandler.copyToClipboard(
+                context: ctx,
+                entity: file,
+              ),
+            ),
+            ContextMenuAction(
+              id: 'share',
+              label: l10n.share,
+              icon: PhosphorIconsLight.shareFat,
+              onSelected: (_) => _shareImage(),
+            ),
+            ContextMenuAction(
+              id: 'delete',
+              label: l10n.delete,
+              icon: PhosphorIconsLight.trash,
+              isDestructive: true,
+              onSelected: (ctx) => _deleteImage(ctx),
+            ),
+          ],
+        ),
+        ContextMenuSection(
+          actions: [
+            ContextMenuAction(
+              id: 'open_with',
+              label: '${l10n.openWith}...',
+              icon: PhosphorIconsLight.arrowSquareOut,
+              onSelected: (_) => _openWithExternalApp(),
+            ),
+            ContextMenuAction(
+              id: 'edit',
+              label: l10n.ivEditImage,
+              icon: PhosphorIconsLight.slidersHorizontal,
+              onSelected: (_) => _toggleEditMode(),
+            ),
+            ContextMenuAction(
+              id: 'print',
+              label: l10n.ivPrint,
+              icon: PhosphorIconsLight.printer,
+              onSelected: (_) => _printImage(),
+            ),
+            if (_isDesktop)
+              ContextMenuAction(
+                id: 'open_file_location',
+                label: l10n.openFileLocation,
+                icon: PhosphorIconsLight.folderOpen,
+                onSelected: (_) => _revealInSystem(file),
+              ),
+          ],
+        ),
+        ContextMenuSection(
+          actions: [
+            ContextMenuAction(
+              id: 'rotate_left',
+              label: l10n.ivRotateLeft,
+              icon: PhosphorIconsLight.arrowCounterClockwise,
+              onSelected: (_) => _rotateImageLeft(),
+            ),
+            ContextMenuAction(
+              id: 'rotate_right',
+              label: l10n.ivRotateRight,
+              icon: PhosphorIconsLight.arrowClockwise,
+              onSelected: (_) => _rotateImage(),
+            ),
+          ],
+        ),
+        ContextMenuSection(
+          actions: [
+            ContextMenuAction(
+              id: 'copy_path',
+              label: l10n.ivCopyPath,
+              icon: PhosphorIconsLight.copy,
+              onSelected: (_) => _copyPathToClipboard(),
+            ),
+            if (multiple)
+              ContextMenuAction(
+                id: 'toggle_thumbs',
+                label: _showThumbnailStrip
+                    ? l10n.ivHideThumbnails
+                    : l10n.ivShowThumbnails,
+                icon: PhosphorIconsLight.squaresFour,
+                onSelected: (_) => _toggleThumbnailStrip(),
+              ),
+            ContextMenuAction(
+              id: 'properties',
+              label: l10n.properties,
+              icon: PhosphorIconsLight.info,
+              onSelected: (_) => _showProperties(file),
+            ),
+          ],
+        ),
+      ],
+    );
+    // Choosing Edit hands the keys to the editor instead.
+    if (mounted && !_isEditMode) _keyboardFocusNode.requestFocus();
+  }
+
   // Fades the picture in once its first frame is decoded.
   Widget _fadeInFrame(
     BuildContext context,
@@ -863,6 +1011,8 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
         onVerticalDragEnd: _canDragToDismiss ? _onDismissDragEnd : null,
         child: GestureDetector(
           onTap: _toggleControls,
+          onSecondaryTapDown: (details) =>
+              _showContextMenu(details.globalPosition),
           child: ValueListenableBuilder<double>(
             valueListenable: _dismissOffset,
             builder: (context, offset, child) {

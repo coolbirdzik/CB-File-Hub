@@ -601,10 +601,15 @@ class _TorrentScreenState extends State<TorrentScreen> {
     await _showOpenedEntry(entry);
   }, source: source);
 
-  Future<void> _showOpenedEntry(TorrentEntry entry) async {
+  Future<void> _showOpenedEntry(
+    TorrentEntry entry, {
+    bool existed = false,
+  }) async {
     if (!mounted) return;
     if (_service.receiveInBackground) {
-      await TorrentBackgroundReceiver(_service).receiveEntry(entry);
+      await TorrentBackgroundReceiver(
+        _service,
+      ).receiveEntry(entry, existed: existed);
       await _load(background: true);
       return;
     }
@@ -638,17 +643,21 @@ class _TorrentScreenState extends State<TorrentScreen> {
     if ((!_service.receiveInBackground && !await _storageReady()) || !mounted) {
       return;
     }
+    var existed = false;
     final entry = await showDialog<TorrentEntry>(
       context: context,
       barrierDismissible: false,
       builder: (_) => TorrentLinkDialog(
         onAdd: (source) => _service.openLink(
           source,
-          onDuplicate: _service.receiveInBackground ? null : _confirmMerge,
+          // Background mode merges silently; the notice says it already exists.
+          onDuplicate: _service.receiveInBackground
+              ? (_) async => existed = true
+              : _confirmMerge,
         ),
       ),
     );
-    if (entry != null) await _showOpenedEntry(entry);
+    if (entry != null) await _showOpenedEntry(entry, existed: existed);
   });
 
   Future<bool> _confirmMerge(TorrentEntry existing) async {

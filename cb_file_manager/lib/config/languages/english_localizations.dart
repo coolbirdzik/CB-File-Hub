@@ -125,6 +125,9 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get torrentBackgroundAdded => 'Torrent received';
   @override
+  String get torrentBackgroundAlreadyExists =>
+      'Torrent received (already in library)';
+  @override
   String get torrentBackgroundFailed => 'Could not add torrent';
   @override
   String get torrentOpeningOptions => 'When opening torrents';

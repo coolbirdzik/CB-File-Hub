@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/bloc/selection/selection.dart';
 import 'package:cb_file_manager/ui/components/common/library_hub_scaffold.dart';
@@ -64,6 +66,15 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
     ViewMode.details,
     ViewMode.tree,
   };
+  static const _allowedSortOptions = {
+    SortOption.nameAsc,
+    SortOption.nameDesc,
+    SortOption.dateAsc,
+    SortOption.dateDesc,
+    SortOption.dateCreatedAsc,
+    SortOption.dateCreatedDesc,
+  };
+  String get _sortCollectionId => 'albums-${widget.rootPath}';
   // Migration to dependency injection: Use locator instead of .instance
   // Old way: final AlbumService _albumService = AlbumService.instance;
   // New way: Use service locator for better testability and dependency management
@@ -110,6 +121,7 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
     _loadAlbums();
     _view.initialize();
     _loadGridZoom();
+    unawaited(_loadSortOption());
   }
 
   Future<void> _loadGridZoom() async {
@@ -187,8 +199,25 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
 
   void _setSearchQuery(String value) => setState(() => _searchQuery = value);
 
-  void _setSortOption(SortOption option) =>
-      setState(() => _sortOption = option);
+  void _setSortOption(SortOption option) {
+    setState(() => _sortOption = option);
+    unawaited(
+      UserPreferences.instance
+          .setCollectionSort(_sortCollectionId, option.name)
+          .catchError((Object e) => debugPrint('Error saving album sort: $e')),
+    );
+  }
+
+  Future<void> _loadSortOption() async {
+    await UserPreferences.instance.init();
+    final saved = await UserPreferences.instance.getCollectionSort(
+      _sortCollectionId,
+    );
+    final option = SortOption.values
+        .where((o) => o.name == saved && _allowedSortOptions.contains(o))
+        .firstOrNull;
+    if (option != null && mounted) setState(() => _sortOption = option);
+  }
 
   void _toggleSelectionMode() {
     _selectionBloc.add(
@@ -733,14 +762,7 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
       isSearchActive: _showSearchBar,
       onSortOptionSelected: _setSortOption,
       currentSortOption: _sortOption,
-      allowedSortOptions: const {
-        SortOption.nameAsc,
-        SortOption.nameDesc,
-        SortOption.dateAsc,
-        SortOption.dateDesc,
-        SortOption.dateCreatedAsc,
-        SortOption.dateCreatedDesc,
-      },
+      allowedSortOptions: _allowedSortOptions,
       viewMode: _view.mode,
       onViewModeToggled: () => _view.select(
         _view.mode == ViewMode.grid ? ViewMode.list : ViewMode.grid,

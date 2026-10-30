@@ -5,6 +5,8 @@
 #include <flutter/plugin_registrar_windows.h>
 #include <windows.h>
 
+#include "window_backdrop.h"
+
 #include <memory>
 #include <string>
 
@@ -51,6 +53,10 @@ private:
     bool backdrop_active_ = false;
     bool backdrop_prefer_acrylic_ = true;
     bool backdrop_dark_mode_ = false;
+    WindowBackdrop::State backdrop_state_;
+    // Last WM_SIZE, to tell a real resize from a repeated frame refresh.
+    WPARAM backdrop_size_type_ = SIZE_RESTORED;
+    LPARAM backdrop_client_size_ = 0;
     // Tab strip in logical pixels relative to the Flutter view.
     bool has_tab_strip_ = false;
     double tab_strip_left_ = 0;

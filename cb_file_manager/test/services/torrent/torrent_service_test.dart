@@ -254,7 +254,10 @@ void main() {
           'torrent.storageMode',
           'move',
         );
-        final entry = await service.openSourceInBackground(source.path);
+        final (:entry, :existed) = await service.openSourceInBackground(
+          source.path,
+        );
+        expect(existed, isFalse);
         expect(entry.status, start ? 'waiting' : 'paused');
         expect(entry.downloadDir, destination);
         expect(await source.exists(), isTrue);
@@ -293,11 +296,11 @@ void main() {
           expect(service.startDownloadsImmediately, !start);
           final entry = existing != null
               ? await service.downloadInBackground(existing)
-              : await service.openSourceInBackground(
+              : (await service.openSourceInBackground(
                   sourceType == 'magnet'
                       ? 'magnet:?xt=urn:btih:${'1' * 40}'
                       : source.path,
-                );
+                )).entry;
           expect(entry.status, start ? 'waiting' : 'paused');
           expect(entry.downloadDir, destination);
           expect(
@@ -320,13 +323,44 @@ void main() {
     await service.setDefaultDownloadDirectory(p.join(root.path, 'payload'));
     await service.setStartDownloadsImmediately(false);
     final paused = await service.openSourceInBackground(source.path);
+    expect(paused.existed, isFalse);
     await service.setStartDownloadsImmediately(true);
     final repeated = await service.openSourceInBackground(source.path);
-    expect(repeated.status, 'paused');
-    expect(repeated.gid, paused.gid);
+    expect(repeated.existed, isTrue);
+    expect(repeated.entry.status, 'paused');
+    expect(repeated.entry.gid, paused.entry.gid);
     expect(engine.addedDirectories, hasLength(1));
     expect((await repo.page()).total, 1);
   });
+
+  for (final sourceType in ['file', 'magnet']) {
+    test(
+      'repeated background $sourceType receive notifies that it already exists',
+      () async {
+        final file = await create('Downloads/exists.torrent');
+        final source = sourceType == 'magnet'
+            ? 'magnet:?xt=urn:btih:${'2' * 40}&dn=Exists'
+            : file.path;
+        await service.setDefaultDownloadDirectory(p.join(root.path, 'payload'));
+        final notices = <({String title, String body, bool isError})>[];
+        final receiver = TorrentBackgroundReceiver(
+          service,
+          notify: ({required title, required body, required isError}) async {
+            notices.add((title: title, body: body, isError: isError));
+          },
+          statusCenter: OperationProgressController(),
+        );
+        expect(await receiver.receiveSource(source), isNotNull);
+        expect(await receiver.receiveSource(source), isNotNull);
+        expect(notices.map((n) => n.title), [
+          'Torrent received',
+          'Torrent received (already in library)',
+        ]);
+        expect(notices.every((n) => !n.isError), isTrue);
+        expect(engine.addedDirectories, hasLength(1));
+      },
+    );
+  }
 
   test(
     'background failure is indexed and notified without blocking the next import',

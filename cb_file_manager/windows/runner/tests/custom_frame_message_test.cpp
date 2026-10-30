@@ -63,6 +63,9 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM wp, LPARAM lp) {
           return LRESULT{0};
         }
         break;
+      case WM_GETMINMAXINFO:
+        // window_manager answers this without touching the maximized rect.
+        return LRESULT{0};
       case WM_NCHITTEST:
         if (events->refuse_resize) return LRESULT{HTNOWHERE};
         break;
@@ -212,6 +215,94 @@ void CheckClientAndResize(HWND hwnd, Events& events) {
   SetWindowLongPtrW(hwnd, GWL_STYLE, style);
   DestroyWindow(view);
 }
+
+// The kernel lays a maximized window out as the work area plus its resize
+// frame; the rect must be the work area itself or the glass paints onto the
+// neighbouring monitor.
+void CheckMaximizedBounds() {
+  Events events;
+  const HWND hwnd = CreateReceiver(&events);
+  const RECT normal{100, 80, 1100, 730};
+  MONITORINFO monitor{};
+  monitor.cbSize = sizeof(monitor);
+  GetMonitorInfoW(MonitorFromRect(&normal, MONITOR_DEFAULTTONEAREST), &monitor);
+  const RECT work = monitor.rcWork;
+  auto bounds = [&] {
+    RECT rect{};
+    GetWindowRect(hwnd, &rect);
+    return rect;
+  };
+  auto place_normal = [&] {
+    ShowWindow(hwnd, SW_RESTORE);
+    SetWindowPos(hwnd, nullptr, normal.left, normal.top, normal.right - normal.left,
+                 normal.bottom - normal.top, SWP_NOZORDER | SWP_NOACTIVATE);
+  };
+  place_normal();
+  const LONG_PTR style = GetWindowLongPtrW(hwnd, GWL_STYLE);
+
+  const int sizes_before = events.sizes;
+  ShowWindow(hwnd, SW_SHOWMAXIMIZED);
+  Check(IsZoomed(hwnd) && (GetWindowLongPtrW(hwnd, GWL_STYLE) & WS_MAXIMIZE) != 0,
+        "Could not maximize the native test window");
+  RECT maximized = bounds();
+  Check(EqualRect(&maximized, &work),
+        "A maximized window overhangs its monitor work area");
+  Check(events.sizes > sizes_before,
+        "Maximizing did not report a size change to plugins");
+  Check(GetPropW(hwnd, kMaximizeHiddenProp) == nullptr,
+        "The maximized bit stayed hidden after a placement");
+
+  // Every tab switch refreshes the frame; it must not nudge the window.
+  for (int i = 0; i < 20; ++i) {
+    SetWindowTextW(hwnd, L"CB File Hub - tab");
+    maximized = bounds();
+    Check(EqualRect(&maximized, &work) && IsZoomed(hwnd),
+          "A title update moved a maximized window");
+  }
+
+  // Taskbar minimize and restore of a maximized window.
+  ShowWindow(hwnd, SW_MINIMIZE);
+  Check(IsIconic(hwnd), "A maximized window could not minimize");
+  ShowWindow(hwnd, SW_RESTORE);
+  maximized = bounds();
+  Check(IsZoomed(hwnd) && EqualRect(&maximized, &work),
+        "Restoring from minimize lost the maximized work-area bounds");
+
+  // Leaving the maximized state returns to the rect from before maximizing,
+  // also after a minimize: the kernel stores the work area there otherwise.
+  ShowWindow(hwnd, SW_RESTORE);
+  RECT restored = bounds();
+  Check(!IsZoomed(hwnd) && EqualRect(&restored, &normal),
+        "Restore did not return to the previous bounds");
+
+  // A window without WS_THICKFRAME and WS_MAXIMIZEBOX is full screen: not fitted.
+  place_normal();
+  SetWindowLongPtrW(hwnd, GWL_STYLE, style & ~(WS_THICKFRAME | WS_MAXIMIZEBOX));
+  SetWindowPos(hwnd, nullptr, 0, 0, 0, 0,
+               SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE |
+                   SWP_FRAMECHANGED);
+  ShowWindow(hwnd, SW_SHOWMAXIMIZED);
+  Check(GetPropW(hwnd, kMaximizeHiddenProp) == nullptr && IsZoomed(hwnd),
+        "A full-screen style window was fitted to the work area");
+  SetWindowPos(hwnd, nullptr, monitor.rcMonitor.left, monitor.rcMonitor.top,
+               monitor.rcMonitor.right - monitor.rcMonitor.left,
+               monitor.rcMonitor.bottom - monitor.rcMonitor.top,
+               SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+  RECT full = bounds();
+  Check(EqualRect(&full, &monitor.rcMonitor),
+        "A full-screen style window did not cover its monitor");
+  // Leaving full screen restores the style and refreshes the frame, as
+  // window_manager does, and must land on the work area, not the monitor.
+  SetWindowLongPtrW(hwnd, GWL_STYLE, style | WS_MAXIMIZE);
+  SetWindowPos(hwnd, nullptr, 0, 0, 0, 0,
+               SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE |
+                   SWP_FRAMECHANGED);
+  RECT left_full = bounds();
+  Check(IsZoomed(hwnd) && EqualRect(&left_full, &work),
+        "Leaving full screen left a maximized window off its work area");
+  SetWindowLongPtrW(hwnd, GWL_STYLE, style);
+  DestroyWindow(hwnd);
+}
 }  // namespace
 
 int main() {
@@ -224,6 +315,7 @@ int main() {
     Events first, second;
     const HWND windows[] = {CreateReceiver(&first), CreateReceiver(&second)};
     CheckClientAndResize(windows[0], first);
+    CheckMaximizedBounds();
     first.sizes = 0;
     const COLORREF visible_border = RGB(255, 0, 0);
     const bool supports_border_color = SUCCEEDED(ObserveDwmSetWindowAttribute(
@@ -335,7 +427,8 @@ int main() {
     Check(second.native_paints == 1, "Fullscreen dispatch was changed");
     for (const HWND hwnd : windows) DestroyWindow(hwnd);
     std::cout << "PASS: real client fills window, all 8 resize grips work through "
-                 "embedded view, maximized work area respected; "
+                 "embedded view, maximized window and client stay in the "
+                 "work area; "
                  "100 title-only tab switches refresh the custom frame; "
                  "caption paints blocked before plugins across 200 "
                  "merge cycles; focus/title/resize/spare state preserved; "

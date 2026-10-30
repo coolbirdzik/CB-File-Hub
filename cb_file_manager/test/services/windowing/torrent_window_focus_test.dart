@@ -24,9 +24,11 @@ class _BackgroundService extends TorrentService {
         stateDirectory: '/unused',
       );
   @override
-  Future<TorrentEntry> openSourceInBackground(String source) async {
+  Future<({TorrentEntry entry, bool existed})> openSourceInBackground(
+    String source,
+  ) async {
     received.add(source);
-    return TorrentEntry.fromMap({
+    final entry = TorrentEntry.fromMap({
       'hash': '1' * 40,
       'name': 'Background torrent',
       'torrent_path': source,
@@ -39,6 +41,7 @@ class _BackgroundService extends TorrentService {
       'download_speed': 0,
       'added_at': 0,
     });
+    return (entry: entry, existed: false);
   }
 }
 

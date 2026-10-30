@@ -129,6 +129,9 @@ class TurkishLocalizations implements AppLocalizations {
   @override
   String get torrentBackgroundAdded => 'Torrent alındı';
   @override
+  String get torrentBackgroundAlreadyExists =>
+      'Torrent alındı (zaten kitaplıkta)';
+  @override
   String get torrentBackgroundFailed => 'Torrent eklenemedi';
   @override
   String get torrentOpeningOptions => 'Torrent açarken';

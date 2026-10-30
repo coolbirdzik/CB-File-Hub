@@ -94,6 +94,7 @@ abstract class AppLocalizations {
   String get torrentReceiveInBackground;
   String get torrentReceiveInBackgroundHint;
   String get torrentBackgroundAdded;
+  String get torrentBackgroundAlreadyExists;
   String get torrentBackgroundFailed;
   String get torrentShowDownloadDialog;
   String get torrentShowDownloadDialogHint;

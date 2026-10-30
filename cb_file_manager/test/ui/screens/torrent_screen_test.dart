@@ -380,8 +380,12 @@ class _Service extends TorrentService {
   }
 
   @override
-  Future<TorrentEntry> openSourceInBackground(String source) async =>
-      downloadInBackground(await openSource(source));
+  Future<({TorrentEntry entry, bool existed})> openSourceInBackground(
+    String source,
+  ) async => (
+    entry: await downloadInBackground(await openSource(source)),
+    existed: false,
+  );
 
   @override
   Future<TorrentEntry> downloadInBackground(TorrentEntry entry) async {
@@ -2346,6 +2350,59 @@ void main() {
       },
     );
   }
+
+  testWidgets(
+    'background duplicate link notifies that it already exists without a dialog',
+    (tester) async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('torrent.receiveInBackground', true);
+      await prefs.setString(
+        'torrent.lastDownloadDirectory',
+        Directory.systemTemp.path,
+      );
+      final fake = service as _Service;
+      fake.duplicate = true;
+      fake.openStatus = 'paused';
+      final notices = <MethodCall>[];
+      const native = MethodChannel('cb_file_manager/window_utils');
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(native, (
+        call,
+      ) async {
+        if (call.method == 'notifyTorrent') notices.add(call);
+        return true;
+      });
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          native,
+          null,
+        ),
+      );
+      await mount(tester);
+      await tester.tap(find.byKey(const ValueKey('torrent-add-link-action')));
+      await tester.pumpAndSettle();
+      tester
+              .widget<CbTextField>(
+                find.byKey(const ValueKey('torrent-link-input')),
+              )
+              .controller!
+              .text =
+          'magnet:?xt=urn:btih:${'0' * 40}';
+      await tester.tap(find.byKey(const ValueKey('torrent-link-confirm')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('torrent-duplicate-dialog')),
+        findsNothing,
+      );
+      expect(fake.mergeApprovals, 1);
+      expect(fake.downloads, isEmpty);
+      expect(notices, hasLength(1));
+      expect(
+        (notices.single.arguments as Map)['title'],
+        'Torrent received (already in library)',
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets(
     'browser selection, range selection, keyboard and pagination stay consistent',

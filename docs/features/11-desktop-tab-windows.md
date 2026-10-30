@@ -61,11 +61,23 @@ the existing process. macOS and Linux retain their process launchers.
   `WS_VISIBLE` cleared; `WM_NCACTIVATE` passes lParam -1 through the delegates
   to preserve focus notifications without requesting a caption repaint.
   `WM_NCPAINT` and uxtheme's `WM_NCUAHDRAWCAPTION`/`WM_NCUAHDRAWFRAME`
-  (0xAE/0xAF) are suppressed. In particular, activation reapplies the acrylic
-  backdrop using `RedrawWindow(RDW_FRAME)`, which otherwise redraws the native
-  bar briefly during a merge. `scripts/test_windows_custom_frame.ps1` runs
+  (0xAE/0xAF) are suppressed. In particular, rebuilding the acrylic backdrop
+  uses `RedrawWindow(RDW_FRAME)`, which otherwise redraws the native bar
+  briefly during a merge. Each rebuild clears the material for a frame, so
+  `WindowBackdrop::Sync` rebuilds only for new settings or after a size, state,
+  show or theme change; activation and repeated requests only re-assert the
+  Flutter view's accent. `scripts/test_windows_custom_frame.ps1` runs
   standalone Win32 coverage of repeated frame updates and focus/title/resize
   behavior without running app E2E tests.
+  Maximizing a `WS_THICKFRAME` window makes the kernel add the resize frame
+  (8 px) on every side after `WM_WINDOWPOSCHANGING`, keyed on the `WS_MAXIMIZE`
+  bit, and the DWM glass then paints that overhang onto an adjacent monitor.
+  `FitMaximizedPlacement` hides the bit for one placement so the window rect is
+  the work area, restores it before `WM_SIZE` is derived (plugins still see a
+  maximize) and puts the saved restore rect back when the window leaves the
+  state. Placements already on the work area, such as every tab-title frame
+  refresh, are left alone; window_manager's fullscreen (no `WS_THICKFRAME` and
+  `WS_MAXIMIZEBOX`) is not fitted.
   Backdrop, fullscreen and reveal-hold state belong to each native window.
 - Closing the primary window hides it while other user windows exist, retaining
   its coordinator/registry engine. Closing an idle secondary destroys its engine.

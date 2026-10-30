@@ -40,11 +40,19 @@ class TorrentBackgroundReceiver {
     p.basename(source),
   );
 
-  Future<TorrentEntry?> receiveEntry(TorrentEntry entry) =>
-      _receive(() => service.downloadInBackground(entry), entry.name);
+  /// [existed] is set by callers that just imported [entry] from a link and
+  /// found it already in the library.
+  Future<TorrentEntry?> receiveEntry(
+    TorrentEntry entry, {
+    bool existed = false,
+  }) => _receive(
+    () async =>
+        (entry: await service.downloadInBackground(entry), existed: existed),
+    entry.name,
+  );
 
   Future<TorrentEntry?> _receive(
-    Future<TorrentEntry> Function() action,
+    Future<({TorrentEntry entry, bool existed})> Function() action,
     String name,
   ) async {
     final prefs = await SharedPreferences.getInstance();
@@ -52,9 +60,10 @@ class TorrentBackgroundReceiver {
       Locale(prefs.getString('selected_language') ?? 'en'),
     );
     TorrentEntry? entry;
+    var existed = false;
     Object? error;
     try {
-      entry = await action();
+      (:entry, :existed) = await action();
     } catch (e, stack) {
       error = e;
       AppLogger.warning(
@@ -63,9 +72,11 @@ class TorrentBackgroundReceiver {
         stackTrace: stack,
       );
     }
-    final title = error == null
-        ? l.torrentBackgroundAdded
-        : l.torrentBackgroundFailed;
+    final title = error != null
+        ? l.torrentBackgroundFailed
+        : existed
+        ? l.torrentBackgroundAlreadyExists
+        : l.torrentBackgroundAdded;
     final body = error == null
         ? '${entry!.name}\n${l.torrentStatus(entry.status)}'
         : '$name\n$error';
