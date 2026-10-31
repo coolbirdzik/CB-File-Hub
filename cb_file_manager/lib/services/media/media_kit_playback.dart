@@ -241,15 +241,6 @@ class PlaybackPlayer {
   Future<void> setVolume(double volume) =>
       _player.setVolume(volume.clamp(0, 100));
 
-  /// Silences output through libmpv's own mute, leaving the volume and mute
-  /// preference the UI owns untouched.
-  Future<void> setAudioSuppressed(bool suppressed) async {
-    if (_disposal != null) return;
-    if (_player.platform case final mk.NativePlayer native) {
-      await native.setProperty('mute', suppressed ? 'yes' : 'no');
-    }
-  }
-
   Future<void> setRate(double rate) => _player.setRate(rate);
   Future<void> next() => _player.next();
   Future<void> previous() => _player.previous();

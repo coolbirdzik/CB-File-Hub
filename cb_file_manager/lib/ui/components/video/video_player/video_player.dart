@@ -1910,10 +1910,6 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
     _startSeekDrag();
     _seekDragPosition = origin;
 
-    // Every repeat restarts the audio at a new position; held, that is only
-    // stutter. Stay silent until the release position is reached.
-    unawaited(_player!.setAudioSuppressed(true));
-
     _fastSeekTicks = 0;
     final baseStep = fromKeyboard ? _videoKeyboardSeekSeconds : 3;
     _fastSeekSeconds = withCtrl ? 30 : baseStep;
@@ -2048,17 +2044,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
     _fastSeekTimer = null;
 
     if (_isFastSeeking) {
-      final player = _player;
-      final landed = _finishSeekDrag();
-      if (player != null) {
-        unawaited(() async {
-          try {
-            await landed;
-          } catch (_) {}
-          // A new hold may have started while the final seek was in flight.
-          if (!_isFastSeeking) await player.setAudioSuppressed(false);
-        }());
-      }
+      unawaited(_finishSeekDrag());
       setState(() {
         _isFastSeeking = false;
         _fastSeekSeconds = 5;
