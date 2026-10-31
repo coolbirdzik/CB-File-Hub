@@ -15,6 +15,7 @@
 #include "window_utils_plugin.h"
 #include "store_update_plugin.h"
 #include "custom_frame_message.h"
+#include "window_backdrop_diagnostics.h"
 
 namespace
 {
@@ -211,10 +212,32 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                               WPARAM const wparam,
                               LPARAM const lparam) noexcept
 {
-  return DispatchCustomFrameMessage(
+  if (message == WindowBackdrop::kResizeFrameReady) {
+    WindowBackdrop::Trace("resize-frame-received", hwnd,
+        flutter_controller_ ? flutter_controller_->view()->GetNativeWindow() : nullptr);
+  }
+  if (message == WindowBackdrop::kResizeFrameReady &&
+      !backdrop_frame_sync_.OnFrame(hwnd, wparam)) {
+    return 0;  // Ignore a rendered frame superseded by a newer size/minimize.
+  }
+  const bool await_resize_frame = message == WM_SIZE && flutter_controller_ &&
+      backdrop_frame_sync_.OnSize(hwnd, wparam, lparam);
+  const LRESULT result = DispatchCustomFrameMessage(
       hwnd, message, wparam, lparam, [&](LPARAM forwarded_lparam) {
         return DispatchMessageToPlugins(hwnd, message, wparam, forwarded_lparam);
       });
+  if (await_resize_frame && flutter_controller_) {
+    WindowBackdrop::Trace("resize-frame-requested", hwnd,
+                         flutter_controller_->view()->GetNativeWindow());
+    const WPARAM generation = backdrop_frame_sync_.generation();
+    // Register after child layout, then request a frame at the final size.
+    // The engine invokes this once on the platform thread after drawing.
+    flutter_controller_->engine()->SetNextFrameCallback([hwnd, generation]() {
+      ::PostMessageW(hwnd, WindowBackdrop::kResizeFrameReady, generation, 0);
+    });
+    flutter_controller_->ForceRedraw();
+  }
+  return result;
 }
 
 LRESULT FlutterWindow::DispatchMessageToPlugins(HWND hwnd, UINT message,

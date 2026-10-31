@@ -104,6 +104,54 @@ void main() {
     expect(DesktopWindowInfo.fromJson(old).processId, isNull);
   });
 
+  test(
+    'Windows tab switches update registry labels without changing the native frame',
+    () async {
+      final reservation = await ServerSocket.bind(
+        InternetAddress.loopbackIPv4,
+        0,
+      );
+      final port = reservation.port;
+      await reservation.close();
+      final service = DesktopWindowingService.forTesting(registryPort: port);
+      final tabs = TabManagerBloc();
+      addTearDown(() async {
+        await service.dispose();
+        await tabs.close();
+      });
+      Future<void> dispatch(TabEvent event) async {
+        final changed = tabs.stream.first;
+        tabs.add(event);
+        await changed;
+      }
+
+      await dispatch(AddTab(path: '#home', name: 'Home'));
+      await dispatch(AddTab(path: '#torrents', name: 'Torrents'));
+      await service.attachTabBloc(tabs);
+      calls.clear();
+      for (var i = 0; i < 10; i++) {
+        final selected = tabs.state.tabs[i % 2];
+        await dispatch(SwitchToTab(selected.id));
+        DesktopWindowInfo? registered;
+        for (var attempt = 0; attempt < 100; attempt++) {
+          final windows = await service.listWindows();
+          if (windows.length == 1 && windows.single.title == selected.name) {
+            registered = windows.single;
+            break;
+          }
+          await Future<void>.delayed(const Duration(milliseconds: 5));
+        }
+        expect(tabs.state.activeTab!.id, selected.id);
+        expect(registered?.title, selected.name);
+        expect(registered?.tabCount, 2);
+      }
+      expect(calls, isNot(contains('setTitle')));
+      expect(calls, isNot(contains('setBackgroundColor')));
+      expect(calls, isNot(contains('setWindowsSystemBackdrop')));
+    },
+    skip: !Platform.isWindows,
+  );
+
   for (final source in [
     r'C:\Downloads\example.torrent',
     'magnet:?xt=urn:btih:${'1' * 40}',

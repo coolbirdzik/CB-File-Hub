@@ -1246,7 +1246,10 @@ class DesktopWindowingService {
   }
 
   Future<void> _updateWindowTitle() async {
-    if (!isDesktop) return;
+    // The Windows runner already supplies "CB File Hub". Updating its native
+    // caption per tab mutates DWM frame state and can disrupt live acrylic.
+    // Keep tab names in the Flutter strip and peer registry (_lastTitle).
+    if (!isDesktop || Platform.isWindows) return;
     try {
       await windowManager.setTitle('CB File Hub - $_lastTitle');
     } catch (_) {}

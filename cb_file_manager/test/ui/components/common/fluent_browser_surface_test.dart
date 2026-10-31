@@ -148,6 +148,10 @@ void main() {
         );
       }
     },
+    variant: TargetPlatformVariant({
+      TargetPlatform.windows,
+      TargetPlatform.linux,
+    }),
   );
 
   testWidgets('Fluent chrome explicitly composites toolbar and drawer alpha', (

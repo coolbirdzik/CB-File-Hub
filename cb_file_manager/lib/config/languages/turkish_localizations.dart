@@ -1281,10 +1281,10 @@ class TurkishLocalizations implements AppLocalizations {
   String desktopGlassBlurDescription(int percentage) =>
       'Cam yüzeylerin arkasındaki duvar kağıdını ve içeriği yumuşatın (%$percentage).';
   @override
-  String get desktopAcrylicStrength => 'Masaüstü akrilik yoğunluğu';
+  String get desktopAcrylicStrength => 'Akrilik şeffaflığı';
   @override
   String desktopAcrylicStrengthDescription(int percentage) =>
-      'Masaüstü arka planı için bulanıklık ve ton yoğunluğunu ayarlayın (%$percentage).';
+      'Daha opak bir arka plan için azaltın; %0 tamamen opaktır (%$percentage).';
   @override
   String get vietnameseLanguage => 'Vietnamca';
   @override

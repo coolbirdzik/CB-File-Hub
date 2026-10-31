@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../design_system/macos_glass_theme.dart';
+import '../design_system/desktop_acrylic_theme.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import 'package:flutter/material.dart';
 
@@ -28,7 +29,6 @@ class FluentThemeConfig {
       uiFont: uiFont,
     );
     final fluentAccentColor = _resolveAccentColor(accentColor);
-    final isDark = materialTheme.brightness == Brightness.dark;
     final glass = (platform ?? defaultTargetPlatform) == TargetPlatform.macOS
         ? MacosGlassTheme(
             strength: acrylicStrength,
@@ -36,16 +36,11 @@ class FluentThemeConfig {
             brightness: materialTheme.brightness,
           )
         : null;
-    final double normalizedStrength = acrylicStrength
-        .clamp(0.0, 2.0)
-        .toDouble();
-    double opacityByStrength({
-      required double solidAtMin,
-      required double glassAtMax,
-    }) {
-      return solidAtMin + (glassAtMax - solidAtMin) * normalizedStrength;
-    }
-
+    final acrylic = DesktopAcrylicTheme(
+      strength: acrylicStrength,
+      brightness: materialTheme.brightness,
+      dynamicBackdrop: preferTransparentBackdrop,
+    );
     // Keep both hosts on the same semantic surface ramp. Home inherits the
     // Material bridge canvas from the tab shell, so the Fluent scaffold must
     // use the same Cb canvas rather than an independent Fluent neutral.
@@ -63,45 +58,13 @@ class FluentThemeConfig {
         tint.withValues(alpha: alpha);
     final scaffoldColor = surface(
       scaffoldBase,
-      alpha:
-          glass?.canvasOpacity ??
-          (isDark
-              ? opacityByStrength(
-                  solidAtMin: 0.96,
-                  glassAtMax: preferTransparentBackdrop ? 0.76 : 0.88,
-                )
-              : opacityByStrength(
-                  solidAtMin: 0.995,
-                  glassAtMax: preferTransparentBackdrop ? 0.84 : 0.96,
-                )),
+      alpha: glass?.canvasOpacity ?? acrylic.canvasOpacity,
     );
     final cardColor = surface(
       cardBase,
-      alpha:
-          glass?.containerOpacity ??
-          (isDark
-              ? opacityByStrength(
-                  solidAtMin: 0.98,
-                  glassAtMax: preferTransparentBackdrop ? 0.84 : 0.94,
-                )
-              : opacityByStrength(
-                  solidAtMin: 0.99,
-                  glassAtMax: preferTransparentBackdrop ? 0.88 : 0.97,
-                )),
+      alpha: glass?.containerOpacity ?? acrylic.containerOpacity,
     );
-    final menuColor = menuBase.withValues(
-      alpha: (glass != null
-          ? 1.0
-          : (isDark
-                ? opacityByStrength(
-                    solidAtMin: 0.995,
-                    glassAtMax: preferTransparentBackdrop ? 0.90 : 0.98,
-                  )
-                : opacityByStrength(
-                    solidAtMin: 0.995,
-                    glassAtMax: preferTransparentBackdrop ? 0.90 : 0.98,
-                  ))),
-    );
+    final menuColor = menuBase.withValues(alpha: 1);
 
     return fluent.FluentThemeData(
       brightness: materialTheme.brightness,
@@ -109,31 +72,11 @@ class FluentThemeConfig {
       scaffoldBackgroundColor: scaffoldColor,
       acrylicBackgroundColor: surface(
         scaffoldBase,
-        alpha:
-            glass?.chromeOpacity ??
-            (isDark
-                ? opacityByStrength(
-                    solidAtMin: 0.98,
-                    glassAtMax: preferTransparentBackdrop ? 0.82 : 0.92,
-                  )
-                : opacityByStrength(
-                    solidAtMin: 0.99,
-                    glassAtMax: preferTransparentBackdrop ? 0.88 : 0.97,
-                  )),
+        alpha: glass?.chromeOpacity ?? acrylic.chromeOpacity,
       ),
       micaBackgroundColor: surface(
         scaffoldBase,
-        alpha:
-            glass?.chromeOpacity ??
-            (isDark
-                ? opacityByStrength(
-                    solidAtMin: 0.96,
-                    glassAtMax: preferTransparentBackdrop ? 0.70 : 0.82,
-                  )
-                : opacityByStrength(
-                    solidAtMin: 0.99,
-                    glassAtMax: preferTransparentBackdrop ? 0.84 : 0.96,
-                  )),
+        alpha: glass?.chromeOpacity ?? acrylic.chromeOpacity,
       ),
       menuColor: menuColor,
       cardColor: cardColor,

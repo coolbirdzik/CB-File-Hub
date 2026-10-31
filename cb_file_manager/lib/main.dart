@@ -410,6 +410,7 @@ Future<void> runCbFileApp() async {
   }
 
   final windowAcrylicService = WindowAcrylicService();
+  bool startupVisibilityHeld = false;
   // Register the SQLite worker from the long-lived coordinator before any
   // spare/player engine can connect to it. A child engine must never own the
   // worker and take every window's database down when that engine closes.
@@ -422,6 +423,23 @@ Future<void> runCbFileApp() async {
     try {
       await windowManager.ensureInitialized();
     } catch (_) {}
+
+    if (Platform.isWindows &&
+        !isSecondaryWindow &&
+        !isPip &&
+        !isProgressWindow &&
+        !isDedicatedVideoWindow &&
+        !backgroundTorrentLaunch &&
+        !kCbE2E) {
+      try {
+        // Maximize itself can show an HWND. Hold native visibility while its
+        // final bounds, backdrop and first Flutter frame are prepared.
+        await WindowsNativeTabDragDropService.setStartupVisibilityHeld(true);
+        startupVisibilityHeld = true;
+      } catch (e) {
+        debugPrint('Startup visibility guard unavailable: $e');
+      }
+    }
 
     if (!isPip && !isProgressWindow) {
       // A player spawned by VideoWindowService was already created over its
@@ -497,6 +515,8 @@ Future<void> runCbFileApp() async {
             if (backgroundTorrentLaunch) {
               // The native notification exposes only a minimized taskbar button.
               await windowManager.hide();
+            } else if (startupVisibilityHeld) {
+              // Revealed after waitUntilFirstFrameRasterized below.
             } else if (torrentSources.isNotEmpty) {
               await DesktopWindowingService.focusTorrentWindow();
             } else {
@@ -519,12 +539,17 @@ Future<void> runCbFileApp() async {
       }
     }
 
-    // The player paints an opaque black surface, so the backdrop (and the
-    // settle delay before it) would only postpone its first frame.
-    if (!isPip && !kCbE2EFast && !isDedicatedVideoWindow) {
+    // Prepare Windows acrylic while hidden. A delay after showing leaves a
+    // visible transparent/solid frame before the material is installed.
+    if (!isPip &&
+        !kCbE2EFast &&
+        !isDedicatedVideoWindow &&
+        !startupVisibilityHeld) {
       try {
         final isDarkMode = await _resolveInitialNativeBackdropDarkMode();
-        await Future<void>.delayed(const Duration(milliseconds: 120));
+        if (Platform.isMacOS) {
+          await Future<void>.delayed(const Duration(milliseconds: 120));
+        }
         await windowAcrylicService.applyDesktopAcrylicBackground(
           isDesktopPlatform: isDesktopPlatform,
           isPipWindow: isPip,
@@ -769,7 +794,47 @@ Future<void> runCbFileApp() async {
       windowAcrylicService: windowAcrylicService,
     ),
   );
+  // ThemeProvider starts loading in its constructor. Await it before building
+  // the host so a saved dark theme never flashes the default light frame.
+  try {
+    await locator<ThemeProvider>().ready;
+  } catch (e) {
+    debugPrint('Error loading saved appearance; using the default theme: $e');
+  }
   runApp(mainApp);
+
+  if (startupVisibilityHeld) {
+    unawaited(() async {
+      await WidgetsBinding.instance.waitUntilFirstFrameRasterized;
+      try {
+        final theme = locator<ThemeProvider>();
+        if (theme.isWallpaperMode) {
+          await WindowsNativeTabDragDropService.setWindowsSystemBackdrop(
+            enabled: false,
+          );
+        } else {
+          await windowAcrylicService.applyDesktopAcrylicBackground(
+            isDesktopPlatform: true,
+            isPipWindow: false,
+            isDarkMode: theme.isDarkMode,
+          );
+        }
+      } catch (e) {
+        debugPrint('Error preparing the first app backdrop: $e');
+      }
+      try {
+        await WindowsNativeTabDragDropService.setStartupVisibilityHeld(false);
+        if (torrentSources.isNotEmpty) {
+          await DesktopWindowingService.focusTorrentWindow();
+        } else {
+          await windowManager.show();
+          await windowManager.focus();
+        }
+      } catch (e) {
+        debugPrint('Error revealing the first app frame: $e');
+      }
+    }());
+  }
 
   debugPrint('Startup: runApp after ${startupStopwatch.elapsedMilliseconds}ms');
   if (TorrentOptionsWindowService.isSupported &&
@@ -1157,25 +1222,16 @@ class _CBFileAppState extends State<CBFileApp>
     _lastAppliedNativeBackdropDarkMode = isDarkMode;
 
     final int generation = ++_acrylicSyncGeneration;
-    final List<int> delaysMs = <int>[
-      if (includeImmediate) 0,
-      80,
-      180,
-      320,
-      560,
-    ];
+    // Windows owns recovery in its native window delegate. Repeating these
+    // requests races show/resize and needlessly touches composition at startup.
+    final List<int> delaysMs = Platform.isWindows
+        ? <int>[0]
+        : <int>[if (includeImmediate) 0, 80, 180, 320, 560];
 
     for (final int delayMs in delaysMs) {
       unawaited(
         Future<void>.delayed(Duration(milliseconds: delayMs), () async {
           if (!mounted || generation != _acrylicSyncGeneration) return;
-          if (Platform.isWindows) {
-            try {
-              await WindowsNativeTabDragDropService.setNativeSystemMenuVisible(
-                false,
-              );
-            } catch (_) {}
-          }
           try {
             await widget.windowAcrylicService.applyDesktopAcrylicBackground(
               isDesktopPlatform: true,

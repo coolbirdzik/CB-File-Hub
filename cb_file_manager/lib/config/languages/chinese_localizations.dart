@@ -1197,10 +1197,10 @@ class ChineseLocalizations implements AppLocalizations {
   String desktopGlassBlurDescription(int percentage) =>
       '柔化玻璃表面后方的壁纸和内容（$percentage%）。';
   @override
-  String get desktopAcrylicStrength => '桌面亚克力强度';
+  String get desktopAcrylicStrength => '亚克力透明度';
   @override
   String desktopAcrylicStrengthDescription(int percentage) =>
-      '调整桌面背景的模糊和着色强度 ($percentage%)。';
+      '降低数值可使背景更不透明；0% 为实色背景（$percentage%）。';
   @override
   String get vietnameseLanguage => '越南语';
   @override

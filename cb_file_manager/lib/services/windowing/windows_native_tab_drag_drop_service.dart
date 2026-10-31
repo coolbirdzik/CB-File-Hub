@@ -70,6 +70,14 @@ class WindowsNativeTabDragDropService {
     'cb_file_manager/window_utils',
   );
 
+  /// Prevents maximize/show from exposing the window before its first frame.
+  static Future<void> setStartupVisibilityHeld(bool held) async {
+    if (!Platform.isWindows) return;
+    await _channel.invokeMethod<void>('setStartupVisibilityHeld', {
+      'held': held,
+    });
+  }
+
   static bool _initialized = false;
   static TabManagerBloc? _tabBloc;
   static void Function(List<String>)? onTorrentSources;

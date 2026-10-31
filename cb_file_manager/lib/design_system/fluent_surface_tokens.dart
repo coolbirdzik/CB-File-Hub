@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'cb_tokens.dart';
+import 'desktop_acrylic_theme.dart';
 import 'macos_glass_theme.dart';
 import 'tokens/cb_geometry_tokens.dart';
 
@@ -69,15 +70,18 @@ class FluentSurfaceTokens {
       opacity: glass.chromeOpacity,
       foregrounds: [colors.textPrimary, colors.textSecondary],
     );
-    final toolbarTintAlpha = readableChrome?.a ?? (isDark ? 0.52 : 0.64);
-    final drawerTintAlpha = readableChrome?.a ?? (isDark ? 0.60 : 0.72);
+    final acrylic = theme.extension<DesktopAcrylicTheme>();
+    final toolbarTintAlpha =
+        readableChrome?.a ?? acrylic?.chromeOpacity ?? (isDark ? 0.52 : 0.64);
+    final drawerTintAlpha =
+        readableChrome?.a ?? acrylic?.drawerOpacity ?? (isDark ? 0.60 : 0.72);
     return FluentSurfaceTokens(
       canvas: theme.scaffoldBackgroundColor,
       chromeTint: chromeTint,
       toolbar: chromeTint.withValues(alpha: toolbarTintAlpha),
       toolbarTintAlpha: toolbarTintAlpha,
       drawerTintAlpha: drawerTintAlpha,
-      chromeBlur: glass?.blurSigma ?? 18,
+      chromeBlur: glass?.blurSigma ?? acrylic?.blurSigma ?? 18,
       // A translucent fill, not the sunken neutral: with no outline around
       // it, the control has to read as a tone on the tinted toolbar, and the
       // sunken neutral matches the dark canvas exactly.

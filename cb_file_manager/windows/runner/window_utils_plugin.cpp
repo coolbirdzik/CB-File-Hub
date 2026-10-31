@@ -1,5 +1,8 @@
 #include "window_utils_plugin.h"
+#include "startup_visibility.h"
 #include "window_backdrop.h"
+#include "window_backdrop_frame.h"
+#include "window_backdrop_diagnostics.h"
 #include "torrent_launch.h"
 #include "resource.h"
 #include "engine_window_host.h"
@@ -155,8 +158,12 @@ namespace
     HWND target = root ? root : hwnd;
     if (!target)
       target = GetTopLevelWindow(registrar);
-    if (!target || ::IsIconic(target) || !::IsWindowVisible(target))
+    if (!target || ::IsIconic(target) || !::IsWindowVisible(target) ||
+        WindowBackdrop::IsResizeFramePending(target))
+    {
+      WindowBackdrop::Trace("reapply-blocked", target, GetMainWindow(registrar), &state);
       return;
+    }
 
     SetNativeSystemBackdrop(state, target, GetMainWindow(registrar), active,
                             prefer_acrylic, dark_mode);
@@ -182,9 +189,11 @@ namespace
       WindowBackdrop::State &state, HWND hwnd, HWND view, bool enabled,
       bool prefer_acrylic, bool is_dark_mode)
   {
-    return WindowBackdrop::Sync(
+    const bool result = WindowBackdrop::Sync(
         state, hwnd, view, GetWindowsVersionInfo().dwBuildNumber,
         enabled, prefer_acrylic, is_dark_mode);
+    WindowBackdrop::Trace("apply", hwnd, view, &state);
+    return result;
   }
 
   HWND GetMainWindow(flutter::PluginRegistrarWindows *registrar)
@@ -2200,6 +2209,10 @@ void WindowUtilsPlugin::EnsureWindowProcDelegateRegistered()
       [this](HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
           -> std::optional<LRESULT>
       {
+        if (message == WM_WINDOWPOSCHANGING) {
+          HoldStartupVisibility(startup_visibility_held_,
+                                reinterpret_cast<WINDOWPOS*>(lparam));
+        }
         LRESULT tab_merge_result = 0;
         if (HandleTabMergeMessage(hwnd, message, wparam, lparam,
                                   &tab_merge_result))
@@ -2238,11 +2251,25 @@ void WindowUtilsPlugin::EnsureWindowProcDelegateRegistered()
 
         switch (message)
         {
+        case WindowBackdrop::kResizeFrameReady:
+          // A resize can replace Flutter's presentation surface after the
+          // early timers ran. Invalidate once at the actual frame boundary.
+          if (this->backdrop_resize_frame_pending_) {
+            this->backdrop_resize_frame_pending_ = false;
+            this->backdrop_state_.material_lost = true;
+            ScheduleBackdropReapplyForPluginInstance(hwnd, this->backdrop_active_);
+          }
+          break;
+
         case WM_ACTIVATE:
-          // Re-apply the transparent-gradient accent when the window becomes
-          // active. Windows resets WCA_ACCENT_POLICY on every WM_ACTIVATE.
+          WindowBackdrop::Trace(
+              LOWORD(wparam) == WA_INACTIVE ? "deactivated" : "activated",
+              hwnd, GetMainWindow(registrar_), &this->backdrop_state_);
+          // Restore the root acrylic accent in place, even when Windows
+          // rejects the child transparency request.
           if (LOWORD(wparam) != WA_INACTIVE)
           {
+            this->backdrop_state_.child_transparency_lost = true;
             HWND root = ::GetAncestor(hwnd, GA_ROOT);
             HWND target = root ? root : hwnd;
             ScheduleBackdropReapplyForPluginInstance(target, this->backdrop_active_);
@@ -2253,6 +2280,7 @@ void WindowUtilsPlugin::EnsureWindowProcDelegateRegistered()
           // Non-client area activation also triggers a DWM accent reset.
           if (wparam != FALSE)
           {
+            this->backdrop_state_.child_transparency_lost = true;
             HWND root = ::GetAncestor(hwnd, GA_ROOT);
             HWND target = root ? root : hwnd;
             ScheduleBackdropReapplyForPluginInstance(target, this->backdrop_active_);
@@ -2266,6 +2294,9 @@ void WindowUtilsPlugin::EnsureWindowProcDelegateRegistered()
               lparam != this->backdrop_client_size_)
           {
             this->backdrop_state_.material_lost = true;
+            // Initial layout happened before acrylic was enabled, so its
+            // callback must not rebuild the just-prepared startup material.
+            this->backdrop_resize_frame_pending_ = wparam != SIZE_MINIMIZED;
           }
           this->backdrop_size_type_ = wparam;
           this->backdrop_client_size_ = lparam;
@@ -2275,8 +2306,31 @@ void WindowUtilsPlugin::EnsureWindowProcDelegateRegistered()
           }
           break;
 
+        case WM_WINDOWPOSCHANGED:
+        {
+          // window_manager's delegate runs first and consumes WM_SIZE for
+          // SIZE_MINIMIZED, so detect minimizing from the placement instead.
+          // Otherwise a restore to the previous size never rebuilds.
+          constexpr UINT kSwpStateChanged = 0x8000;
+          const auto *pos = reinterpret_cast<const WINDOWPOS *>(lparam);
+          if (pos && (pos->flags & kSwpStateChanged) && ::IsIconic(hwnd))
+          {
+            this->backdrop_state_.material_lost = true;
+            this->backdrop_size_type_ = SIZE_MINIMIZED;
+            this->backdrop_resize_frame_pending_ = false;
+          }
+          if (pos && (pos->flags & SWP_SHOWWINDOW)) {
+            // WM_SHOWWINDOW arrives before WS_VISIBLE is updated. Schedule
+            // here too so a previously hidden spare recovers after showing.
+            ScheduleBackdropReapplyForPluginInstance(hwnd, this->backdrop_active_);
+          }
+          break;
+        }
+
         case WM_SHOWWINDOW:
-          if (wparam)
+          // Showing a prepared window does not discard its root material.
+          // Hiding an existing window can discard it; recover on the next show.
+          if (!wparam)
             this->backdrop_state_.material_lost = true;
           ScheduleBackdropReapplyForPluginInstance(hwnd, this->backdrop_active_);
           break;
@@ -2288,9 +2342,21 @@ void WindowUtilsPlugin::EnsureWindowProcDelegateRegistered()
         case WM_TIMER:
           if (wparam == 0xCBA0 || wparam == 0xCBA1 || wparam == 0xCBA2 || wparam == 0xCBA3)
           {
+            // Acrylic can be repaired as soon as its resized frame arrives,
+            // even while the mouse is held. Only defer system fallbacks.
+            // (window_manager consumes WM_EXITSIZEMOVE, so poll for it.)
+            GUITHREADINFO thread_info{sizeof(thread_info)};
+            if (::GetGUIThreadInfo(::GetCurrentThreadId(), &thread_info) &&
+                WindowBackdrop::ShouldDeferSizeMoveRepair(
+                    this->backdrop_state_,
+                    (thread_info.flags & GUI_INMOVESIZE) != 0))
+            {
+              ::SetTimer(hwnd, static_cast<UINT_PTR>(wparam), 100, nullptr);
+              break;
+            }
             ::KillTimer(hwnd, static_cast<UINT_PTR>(wparam));
-            // The first timer rebuilds a lost material; later ones only
-            // refresh, so a single event no longer flashes it four times.
+            // The first timer restores lost state; later retries are no-ops
+            // once both the material and child transparency are healthy.
             ReapplyBackdropForPluginInstance(
                 this->registrar_, this->backdrop_state_, hwnd,
                 this->backdrop_active_, this->backdrop_prefer_acrylic_,
@@ -2306,6 +2372,13 @@ void WindowUtilsPlugin::EnsureWindowProcDelegateRegistered()
           ScheduleBackdropReapplyForPluginInstance(hwnd, this->backdrop_active_);
           break;
         }
+
+        case WM_DWMCOLORIZATIONCOLORCHANGED:
+          // Win32Window::UpdateTheme then applies the system's dark mode,
+          // which flips the material's tint when the app theme differs.
+          this->backdrop_state_.dark_mode_lost = true;
+          ScheduleBackdropReapplyForPluginInstance(hwnd, this->backdrop_active_);
+          break;
         }
         // Never consume the message — let Flutter and DefWindowProc handle it.
         return std::nullopt;
@@ -2317,6 +2390,22 @@ void WindowUtilsPlugin::HandleMethodCall(
     std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result)
 {
   const auto method = method_call.method_name();
+
+  if (method == "setStartupVisibilityHeld") {
+    const auto* args = std::get_if<flutter::EncodableMap>(method_call.arguments());
+    if (!args) {
+      result->Error("INVALID_ARGUMENTS", "Missing arguments.");
+      return;
+    }
+    const auto it = args->find(flutter::EncodableValue("held"));
+    if (it == args->end() || !std::holds_alternative<bool>(it->second)) {
+      result->Error("INVALID_ARGUMENTS", "Missing held boolean.");
+      return;
+    }
+    startup_visibility_held_ = std::get<bool>(it->second);
+    result->Success();
+    return;
+  }
 
   if (method == "notifyTorrent")
   {

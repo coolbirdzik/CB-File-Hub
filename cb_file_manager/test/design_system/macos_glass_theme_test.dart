@@ -70,7 +70,7 @@ void main() {
       platform: TargetPlatform.windows,
     );
     expect(theme.extension<MacosGlassTheme>(), isNull);
-    expect(theme.scaffoldBackgroundColor.a, closeTo(0.62, 0.005));
+    expect(theme.scaffoldBackgroundColor.a, closeTo(0.81, 0.005));
     expect(FluentSurfaceTokens.fromTheme(theme).chromeBlur, 18);
   });
 

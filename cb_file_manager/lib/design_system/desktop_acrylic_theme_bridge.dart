@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'macos_glass_theme.dart';
+import 'desktop_acrylic_theme.dart';
 import 'package:flutter/material.dart';
 
 /// Resolves the Material surface theme used alongside the desktop acrylic
@@ -20,84 +21,22 @@ ThemeData createDesktopAcrylicMaterialBridgeTheme({
           brightness: brightness,
         )
       : null;
-  final double normalizedStrength = strength.clamp(0.0, 2.0).toDouble();
+  final acrylic = DesktopAcrylicTheme(
+    strength: strength,
+    brightness: brightness,
+    dynamicBackdrop: preferTransparentBackdrop,
+  );
   final bool isLightMode = brightness == Brightness.light;
   const Color fluentLightBackground2 = Color(0xFFF3F4F7);
   const Color fluentLightBackground3 = Color(0xFFFFFFFF);
-
-  double opacityByStrength({
-    required double solidAtMin,
-    required double glassAtMax,
-  }) {
-    return solidAtMin + (glassAtMax - solidAtMin) * normalizedStrength;
-  }
-
-  final scaffoldOpacity =
-      glass?.canvasOpacity ??
-      (brightness == Brightness.dark
-          ? opacityByStrength(
-              solidAtMin: 0.90,
-              glassAtMax: preferTransparentBackdrop ? 0.24 : 0.34,
-            )
-          : opacityByStrength(
-              solidAtMin: 0.99,
-              glassAtMax: preferTransparentBackdrop ? 0.62 : 0.92,
-            ));
-  final appBarOpacity =
-      glass?.chromeOpacity ??
-      (brightness == Brightness.dark
-          ? opacityByStrength(
-              solidAtMin: 0.94,
-              glassAtMax: preferTransparentBackdrop ? 0.36 : 0.46,
-            )
-          : opacityByStrength(
-              solidAtMin: 0.99,
-              glassAtMax: preferTransparentBackdrop ? 0.70 : 0.93,
-            ));
-  final surfaceOpacity =
-      glass?.surfaceOpacity ??
-      (brightness == Brightness.dark
-          ? opacityByStrength(
-              solidAtMin: 0.88,
-              glassAtMax: preferTransparentBackdrop ? 0.30 : 0.40,
-            )
-          : opacityByStrength(
-              solidAtMin: 0.99,
-              glassAtMax: preferTransparentBackdrop ? 0.72 : 0.90,
-            ));
-  final containerOpacity =
-      glass?.containerOpacity ??
-      (brightness == Brightness.dark
-          ? opacityByStrength(
-              solidAtMin: 0.84,
-              glassAtMax: preferTransparentBackdrop ? 0.28 : 0.36,
-            )
-          : opacityByStrength(
-              solidAtMin: 0.98,
-              glassAtMax: preferTransparentBackdrop ? 0.68 : 0.88,
-            ));
+  final scaffoldOpacity = glass?.canvasOpacity ?? acrylic.canvasOpacity;
+  final appBarOpacity = glass?.chromeOpacity ?? acrylic.chromeOpacity;
+  final surfaceOpacity = glass?.surfaceOpacity ?? acrylic.surfaceOpacity;
+  final containerOpacity = glass?.containerOpacity ?? acrylic.containerOpacity;
   final lowContainerOpacity =
-      glass?.lowContainerOpacity ??
-      (brightness == Brightness.dark
-          ? opacityByStrength(
-              solidAtMin: 0.80,
-              glassAtMax: preferTransparentBackdrop ? 0.24 : 0.32,
-            )
-          : opacityByStrength(
-              solidAtMin: 0.98,
-              glassAtMax: preferTransparentBackdrop ? 0.62 : 0.86,
-            ));
+      glass?.lowContainerOpacity ?? acrylic.lowContainerOpacity;
   final lowestContainerOpacity =
-      glass?.lowestContainerOpacity ??
-      (brightness == Brightness.dark
-          ? opacityByStrength(
-              solidAtMin: 0.76,
-              glassAtMax: preferTransparentBackdrop ? 0.20 : 0.28,
-            )
-          : opacityByStrength(
-              solidAtMin: 0.97,
-              glassAtMax: preferTransparentBackdrop ? 0.56 : 0.84,
-            ));
+      glass?.lowestContainerOpacity ?? acrylic.lowestContainerOpacity;
 
   final colorScheme = baseTheme.colorScheme;
   Color surface(Color tint, double opacity, {bool inverse = false}) =>
@@ -157,9 +96,9 @@ ThemeData createDesktopAcrylicMaterialBridgeTheme({
   return baseTheme.copyWith(
     extensions: [
       ...baseTheme.extensions.values.where(
-        (value) => value is! MacosGlassTheme,
+        (value) => value is! MacosGlassTheme && value is! DesktopAcrylicTheme,
       ),
-      ?glass,
+      if (glass != null) glass else acrylic,
     ],
     colorScheme: bridgedColorScheme,
     scaffoldBackgroundColor: surface(

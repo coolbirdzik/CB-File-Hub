@@ -199,6 +199,7 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
   // Sidebar (Windows-Explorer-style left rail) state.
   List<_SidebarEntry> _quickAccess = [];
   List<_SidebarEntry> _drives = [];
+  AppLocalizations? _sidebarLocalizations;
 
   /// Whether the left rail should be shown. Only on desktop, when enabled by
   /// config, and when not sandboxed to a single root folder.
@@ -232,12 +233,20 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
         _performTagSearch(initialTag);
       }
     }
-    if (_showSidebar) {
-      _loadSidebar();
-    }
   }
 
-  Future<void> _loadSidebar() async {
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_showSidebar) return;
+
+    final l10n = context.tr;
+    if (identical(_sidebarLocalizations, l10n)) return;
+    _sidebarLocalizations = l10n;
+    _loadSidebar(l10n);
+  }
+
+  Future<void> _loadSidebar(AppLocalizations l10n) async {
     // Quick-access folders (best-effort; skip any that don't resolve).
     final quick = <_SidebarEntry>[];
     Future<void> addQuick(
@@ -273,7 +282,7 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
     if (home != null && home.isNotEmpty && Directory(home).existsSync()) {
       quick.add(
         _SidebarEntry(
-          label: context.tr.home,
+          label: l10n.home,
           path: path.normalize(home),
           icon: PhosphorIconsLight.house,
         ),
@@ -300,7 +309,7 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
       final locations = await getAllStorageLocations();
       drives = locations.map((dir) {
         return _SidebarEntry(
-          label: _driveLabel(dir),
+          label: _driveLabel(dir, l10n),
           path: dir.path,
           icon: _driveIcon(dir),
           requiresAdmin: dir.requiresAdmin,
@@ -310,14 +319,14 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
       debugPrint('MediaPickerDialog: failed to load drives: $e');
     }
 
-    if (!mounted) return;
+    if (!mounted || !identical(_sidebarLocalizations, l10n)) return;
     setState(() {
       _quickAccess = quick;
       _drives = drives;
     });
   }
 
-  String _driveLabel(Directory drive) {
+  String _driveLabel(Directory drive, AppLocalizations l10n) {
     var p = drive.path;
     if (p.length > 1 && p.endsWith(Platform.pathSeparator)) {
       p = p.substring(0, p.length - 1);
@@ -325,8 +334,8 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
     if (Platform.isWindows && p.contains(':')) {
       final letter = p.split(r'\')[0];
       return p.startsWith('C:')
-          ? context.tr.mpDriveSystem(letter)
-          : context.tr.mpDriveOther(letter);
+          ? l10n.mpDriveSystem(letter)
+          : l10n.mpDriveOther(letter);
     }
     return p;
   }
@@ -791,23 +800,27 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
     return Container(
       width: 200,
       decoration: CbDecorations.card(context, radius: 12),
-      child: ListView(
-        padding: const EdgeInsets.only(right: 8),
-        children: [
-          if (_quickAccess.isNotEmpty) ...[
-            _SectionHeader(label: l10n.quickAccess),
-            ..._quickAccess.map(_buildSidebarTile),
-            const SizedBox(height: 8),
+      // Keep ListTile ink above the card's decorated background.
+      child: Material(
+        type: MaterialType.transparency,
+        child: ListView(
+          padding: const EdgeInsets.only(right: 8),
+          children: [
+            if (_quickAccess.isNotEmpty) ...[
+              _SectionHeader(label: l10n.quickAccess),
+              ..._quickAccess.map(_buildSidebarTile),
+              const SizedBox(height: 8),
+            ],
+            _SectionHeader(label: l10n.thisPC),
+            if (_drives.isEmpty)
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Text(l10n.loading, style: theme.textTheme.bodySmall),
+              )
+            else
+              ..._drives.map(_buildSidebarTile),
           ],
-          _SectionHeader(label: l10n.thisPC),
-          if (_drives.isEmpty)
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Text(l10n.loading, style: theme.textTheme.bodySmall),
-            )
-          else
-            ..._drives.map(_buildSidebarTile),
-        ],
+        ),
       ),
     );
   }

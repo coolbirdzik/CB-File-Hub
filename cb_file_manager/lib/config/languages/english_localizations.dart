@@ -1272,10 +1272,10 @@ class EnglishLocalizations implements AppLocalizations {
   String desktopGlassBlurDescription(int percentage) =>
       'Soften wallpaper and content behind glass surfaces ($percentage%).';
   @override
-  String get desktopAcrylicStrength => 'Desktop acrylic strength';
+  String get desktopAcrylicStrength => 'Acrylic transparency';
   @override
   String desktopAcrylicStrengthDescription(int percentage) =>
-      'Adjust blur and tint intensity for desktop backdrop ($percentage%).';
+      'Lower for a more opaque background; 0% is solid ($percentage%).';
   @override
   String get vietnameseLanguage => 'Vietnamese';
   @override

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cb_file_manager/design_system/primitives/cb_slider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -12,8 +14,9 @@ class DesktopBackdropStrengthControl extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final themeProvider = context.watch<ThemeProvider>();
-    final value = themeProvider.desktopBackdropStrength;
-    final percentage = (value * 100).round();
+    final glass = themeProvider.usesMacosGlass;
+    final scale = glass ? 1.0 : 2.0;
+    final value = themeProvider.desktopBackdropStrength / scale;
     final l10n = AppLocalizations.of(context)!;
 
     return Column(
@@ -23,22 +26,25 @@ class DesktopBackdropStrengthControl extends StatelessWidget {
               ? l10n.desktopGlassStrength
               : l10n.desktopAcrylicStrength,
           description: themeProvider.usesMacosGlass
-              ? l10n.desktopGlassStrengthDescription(percentage)
-              : l10n.desktopAcrylicStrengthDescription(percentage),
+              ? l10n.desktopGlassStrengthDescription
+              : l10n.desktopAcrylicStrengthDescription,
           value: value,
+          max: glass ? 2 : 1,
+          divisions: glass ? 20 : 100,
+          previewInterval: glass
+              ? Duration.zero
+              : const Duration(milliseconds: 80),
           onChanged: (nextValue) => themeProvider.setDesktopBackdropStrength(
-            nextValue,
+            nextValue * scale,
             persist: false,
           ),
           onChangeEnd: (nextValue) =>
-              themeProvider.setDesktopBackdropStrength(nextValue),
+              themeProvider.setDesktopBackdropStrength(nextValue * scale),
         ),
         if (themeProvider.usesMacosGlass)
           _BackdropSlider(
             title: l10n.desktopGlassBlur,
-            description: l10n.desktopGlassBlurDescription(
-              (themeProvider.desktopGlassBlurStrength * 100).round(),
-            ),
+            description: l10n.desktopGlassBlurDescription,
             value: themeProvider.desktopGlassBlurStrength,
             onChanged: (nextValue) => themeProvider.setDesktopGlassBlurStrength(
               nextValue,
@@ -52,10 +58,13 @@ class DesktopBackdropStrengthControl extends StatelessWidget {
   }
 }
 
-class _BackdropSlider extends StatelessWidget {
+class _BackdropSlider extends StatefulWidget {
   final String title;
-  final String description;
+  final String Function(int percentage) description;
   final double value;
+  final double max;
+  final int divisions;
+  final Duration previewInterval;
   final ValueChanged<double> onChanged;
   final ValueChanged<double> onChangeEnd;
 
@@ -63,24 +72,66 @@ class _BackdropSlider extends StatelessWidget {
     required this.title,
     required this.description,
     required this.value,
+    this.max = 2,
+    this.divisions = 20,
+    this.previewInterval = Duration.zero,
     required this.onChanged,
     required this.onChangeEnd,
   });
 
   @override
+  State<_BackdropSlider> createState() => _BackdropSliderState();
+}
+
+class _BackdropSliderState extends State<_BackdropSlider> {
+  double? _dragValue;
+  Timer? _previewTimer;
+  double? _pendingPreview;
+
+  void _preview(double value) {
+    setState(() => _dragValue = value);
+    if (widget.previewInterval == Duration.zero) {
+      widget.onChanged(value);
+      return;
+    }
+    _pendingPreview = value;
+    _previewTimer ??= Timer(widget.previewInterval, () {
+      _previewTimer = null;
+      final latest = _pendingPreview;
+      _pendingPreview = null;
+      if (latest != null) widget.onChanged(latest);
+    });
+  }
+
+  void _commit(double value) {
+    _previewTimer?.cancel();
+    _previewTimer = null;
+    _pendingPreview = null;
+    setState(() => _dragValue = null);
+    widget.onChangeEnd(value);
+  }
+
+  @override
+  void dispose() {
+    _previewTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final value = _dragValue ?? widget.value;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            title,
+            widget.title,
             style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 4),
           Text(
-            description,
+            widget.description((value * 100).round()),
             style: TextStyle(
               fontSize: 12,
               color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -88,15 +139,15 @@ class _BackdropSlider extends StatelessWidget {
           ),
           Semantics(
             container: true,
-            label: title,
+            label: widget.title,
             child: CbSlider(
               min: 0,
-              max: 2,
-              divisions: 20,
+              max: widget.max,
+              divisions: widget.divisions,
               value: value,
               label: '${(value * 100).round()}%',
-              onChanged: onChanged,
-              onChangeEnd: onChangeEnd,
+              onChanged: _preview,
+              onChangeEnd: _commit,
             ),
           ),
         ],

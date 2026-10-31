@@ -1264,10 +1264,10 @@ class VietnameseLocalizations implements AppLocalizations {
   String desktopGlassBlurDescription(int percentage) =>
       'Làm mờ ảnh nền và nội dung phía sau bề mặt kính ($percentage%).';
   @override
-  String get desktopAcrylicStrength => 'Độ mạnh acrylic máy tính';
+  String get desktopAcrylicStrength => 'Độ trong suốt acrylic';
   @override
   String desktopAcrylicStrengthDescription(int percentage) =>
-      'Điều chỉnh độ mờ và độ đậm nền máy tính ($percentage%).';
+      'Giảm để nền đậm hơn; 0% là nền đặc ($percentage%).';
   @override
   String get vietnameseLanguage => 'Tiếng Việt';
   @override

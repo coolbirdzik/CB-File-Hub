@@ -105,7 +105,7 @@ namespace WindowBackdrop {
 
     ACCENT_POLICY accent = {
         state,
-        2,
+        state == ACCENT_ENABLE_ACRYLICBLURBEHIND ? 0u : 2u,
         gradient_color,
         0,
     };
@@ -127,16 +127,17 @@ namespace WindowBackdrop {
         sizeof(enable_alpha));
   }
 
-  inline void SetFlutterChildBackdropTransparency(HWND hwnd, DWORD build_number, bool enabled)
+  inline bool SetFlutterChildBackdropTransparency(HWND hwnd, DWORD build_number, bool enabled)
   {
     if (!hwnd)
-      return;
+      return false;
 
     SetRedirectionBitmapAlpha(hwnd, build_number, enabled);
-    ApplyAccentPolicy(hwnd, enabled ? ACCENT_ENABLE_TRANSPARENTGRADIENT
-                                    : ACCENT_DISABLED);
+    const bool applied = ApplyAccentPolicy(
+        hwnd, enabled ? ACCENT_ENABLE_TRANSPARENTGRADIENT : ACCENT_DISABLED);
     ::RedrawWindow(
-        hwnd, nullptr, nullptr, RDW_INVALIDATE | RDW_UPDATENOW | RDW_FRAME);
+        hwnd, nullptr, nullptr, RDW_INVALIDATE | RDW_FRAME);
+    return applied;
   }
 
   inline bool SetLegacyBlurBehind(HWND hwnd, bool enabled)
@@ -153,18 +154,26 @@ namespace WindowBackdrop {
     return SUCCEEDED(::DwmEnableBlurBehindWindow(hwnd, &blur));
   }
 
-  inline bool Apply(
-      HWND hwnd, DWORD build_number, bool enabled, bool prefer_acrylic, bool is_dark_mode)
+  inline bool SetAcrylicAccent(HWND hwnd, bool dark)
   {
+    // Acrylic requires nonzero tint alpha. Flutter already owns the user's
+    // tint/strength, so do not stack a second opaque native tint over it.
+    return ApplyAccentPolicy(hwnd, ACCENT_ENABLE_ACRYLICBLURBEHIND,
+                             dark ? 0x01222222 : 0x01FFFFFF);
+  }
+
+  inline bool Apply(
+      HWND hwnd, DWORD build_number, bool enabled, bool prefer_acrylic, bool is_dark_mode,
+      bool* accent_acrylic_applied = nullptr)
+  {
+    if (accent_acrylic_applied) *accent_acrylic_applied = false;
     if (!hwnd)
       return false;
 
-    // Persist for the window proc delegate to re-apply on WM_ACTIVATE etc.
-
-
-    // Clear accent state first. This mirrors flutter_acrylic behavior and avoids
-    // stale composition artifacts when switching effects.
+    // Clear old composition only when installing/changing the effect. Sync
+    // repairs an existing acrylic accent in place on resize and activation.
     ApplyAccentPolicy(hwnd, ACCENT_DISABLED);
+    SetLegacyBlurBehind(hwnd, false);
 
     if (!enabled)
     {
@@ -184,16 +193,36 @@ namespace WindowBackdrop {
           hwnd, kWindowAttributeMicaEffect, &disable, sizeof(disable));
 
       SetRedirectionBitmapAlpha(hwnd, build_number, false);
-      SetLegacyBlurBehind(hwnd, false);
       ::RedrawWindow(
-          hwnd, nullptr, nullptr, RDW_INVALIDATE | RDW_UPDATENOW | RDW_FRAME);
+          hwnd, nullptr, nullptr, RDW_INVALIDATE | RDW_FRAME);
       return true;
     }
 
     bool applied = false;
+    if (prefer_acrylic)
+    {
+      // The transient system backdrop and a transparent-gradient root accent
+      // are different composition paths. Do not stack them. Use one root
+      // acrylic accent for Flutter's HWND-backed swapchain, including Win11.
+      const BOOL disable_host_backdrop = FALSE;
+      ::DwmSetWindowAttribute(hwnd, kDwmwaUseHostBackdropBrush,
+                              &disable_host_backdrop, sizeof(disable_host_backdrop));
+      if (build_number >= 22621) {
+        const DWORD none = kDwmsbtNone;
+        ::DwmSetWindowAttribute(hwnd, kDwmwaSystemBackdropType, &none, sizeof(none));
+      } else if (build_number >= 22000) {
+        const BOOL disable_mica = FALSE;
+        ::DwmSetWindowAttribute(hwnd, kWindowAttributeMicaEffect,
+                                &disable_mica, sizeof(disable_mica));
+      }
+      const MARGINS shadow = {0, 0, 1, 0};
+      ::DwmExtendFrameIntoClientArea(hwnd, &shadow);
+      applied = SetAcrylicAccent(hwnd, is_dark_mode);
+      if (accent_acrylic_applied) *accent_acrylic_applied = applied;
+    }
 
-    // Windows 11 22H2+ modern system backdrops.
-    if (build_number >= 22621)
+    // Keep the supported DWM path for Mica, or if acrylic accents are rejected.
+    if (!applied && build_number >= 22621)
     {
       const BOOL enable_dark = is_dark_mode ? TRUE : FALSE;
       const COLORREF kColorNone = 0xFFFFFFFE;
@@ -213,11 +242,6 @@ namespace WindowBackdrop {
       ::DwmSetWindowAttribute(
           hwnd, kDwmwaUseHostBackdropBrush, &enable_host_backdrop,
           sizeof(enable_host_backdrop));
-      // Resize/minimize can discard the material while retaining its enum.
-      // Rebuild it explicitly instead of setting the same cached value again.
-      const DWORD no_backdrop = kDwmsbtNone;
-      ::DwmSetWindowAttribute(hwnd, kDwmwaSystemBackdropType, &no_backdrop,
-                              sizeof(no_backdrop));
       const HRESULT backdrop_hr = ::DwmSetWindowAttribute(
           hwnd, kDwmwaSystemBackdropType, &backdrop_type, sizeof(backdrop_type));
 
@@ -239,39 +263,17 @@ namespace WindowBackdrop {
       applied = SUCCEEDED(mica_hr);
     }
 
-    if (!applied)
-    {
-      // Legacy approach from flutter_acrylic for pre-Windows 11 systems.
-      // Here ACCENT_DISABLED was already called above to clear stale state.
-      if (prefer_acrylic)
-      {
-        // ARGB format (AABBGGRR). Fallback for Windows 10 / early Windows 11.
-        const DWORD kLegacyAcrylicTint =
-            is_dark_mode ? 0x99222222 : 0x99FFFFFF;
-        applied = ApplyAccentPolicy(
-            hwnd, ACCENT_ENABLE_ACRYLICBLURBEHIND, kLegacyAcrylicTint);
-      }
-      else
-      {
-        applied = ApplyAccentPolicy(hwnd, ACCENT_ENABLE_BLURBEHIND);
-      }
-    }
+    if (!applied && !prefer_acrylic)
+      applied = ApplyAccentPolicy(hwnd, ACCENT_ENABLE_BLURBEHIND);
 
-    // Avoid stacking legacy blur with modern system backdrops.
-    if (applied)
-    {
-      SetLegacyBlurBehind(hwnd, false);
-    }
-    else
-    {
-      SetLegacyBlurBehind(hwnd, enabled);
-    }
-
+    // Never overwrite a root acrylic accent with TRANSPARENTGRADIENT. Child
+    // transparency is a separate, optional compatibility request below.
     // Never leave an alpha-enabled root behind if all material APIs failed.
     SetRedirectionBitmapAlpha(hwnd, build_number, applied);
 
-    ::RedrawWindow(
-        hwnd, nullptr, nullptr, RDW_INVALIDATE | RDW_UPDATENOW | RDW_FRAME);
+    // Do not force a synchronous paint while the child still has its previous
+    // alpha/accent state. Let DWM compose after both surfaces are updated.
+    ::RedrawWindow(hwnd, nullptr, nullptr, RDW_INVALIDATE | RDW_FRAME);
     return applied;
   }
 
@@ -279,6 +281,9 @@ namespace WindowBackdrop {
                              bool enabled, bool prefer_acrylic, bool dark) {
     const bool applied = Apply(root, build_number, enabled, prefer_acrylic, dark);
     if (view && view != root) {
+      // Some Windows builds reject accent policies on child HWNDs. The root
+      // still owns a valid system material; do not clear/rebuild it on every
+      // recovery timer merely because this compatibility request was rejected.
       SetFlutterChildBackdropTransparency(
           view, build_number, enabled && prefer_acrylic && applied);
     }
@@ -295,28 +300,74 @@ namespace WindowBackdrop {
     bool dark = false;
     // Minimize and resize can discard the material while DWM keeps its enum.
     bool material_lost = true;
+    // Activation can reset root/child transparency independently of the
+    // material. Repair once without rebuilding the system backdrop.
+    bool child_transparency_lost = false;
+    // The child rejected its accent while the root material was rebuilt.
+    // Current builds do this permanently; activations must not retry it.
+    bool child_transparency_unsupported = false;
+    // The runner resets immersive dark mode from the system theme on
+    // colorization changes. Restore the app's value without a rebuild.
+    bool dark_mode_lost = false;
+    bool accent_acrylic = false;
   };
 
-  // Rebuilds only for new settings, a lost material, a previous failure or a
-  // pre-22H2 accent backdrop, which Windows resets on activation. Otherwise
-  // re-asserts the Flutter view's accent without touching the root material.
+  inline bool ShouldDeferSizeMoveRepair(const State& state, bool in_size_move)
+  {
+    // Acrylic is repaired in place, so waiting for mouse-up leaves the
+    // restored Flutter surface without blur for the entire drag. Only a
+    // system-material rebuild needs the old size/move-loop delay.
+    return in_size_move && state.material_lost && !state.accent_acrylic;
+  }
+
+  // Settings changes install a new material. Resizing/activation repair an
+  // existing acrylic accent without clearing it or toggling the DWM material.
   inline bool Sync(State &state, HWND root, HWND view, DWORD build_number,
                    bool enabled, bool prefer_acrylic, bool dark)
   {
-    if (state.applied && !state.material_lost && build_number >= 22621 &&
+    if (state.applied && (!state.material_lost || state.accent_acrylic) &&
         state.enabled == enabled && state.prefer_acrylic == prefer_acrylic &&
         state.dark == dark)
     {
-      if (view && view != root && enabled && prefer_acrylic)
+      if (enabled && state.dark_mode_lost)
       {
-        SetRedirectionBitmapAlpha(view, build_number, true);
-        ApplyAccentPolicy(view, ACCENT_ENABLE_TRANSPARENTGRADIENT);
+        const BOOL enable_dark = dark ? TRUE : FALSE;
+        ::DwmSetWindowAttribute(root, kWindowAttributeUseImmersiveDarkMode,
+                                &enable_dark, sizeof(enable_dark));
+        state.dark_mode_lost = false;
+      }
+      if (enabled && prefer_acrylic &&
+          (state.child_transparency_lost || state.material_lost))
+      {
+        SetRedirectionBitmapAlpha(root, build_number, true);
+        const bool root_restored = !state.accent_acrylic || SetAcrylicAccent(root, dark);
+        bool restored = root_restored;
+        if (view && view != root && !state.child_transparency_unsupported) {
+          restored = SetFlutterChildBackdropTransparency(view, build_number, true) && restored;
+        }
+        ::RedrawWindow(root, nullptr, nullptr, RDW_INVALIDATE);
+        state.material_lost = !root_restored;
+        state.child_transparency_lost = !restored;
+        return restored;
       }
       return true;
     }
-    const bool applied =
-        ApplyToWindow(root, view, build_number, enabled, prefer_acrylic, dark);
-    state = {applied, enabled, prefer_acrylic, dark, false};
+    bool accent_acrylic = false;
+    const bool applied = Apply(root, build_number, enabled, prefer_acrylic, dark,
+                               &accent_acrylic);
+    bool child_unsupported = false;
+    if (view && view != root)
+    {
+      // Some Windows builds reject accent policies on child HWNDs. The root
+      // still owns a valid system material; do not clear/rebuild it on every
+      // recovery timer merely because this compatibility request was rejected.
+      const bool child_enabled = enabled && prefer_acrylic && applied;
+      child_unsupported =
+          !SetFlutterChildBackdropTransparency(view, build_number, child_enabled) &&
+          child_enabled;
+    }
+    state = {applied, enabled, prefer_acrylic, dark, false, false,
+             child_unsupported, false, accent_acrylic};
     return applied;
   }
 

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../design_system/cb_theme_builder.dart';
@@ -44,6 +45,14 @@ class ThemeConfig {
   static const AppAccentColor defaultAccentColor = AppAccentColor.blue;
   static const AppFontColor defaultFontColor = AppFontColor.system;
   static const AppUiFont defaultUiFont = AppUiFontConfig.defaultFont;
+
+  // Acrylic previews change tint, not typography or base component themes.
+  // Bound the cache so exploring appearance options cannot retain every theme.
+  static final _themeCache =
+      <
+        (Brightness, AppAccentColor, AppFontColor, AppUiFont, TargetPlatform),
+        ThemeData
+      >{};
 
   static const Map<AppThemeType, String> themeNames = {
     AppThemeType.light: 'Light',
@@ -203,36 +212,43 @@ class ThemeConfig {
     AppAccentColor accentColor = defaultAccentColor,
     AppFontColor fontColor = defaultFontColor,
     AppUiFont uiFont = defaultUiFont,
-  }) {
-    final base = CbThemeBuilder.build(
-      brightness: Brightness.light,
-      accent: getAccentSeedColor(accentColor),
-      textColor: resolveFontColor(
-        fontColor,
-        Brightness.light,
-        accentColor: accentColor,
-      ),
-      extraExtensions: _extraExtensions,
-    );
-    return AppUiFontConfig.applyToTheme(base, uiFont);
-  }
+  }) => _baseTheme(Brightness.light, accentColor, fontColor, uiFont);
 
   static ThemeData getDarkTheme({
     AppAccentColor accentColor = defaultAccentColor,
     AppFontColor fontColor = defaultFontColor,
     AppUiFont uiFont = defaultUiFont,
-  }) {
+  }) => _baseTheme(Brightness.dark, accentColor, fontColor, uiFont);
+
+  static ThemeData _baseTheme(
+    Brightness brightness,
+    AppAccentColor accentColor,
+    AppFontColor fontColor,
+    AppUiFont uiFont,
+  ) {
+    final key = (
+      brightness,
+      accentColor,
+      fontColor,
+      uiFont,
+      defaultTargetPlatform,
+    );
+    final cached = _themeCache[key];
+    if (cached != null) return cached;
     final base = CbThemeBuilder.build(
-      brightness: Brightness.dark,
+      brightness: brightness,
       accent: getAccentSeedColor(accentColor),
       textColor: resolveFontColor(
         fontColor,
-        Brightness.dark,
+        brightness,
         accentColor: accentColor,
       ),
       extraExtensions: _extraExtensions,
     );
-    return AppUiFontConfig.applyToTheme(base, uiFont);
+    final theme = AppUiFontConfig.applyToTheme(base, uiFont);
+    if (_themeCache.length >= 8) _themeCache.remove(_themeCache.keys.first);
+    _themeCache[key] = theme;
+    return theme;
   }
 
   // --------------------------------------------------------------------

@@ -30,6 +30,9 @@ class ThemeProvider extends ChangeNotifier {
   static const double _defaultDesktopAcrylicStrength = 1.00;
   final TargetPlatform platform;
 
+  /// Completes when the saved appearance is ready for the first app frame.
+  late final Future<void> ready;
+
   AppThemeType _currentTheme = AppThemeType.light;
   AppAccentColor _currentAccentColor = ThemeConfig.defaultAccentColor;
   AppFontColor _currentFontColor = ThemeConfig.defaultFontColor;
@@ -84,7 +87,7 @@ class ThemeProvider extends ChangeNotifier {
 
   ThemeProvider({TargetPlatform? platform})
     : platform = platform ?? defaultTargetPlatform {
-    _loadTheme();
+    ready = _loadTheme();
   }
 
   static double _readGlassStrength(SharedPreferences prefs) =>
