@@ -99,8 +99,7 @@ class TorrentDetailsColumns {
             'tracker' => e.trackers.isEmpty ? '—' : e.trackers.first,
             'trackerCount' =>
               e.pieceCount == null ? '—' : '${e.trackers.length}',
-            'torrentCreated' =>
-              e.torrentCreatedAt?.toLocal().toString().split('.').first ?? '—',
+            'torrentCreated' => e.addedAt.toLocal().toString().split('.').first,
             'createdBy' => e.createdBy ?? '—',
             'comment' => e.comment ?? '—',
             'private' =>

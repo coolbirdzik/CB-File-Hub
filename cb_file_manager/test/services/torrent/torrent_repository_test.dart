@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:cb_file_manager/services/torrent/torrent_metainfo.dart';
 import 'package:cb_file_manager/services/torrent/torrent_repository.dart';
+import 'package:cb_file_manager/services/torrent/magnet_link.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'torrent_fixtures.dart';
 
@@ -102,6 +103,7 @@ void main() {
         await repo.import(info, '/archive/a', '/source/a', 10, 200),
         isTrue,
       );
+      final addedAt = (await repo.get(info.hash))!.addedAt;
       await repo.update(info.hash, {
         'status': 'paused',
         'download_dir': '/downloads',
@@ -117,10 +119,36 @@ void main() {
       expect(entry.status, 'paused');
       expect(entry.completedBytes, 3);
       expect(entry.torrentPath, '/archive/b');
+      expect(entry.addedAt, addedAt);
       expect(await repo.sourceUnchanged('/source/b', 11, 201), isTrue);
       expect(await repo.sourceUnchanged('/source/b', 12, 201), isFalse);
     },
   );
+
+  test('first addition survives magnet merges, metainfo and updates', () async {
+    final info = TorrentMetainfo.parse(torrentBytes());
+    final first = await repo.importMagnet(
+      MagnetLink.fromMetadata(hash: info.hash, name: info.name),
+    );
+    await repo.importMagnet(
+      MagnetLink.fromMetadata(
+        hash: info.hash,
+        name: info.name,
+        trackers: ['https://tracker.example/announce'],
+      ),
+      touch: true,
+    );
+    expect((await repo.get(info.hash))!.addedAt, first.addedAt);
+    await repo.import(info, '/archive', '/source', 1000000, 200);
+    expect((await repo.get(info.hash))!.addedAt, first.addedAt);
+    await repo.update(info.hash, {'added_at': 1, 'status': 'paused'});
+    await repo.update(info.hash, {'added_at': 2});
+    final updated = (await repo.get(info.hash))!;
+    expect(updated.addedAt, first.addedAt);
+    expect(updated.status, 'paused');
+    await repo.initialize();
+    expect((await repo.get(info.hash))!.addedAt, first.addedAt);
+  });
 
   test(
     'persists torrent metadata columns and preserves task counters on reimport',
@@ -329,7 +357,12 @@ void main() {
       final info = TorrentMetainfo.parse(torrentBytes(name: '$i.txt'));
       await repo.import(info, '/$i', '/$i', i * 1000000, 1);
       // Adding an older file later must not make it the newest source file.
-      await repo.update(info.hash, {'added_at': 1000000 - i});
+      await db.update(
+        'torrents',
+        {'added_at': 1000000 - i},
+        where: 'hash = ?',
+        whereArgs: [info.hash],
+      );
     }
     expect((await repo.page()).entries.first.name, '179.txt');
     expect((await repo.page(offset: 80)).entries.first.name, '99.txt');

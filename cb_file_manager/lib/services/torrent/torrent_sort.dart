@@ -32,7 +32,7 @@ class TorrentSort {
     'tracker': "NULLIF(sort_tracker, '')",
     'trackerCount':
         'CASE WHEN piece_count IS NOT NULL THEN sort_tracker_count END',
-    'torrentCreated': 'torrent_created_at',
+    'torrentCreated': 'added_at',
     'createdBy': "NULLIF(lower(created_by), '')",
     'comment': "NULLIF(lower(comment), '')",
     'private': 'is_private',

@@ -255,7 +255,10 @@ The view and grid size initially use the browser defaults and are saved separate
 
 Name, size, content category and date sorting apply to the entire index before
 pagination, with stable info-hash tie breaking. Modified date is the imported
-metainfo's source timestamp; created date is when the entry joined the index.
+metainfo's source timestamp; created date (including the **Torrent created**
+column) is when the entry first joined CB File Hub. This timestamp never changes
+on merges, reimports, metadata updates or qBittorrent imports; source metainfo
+creation dates and qBittorrent's original added time do not replace it.
 Magnets use the index timestamp until metainfo is imported. Literal search uses
 the shared Unicode/accent folding, separator and word-order rules across name,
 group and hash. Regex searches each original field independently, preserving

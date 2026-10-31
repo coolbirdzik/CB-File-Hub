@@ -15,6 +15,7 @@ void main() {
     'status': 'active',
     'completed_bytes': 400,
     'download_speed': 99,
+    'added_at': 1700000000000,
     ...values,
   });
 
@@ -90,7 +91,27 @@ void main() {
       final unknown = values(entry({}));
       expect(unknown['trackerCount'], '—');
       expect(unknown['private'], '—');
-      expect(unknown['torrentCreated'], '—');
+      expect(
+        unknown['torrentCreated'],
+        DateTime.fromMillisecondsSinceEpoch(
+          1700000000000,
+        ).toLocal().toString().split('.').first,
+      );
+    },
+  );
+
+  test(
+    'creation column uses library addition time instead of metainfo date',
+    () {
+      final original = values(entry({}))['torrentCreated'];
+      expect(
+        values(entry({'torrent_created_at': 1000}))['torrentCreated'],
+        original,
+      );
+      expect(
+        values(entry({'modified_at': 1800000000000}))['torrentCreated'],
+        original,
+      );
     },
   );
 

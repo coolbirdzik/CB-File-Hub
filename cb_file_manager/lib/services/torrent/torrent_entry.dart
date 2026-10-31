@@ -28,6 +28,8 @@ class TorrentEntry {
   final int? pieceLength;
   final int? pieceCount;
   final int? metainfoBytes;
+
+  /// When this torrent first joined this library; imports and merges retain it.
   final DateTime addedAt;
   final DateTime modifiedAt;
 

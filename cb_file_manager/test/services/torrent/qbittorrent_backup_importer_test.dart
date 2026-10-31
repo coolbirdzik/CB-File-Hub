@@ -120,7 +120,9 @@ void main() {
     'import always copies even in Move mode, without touching qBit or payload',
     () async {
       final item = await create('First.mp4');
+      final before = DateTime.now().millisecondsSinceEpoch;
       final result = await importer.run(await preview(), destination);
+      final after = DateTime.now().millisecondsSinceEpoch;
       expect(result.stored, 1);
       expect(result.cleaned, 0);
       expect(result.failed, 0);
@@ -128,6 +130,10 @@ void main() {
       expect(await item.resume.exists(), isTrue);
       expect(service.storageMode, 'move');
       final entry = (await repository.get(item.hash))!;
+      expect(
+        entry.addedAt.millisecondsSinceEpoch,
+        inInclusiveRange(before, after),
+      );
       expect(p.isWithin(destination, entry.torrentPath), isTrue);
       expect(
         TorrentMetainfo.parse(await File(entry.torrentPath).readAsBytes()).hash,
@@ -221,12 +227,14 @@ void main() {
       final invalid = await create('Invalid.mp4');
       await missing.torrent.delete();
       await invalid.torrent.writeAsString('invalid torrent');
+      final before = DateTime.now().millisecondsSinceEpoch;
       final result = await importer.run(
         await preview(),
         destination,
         removeSources: true,
         confirmedRemoval: true,
       );
+      final after = DateTime.now().millisecondsSinceEpoch;
       expect(result.stored, 1);
       expect(result.cleaned, 1);
       expect(result.failed, 1);
@@ -238,7 +246,10 @@ void main() {
       expect(entry.downloadDir, p.join(root.path, 'existing-payload'));
       expect(entry.group, 'Movies');
       expect(entry.trackers, ['https://tracker.example/announce']);
-      expect(entry.addedAt.millisecondsSinceEpoch, 1737096422000);
+      expect(
+        entry.addedAt.millisecondsSinceEpoch,
+        inInclusiveRange(before, after),
+      );
       expect(entry.status, 'library');
       expect(entry.completedBytes, 0);
       expect(entry.seeders, isNull);
@@ -258,10 +269,14 @@ void main() {
       await item.torrent.delete();
       final bytes = await item.resume.readAsBytes();
       final plan = await preview();
+      DateTime? addedAt;
       for (var i = 0; i < 2; i++) {
         final result = await importer.run(plan, destination);
         expect(result.stored, 1);
         expect(result.failed, 0);
+        final entry = (await repository.get(item.hash))!;
+        addedAt ??= entry.addedAt;
+        expect(entry.addedAt, addedAt);
       }
       expect((await repository.page()).total, 1);
       expect(await item.resume.readAsBytes(), bytes);
@@ -293,6 +308,7 @@ void main() {
         'download_dir': p.join(root.path, 'app-payload'),
         'group_name': 'User group',
       });
+      final addedAt = (await repository.get(item.hash))!.addedAt;
       await item.torrent.delete();
       await db.execute(
         'ALTER TABLE torrents DROP COLUMN qbittorrent_resume_path',
@@ -304,6 +320,7 @@ void main() {
       expect(result.stored, 1);
       expect(result.failed, 0);
       final entry = (await repository.get(item.hash))!;
+      expect(entry.addedAt, addedAt);
       expect(entry.status, 'paused');
       expect(entry.gid, 'existing-task');
       expect(entry.completedBytes, 3);

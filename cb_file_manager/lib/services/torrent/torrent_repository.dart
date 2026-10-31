@@ -367,8 +367,6 @@ class TorrentRepository {
     final values = <String, Object?>{
       'qbittorrent_resume_path': archive,
       'qbittorrent_resume_digest': digest,
-      if (previous == null && resume.addedAt != null)
-        'added_at': resume.addedAt,
       if (previous?.downloadDir == null && resume.downloadDirectory != null)
         'download_dir': resume.downloadDirectory,
       if ((previous?.group.isEmpty ?? true) && resume.group != null) ...{
@@ -593,10 +591,13 @@ class TorrentRepository {
   }
 
   Future<void> update(String hash, Map<String, Object?> values) async {
+    // The first import owns this timestamp, including imports from other clients.
+    final changes = Map<String, Object?>.of(values)..remove('added_at');
+    if (changes.isEmpty) return;
     await db.update(
       'torrents',
       {
-        ...values,
+        ...changes,
         if (values.containsKey('trackers'))
           ..._trackerSort(values['trackers'] as String?),
         if (values['name'] is String)
