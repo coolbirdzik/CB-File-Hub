@@ -131,10 +131,17 @@ class _BreadcrumbAddressBarState extends State<BreadcrumbAddressBar> {
             constraints.hasBoundedWidth &&
             _estimatedNaturalWidth(context) > constraints.maxWidth;
         final items = <Widget>[];
+        // Too narrow even for squeezed chips and their carets: keep only the
+        // current location, since Back and Up still reach the rest.
+        final segments =
+            constraints.hasBoundedWidth &&
+                constraints.maxWidth < widget.segments.length * 56
+            ? [widget.segments.last]
+            : widget.segments;
 
-        for (int i = 0; i < widget.segments.length; i++) {
-          final seg = widget.segments[i];
-          final isLast = i == widget.segments.length - 1;
+        for (int i = 0; i < segments.length; i++) {
+          final seg = segments[i];
+          final isLast = i == segments.length - 1;
 
           if (i > 0) {
             items.add(

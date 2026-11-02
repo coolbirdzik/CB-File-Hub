@@ -37,6 +37,15 @@ class SystemScreen extends StatelessWidget {
   final ViewMode viewMode;
   final String? homePath;
 
+  /// Like the file browser, [searchBar] takes the path's place in the
+  /// toolbar while [showSearchBar] is set.
+  final bool showSearchBar;
+  final Widget? searchBar;
+
+  /// Ctrl+F and Escape.
+  final VoidCallback? onSearch;
+  final VoidCallback? onEscape;
+
   /// Constructor
   const SystemScreen({
     super.key,
@@ -50,19 +59,24 @@ class SystemScreen extends StatelessWidget {
     this.onRefresh,
     this.viewMode = ViewMode.list,
     this.homePath,
+    this.showSearchBar = false,
+    this.searchBar,
+    this.onSearch,
+    this.onEscape,
   });
 
   @override
   Widget build(BuildContext context) {
     if (tabId != null &&
-        const [
-          '#network',
-          '#smb',
-          '#ftp',
-          '#webdav',
-          '#sftp',
-          '#ssh',
-        ].contains(systemId)) {
+            const [
+              '#network',
+              '#smb',
+              '#ftp',
+              '#webdav',
+              '#sftp',
+              '#ssh',
+            ].contains(systemId) ||
+        systemId.startsWith('#ssh/')) {
       final tabs = context.read<TabManagerBloc>();
       void back() => tabs.backNavigationToPath(tabId!);
       void forward() => tabs.forwardNavigationToPath(tabId!);
@@ -100,14 +114,16 @@ class SystemScreen extends StatelessWidget {
           showManageAllTagsDialog: (_) {},
           showDeleteConfirmationDialog: (_) {},
           showAppBar: showAppBar,
-          showSearchBar: false,
-          searchBar: const SizedBox.shrink(),
+          showSearchBar: showSearchBar && searchBar != null,
+          searchBar: searchBar ?? const SizedBox.shrink(),
           pathNavigationBar: NetworkNavigationBar(
             tabId: tabId!,
             path: systemId,
             homePath:
                 homePath ??
-                (const ['#ssh', '#sftp'].contains(systemId) ? '#ssh' : '#home'),
+                (systemId == '#sftp' || systemId.startsWith('#ssh')
+                    ? '#ssh'
+                    : '#home'),
           ),
           actions: actions ?? const [],
           body: ClipRect(
@@ -116,6 +132,8 @@ class SystemScreen extends StatelessWidget {
               onMouseBack: back,
               onMouseForward: forward,
               onRefresh: onRefresh,
+              onSearch: onSearch,
+              onEscape: onEscape,
               child: Material(type: MaterialType.transparency, child: child),
             ),
           ),

@@ -8,6 +8,8 @@ import 'package:flutter/rendering.dart';
 import 'package:cb_file_manager/services/ssh/ssh_profile_store.dart';
 import 'package:cb_file_manager/ui/screens/ssh/ssh_workspace_screen.dart';
 import 'package:cb_file_manager/ui/screens/ssh/ssh_host_list_item.dart';
+import 'package:cb_file_manager/ui/screens/ssh/ssh_section.dart';
+import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:cb_file_manager/ui/screens/ssh/ssh_host_sort.dart';
 import 'package:cb_file_manager/ui/screens/ssh/ssh_host_dialog.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';
@@ -19,6 +21,42 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'network_recovery_test.dart' show host;
 import 'ssh_connection_dialog_test.dart' show FixtureSshDiscovery;
 import 'package:cb_file_manager/services/ssh/local_ssh_discovery.dart';
+
+/// Opens a folder-like section entry with a double click and checks that the
+/// tab moved to the section's path.
+Future<void> openSection(
+  WidgetTester tester,
+  TabManagerBloc tabs,
+  SshSection section,
+) async {
+  final entry = find.byKey(
+    ValueKey('ssh-section-${section.path.split('/').last}'),
+  );
+  await tester.tap(entry);
+  await tester.pump(const Duration(milliseconds: 60));
+  await tester.tap(entry);
+  await tester.pumpAndSettle();
+  expect(tabs.state.activeTab?.path, section.path);
+}
+
+Future<void> selectViewMode(WidgetTester tester, ViewMode mode) async {
+  // Narrow toolbars move the view mode into the more menu.
+  if (find.byKey(const ValueKey('shared-view-mode-menu')).evaluate().isEmpty) {
+    await tester.tap(find.byKey(const ValueKey('ssh-more-action')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('ssh-view-mode-toggle')));
+    await tester.pumpAndSettle();
+    return;
+  }
+  await tester.tap(find.byKey(const ValueKey('shared-view-mode-menu')));
+  await tester.pumpAndSettle();
+  await tester.tap(
+    find.byWidgetPredicate(
+      (w) => w is PopupMenuItem<ViewMode> && w.value == mode,
+    ),
+  );
+  await tester.pumpAndSettle();
+}
 
 void main() {
   setUpAll(() async {
@@ -72,27 +110,30 @@ void main() {
             tabs.add(AddTab(path: sftp ? '#sftp' : '#ssh'));
             await change;
             final capture = GlobalKey();
-            await tester.pumpWidget(
-              RepaintBoundary(
-                key: capture,
-                child: BlocProvider.value(
-                  value: tabs,
-                  child: host(
-                    SshWorkspaceScreen(
-                      tabId: tabs.state.activeTabId!,
-                      sftpOnly: sftp,
-                      store: store,
-                      viewController: GridListViewController(),
-                      sortController: SshHostSortController(),
-                      discovery: FixtureSshDiscovery(
-                        Future.value(const LocalSshSnapshot()),
+            final view = GridListViewController();
+            Widget screen([SshSection section = SshSection.hosts]) =>
+                RepaintBoundary(
+                  key: capture,
+                  child: BlocProvider.value(
+                    value: tabs,
+                    child: host(
+                      SshWorkspaceScreen(
+                        key: ValueKey(section),
+                        tabId: tabs.state.activeTabId!,
+                        sftpOnly: sftp,
+                        section: section,
+                        store: store,
+                        viewController: view,
+                        sortController: SshHostSortController(),
+                        discovery: FixtureSshDiscovery(
+                          Future.value(const LocalSshSnapshot()),
+                        ),
                       ),
+                      vietnamese: language == 'vi',
                     ),
-                    vietnamese: language == 'vi',
                   ),
-                ),
-              ),
-            );
+                );
+            await tester.pumpWidget(screen());
             await tester.pumpAndSettle();
             expect(find.text('Development server'), findsOneWidget);
             if (const bool.fromEnvironment('CB_SSH_CAPTURE') &&
@@ -145,37 +186,36 @@ void main() {
               isFalse,
             );
             expect(find.byType(PopupMenuButton<void>), findsOneWidget);
-            await tester.tap(
-              find.byKey(const ValueKey('collection-view-list')),
-            );
-            await tester.pumpAndSettle();
+            await selectViewMode(tester, ViewMode.list);
             expect(
               find.byKey(const ValueKey('grid-list-collection-list')),
               findsOneWidget,
             );
             expect(find.byType(AdaptiveFileList), findsOneWidget);
             expect(find.text('Development server'), findsOneWidget);
-            await tester.tap(
-              find.byKey(const ValueKey('collection-view-grid')),
-            );
-            await tester.pumpAndSettle();
+            await selectViewMode(tester, ViewMode.grid);
             expect(
               find.byKey(const ValueKey('grid-list-collection-grid')),
               findsOneWidget,
             );
             expect(find.byType(AdaptiveFileList), findsNothing);
             expect(find.byType(GridView), findsOneWidget);
-            expect(find.byType(CbSurface), findsOneWidget);
+            // The host, plus the three section folders outside SFTP.
+            expect(find.byType(CbSurface), findsNWidgets(sftp ? 1 : 4));
             expect(find.text('Development server'), findsOneWidget);
             expect(tester.takeException(), isNull);
-            if (!sftp) {
-              await tester.tap(find.byKey(const ValueKey('ssh-section-keys')));
+            if (sftp) {
+              expect(
+                find.byKey(const ValueKey('ssh-section-keys')),
+                findsNothing,
+              );
+            } else {
+              await openSection(tester, tabs, SshSection.keys);
+              await tester.pumpWidget(screen(SshSection.keys));
               await tester.pumpAndSettle();
               expect(find.text('Work key'), findsOneWidget);
               expect(tester.takeException(), isNull);
-              await tester.tap(
-                find.byKey(const ValueKey('ssh-section-known-hosts')),
-              );
+              await tester.pumpWidget(screen(SshSection.knownHosts));
               await tester.pumpAndSettle();
               expect(tester.takeException(), isNull);
             }
@@ -207,30 +247,31 @@ void main() {
           ),
         ),
       );
-      await tester.pumpWidget(
-        BlocProvider.value(
-          value: tabs,
-          child: host(
-            SshWorkspaceScreen(
-              tabId: tabs.state.activeTabId!,
-              store: store,
-              discovery: discovery,
-              viewController: GridListViewController(),
-              sortController: SshHostSortController(),
-            ),
+      Widget screen(SshSection section) => BlocProvider.value(
+        value: tabs,
+        child: host(
+          SshWorkspaceScreen(
+            key: ValueKey(section),
+            tabId: tabs.state.activeTabId!,
+            section: section,
+            store: store,
+            discovery: discovery,
+            viewController: GridListViewController(),
+            sortController: SshHostSortController(),
           ),
         ),
       );
+      await tester.pumpWidget(screen(SshSection.hosts));
       await tester.pumpAndSettle();
       expect(find.text('Local dev'), findsNothing);
-      expect(
-        // Secondary actions collapse to icon buttons at this width.
-        find.byWidgetPredicate(
-          (w) => w is CbButton && w.tooltip == 'Import private key',
-        ),
-        findsOneWidget,
-      );
-      await tester.tap(find.byKey(const ValueKey('ssh-section-keys')));
+      // Imports sit in the toolbar's more menu, as in the file browser.
+      await tester.tap(find.byKey(const ValueKey('ssh-more-action')));
+      await tester.pumpAndSettle();
+      expect(find.text('Import private key'), findsOneWidget);
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      await openSection(tester, tabs, SshSection.keys);
+      await tester.pumpWidget(screen(SshSection.keys));
       await tester.pumpAndSettle();
       expect(find.text('dev_key'), findsOneWidget);
       expect(store.keys, isEmpty);
@@ -308,6 +349,26 @@ void main() {
     await pick(SshHostSortField.name);
     expect(order(), ['web10', 'web2', 'db1']);
     expect(saved, ['name:asc', 'name:desc']);
+
+    // Search works like the file browser's: the toolbar icon swaps the path
+    // for a search bar, and closing it clears the filter.
+    expect(find.byKey(const ValueKey('ssh-search')), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('shared-search-action')));
+    await tester.pumpAndSettle();
+    final search = find.byKey(const ValueKey('ssh-search'));
+    await tester.enterText(
+      find.descendant(of: search, matching: find.byType(EditableText)),
+      'web',
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('web10'), findsOneWidget);
+    expect(find.text('db1'), findsNothing);
+    // Section folders give way to matches while searching.
+    expect(find.byKey(const ValueKey('ssh-section-keys')), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('shared-search-action')));
+    await tester.pumpAndSettle();
+    expect(search, findsNothing);
+    expect(find.text('db1'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
   test('host sort restores a saved order and ignores unknown values', () async {

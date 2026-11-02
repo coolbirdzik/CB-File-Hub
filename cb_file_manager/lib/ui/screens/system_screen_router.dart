@@ -1,3 +1,4 @@
+import 'ssh/ssh_section.dart';
 import 'ssh/ssh_workspace_screen.dart';
 import 'torrent/torrent_screen.dart';
 import '../../services/torrent/torrent_launch_request.dart';
@@ -153,6 +154,9 @@ class SystemScreenRouter {
         tabId: tabId,
         location: deviceMedia,
       );
+    }
+    if (SshSection.fromPath(path) case final section?) {
+      return SshWorkspaceScreen(tabId: tabId, section: section);
     }
     if (path.startsWith('#ssh/session/')) {
       return SshTerminalScreen(
