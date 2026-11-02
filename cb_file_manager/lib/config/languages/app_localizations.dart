@@ -162,6 +162,12 @@ abstract class AppLocalizations {
   String get sshConnecting;
   String get sshDisconnected;
   String get sshReconnect;
+  String get sshStatusNotConnected;
+  String get sshStatusTunneling;
+  String get sshStatusVerifyingHost;
+  String get sshStatusAuthenticating;
+  String get sshStatusFailed;
+  String get sshStatusAuthFailed;
   String get sshClearTerminal;
   String get sshVaultHint;
   String get ftpSecurity;

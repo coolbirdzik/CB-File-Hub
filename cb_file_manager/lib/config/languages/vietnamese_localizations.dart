@@ -514,6 +514,18 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get sshReconnect => 'Kết nối lại';
   @override
+  String get sshStatusNotConnected => 'Chưa kết nối';
+  @override
+  String get sshStatusTunneling => 'Đang mở đường hầm…';
+  @override
+  String get sshStatusVerifyingHost => 'Đang xác minh khóa máy chủ…';
+  @override
+  String get sshStatusAuthenticating => 'Đang xác thực…';
+  @override
+  String get sshStatusFailed => 'Kết nối thất bại';
+  @override
+  String get sshStatusAuthFailed => 'Xác thực thất bại';
+  @override
   String get sshClearTerminal => 'Xóa màn hình terminal';
   @override
   String get sshVaultHint =>

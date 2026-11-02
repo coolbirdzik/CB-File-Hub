@@ -7,6 +7,7 @@ import '../../../design_system/cb_design_system.dart';
 import '../../components/common/optimized_interaction_handler.dart';
 import '../../utils/item_interaction_style.dart';
 import '../../widgets/compact_list_content.dart';
+import 'ssh_connection_status.dart';
 import 'ssh_host_avatar.dart';
 
 class SshHostListItem extends StatefulWidget {
@@ -31,17 +32,28 @@ class SshHostListItem extends StatefulWidget {
     this.authenticationLabel,
     this.usesKeyAuth = false,
     this.group = '',
+    this.routeLabel,
+    this.viaProxy = false,
+    this.connectionStatus,
   });
 
-  /// Unscaled height of a grid card: a name line level with the actions and a
-  /// full-width address line.
-  static const double gridExtent = 60;
+  /// Unscaled height of a grid card: a name of up to two lines level with the
+  /// actions, then the address and the connection line.
+  static const double gridExtent = 90;
 
   /// [description] is the `user@host:port` address.
   final String name, description, menuTooltip, terminalTooltip, browseTooltip;
   final String group;
   final bool isDesktop, isSelected, isConnecting, isGrid, usesKeyAuth;
   final String? authenticationLabel;
+
+  /// How the host is reached at rest: through which proxy, or directly.
+  final String? routeLabel;
+  final bool viaProxy;
+
+  /// The proxy and SSH steps while connecting or after a failure; replaces
+  /// [routeLabel]. Idle or null shows the route.
+  final SshConnectionStatus? connectionStatus;
   final VoidCallback onSelect;
   final VoidCallback? onOpen, onOpenInNewTab, onBrowse, onBrowseInNewTab;
   final bool showTerminalAction;
@@ -95,6 +107,7 @@ class _SshHostListItemState extends State<SshHostListItem> {
           widget.description,
           if (widget.group.isNotEmpty) widget.group,
           ?widget.authenticationLabel,
+          ?widget.routeLabel,
         ].join('\n'),
         child: widget.isGrid ? _grid(context) : _list(context),
       ),
@@ -131,8 +144,16 @@ class _SshHostListItemState extends State<SshHostListItem> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                // The address only joins the row once the name keeps room.
-                trailing: constraints.maxWidth < 480
+                // The address only joins the row once the name keeps room; a
+                // connection status always does.
+                trailing: _connecting
+                    ? ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth: constraints.maxWidth * 0.45,
+                        ),
+                        child: _steps(),
+                      )
+                    : constraints.maxWidth < 480
                     ? null
                     : ConstrainedBox(
                         constraints: BoxConstraints(
@@ -200,11 +221,15 @@ class _SshHostListItemState extends State<SshHostListItem> {
         : widget.showTerminalAction
         ? 3
         : 2;
-    // The name line stops short of the actions; the address runs beneath them.
+    // The name stops short of the actions; the lines below run beneath them.
     final actionsWidth =
         actionCount * CbSizes.controlSm +
         (actionCount - 1) * buttonGap +
         CbSpacing.sm;
+    // Two name lines always keep their room, so a name that rewraps when the
+    // actions appear never moves the lines below it.
+    final nameHeight = MediaQuery.textScalerOf(context).scale(20) * 2;
+    const topInset = CbSpacing.sm;
     return CbSurface(
       selected: widget.isSelected,
       clip: true,
@@ -215,7 +240,7 @@ class _SshHostListItemState extends State<SshHostListItem> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(
                   CbSpacing.md - 2,
-                  CbSpacing.sm,
+                  topInset,
                   CbSpacing.md - 2,
                   CbSpacing.sm,
                 ),
@@ -229,32 +254,19 @@ class _SshHostListItemState extends State<SshHostListItem> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           SizedBox(
-                            height: CbSizes.controlSm,
+                            height: nameHeight,
                             child: Padding(
                               padding: EdgeInsets.only(right: actionsWidth),
-                              child: Row(
-                                children: [
-                                  Flexible(
-                                    child: Text(
-                                      widget.name,
-                                      style: CbTypography.headingSm.copyWith(
-                                        color: colors.textPrimary,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
+                              child: Align(
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  widget.name,
+                                  style: CbTypography.headingSm.copyWith(
+                                    color: colors.textPrimary,
                                   ),
-                                  if (widget.group.isNotEmpty) ...[
-                                    const SizedBox(width: CbSpacing.xs + 2),
-                                    // Capped so the name keeps priority.
-                                    ConstrainedBox(
-                                      constraints: const BoxConstraints(
-                                        maxWidth: 72,
-                                      ),
-                                      child: _groupBadge(context),
-                                    ),
-                                  ],
-                                ],
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
                             ),
                           ),
@@ -280,6 +292,8 @@ class _SshHostListItemState extends State<SshHostListItem> {
                               ),
                             ],
                           ),
+                          const SizedBox(height: 2),
+                          _connectionRow(context),
                         ],
                       ),
                     ),
@@ -291,7 +305,7 @@ class _SshHostListItemState extends State<SshHostListItem> {
           // Outside the interaction layer, so a button press neither selects
           // nor opens the card.
           Positioned(
-            top: CbSpacing.sm,
+            top: topInset + (nameHeight - CbSizes.controlSm) / 2,
             right: CbSpacing.xs + 2,
             child: actions,
           ),
@@ -313,6 +327,56 @@ class _SshHostListItemState extends State<SshHostListItem> {
             ),
         ],
       ),
+    );
+  }
+
+  bool get _connecting => !(widget.connectionStatus?.isIdle ?? true);
+
+  Widget _steps() => SshConnectionSteps(
+    status: widget.connectionStatus!,
+    proxy: null,
+    viaProxy: widget.viaProxy,
+    address: widget.description,
+    dense: true,
+  );
+
+  /// The proxy and SSH steps while connecting or after a failure, otherwise
+  /// the route, followed by the group.
+  Widget _connectionRow(BuildContext context) {
+    final colors = context.cbColors;
+    final route = widget.routeLabel;
+    return Row(
+      children: [
+        if (_connecting)
+          Expanded(child: _steps())
+        else if (route != null) ...[
+          Icon(
+            widget.viaProxy
+                ? PhosphorIconsLight.shuffleAngular
+                : PhosphorIconsLight.plugsConnected,
+            size: CbSizes.iconXs,
+            color: colors.textTertiary,
+          ),
+          const SizedBox(width: CbSpacing.xs),
+          Expanded(
+            child: Text(
+              route,
+              style: CbTypography.labelXs.copyWith(color: colors.textTertiary),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ] else
+          const Spacer(),
+        if (widget.group.isNotEmpty) ...[
+          const SizedBox(width: CbSpacing.xs + 2),
+          // Capped so the status keeps priority.
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 96),
+            child: _groupBadge(context),
+          ),
+        ],
+      ],
     );
   }
 

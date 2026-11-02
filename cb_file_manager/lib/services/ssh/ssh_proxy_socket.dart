@@ -7,13 +7,30 @@ import 'package:dartssh2/dartssh2.dart';
 
 import 'ssh_proxy.dart';
 
+/// Steps of an SSH connection, in order. The proxy steps only occur when the
+/// host is reached through a proxy.
+enum SshConnectPhase {
+  proxyConnecting,
+  proxyNegotiating,
+  sshConnecting,
+  verifyingHostKey,
+  authenticating,
+  connected;
+
+  bool get isProxy => index <= proxyNegotiating.index;
+}
+
+typedef SshPhaseListener = void Function(SshConnectPhase phase);
+
 /// Proxy negotiation stays on this TCP connection; failures never fall back to
 /// direct TCP. Destination DNS is resolved by the proxy, not by this machine.
+/// [onPhase] only reports the proxy steps.
 Future<SSHSocket> openSshTransport(
   String host,
   int port, {
   SshProxy? proxy,
   Duration timeout = const Duration(seconds: 15),
+  SshPhaseListener? onPhase,
 }) async {
   if (proxy == null) return SSHSocket.connect(host, port, timeout: timeout);
   if (!proxy.isValid ||
@@ -26,10 +43,12 @@ Future<SSHSocket> openSshTransport(
   Socket? socket;
   _ProxyInput? input;
   try {
+    onPhase?.call(SshConnectPhase.proxyConnecting);
     socket = await Socket.connect(proxy.host, proxy.port, timeout: timeout);
     // Observe sink errors even if the peer fails during negotiation.
     unawaited(socket.done.catchError((Object _) {}));
     input = _ProxyInput(socket);
+    onPhase?.call(SshConnectPhase.proxyNegotiating);
     await _negotiate(socket, input, proxy, host, port).timeout(timeout);
     return _ProxySocket(socket, input);
   } catch (_) {

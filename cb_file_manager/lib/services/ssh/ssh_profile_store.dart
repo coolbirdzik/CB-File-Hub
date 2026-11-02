@@ -11,6 +11,7 @@ import 'putty_private_key.dart';
 import 'ssh_proxy.dart';
 import 'ssh_proxy_socket.dart';
 export 'ssh_proxy.dart';
+export 'ssh_proxy_socket.dart' show SshConnectPhase, SshPhaseListener;
 
 class SshProfile {
   final String id, name, host, username, password, group;
@@ -351,10 +352,14 @@ class SshConnector {
   final SshProfileStore store;
   SshConnector([SshProfileStore? store])
     : store = store ?? SshProfileStore.instance;
+
+  /// [onPhase] reports each step reached, so a caller can tell whether a
+  /// failure happened at the proxy or at the SSH server.
   Future<SSHClient> connect(
     SshProfile profile, {
     SshTrustPrompt? trustPrompt,
     void Function(SSHClient)? onClientCreated,
+    SshPhaseListener? onPhase,
   }) async {
     await store.load();
     final key = profile.keyId == null
@@ -370,33 +375,56 @@ class SshConnector {
     if (profile.proxyId != null && proxy == null) {
       throw StateError('SSH proxy no longer exists.');
     }
+    if (proxy == null) onPhase?.call(SshConnectPhase.sshConnecting);
     final socket = await openSshTransport(
       profile.host,
       profile.port,
       proxy: proxy,
       timeout: const Duration(seconds: 15),
+      onPhase: onPhase,
     );
+    if (proxy != null) onPhase?.call(SshConnectPhase.sshConnecting);
+    final password = profile.password;
+    // Servers that disable `password` (PAM-only sshd) ask for it through
+    // keyboard-interactive. Answer one password prompt only, so a wrong
+    // password fails fast instead of looping until MaxAuthTries.
+    var passwordPrompted = false;
     final client = SSHClient(
       socket,
       username: profile.username,
       identities: identities,
-      onPasswordRequest: key == null ? () => profile.password : null,
+      onPasswordRequest: password.isEmpty ? null : () => password,
+      onUserInfoRequest: (request) {
+        if (request.prompts.isEmpty) return const [];
+        final asksPassword =
+            request.prompts.length == 1 &&
+            !request.prompts.single.echo &&
+            request.prompts.single.promptText.toLowerCase().contains(
+              'password',
+            );
+        if (password.isEmpty || passwordPrompted || !asksPassword) return null;
+        passwordPrompted = true;
+        return [password];
+      },
       onVerifyHostKey: (type, bytes) async {
+        onPhase?.call(SshConnectPhase.verifyingHostKey);
         final fingerprint = utf8.decode(bytes);
         final previous =
             store.knownHosts['${profile.host.toLowerCase()}:${profile.port}'];
-        if (previous == fingerprint) return true;
-        if (trustPrompt == null ||
-            !await trustPrompt(
-              profile.host,
-              profile.port,
-              type,
-              fingerprint,
-              previous,
-            )) {
-          return false;
+        if (previous != fingerprint) {
+          if (trustPrompt == null ||
+              !await trustPrompt(
+                profile.host,
+                profile.port,
+                type,
+                fingerprint,
+                previous,
+              )) {
+            return false;
+          }
+          await store.trust(profile.host, profile.port, fingerprint);
         }
-        await store.trust(profile.host, profile.port, fingerprint);
+        onPhase?.call(SshConnectPhase.authenticating);
         return true;
       },
       authTimeout: const Duration(seconds: 90),
@@ -404,6 +432,7 @@ class SshConnector {
     onClientCreated?.call(client);
     try {
       await client.authenticated;
+      onPhase?.call(SshConnectPhase.connected);
       return client;
     } catch (_) {
       client.close();

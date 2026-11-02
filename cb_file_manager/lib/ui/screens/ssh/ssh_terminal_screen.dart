@@ -11,6 +11,7 @@ import '../../../services/ssh/ssh_profile_store.dart';
 import '../../components/common/screen_scaffold.dart';
 import '../../../bloc/selection/selection.dart';
 import '../network_browsing/components/network_navigation_bar.dart';
+import 'ssh_connection_status.dart';
 import 'ssh_host_dialog.dart';
 
 class SshTerminalScreen extends StatefulWidget {
@@ -34,6 +35,8 @@ class _SshTerminalScreenState extends State<SshTerminalScreen> {
   bool _connecting = false;
   String? _error;
   SshProfile? _profile;
+  SshProxy? _proxy;
+  SshConnectionStatus _status = const SshConnectionStatus();
   @override
   void initState() {
     super.initState();
@@ -64,6 +67,7 @@ class _SshTerminalScreenState extends State<SshTerminalScreen> {
     setState(() {
       _connecting = true;
       _error = null;
+      _status = const SshConnectionStatus();
     });
     try {
       final store = SshProfileStore.instance;
@@ -72,9 +76,20 @@ class _SshTerminalScreenState extends State<SshTerminalScreen> {
           .where((p) => p.id == widget.profileId)
           .firstOrNull;
       if (profile == null) throw StateError('Saved SSH host no longer exists.');
-      _profile = profile;
+      if (!mounted || generation != _generation) return;
+      setState(() {
+        _profile = profile;
+        _proxy = store.proxies
+            .where((p) => p.id == profile.proxyId)
+            .firstOrNull;
+      });
       final client = await SshConnector(store).connect(
         profile,
+        onPhase: (phase) {
+          if (mounted && generation == _generation) {
+            setState(() => _status = SshConnectionStatus(phase: phase));
+          }
+        },
         onClientCreated: (client) {
           if (!mounted || generation != _generation) {
             client.close();
@@ -121,13 +136,19 @@ class _SshTerminalScreenState extends State<SshTerminalScreen> {
           (_) {
             if (mounted && generation == _generation) {
               _disconnect();
-              setState(() => _error = context.tr.sshDisconnected);
+              setState(() {
+                _error = context.tr.sshDisconnected;
+                _status = const SshConnectionStatus();
+              });
             }
           },
           onError: (Object e) {
             if (mounted && generation == _generation) {
               _disconnect();
-              setState(() => _error = e.toString());
+              setState(() {
+                _error = e.toString();
+                _status = _failedStatus;
+              });
             }
           },
         ),
@@ -136,7 +157,10 @@ class _SshTerminalScreenState extends State<SshTerminalScreen> {
     } catch (e) {
       if (mounted && generation == _generation) {
         _disconnect();
-        setState(() => _error = e.toString());
+        setState(() {
+          _error = e.toString();
+          _status = _failedStatus;
+        });
       }
     } finally {
       if (mounted && generation == _generation) {
@@ -146,6 +170,9 @@ class _SshTerminalScreenState extends State<SshTerminalScreen> {
       }
     }
   }
+
+  SshConnectionStatus get _failedStatus =>
+      SshConnectionStatus(phase: _status.phase, failed: true);
 
   @override
   void dispose() {
@@ -175,12 +202,22 @@ class _SshTerminalScreenState extends State<SshTerminalScreen> {
             tooltip: tr.sshWorkspace,
             onPressed: () => navigateNetworkTab(context, widget.tabId, '#ssh'),
           ),
-          Expanded(
+          Flexible(
             child: Text(
               _profile?.name ?? 'SSH',
               overflow: TextOverflow.ellipsis,
             ),
           ),
+          if (_profile case final profile?) ...[
+            const SizedBox(width: CbSpacing.md),
+            Flexible(
+              child: SshConnectionSteps(
+                status: _status,
+                proxy: _proxy,
+                address: '${profile.username}@${profile.host}:${profile.port}',
+              ),
+            ),
+          ],
         ],
       ),
       actions: [
@@ -196,7 +233,10 @@ class _SshTerminalScreenState extends State<SshTerminalScreen> {
               ? null
               : () {
                   _disconnect();
-                  setState(() => _error = tr.sshDisconnected);
+                  setState(() {
+                    _error = tr.sshDisconnected;
+                    _status = const SshConnectionStatus();
+                  });
                 },
         ),
         CbButton.icon(

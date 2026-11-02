@@ -16,6 +16,7 @@ import '../../components/common/grid_list_collection.dart';
 import '../../../helpers/core/user_preferences.dart';
 import '../../../helpers/core/text_utils.dart';
 import '../folder_list/folder_list_state.dart';
+import 'ssh_connection_status.dart';
 import 'ssh_host_list_item.dart';
 import 'ssh_host_sort.dart';
 import '../network_browsing/components/network_navigation_bar.dart';
@@ -61,6 +62,11 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
   final _search = TextEditingController();
   bool _loaded = false;
   String? _error, _connecting, _selectedProfileId;
+
+  /// The latest file-browsing connection, kept after a failure so the card
+  /// shows which step failed.
+  String? _statusProfileId;
+  SshConnectionStatus _status = const SshConnectionStatus();
   int _section = 0;
   late final _view =
       widget.viewController ??
@@ -166,6 +172,8 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
     setState(() {
       _connecting = p.id;
       _error = null;
+      _statusProfileId = p.id;
+      _status = const SshConnectionStatus();
     });
     await _run(() async {
       final result = await NetworkServiceRegistry().connect(
@@ -180,6 +188,11 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
           'trustPrompt':
               (String h, int port, String type, String fp, String? old) =>
                   promptSshHostTrust(context, h, port, type, fp, old),
+          'onPhase': (SshConnectPhase phase) {
+            if (mounted && _statusProfileId == p.id) {
+              setState(() => _status = SshConnectionStatus(phase: phase));
+            }
+          },
         },
       );
       if (!result.success) {
@@ -202,7 +215,16 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
         }
       }
     });
-    if (mounted) setState(() => _connecting = null);
+    if (mounted) {
+      setState(() {
+        _connecting = null;
+        if (_statusProfileId != p.id) return;
+        // A failure keeps its step on the card; success leaves the route.
+        _status = _error == null
+            ? const SshConnectionStatus()
+            : SshConnectionStatus(phase: _status.phase, failed: true);
+      });
+    }
   }
 
   void _openTerminal(SshProfile p) {
@@ -483,7 +505,10 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
                 icon: PhosphorIconsLight.x,
                 tooltip: context.tr.close,
                 size: CbButtonSize.sm,
-                onPressed: () => setState(() => _error = null),
+                onPressed: () => setState(() {
+                  _error = null;
+                  if (_status.failed) _status = const SshConnectionStatus();
+                }),
               ),
             ],
           ),
@@ -641,9 +666,17 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
 
   Widget _hostItem(BuildContext context, SshProfile p, ViewMode mode) {
     final tr = context.tr;
+    final proxy = p.proxyId == null
+        ? null
+        : store.proxies.where((x) => x.id == p.proxyId).firstOrNull;
     return SshHostListItem(
       key: ValueKey(p.id),
       name: p.name,
+      routeLabel: p.proxyId == null
+          ? tr.sshProxyNone
+          : '${tr.sshProxy}: ${proxy == null ? '—' : sshProxyDescription(proxy)}',
+      viaProxy: p.proxyId != null,
+      connectionStatus: _statusProfileId == p.id ? _status : null,
       isGrid: mode == ViewMode.grid,
       authenticationLabel: p.keyId == null ? tr.sshPasswordAuth : tr.sshKeyAuth,
       usesKeyAuth: p.keyId != null,
