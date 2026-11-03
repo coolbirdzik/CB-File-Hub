@@ -32,7 +32,9 @@ Future<SSHSocket> openSshTransport(
   Duration timeout = const Duration(seconds: 15),
   SshPhaseListener? onPhase,
 }) async {
-  if (proxy == null) return SSHSocket.connect(host, port, timeout: timeout);
+  if (proxy == null) {
+    return _DirectSocket(await SSHSocket.connect(host, port, timeout: timeout));
+  }
   if (!proxy.isValid ||
       host.isEmpty ||
       host.contains(RegExp(r'[\s/@\\\x00-\x1f\x7f]')) ||
@@ -176,6 +178,38 @@ Future<void> _negotiate(
         throw const FormatException('SOCKS4 connection');
       }
   }
+}
+
+/// dartssh2 closes its transport from the stream's onDone callback without
+/// awaiting that close. On Windows, a peer disconnect can also fail the native
+/// socket's pending writes, so closing it must not emit that error a second time.
+/// The original error still reaches the transport through [done] and [stream].
+class _DirectSocket implements SSHSocket {
+  final SSHSocket socket;
+  _DirectSocket(this.socket) {
+    // Observe early write errors before SSHClient takes ownership as well.
+    unawaited(socket.done.catchError((Object _) {}));
+  }
+
+  @override
+  Stream<Uint8List> get stream => socket.stream;
+  @override
+  StreamSink<List<int>> get sink => socket.sink;
+  @override
+  Future<void> get done => socket.done;
+  @override
+  Future<void> close() async {
+    try {
+      await socket.close();
+    } on SocketException {
+      socket.destroy();
+    }
+  }
+
+  @override
+  void destroy() => socket.destroy();
+  @override
+  Future<void> flush() => socket.flush();
 }
 
 /// Keeps any banner bytes coalesced with the final handshake response.
