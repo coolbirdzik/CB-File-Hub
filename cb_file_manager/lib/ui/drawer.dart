@@ -1160,6 +1160,9 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
     if (targetPath == '#torrents') {
       return activePath == '#torrents' || activePath.startsWith('#torrents?');
     }
+    if (targetPath == '#ssh') {
+      return activePath == '#ssh' || activePath.startsWith('#ssh/');
+    }
     if (targetPath.startsWith('#')) return activePath == targetPath;
 
     final current = _normalizeFluentPath(activePath);

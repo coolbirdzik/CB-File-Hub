@@ -9,6 +9,7 @@ import 'dart:async';
 
 import 'fake_tunnel_link.dart' show freePort, roundTrip, startEchoServer;
 import 'package:cb_file_manager/services/ssh/ssh_profile_store.dart';
+import 'package:dartssh2/dartssh2.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -385,6 +386,49 @@ void main() {
         Socket.connect('127.0.0.1', local.bindPort),
         throwsA(isA<SocketException>()),
       );
+    },
+    skip: !enabled,
+    timeout: const Timeout(Duration(seconds: 45)),
+  );
+  test(
+    'SSH answers keyboard-interactive password prompts and falls back from keys',
+    () async {
+      Future<bool> trust(
+        String h,
+        int p,
+        String type,
+        String fp,
+        String? old,
+      ) async => true;
+      SshProfile profile(int port, String password, [String? keyId]) =>
+          SshProfile(
+            id: 'kbdint',
+            name: 'kbdint',
+            host: '127.0.0.1',
+            username: 'developer',
+            port: port,
+            password: password,
+            keyId: keyId,
+          );
+      final kbdint = await SshConnector().connect(
+        profile(config['kbdint'], 'fixture-password'),
+        trustPrompt: trust,
+      );
+      kbdint.close();
+      await expectLater(
+        SshConnector()
+            .connect(profile(config['kbdint'], 'wrong'), trustPrompt: trust)
+            .timeout(const Duration(seconds: 10)),
+        throwsA(isA<SSHAuthFailError>()),
+      );
+      // A key the server does not accept must not block the saved password.
+      final key = SshStoredKey.generate('unauthorized');
+      await SshProfileStore.instance.saveKey(key);
+      final fallback = await SshConnector().connect(
+        profile(config['ssh2'], 'fixture-password', key.id),
+        trustPrompt: trust,
+      );
+      fallback.close();
     },
     skip: !enabled,
     timeout: const Timeout(Duration(seconds: 45)),

@@ -564,6 +564,18 @@ class ChineseLocalizations implements AppLocalizations {
   @override
   String sshForwardViaHost(String name) => '经由 $name';
   @override
+  String get sshStatusNotConnected => '未连接';
+  @override
+  String get sshStatusTunneling => '正在建立隧道…';
+  @override
+  String get sshStatusVerifyingHost => '正在验证主机密钥…';
+  @override
+  String get sshStatusAuthenticating => '正在验证身份…';
+  @override
+  String get sshStatusFailed => '连接失败';
+  @override
+  String get sshStatusAuthFailed => '身份验证失败';
+  @override
   String get sshClearTerminal => '清除终端';
   @override
   String get sshVaultHint => '密码和私钥保存在此设备的安全存储中。';

@@ -937,6 +937,7 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
         controller: _searchController,
         focusNode: _searchFocusNode,
         autofocus: true,
+        textAlignVertical: TextAlignVertical.center,
         decoration: InputDecoration(
           hintText: AppLocalizations.of(context)!.searchByFilename,
           contentPadding: const EdgeInsets.symmetric(horizontal: 12),

@@ -626,6 +626,18 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String sshForwardViaHost(String name) => 'via $name';
   @override
+  String get sshStatusNotConnected => 'Not connected';
+  @override
+  String get sshStatusTunneling => 'Opening tunnel…';
+  @override
+  String get sshStatusVerifyingHost => 'Verifying host key…';
+  @override
+  String get sshStatusAuthenticating => 'Authenticating…';
+  @override
+  String get sshStatusFailed => 'Connection failed';
+  @override
+  String get sshStatusAuthFailed => 'Authentication failed';
+  @override
   String get sshClearTerminal => 'Clear terminal';
   @override
   String get sshVaultHint =>

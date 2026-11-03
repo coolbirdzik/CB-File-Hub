@@ -3,6 +3,7 @@ import 'package:cb_file_manager/services/ssh/ssh_profile_store.dart';
 import 'package:cb_file_manager/services/ssh/ssh_tunnel_manager.dart';
 import 'package:cb_file_manager/ui/components/common/grid_list_collection.dart';
 import 'package:cb_file_manager/ui/screens/ssh/ssh_host_sort.dart';
+import 'package:cb_file_manager/ui/screens/ssh/ssh_section.dart';
 import 'package:cb_file_manager/ui/screens/ssh/ssh_workspace_screen.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';
 import 'package:flutter/material.dart';
@@ -65,26 +66,35 @@ void main() {
     final change = tabs.stream.first;
     tabs.add(AddTab(path: '#ssh'));
     await change;
-    await tester.pumpWidget(
-      BlocProvider.value(
-        value: tabs,
-        child: host(
-          SshWorkspaceScreen(
-            tabId: tabs.state.activeTabId!,
-            store: store,
-            tunnels: tunnels,
-            viewController: GridListViewController(),
-            sortController: SshHostSortController(),
-            discovery: FixtureSshDiscovery(
-              Future.value(const LocalSshSnapshot()),
-            ),
+    final view = GridListViewController();
+    final sort = SshHostSortController();
+    addTearDown(view.dispose);
+    addTearDown(sort.dispose);
+    Widget screen(SshSection section) => BlocProvider.value(
+      value: tabs,
+      child: host(
+        SshWorkspaceScreen(
+          tabId: tabs.state.activeTabId!,
+          section: section,
+          store: store,
+          tunnels: tunnels,
+          viewController: view,
+          sortController: sort,
+          discovery: FixtureSshDiscovery(
+            Future.value(const LocalSshSnapshot()),
           ),
-          vietnamese: vietnamese,
         ),
+        vietnamese: vietnamese,
       ),
     );
+    await tester.pumpWidget(screen(SshSection.hosts));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('ssh-section-forwards')));
+    await tester.pump(const Duration(milliseconds: 60));
+    await tester.tap(find.byKey(const ValueKey('ssh-section-forwards')));
+    await tester.pumpAndSettle();
+    expect(tabs.state.activeTab?.path, SshSection.forwards.path);
+    await tester.pumpWidget(screen(SshSection.forwards));
     await tester.pumpAndSettle();
     return (store: store, tunnels: tunnels);
   }
@@ -100,6 +110,29 @@ void main() {
             vietnamese: vietnamese,
           );
           expect(find.text('Database'), findsOneWidget);
+          if (width == 1200) {
+            await tester.tap(
+              find.byKey(const ValueKey('shared-search-action')),
+            );
+            await tester.pumpAndSettle();
+            final search = find.descendant(
+              of: find.byKey(const ValueKey('ssh-search')),
+              matching: find.byType(EditableText),
+            );
+            await tester.enterText(search, 'missing-forward');
+            await tester.pumpAndSettle();
+            expect(find.text('Database'), findsNothing);
+            await tester.enterText(search, 'Database');
+            await tester.pumpAndSettle();
+            expect(
+              find.byKey(const ValueKey('ssh-forward-db')),
+              findsOneWidget,
+            );
+            await tester.tap(
+              find.byKey(const ValueKey('shared-search-action')),
+            );
+            await tester.pumpAndSettle();
+          }
           expect(find.text('-L'), findsOneWidget);
           expect(find.text(vietnamese ? 'Đã tắt' : 'Stopped'), findsOneWidget);
           await tester.tap(find.byKey(const ValueKey('ssh-forward-toggle-db')));

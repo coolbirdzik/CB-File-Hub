@@ -132,7 +132,7 @@ and cancels a 4 MiB upload, checking that no partial file remains. Close the
 
 ## Port forwarding
 
-**SSH → Port forwarding** lists saved rules; **Add forward** (also in each
+**SSH → Port forwarding** (`#ssh/forwards`) lists saved rules; **Add forward** (also in each
 host's menu, with that host preselected) creates one:
 
 | Type | Like | Listens on | Connections go to |

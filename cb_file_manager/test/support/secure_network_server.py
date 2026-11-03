@@ -78,6 +78,16 @@ class SSHServer(asyncssh.SSHServer):
     def connection_requested(self, dest_host, dest_port, orig_host, orig_port): return True
     def server_requested(self, listen_host, listen_port): return True
 
+class KbdintSSHServer(asyncssh.SSHServer):
+    """PAM-style sshd: the password is only accepted through keyboard-interactive."""
+    def begin_auth(self, username): return True
+    def password_auth_supported(self): return False
+    def kbdint_auth_supported(self): return True
+    def get_kbdint_challenge(self, username, lang, submethods):
+        return '', '', '', [('Password: ', False)]
+    def validate_kbdint_response(self, username, responses):
+        return username == 'developer' and responses == ['fixture-password']
+
 async def shell(process):
     process.stdout.write('fixture terminal ready\r\n')
     async for line in process.stdin:
@@ -92,9 +102,13 @@ async def main():
         sftp_factory=lambda channel: asyncssh.SFTPServer(channel, chroot=str(root)))
     second = await asyncssh.create_server(SSHServer, '127.0.0.1', 0,
         server_host_keys=[host_key], sftp_factory=lambda channel: asyncssh.SFTPServer(channel, chroot=str(root)))
-    print(json.dumps({'ssh': server.get_port(), 'ssh2': second.get_port(), 'none': ports[2], 'explicitTls': ports[0],
+    kbdint = await asyncssh.create_server(KbdintSSHServer, '127.0.0.1', 0,
+        server_host_keys=[host_key], process_factory=shell)
+    print(json.dumps({'ssh': server.get_port(), 'ssh2': second.get_port(), 'kbdint': kbdint.get_port(), 'none': ports[2], 'explicitTls': ports[0],
         'implicitTls': ports[1], 'certificate': str(cert_path)}), flush=True)
     await asyncio.to_thread(sys.stdin.readline)
+    kbdint.close()
+    await kbdint.wait_closed()
     second.close()
     await second.wait_closed()
     server.close()

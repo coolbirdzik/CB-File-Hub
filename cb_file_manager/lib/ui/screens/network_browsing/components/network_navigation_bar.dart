@@ -6,6 +6,7 @@ import '../../../../config/languages/app_localizations.dart';
 import '../../../components/common/breadcrumb_address_bar.dart';
 import '../../../tab_manager/components/navigation_bar.dart';
 import '../../../tab_manager/core/tab_manager.dart';
+import '../../ssh/ssh_section.dart';
 
 String networkAddress(String path) {
   if (!path.startsWith('#network/')) return path;
@@ -44,6 +45,7 @@ String? networkParentPath(String path) {
   if (const ['#smb', '#ftp', '#webdav', '#sftp', '#ssh'].contains(path)) {
     return '#network';
   }
+  if (path.startsWith('#ssh/')) return '#ssh';
   if (!path.startsWith('#network/')) return null;
   final parts = path.split('/').where((part) => part.isNotEmpty).toList();
   if (parts.length <= 3) {
@@ -57,7 +59,11 @@ void navigateNetworkTab(BuildContext context, String tabId, String path) {
   final tabs = context.read<TabManagerBloc>();
   if (!tabs.state.tabs.any((tab) => tab.id == tabId)) return;
   final l10n = AppLocalizations.of(context)!;
+  final section = SshSection.fromPath(path);
   final name = switch (path) {
+    _ when section != null && section != SshSection.hosts => section.label(
+      l10n,
+    ),
     '#home' => l10n.homeTab,
     '#network' => l10n.networkTab,
     '#smb' => l10n.smbNetwork,
@@ -127,7 +133,11 @@ class _NetworkNavigationBarState extends State<NetworkNavigationBar> {
     final l10n = AppLocalizations.of(context)!;
     final paths = <String>['#network'];
     final labels = <String>[l10n.networkTab];
-    if (widget.path != '#network') {
+    final section = SshSection.fromPath(widget.path);
+    if (section != null && section != SshSection.hosts) {
+      paths.addAll(['#ssh', section.path]);
+      labels.addAll(['SSH', section.label(l10n)]);
+    } else if (widget.path != '#network') {
       final parts = widget.path
           .split('/')
           .where((part) => part.isNotEmpty)

@@ -1,3 +1,4 @@
+import 'ssh/ssh_section.dart';
 import 'ssh/ssh_workspace_screen.dart';
 import 'torrent/torrent_screen.dart';
 import '../../services/torrent/torrent_launch_request.dart';
@@ -160,7 +161,11 @@ class SystemScreenRouter {
           ? path.substring('#ssh/transfer/'.length)
           : null;
       return SftpTransferScreen(tabId: tabId, profileId: profileId);
-    } else if (path.startsWith('#ssh/session/')) {
+    }
+    if (SshSection.fromPath(path) case final section?) {
+      return SshWorkspaceScreen(tabId: tabId, section: section);
+    }
+    if (path.startsWith('#ssh/session/')) {
       return SshTerminalScreen(
         tabId: tabId,
         profileId: path.substring('#ssh/session/'.length),

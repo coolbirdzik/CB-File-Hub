@@ -628,6 +628,18 @@ class TurkishLocalizations implements AppLocalizations {
   @override
   String sshForwardViaHost(String name) => '$name üzerinden';
   @override
+  String get sshStatusNotConnected => 'Bağlı değil';
+  @override
+  String get sshStatusTunneling => 'Tünel açılıyor…';
+  @override
+  String get sshStatusVerifyingHost => 'Sunucu anahtarı doğrulanıyor…';
+  @override
+  String get sshStatusAuthenticating => 'Kimlik doğrulanıyor…';
+  @override
+  String get sshStatusFailed => 'Bağlantı başarısız';
+  @override
+  String get sshStatusAuthFailed => 'Kimlik doğrulama başarısız';
+  @override
   String get sshClearTerminal => 'Terminali temizle';
   @override
   String get sshVaultHint =>

@@ -200,6 +200,60 @@ void main() {
     );
   });
 
+  test('connector reports whether the proxy or the SSH step failed', () async {
+    final store = SshProfileStore();
+    Future<List<SshConnectPhase>> phases(ServerSocket target, {String? via}) {
+      final reached = <SshConnectPhase>[];
+      return SshConnector(store)
+          .connect(
+            SshProfile(
+              id: 'host',
+              name: 'Host',
+              host: '127.0.0.1',
+              port: target.port,
+              username: 'deploy',
+              proxyId: via,
+            ),
+            onPhase: reached.add,
+          )
+          .then<List<SshConnectPhase>>(
+            (_) => fail('connected to a fixture that is not SSH'),
+            onError: (Object _) => reached,
+          )
+          .timeout(const Duration(seconds: 10));
+    }
+
+    final target = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(target.close);
+    target.listen((s) => s.destroy());
+    expect(await phases(target), [SshConnectPhase.sshConnecting]);
+
+    final rejecting = await proxyServer((peer) async {
+      await peer.until([13, 10, 13, 10]);
+      peer.socket.add(ascii.encode('HTTP/1.1 403 Forbidden\r\n\r\n'));
+      await peer.socket.flush();
+    });
+    await store.saveProxy(route(rejecting, SshProxyType.httpConnect));
+    expect(await phases(target, via: 'route'), [
+      SshConnectPhase.proxyConnecting,
+      SshConnectPhase.proxyNegotiating,
+    ]);
+
+    // The tunnel opens, then the far end hangs up before any SSH banner.
+    final tunnel = await proxyServer((peer) async {
+      await peer.until([13, 10, 13, 10]);
+      peer.socket.add(ascii.encode('HTTP/1.1 200 OK\r\n\r\n'));
+      await peer.socket.flush();
+      await peer.socket.close();
+    });
+    await store.saveProxy(route(tunnel, SshProxyType.httpConnect));
+    expect(await phases(target, via: 'route'), [
+      SshConnectPhase.proxyConnecting,
+      SshConnectPhase.proxyNegotiating,
+      SshConnectPhase.sshConnecting,
+    ]);
+  });
+
   test(
     'rejected/timeout proxy never connects directly and never leaks credentials',
     () async {

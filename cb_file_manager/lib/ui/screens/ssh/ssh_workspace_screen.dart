@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
+import '../../../config/languages/app_localizations.dart';
 import '../../../config/translation_helper.dart';
 import '../../../design_system/cb_design_system.dart';
 import '../../../services/network_browsing/network_service_registry.dart';
@@ -13,10 +14,15 @@ import '../../utils/route.dart';
 import '../../utils/platform_utils.dart';
 import '../../components/common/app_toast.dart';
 import '../../components/common/grid_list_collection.dart';
+import '../../components/common/search_text_field.dart';
 import '../../../helpers/core/user_preferences.dart';
 import '../../../helpers/core/text_utils.dart';
 import '../folder_list/folder_list_state.dart';
+import 'ssh_connection_status.dart';
+import '../../components/common/shared_action_bar.dart';
+import 'ssh_folder_item.dart';
 import 'ssh_host_list_item.dart';
+import 'ssh_section.dart';
 import 'ssh_host_sort.dart';
 import '../network_browsing/components/network_navigation_bar.dart';
 import '../system_screen.dart';
@@ -27,14 +33,8 @@ import 'ssh_key_dialog.dart';
 import 'ssh_import_dialog.dart';
 import 'ssh_proxy_dialog.dart';
 
-/// Below this width every header action and inactive tab collapses to an
-/// icon.
+/// Below this width row actions collapse to icons.
 const double _compactWidth = 640;
-
-/// Below this width only the secondary header actions collapse, so the tabs
-/// and actions stay on one line beside the sidebar, even with Vietnamese
-/// labels.
-const double _wideWidth = 1040;
 
 class SshWorkspaceScreen extends StatefulWidget {
   final String tabId;
@@ -44,6 +44,9 @@ class SshWorkspaceScreen extends StatefulWidget {
   final GridListViewController? viewController;
   final SshHostSortController? sortController;
   final SshTunnelManager? tunnels;
+
+  /// Which section this tab path shows; `#sftp` always shows hosts.
+  final SshSection section;
   const SshWorkspaceScreen({
     super.key,
     this.tunnels,
@@ -53,6 +56,7 @@ class SshWorkspaceScreen extends StatefulWidget {
     this.discovery,
     this.viewController,
     this.sortController,
+    this.section = SshSection.hosts,
   });
   @override
   State<SshWorkspaceScreen> createState() => _SshWorkspaceScreenState();
@@ -62,10 +66,16 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
   late final store = widget.store ?? SshProfileStore.instance;
   late final _discovery = widget.discovery ?? LocalSshDiscovery();
   LocalSshSnapshot _local = const LocalSshSnapshot();
-  final _search = TextEditingController();
+  final _search = SearchTextController();
+  final _searchFocus = FocusNode();
   bool _loaded = false;
-  String? _error, _connecting, _selectedProfileId;
-  int _section = 0;
+  String? _error, _connecting, _selectedId;
+
+  /// The latest file-browsing connection, kept after a failure so the card
+  /// shows which step failed.
+  String? _statusProfileId;
+  SshConnectionStatus _status = const SshConnectionStatus();
+  bool _searching = false;
   late final _view =
       widget.viewController ??
       GridListViewController(
@@ -126,6 +136,7 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
     _sort.removeListener(_changed);
     if (widget.sortController == null) _sort.dispose();
     _search.dispose();
+    _searchFocus.dispose();
     super.dispose();
   }
 
@@ -173,6 +184,8 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
     setState(() {
       _connecting = p.id;
       _error = null;
+      _statusProfileId = p.id;
+      _status = const SshConnectionStatus();
     });
     await _run(() async {
       final result = await NetworkServiceRegistry().connect(
@@ -187,6 +200,11 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
           'trustPrompt':
               (String h, int port, String type, String fp, String? old) =>
                   promptSshHostTrust(context, h, port, type, fp, old),
+          'onPhase': (SshConnectPhase phase) {
+            if (mounted && _statusProfileId == p.id) {
+              setState(() => _status = SshConnectionStatus(phase: phase));
+            }
+          },
         },
       );
       if (!result.success) {
@@ -209,7 +227,16 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
         }
       }
     });
-    if (mounted) setState(() => _connecting = null);
+    if (mounted) {
+      setState(() {
+        _connecting = null;
+        if (_statusProfileId != p.id) return;
+        // A failure keeps its step on the card; success leaves the route.
+        _status = _error == null
+            ? const SshConnectionStatus()
+            : SshConnectionStatus(phase: _status.phase, failed: true);
+      });
+    }
   }
 
   void _openTerminal(SshProfile p) {
@@ -284,51 +311,59 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
     if (await _confirm(proxy.name)) await store.deleteProxy(proxy.id);
   });
 
+  SshSection get _section =>
+      widget.sftpOnly ? SshSection.hosts : widget.section;
+
+  void _openSearch() {
+    if (_searching) {
+      _searchFocus.requestFocus();
+    } else {
+      setState(() => _searching = true);
+    }
+  }
+
+  /// Closing also clears the query, so no hidden filter keeps hiding items.
+  void _closeSearch() => setState(() {
+    _searching = false;
+    _search.clear();
+  });
+
   @override
   Widget build(BuildContext context) {
     final tr = context.tr;
+    final hosts = _section == SshSection.hosts;
     return SystemScreen(
       tabId: widget.tabId,
-      systemId: widget.sftpOnly ? '#sftp' : '#ssh',
+      systemId: widget.sftpOnly ? '#sftp' : _section.path,
       title: widget.sftpOnly ? 'SFTP' : tr.sshWorkspace,
       icon: PhosphorIconsLight.terminalWindow,
       showAppBar: true,
-      viewMode: _section == 0 ? _view.mode : ViewMode.list,
+      viewMode: hosts ? _view.mode : ViewMode.list,
       onRefresh: _load,
-      actions: [
-        if (widget.sftpOnly)
-          CbButton.icon(
-            icon: PhosphorIconsLight.terminalWindow,
-            tooltip: tr.sshWorkspace,
-            onPressed: () => navigateNetworkTab(context, widget.tabId, '#ssh'),
-          ),
-        CbButton.icon(
-          icon: PhosphorIconsLight.plus,
-          tooltip: tr.sshAddHost,
-          onPressed: _loaded ? _edit : null,
-        ),
-      ],
+      showSearchBar: _searching,
+      searchBar: _searchBar(context),
+      onSearch: _openSearch,
+      onEscape: _searching ? _closeSearch : null,
+      actions: _actions(context),
       child: LayoutBuilder(
         builder: (context, constraints) {
           final compact = constraints.maxWidth < _compactWidth;
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _header(
-                context,
-                compact: compact,
-                wide: constraints.maxWidth >= _wideWidth,
-              ),
               if (_error != null) _errorBanner(context),
               if (!_loaded && _error == null)
                 const LinearProgressIndicator(minHeight: 2),
               Expanded(
                 child: switch (_section) {
-                  0 => _hostsSection(context, compact: compact),
-                  1 => _keysSection(context, compact: compact),
-                  2 => _knownHostsSection(context),
-                  3 => _proxiesSection(context),
-                  _ => _forwardsSection(context, compact: compact),
+                  SshSection.hosts => _hostsSection(context),
+                  SshSection.keys => _keysSection(context, compact: compact),
+                  SshSection.proxies => _proxiesSection(context),
+                  SshSection.knownHosts => _knownHostsSection(context),
+                  SshSection.forwards => _forwardsSection(
+                    context,
+                    compact: compact,
+                  ),
                 },
               ),
             ],
@@ -338,162 +373,215 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
     );
   }
 
-  // ─── Header ──────────────────────────────────────────────────────────────
-
-  Widget _header(
-    BuildContext context, {
-    required bool compact,
-    required bool wide,
-  }) {
+  /// The file browser's search bar, in the path's place while searching.
+  Widget _searchBar(BuildContext context) {
     final tr = context.tr;
-    final c = context.cbColors;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, CbSpacing.lg, 20, CbSpacing.md),
-      child: Wrap(
-        alignment: WrapAlignment.spaceBetween,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        spacing: CbSpacing.md,
-        runSpacing: CbSpacing.md,
-        children: [
-          if (widget.sftpOnly)
-            Text(
-              'SFTP',
-              style: CbTypography.headingMd.copyWith(color: c.textPrimary),
-            )
-          else
-            _SectionTabs(
-              compact: compact,
-              selected: _section,
-              onSelected: (section) => setState(() => _section = section),
-              tabs: [
-                (
-                  key: 'hosts',
-                  icon: PhosphorIconsLight.hardDrives,
-                  label: tr.sshHosts,
-                  count: store.profiles.length,
+    return SizedBox(
+      height: 40,
+      child: SearchTextField(
+        key: const ValueKey('ssh-search'),
+        controller: _search,
+        focusNode: _searchFocus,
+        autofocus: true,
+        onChanged: (_) => setState(() {}),
+        textAlignVertical: TextAlignVertical.center,
+        decoration: InputDecoration(
+          hintText: tr.search,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+          prefixIcon: const Icon(PhosphorIconsLight.magnifyingGlass, size: 20),
+          suffixIcon: _search.text.isEmpty
+              ? null
+              : IconButton(
+                  icon: const Icon(PhosphorIconsLight.broom),
+                  tooltip: tr.clearSearch,
+                  onPressed: () => setState(_search.clear),
                 ),
-                (
-                  key: 'keys',
-                  icon: PhosphorIconsLight.key,
-                  label: tr.sshKeys,
-                  count: store.keys.length,
-                ),
-                (
-                  key: 'known-hosts',
-                  icon: PhosphorIconsLight.shieldCheck,
-                  label: tr.sshKnownHosts,
-                  count: store.knownHosts.length,
-                ),
-                (
-                  key: 'proxies',
-                  icon: PhosphorIconsLight.arrowsSplit,
-                  label: tr.sshProxies,
-                  count: store.proxies.length,
-                ),
-                (
-                  key: 'forwards',
-                  icon: PhosphorIconsLight.arrowsLeftRight,
-                  label: tr.sshPortForwarding,
-                  count: store.forwards.length,
-                ),
-              ],
-            ),
-          Wrap(
-            spacing: CbSpacing.sm,
-            runSpacing: CbSpacing.sm,
-            children: _sectionActions(context, compact: compact, wide: wide),
-          ),
-        ],
+        ).flat(context, radius: 16),
       ),
     );
   }
 
-  List<Widget> _sectionActions(
-    BuildContext context, {
-    required bool compact,
-    required bool wide,
-  }) {
+  /// Toolbar actions in the file browser's order and style: search, sort and
+  /// view mode (hosts only), refresh, add, more. As narrow as a phone, only
+  /// add and more stay (and closing an open search); the rest moves into the
+  /// more menu so the path keeps its room.
+  List<Widget> _actions(BuildContext context) {
     final tr = context.tr;
-    Widget action(
-      IconData icon,
-      String label,
-      VoidCallback onPressed, {
-      bool primary = false,
-    }) {
-      final variant = primary
-          ? CbButtonVariant.primary
-          : CbButtonVariant.secondary;
-      final enabled = _loaded ? onPressed : null;
-      return compact || (!primary && !wide)
-          ? CbButton.icon(
-              icon: icon,
-              tooltip: label,
-              variant: variant,
-              onPressed: enabled,
-            )
-          : CbButton(
-              icon: icon,
-              label: label,
-              variant: variant,
-              onPressed: enabled,
-            );
-    }
-
-    final importFromApp = action(
-      PhosphorIconsLight.downloadSimple,
-      tr.sshImportFromApp,
-      _importFromApp,
-    );
-    final importKey = action(
-      PhosphorIconsLight.key,
-      tr.sshImportKey,
-      () => _keyDialog(generate: false),
-    );
-    return switch (_section) {
-      0 => [
-        action(
-          PhosphorIconsLight.arrowsLeftRight,
-          tr.sshFileTransfer,
-          _openTransfer,
-        ),
-        importFromApp,
-        importKey,
-        action(PhosphorIconsLight.plus, tr.sshAddHost, _edit, primary: true),
-      ],
-      1 => [
-        importKey,
-        action(
-          PhosphorIconsLight.sparkle,
-          tr.sshGenerateKey,
-          () => _keyDialog(generate: true),
-          primary: true,
-        ),
-      ],
-      3 => [
-        importFromApp,
-        action(
-          PhosphorIconsLight.plus,
-          tr.sshAddProxy,
-          () => showSshProxyDialog(context, store),
-          primary: true,
-        ),
-      ],
-      4 => [
-        action(
-          PhosphorIconsLight.plus,
-          tr.sshAddForward,
-          () => showSshForwardDialog(context, store),
-          primary: true,
-        ),
-      ],
-      _ => const [],
+    final enabled = _loaded;
+    final hosts = _section == SshSection.hosts;
+    final compact = MediaQuery.sizeOf(context).width < _compactWidth;
+    final add = switch (_section) {
+      SshSection.hosts => (tr.sshAddHost, () => _edit()),
+      SshSection.keys => (tr.sshGenerateKey, () => _keyDialog(generate: true)),
+      SshSection.proxies => (
+        tr.sshAddProxy,
+        () => showSshProxyDialog(context, store),
+      ),
+      SshSection.knownHosts => null,
+      SshSection.forwards => (
+        tr.sshAddForward,
+        () => showSshForwardDialog(context, store),
+      ),
     };
+    void openWorkspace() => navigateNetworkTab(context, widget.tabId, '#ssh');
+    final otherMode = _view.mode == ViewMode.grid
+        ? ViewMode.list
+        : ViewMode.grid;
+    // Null separates groups.
+    final more = <_MenuAction?>[
+      if (hosts)
+        (
+          key: const ValueKey('ssh-transfer-action'),
+          icon: PhosphorIconsLight.arrowsLeftRight,
+          label: tr.sshFileTransfer,
+          run: _openTransfer,
+        ),
+      if (widget.sftpOnly && compact)
+        (
+          key: null,
+          icon: PhosphorIconsLight.terminalWindow,
+          label: tr.sshWorkspace,
+          run: openWorkspace,
+        ),
+      if (hosts || _section == SshSection.proxies)
+        (
+          key: null,
+          icon: PhosphorIconsLight.downloadSimple,
+          label: tr.sshImportFromApp,
+          run: _importFromApp,
+        ),
+      if (hosts || _section == SshSection.keys)
+        (
+          key: null,
+          icon: PhosphorIconsLight.key,
+          label: tr.sshImportKey,
+          run: () => _keyDialog(generate: false),
+        ),
+      if (compact) ...[
+        null,
+        if (!_searching)
+          (
+            key: const ValueKey('ssh-search-menu-action'),
+            icon: PhosphorIconsLight.magnifyingGlass,
+            label: tr.searchTooltip,
+            run: _openSearch,
+          ),
+        if (hosts) ...[
+          (
+            key: const ValueKey('ssh-view-mode-toggle'),
+            icon: otherMode == ViewMode.list
+                ? PhosphorIconsLight.list
+                : PhosphorIconsLight.squaresFour,
+            label: otherMode == ViewMode.list
+                ? tr.viewModeList
+                : tr.viewModeGrid,
+            run: () => _run(() => _view.select(otherMode)),
+          ),
+          for (final field in SshHostSortField.values)
+            (
+              key: ValueKey('ssh-host-sort-${field.name}'),
+              icon: _sortIcon(field),
+              label: '${tr.sortByTooltip}: ${_sortLabel(tr, field)}',
+              run: () => _run(() => _sort.select(field)),
+            ),
+        ],
+        (
+          key: const ValueKey('shared-refresh-action'),
+          icon: PhosphorIconsLight.arrowsClockwise,
+          label: tr.refreshTooltip,
+          run: _load,
+        ),
+      ],
+    ];
+    while (more.isNotEmpty && more.first == null) {
+      more.removeAt(0);
+    }
+    final search = IconButton(
+      key: const ValueKey('shared-search-action'),
+      icon: Icon(
+        _searching ? PhosphorIconsLight.x : PhosphorIconsLight.magnifyingGlass,
+      ),
+      tooltip: _searching ? tr.close : tr.searchTooltip,
+      onPressed: _searching ? _closeSearch : _openSearch,
+    );
+    return [
+      if (widget.sftpOnly && !compact)
+        IconButton(
+          icon: const Icon(PhosphorIconsLight.terminalWindow),
+          tooltip: tr.sshWorkspace,
+          onPressed: openWorkspace,
+        ),
+      if (hosts && !compact)
+        ...SharedActionBar.buildCommonActions(
+          context: context,
+          onSearchPressed: _searching ? _closeSearch : _openSearch,
+          isSearchActive: _searching,
+          sortAction: _sortMenu(context),
+          onSortOptionSelected: (_) {},
+          currentSortOption: SortOption.nameAsc,
+          viewMode: _view.mode,
+          allowedViewModes: const {ViewMode.list, ViewMode.grid},
+          onViewModeToggled: () {},
+          onViewModeSelected: (mode) => _run(() => _view.select(mode)),
+          onRefresh: _load,
+          onSelectionModeToggled: () {},
+          showMoreOptions: false,
+        )
+      else ...[
+        if (!compact || _searching) search,
+        if (!compact)
+          IconButton(
+            key: const ValueKey('shared-refresh-action'),
+            icon: const Icon(PhosphorIconsLight.arrowsClockwise),
+            tooltip: tr.refreshTooltip,
+            onPressed: _load,
+          ),
+      ],
+      if (add != null)
+        IconButton(
+          key: const ValueKey('ssh-add-action'),
+          icon: const Icon(PhosphorIconsLight.plus),
+          tooltip: add.$1,
+          onPressed: enabled ? add.$2 : null,
+        ),
+      if (more.isNotEmpty)
+        PopupMenuButton<VoidCallback>(
+          key: const ValueKey('ssh-more-action'),
+          icon: const Icon(PhosphorIconsLight.dotsThreeVertical),
+          tooltip: tr.moreOptionsTooltip,
+          offset: const Offset(0, 50),
+          enabled: enabled,
+          onSelected: (run) => run(),
+          itemBuilder: (context) => [
+            for (final action in more)
+              if (action == null)
+                const PopupMenuDivider()
+              else
+                PopupMenuItem(
+                  key: action.key,
+                  value: action.run,
+                  child: Row(
+                    children: [
+                      Icon(action.icon, size: 20),
+                      const SizedBox(width: 10),
+                      Flexible(
+                        child: Text(
+                          action.label,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+          ],
+        ),
+    ];
   }
 
   Widget _errorBanner(BuildContext context) {
     final c = context.cbColors;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, CbSpacing.md),
+      padding: const EdgeInsets.fromLTRB(20, CbSpacing.sm, 20, CbSpacing.sm),
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: c.status.dangerSurface,
@@ -524,7 +612,10 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
                 icon: PhosphorIconsLight.x,
                 tooltip: context.tr.close,
                 size: CbButtonSize.sm,
-                onPressed: () => setState(() => _error = null),
+                onPressed: () => setState(() {
+                  _error = null;
+                  if (_status.failed) _status = const SshConnectionStatus();
+                }),
               ),
             ],
           ),
@@ -535,7 +626,7 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
 
   // ─── Sections ────────────────────────────────────────────────────────────
 
-  Widget _hostsSection(BuildContext context, {required bool compact}) {
+  Widget _hostsSection(BuildContext context) {
     final tr = context.tr;
     final query = _search.text;
     final profiles =
@@ -548,156 +639,179 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
             )
             .toList()
           ..sort(_sort.compare);
-    final search = CbTextField(
-      controller: _search,
-      placeholder: tr.search,
-      prefixIcon: PhosphorIconsLight.magnifyingGlass,
-      textInputAction: TextInputAction.search,
-      onChanged: (_) => setState(() {}),
-    );
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, CbSpacing.sm),
-          child: Row(
-            children: [
-              if (compact)
-                Expanded(child: search)
-              else ...[
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 360),
-                  child: SizedBox(width: 360, child: search),
+    // The other sections sit before the hosts, like folders before files.
+    final entries = <_HostsEntry>[
+      if (!widget.sftpOnly && query.isEmpty)
+        for (final section in [
+          SshSection.keys,
+          SshSection.knownHosts,
+          SshSection.proxies,
+          SshSection.forwards,
+        ])
+          _SectionEntry(section),
+      for (final profile in profiles) _ProfileEntry(profile),
+    ];
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTap: _selectedId == null
+          ? null
+          : () => setState(() => _selectedId = null),
+      child: entries.isEmpty
+          ? _empty(
+              context,
+              icon: PhosphorIconsLight.terminalWindow,
+              text: tr.sshNoHosts,
+              label: tr.sshAddHost,
+              action: () => _edit(),
+            )
+          : GridListCollection<_HostsEntry>(
+              mode: _view.mode,
+              isDesktop: isDesktopPlatform,
+              items: entries,
+              identity: (entry) => entry.id,
+              onRefresh: _load,
+              gridMinExtent: SshHostListItem.gridExtent,
+              gridMaxExtent: SshHostListItem.gridExtent,
+              itemBuilder: (_, entry, mode) => switch (entry) {
+                _SectionEntry(:final section) => _folderItem(
+                  context,
+                  section,
+                  mode,
                 ),
-                const Spacer(),
-              ],
-              const SizedBox(width: CbSpacing.sm),
-              _sortMenu(context, compact: compact),
-              const SizedBox(width: CbSpacing.xs),
-              GridListViewToggle(
-                mode: _view.mode,
-                onChanged: (mode) => _run(() => _view.select(mode)),
-              ),
-            ],
-          ),
-        ),
-        Expanded(
-          child: GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onTap: _selectedProfileId == null
-                ? null
-                : () => setState(() => _selectedProfileId = null),
-            child: profiles.isEmpty
-                ? _empty(
-                    context,
-                    icon: PhosphorIconsLight.terminalWindow,
-                    text: tr.sshNoHosts,
-                    label: tr.sshAddHost,
-                    action: () => _edit(),
-                  )
-                : Padding(
-                    // The grid insets its cards by 8px; line them up with the
-                    // header's 20px gutter. List rows stay full-bleed.
-                    padding: EdgeInsets.symmetric(
-                      horizontal: _view.mode == ViewMode.grid ? 12 : 0,
-                    ),
-                    child: GridListCollection<SshProfile>(
-                      mode: _view.mode,
-                      isDesktop: isDesktopPlatform,
-                      items: profiles,
-                      identity: (p) => p.id,
-                      onRefresh: _load,
-                      gridMinExtent: SshHostListItem.gridExtent,
-                      gridMaxExtent: SshHostListItem.gridExtent,
-                      itemBuilder: (_, p, mode) => _hostItem(context, p, mode),
-                    ),
-                  ),
-          ),
-        ),
-      ],
+                _ProfileEntry(:final profile) => _hostItem(
+                  context,
+                  profile,
+                  mode,
+                ),
+              },
+            ),
     );
   }
 
-  Widget _sortMenu(BuildContext context, {required bool compact}) {
+  Widget _folderItem(BuildContext context, SshSection section, ViewMode mode) {
     final tr = context.tr;
-    String label(SshHostSortField field) => switch (field) {
-      SshHostSortField.name => tr.sshDisplayName,
-      SshHostSortField.host => tr.host,
-      SshHostSortField.username => tr.username,
-      SshHostSortField.group => tr.sshGroup,
+    final id = 'section:${section.name}';
+    final count = switch (section) {
+      SshSection.keys => store.keys.length,
+      SshSection.knownHosts => store.knownHosts.length,
+      SshSection.proxies => store.proxies.length,
+      SshSection.forwards => store.forwards.length,
+      SshSection.hosts => store.profiles.length,
     };
-    IconData icon(SshHostSortField field) => switch (field) {
-      SshHostSortField.name => PhosphorIconsLight.textAa,
-      SshHostSortField.host => PhosphorIconsLight.globe,
-      SshHostSortField.username => PhosphorIconsLight.user,
-      SshHostSortField.group => PhosphorIconsLight.folders,
-    };
-    final direction = _sort.ascending
-        ? PhosphorIconsLight.sortAscending
-        : PhosphorIconsLight.sortDescending;
-    return Material(
-      type: MaterialType.transparency,
-      child: MenuAnchor(
-        builder: (context, controller, _) {
-          void toggle() =>
-              controller.isOpen ? controller.close() : controller.open();
-          final tooltip = '${tr.sortByTooltip}: ${label(_sort.field)}';
-          return compact
-              ? CbButton.icon(
-                  key: const ValueKey('ssh-host-sort'),
-                  icon: direction,
-                  tooltip: tooltip,
-                  onPressed: toggle,
-                )
-              : CbButton(
-                  key: const ValueKey('ssh-host-sort'),
-                  icon: direction,
-                  label: label(_sort.field),
-                  trailingIcon: PhosphorIconsLight.caretDown,
-                  variant: CbButtonVariant.ghost,
-                  tooltip: tooltip,
-                  onPressed: toggle,
-                );
-        },
-        menuChildren: [
-          for (final field in SshHostSortField.values)
-            MenuItemButton(
-              key: ValueKey('ssh-host-sort-${field.name}'),
-              leadingIcon: Icon(icon(field), size: CbSizes.iconMd),
-              trailingIcon: field == _sort.field
-                  ? Icon(
-                      _sort.ascending
-                          ? PhosphorIconsLight.arrowUp
-                          : PhosphorIconsLight.arrowDown,
-                      size: CbSizes.iconSm,
-                    )
-                  : null,
-              onPressed: () => _run(() => _sort.select(field)),
-              child: Text(label(field)),
-            ),
-        ],
+    return SshFolderItem(
+      key: ValueKey('ssh-section-${section.path.split('/').last}'),
+      icon: switch (section) {
+        SshSection.keys => PhosphorIconsLight.key,
+        SshSection.knownHosts => PhosphorIconsLight.shieldCheck,
+        SshSection.proxies => PhosphorIconsLight.arrowsSplit,
+        SshSection.forwards => PhosphorIconsLight.arrowsLeftRight,
+        SshSection.hosts => PhosphorIconsLight.hardDrives,
+      },
+      name: section.label(tr),
+      detail: tr.itemsCount(count),
+      isGrid: mode == ViewMode.grid,
+      isDesktop: isDesktopPlatform,
+      isSelected: _selectedId == id,
+      onSelect: () =>
+          setState(() => _selectedId = _selectedId == id ? null : id),
+      onOpen: () => navigateNetworkTab(context, widget.tabId, section.path),
+    );
+  }
+
+  String _sortLabel(AppLocalizations tr, SshHostSortField field) =>
+      switch (field) {
+        SshHostSortField.name => tr.sshDisplayName,
+        SshHostSortField.host => tr.host,
+        SshHostSortField.username => tr.username,
+        SshHostSortField.group => tr.sshGroup,
+      };
+
+  IconData _sortIcon(SshHostSortField field) => switch (field) {
+    SshHostSortField.name => PhosphorIconsLight.textAa,
+    SshHostSortField.host => PhosphorIconsLight.globe,
+    SshHostSortField.username => PhosphorIconsLight.user,
+    SshHostSortField.group => PhosphorIconsLight.folders,
+  };
+
+  /// The file browser's sort icon, with the host fields.
+  Widget _sortMenu(BuildContext context) {
+    final tr = context.tr;
+    final primary = Theme.of(context).colorScheme.primary;
+    String label(SshHostSortField field) => _sortLabel(tr, field);
+    IconData icon(SshHostSortField field) => _sortIcon(field);
+    return PopupMenuButton<SshHostSortField>(
+      key: const ValueKey('ssh-host-sort'),
+      icon: Icon(
+        _sort.ascending
+            ? PhosphorIconsLight.sortAscending
+            : PhosphorIconsLight.sortDescending,
       ),
+      tooltip: '${tr.sortByTooltip}: ${label(_sort.field)}',
+      offset: const Offset(0, 50),
+      onSelected: (field) => _run(() => _sort.select(field)),
+      itemBuilder: (context) => [
+        for (final field in SshHostSortField.values)
+          PopupMenuItem(
+            key: ValueKey('ssh-host-sort-${field.name}'),
+            value: field,
+            child: Row(
+              children: [
+                Icon(
+                  icon(field),
+                  size: 20,
+                  color: field == _sort.field ? primary : null,
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  label(field),
+                  style: TextStyle(
+                    fontWeight: field == _sort.field
+                        ? FontWeight.bold
+                        : FontWeight.normal,
+                    color: field == _sort.field ? primary : null,
+                  ),
+                ),
+                const Spacer(),
+                if (field == _sort.field)
+                  Icon(
+                    _sort.ascending
+                        ? PhosphorIconsLight.arrowUp
+                        : PhosphorIconsLight.arrowDown,
+                    size: 20,
+                    color: primary,
+                  ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 
   Widget _hostItem(BuildContext context, SshProfile p, ViewMode mode) {
     final tr = context.tr;
+    final proxy = p.proxyId == null
+        ? null
+        : store.proxies.where((x) => x.id == p.proxyId).firstOrNull;
     return SshHostListItem(
       key: ValueKey(p.id),
       name: p.name,
+      routeLabel: p.proxyId == null
+          ? tr.sshProxyNone
+          : '${tr.sshProxy}: ${proxy == null ? '—' : sshProxyDescription(proxy)}',
+      viaProxy: p.proxyId != null,
+      connectionStatus: _statusProfileId == p.id ? _status : null,
       isGrid: mode == ViewMode.grid,
       authenticationLabel: p.keyId == null ? tr.sshPasswordAuth : tr.sshKeyAuth,
       usesKeyAuth: p.keyId != null,
       description: '${p.username}@${p.host}:${p.port}',
       group: p.group,
       isDesktop: isDesktopPlatform,
-      isSelected: _selectedProfileId == p.id,
+      isSelected: _selectedId == p.id,
       isConnecting: _connecting == p.id,
       terminalTooltip: tr.sshOpenTerminal,
       browseTooltip: tr.sshBrowseFiles,
-      onSelect: () => setState(
-        () => _selectedProfileId = _selectedProfileId == p.id ? null : p.id,
-      ),
+      onSelect: () =>
+          setState(() => _selectedId = _selectedId == p.id ? null : p.id),
       onOpen: _connecting != null
           ? null
           : () {
@@ -764,7 +878,7 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
         ),
         if (!widget.sftpOnly)
           _menuItem(menuContext, PhosphorIconsLight.plus, tr.sshAddForward, () {
-            setState(() => _section = 4);
+            navigateNetworkTab(context, widget.tabId, SshSection.forwards.path);
             showSshForwardDialog(context, store, profileId: p.id);
           }),
         const PopupMenuDivider(),
@@ -836,10 +950,13 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
         action: () => _keyDialog(generate: true),
       );
     }
+    final query = _search.text;
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, CbSpacing.xl),
+      padding: const EdgeInsets.fromLTRB(20, CbSpacing.sm, 20, CbSpacing.xl),
       children: [
-        for (final key in store.keys)
+        for (final key in store.keys.where(
+          (k) => TextUtils.matchesSearch('${k.name} ${k.fingerprint}', query),
+        ))
           _SshItemRow(
             icon: PhosphorIconsLight.key,
             title: key.name,
@@ -866,7 +983,7 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
               ),
             ],
           ),
-        if (_local.keys.isNotEmpty) ...[
+        if (_local.keys.isNotEmpty && query.isEmpty) ...[
           _GroupHeader(
             title: tr.sshLocalKeys,
             hint: tr.sshLocalKeysHint,
@@ -911,10 +1028,13 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
         text: tr.sshNoTrustedHosts,
       );
     }
+    final query = _search.text;
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, CbSpacing.xl),
+      padding: const EdgeInsets.fromLTRB(20, CbSpacing.sm, 20, CbSpacing.xl),
       children: [
-        for (final entry in store.knownHosts.entries)
+        for (final entry in store.knownHosts.entries.where(
+          (e) => TextUtils.matchesSearch(e.key, query),
+        ))
           _SshItemRow(
             icon: PhosphorIconsLight.shieldCheck,
             title: entry.key,
@@ -948,10 +1068,13 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
         action: () => showSshProxyDialog(context, store),
       );
     }
+    final query = _search.text;
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, CbSpacing.xl),
+      padding: const EdgeInsets.fromLTRB(20, CbSpacing.sm, 20, CbSpacing.xl),
       children: [
-        for (final proxy in store.proxies)
+        for (final proxy in store.proxies.where(
+          (x) => TextUtils.matchesSearch('${x.name} ${x.host}', query),
+        ))
           _SshItemRow(
             icon: PhosphorIconsLight.arrowsSplit,
             title: proxy.name,
@@ -994,8 +1117,15 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
         : f.type == SshForwardType.dynamic
         ? 'SOCKS5 ${f.bindAddress}'
         : '${f.bindPort} → ${f.targetAddress}';
-    final forwards = [...store.forwards]
-      ..sort((a, b) => TextUtils.compareNatural(title(a), title(b)));
+    final forwards = store.forwards.where((f) {
+      final profile = store.profiles
+          .where((p) => p.id == f.profileId)
+          .firstOrNull;
+      return TextUtils.matchesSearch(
+        '${title(f)} ${f.bindAddress} ${f.targetAddress} ${profile?.name ?? ''}',
+        _search.text,
+      );
+    }).toList()..sort((a, b) => TextUtils.compareNatural(title(a), title(b)));
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, CbSpacing.xl),
       children: [
@@ -1194,119 +1324,30 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
   }
 }
 
-typedef _SectionTab = ({String key, IconData icon, String label, int count});
+typedef _MenuAction = ({
+  Key? key,
+  IconData icon,
+  String label,
+  VoidCallback run,
+});
 
-/// Segmented switcher for the workspace sections: a sunken track with the
-/// active segment lifted onto the surface colour. When [compact], inactive
-/// segments drop their label so all four fit a phone-width header.
-class _SectionTabs extends StatelessWidget {
-  const _SectionTabs({
-    required this.selected,
-    required this.tabs,
-    required this.onSelected,
-    this.compact = false,
-  });
+sealed class _HostsEntry {
+  const _HostsEntry();
+  String get id;
+}
 
-  final int selected;
-  final List<_SectionTab> tabs;
-  final ValueChanged<int> onSelected;
-  final bool compact;
-
+class _SectionEntry extends _HostsEntry {
+  const _SectionEntry(this.section);
+  final SshSection section;
   @override
-  Widget build(BuildContext context) {
-    final c = context.cbColors;
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: c.fillSubtle,
-          borderRadius: CbRadii.all(CbRadii.md + 1),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(3),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              for (var i = 0; i < tabs.length; i++)
-                _segment(context, i, tabs[i], i == selected),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+  String get id => 'section:${section.name}';
+}
 
-  Widget _segment(
-    BuildContext context,
-    int index,
-    _SectionTab tab,
-    bool isSelected,
-  ) {
-    final tokens = context.cb;
-    final c = tokens.colors;
-    final showLabel = isSelected || !compact;
-    return Semantics(
-      selected: isSelected,
-      child: CbPressable(
-        key: ValueKey('ssh-section-${tab.key}'),
-        semanticLabel: tab.label,
-        tooltip: showLabel ? null : tab.label,
-        cursor: SystemMouseCursors.click,
-        onPressed: () => onSelected(index),
-        builder: (context, state) => AnimatedContainer(
-          duration: CbDurations.fast,
-          curve: CbCurves.standard,
-          height: CbSizes.controlSm,
-          padding: const EdgeInsets.symmetric(horizontal: CbSpacing.md - 2),
-          decoration: BoxDecoration(
-            // On dark themes the raised surface is too close to the track,
-            // so the active segment takes the strongest fill step instead.
-            color: isSelected
-                ? (tokens.isDark ? c.fillPressed : c.surfaceRaised)
-                : state.pressed
-                ? c.fillPressed
-                : state.hovered
-                ? c.fillHover
-                : c.fillSubtle.withValues(alpha: 0),
-            borderRadius: CbRadii.mdAll,
-            boxShadow: [
-              if (isSelected && !tokens.isDark) ...tokens.shadowLevel1,
-              if (state.focused) ...CbDecorations.focusRing(c),
-            ],
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                tab.icon,
-                size: CbSizes.iconSm,
-                color: isSelected ? c.accent.text : c.iconSubtle,
-              ),
-              if (showLabel) ...[
-                const SizedBox(width: CbSpacing.xs + 2),
-                Text(
-                  tab.label,
-                  style: CbTypography.labelSm.copyWith(
-                    color: isSelected ? c.textPrimary : c.textSecondary,
-                  ),
-                ),
-              ],
-              if (tab.count > 0) ...[
-                const SizedBox(width: CbSpacing.xs + 2),
-                Text(
-                  '${tab.count}',
-                  style: CbTypography.caption.copyWith(
-                    color: c.textTertiary,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+class _ProfileEntry extends _HostsEntry {
+  const _ProfileEntry(this.profile);
+  final SshProfile profile;
+  @override
+  String get id => profile.id;
 }
 
 class _GroupHeader extends StatelessWidget {

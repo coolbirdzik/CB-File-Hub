@@ -63,6 +63,7 @@ class SFTPService extends NetworkServiceBase {
       _ssh = await SshConnector().connect(
         profile,
         trustPrompt: additionalOptions?['trustPrompt'] as SshTrustPrompt?,
+        onPhase: additionalOptions?['onPhase'] as SshPhaseListener?,
       );
       _sftp = await _ssh!.sftp();
       _basePath = Uri(
