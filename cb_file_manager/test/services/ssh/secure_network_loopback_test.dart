@@ -3,6 +3,11 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:cb_file_manager/services/network_browsing/ftp_client/ftp_client.dart';
 import 'package:cb_file_manager/services/network_browsing/sftp_service.dart';
+import 'package:cb_file_manager/services/ssh/sftp_transfer.dart';
+import 'package:cb_file_manager/services/ssh/ssh_tunnel_manager.dart';
+import 'dart:async';
+
+import 'fake_tunnel_link.dart' show freePort, roundTrip, startEchoServer;
 import 'package:cb_file_manager/services/ssh/ssh_profile_store.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -207,6 +212,178 @@ void main() {
           ),
         ),
         throwsA(anything),
+      );
+    },
+    skip: !enabled,
+    timeout: const Timeout(Duration(seconds: 45)),
+  );
+  test(
+    'two-pane transfer round-trips a tree and cancels a multi-chunk upload',
+    () async {
+      final ssh = await SshConnector().connect(
+        SshProfile(
+          id: '',
+          name: '',
+          host: '127.0.0.1',
+          username: 'developer',
+          password: 'fixture-password',
+          port: config['ssh'],
+        ),
+        trustPrompt: (_, _, _, _, _) async => true,
+      );
+      addTearDown(ssh.close);
+      final sftp = await ssh.sftp();
+      // Tear-downs run in reverse, so the subsystem closes before the client.
+      addTearDown(sftp.close);
+      final remote = SftpTransferFileSystem(sftp);
+      final local = LocalTransferFileSystem();
+      final out = Directory('${root.path}/transfer-out/tree');
+      await Directory('${out.path}/nested').create(recursive: true);
+      await File('${out.path}/a.txt').writeAsString('alpha');
+      await File('${out.path}/nested/b.txt').writeAsString('bravo');
+      await remote.createDirectory('/transfer');
+      expect(await remote.kind('/transfer/missing'), isNull);
+      final upload = await SftpTransferTask(
+        from: local,
+        to: remote,
+        sources: await local.list(out.parent.path),
+        destination: '/transfer',
+      ).run();
+      expect(upload.failures, isEmpty);
+      expect(upload.transferred, 2);
+      expect(await remote.kind('/transfer/tree/nested'), isTrue);
+      final back = Directory('${root.path}/transfer-back');
+      await back.create();
+      final download = await SftpTransferTask(
+        from: remote,
+        to: local,
+        sources: await remote.list('/transfer'),
+        destination: back.path,
+      ).run();
+      expect(download.failures, isEmpty);
+      expect(
+        await File('${back.path}/tree/nested/b.txt').readAsString(),
+        'bravo',
+      );
+
+      final big = File('${root.path}/transfer-out/big.bin');
+      await big.writeAsBytes(List.filled(4 * 1024 * 1024, 7));
+      late SftpTransferTask task;
+      task = SftpTransferTask(
+        from: local,
+        to: remote,
+        sources: (await local.list(
+          big.parent.path,
+        )).where((e) => e.name == 'big.bin').toList(),
+        destination: '/transfer',
+        progressInterval: Duration.zero,
+        onProgress: (progress) {
+          if (progress.bytesDone > 0) task.cancel();
+        },
+      );
+      final cancelled = await task.run();
+      expect(cancelled.cancelled, isTrue);
+      expect(cancelled.transferred, 0);
+      expect(await remote.kind('/transfer/big.bin'), isNull);
+    },
+    skip: !enabled,
+    timeout: const Timeout(Duration(seconds: 45)),
+  );
+  test(
+    'port forwarding: -L, -R and SOCKS5 -D move bytes through a real server',
+    () async {
+      final echo = await startEchoServer();
+      addTearDown(echo.close);
+      final store = SshProfileStore.instance;
+      await store.saveProfile(
+        SshProfile(
+          id: 'tunnel-host',
+          name: 'Loopback',
+          host: '127.0.0.1',
+          username: 'developer',
+          password: 'fixture-password',
+          port: config['ssh'],
+        ),
+      );
+      final tunnels = SshTunnelManager(store);
+      addTearDown(tunnels.dispose);
+      Future<bool> trust(
+        String _,
+        int _,
+        String _,
+        String _,
+        String? _,
+      ) async => true;
+
+      final local = SshForward(
+        id: 'tunnel-l',
+        profileId: 'tunnel-host',
+        type: SshForwardType.local,
+        bindPort: await freePort(),
+        targetHost: '127.0.0.1',
+        targetPort: echo.port,
+      );
+      await store.saveForward(local);
+      await tunnels.start(local, trustPrompt: trust);
+      expect(
+        tunnels.state(local.id).status,
+        SshTunnelStatus.running,
+        reason: tunnels.state(local.id).error,
+      );
+      expect(await roundTrip(local.bindPort, 'via -L'), 'via -L');
+
+      final remote = SshForward(
+        id: 'tunnel-r',
+        profileId: 'tunnel-host',
+        type: SshForwardType.remote,
+        bindPort: await freePort(),
+        targetHost: '127.0.0.1',
+        targetPort: echo.port,
+      );
+      await store.saveForward(remote);
+      await tunnels.start(remote, trustPrompt: trust);
+      expect(
+        tunnels.state(remote.id).status,
+        SshTunnelStatus.running,
+        reason: '${tunnels.state(remote.id).failure}',
+      );
+      expect(await roundTrip(remote.bindPort, 'via -R'), 'via -R');
+
+      final socks = SshForward(
+        id: 'tunnel-d',
+        profileId: 'tunnel-host',
+        type: SshForwardType.dynamic,
+        bindPort: await freePort(),
+      );
+      await store.saveForward(socks);
+      await tunnels.start(socks, trustPrompt: trust);
+      expect(tunnels.state(socks.id).status, SshTunnelStatus.running);
+      final client = await Socket.connect('127.0.0.1', socks.bindPort);
+      final replies = StreamIterator(client);
+      Future<List<int>> read(int count) async {
+        final bytes = <int>[];
+        while (bytes.length < count && await replies.moveNext()) {
+          bytes.addAll(replies.current);
+        }
+        return bytes;
+      }
+
+      client.add([5, 1, 0]); // SOCKS5, one method: no authentication.
+      expect(await read(2), [5, 0]);
+      client.add([
+        5, 1, 0, 1, 127, 0, 0, 1, //
+        echo.port >> 8, echo.port & 0xff,
+      ]);
+      final reply = await read(10);
+      expect(reply.take(2), [5, 0], reason: 'CONNECT succeeded');
+      client.add(utf8.encode('via -D'));
+      expect(utf8.decode(await read(6)), 'via -D');
+      client.destroy();
+
+      await tunnels.stop(local.id);
+      await expectLater(
+        Socket.connect('127.0.0.1', local.bindPort),
+        throwsA(isA<SocketException>()),
       );
     },
     skip: !enabled,

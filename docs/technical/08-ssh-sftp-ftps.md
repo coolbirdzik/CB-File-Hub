@@ -79,6 +79,112 @@ provider supports listing, streaming, download/upload, mkdir, rename and delete.
 Directory deletion is non-recursive, so non-empty directories produce a server
 error rather than silently deleting their contents.
 
+### Two-pane SFTP file transfer
+
+`#ssh/transfer` (or `#ssh/transfer/<profileId>`, which connects at once) is a
+WinSCP-style screen in `ui/screens/ssh/sftp_transfer_screen.dart`. This
+computer is always the left pane and the chosen SSH host the right one; below
+720 px the local pane stacks on top. Open it from **SSH → Hosts → File
+transfer**, a host's menu (in place or in a new tab), or the terminal toolbar.
+Choosing another host in the right pane's selector reconnects in place without
+changing the tab path, so the cached tab content and its session survive.
+
+The screen owns its own `SSHClient`/`SftpClient` through `SshConnector` (same
+keys, proxies and fingerprint prompt as the terminal) and closes it when the
+tab closes or navigates away. It does not register in `NetworkServiceRegistry`.
+A closed transport shows a reconnect action and cancels a running transfer.
+
+Each pane has Up, Refresh, New folder and an editable path field; on Windows
+the level above a drive root lists the drives. Rows support click, Ctrl/Shift
+selection, arrow keys, Ctrl+A, Enter, Backspace, F5 and Escape. Double-clicking
+a folder opens it; double-clicking a file sends it to the other pane. Selected
+items go across with the pane's Upload/Download button, Enter, or by dragging
+them onto the other pane.
+
+`services/ssh/sftp_transfer.dart` performs transfers over a small
+`TransferFileSystem` interface (local and SFTP implementations):
+
+- Folders copy recursively and merge into existing folders. When top-level
+  names already exist, one Replace/Skip/Cancel question covers the batch,
+  including files inside merged folders. A file where a folder goes (or the
+  reverse) is reported, never replaced, and its contents are not attempted.
+- Links are listed but never followed, so junctions such as
+  `Application Data` cannot loop. A selected linked folder is reported; linked
+  files copy their target.
+- Downloads to Windows reject names with `<>:"/\|?*`, control characters,
+  trailing dots or spaces, and device names (`CON`, `NUL`, `COM1`…), per item.
+  Names differing only by case (`README.md`, `Readme.md`) keep the first and
+  report the rest instead of silently overwriting it.
+- On Android the local pane starts on the first shared storage location.
+- Progress is aggregated in bytes across the batch and throttled to 100 ms.
+  Cancel stops between chunks and deletes the partly written file. The
+  destination pane refreshes afterwards; failures are listed in a dialog.
+- There is no delete action: SFTP folder deletion stays non-recursive, and a
+  local delete here would bypass the Recycle Bin.
+
+Tests: `test/services/ssh/sftp_transfer_test.dart` (recursive copy, progress,
+links, Windows names and case, conflicts, cancel, drive list) and
+`test/ui/screens/network_browsing/sftp_transfer_screen_test.dart` (pane order
+at 320/1200 px in English and Vietnamese, upload, folder navigation, download).
+The opt-in loopback suite also round-trips a tree through a real SFTP server
+and cancels a 4 MiB upload, checking that no partial file remains. Close the
+`SftpClient` before its `SSHClient`; the reverse order aborts the socket.
+
+## Port forwarding
+
+**SSH → Port forwarding** lists saved rules; **Add forward** (also in each
+host's menu, with that host preselected) creates one:
+
+| Type | Like | Listens on | Connections go to |
+| --- | --- | --- | --- |
+| Local | `ssh -L` | this computer | destination as the SSH server resolves it |
+| Remote | `ssh -R` | the SSH server | destination as this computer resolves it |
+| Dynamic | `ssh -D` | this computer (SOCKS5, no auth, CONNECT) | any address, through the server |
+
+Rules (`SshForward`, `services/ssh/ssh_forward.dart`) are stored in the same
+vault document as hosts under `forwards`, with the same snapshot/rollback.
+Deleting a host deletes its rules. Ports must be 1–65535 and the listen
+address defaults to `127.0.0.1`; any non-loopback address shows a warning in
+the dialog, because other devices could then use the tunnel (for SOCKS, an
+open proxy).
+
+`SshTunnelManager` (`services/ssh/ssh_tunnel_manager.dart`) runs tunnels
+app-wide, so they keep running while tabs change, and stops any whose rule or
+host disappears from the store. Each tunnel has its own SSH connection through
+`SshConnector` (keys, proxies and the fingerprint prompt as for the terminal).
+Rows show Stopped / Starting / Running with the open connection count (not for
+SOCKS), or the failure: server refused the remote listen, transport
+disconnected, or the connect error. A connection whose destination cannot be
+reached is dropped and reported on the row while the tunnel keeps listening.
+Running rules can be stopped but not edited or deleted; Stop also aborts a
+tunnel that is still authenticating.
+
+Each forwarded connection copies both directions with backpressure and
+half-closes the other side when one finishes sending. Shutdown closes the
+listener, then live connections, then the client. The remote listener is
+cancelled with `cancelForwardRemote` directly, since
+`SSHRemoteForward.close()` leaves a cancel request that fails once the client
+closes.
+
+dartssh2 matches incoming `-R` channels to the requested listen address by
+exact string (`SSHClient._findRemoteForward`), so the server must report back
+the address the rule requested. RFC 4254 requires that, and asyncssh does it
+in the loopback test; other servers were not tested. The exposure warning is
+not shown for remote rules, whose reach is decided by the server's
+`GatewayPorts`.
+
+Not implemented: auto-start at launch, automatic reconnect (start the rule
+again after a failure), Unix-socket forwards and X11. On Android the system
+stops tunnels when the app goes to the background.
+
+Tests: `test/services/ssh/ssh_tunnel_manager_test.dart` uses a fake link over
+real loopback TCP (local and remote echo, half-close, refused destinations and
+listens, dropped transport, stop during connect, host deletion, vault
+round-trip). `test/ui/screens/network_browsing/ssh_forward_section_test.dart`
+covers the section at 320/1200 px in English and Vietnamese and the dialog.
+The opt-in loopback suite drives -L, -R and a hand-written SOCKS5 handshake
+through asyncssh, whose test server allows `direct-tcpip` and `tcpip-forward`.
+
 ## SSH proxies
 
 Use **SSH → Proxies → Add proxy**, then choose that proxy in the host editor.

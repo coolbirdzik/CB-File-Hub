@@ -8,8 +8,10 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:pinenacl/ed25519.dart' as nacl;
 import 'package:uuid/uuid.dart';
 import 'putty_private_key.dart';
+import 'ssh_forward.dart';
 import 'ssh_proxy.dart';
 import 'ssh_proxy_socket.dart';
+export 'ssh_forward.dart';
 export 'ssh_proxy.dart';
 
 class SshProfile {
@@ -130,12 +132,14 @@ class SshProfileStore extends ChangeNotifier {
   List<SshProfile> _profiles = [];
   List<SshStoredKey> _keys = [];
   List<SshProxy> _proxies = [];
+  List<SshForward> _forwards = [];
   Map<String, String> _knownHosts = {};
   Future<void>? _loading;
   Future<void> _writes = Future.value();
   List<SshProfile> get profiles => List.unmodifiable(_profiles);
   List<SshStoredKey> get keys => List.unmodifiable(_keys);
   List<SshProxy> get proxies => List.unmodifiable(_proxies);
+  List<SshForward> get forwards => List.unmodifiable(_forwards);
   Map<String, String> get knownHosts => Map.unmodifiable(_knownHosts);
   Future<void> load() => _loading ??= _load();
   Future<void> _load() async {
@@ -150,6 +154,9 @@ class SshProfileStore extends ChangeNotifier {
       _proxies = (j['proxies'] as List? ?? [])
           .map((e) => SshProxy.fromJson(e))
           .toList();
+      _forwards = (j['forwards'] as List? ?? [])
+          .map((e) => SshForward.fromJson(e))
+          .toList();
       _knownHosts = Map<String, String>.from(j['knownHosts'] ?? {});
     } catch (_) {
       _loading = null;
@@ -163,6 +170,7 @@ class SshProfileStore extends ChangeNotifier {
       final oldProfiles = List<SshProfile>.of(_profiles);
       final oldKeys = List<SshStoredKey>.of(_keys);
       final oldProxies = List<SshProxy>.of(_proxies);
+      final oldForwards = List<SshForward>.of(_forwards);
       final oldHosts = Map<String, String>.of(_knownHosts);
       try {
         change();
@@ -172,6 +180,7 @@ class SshProfileStore extends ChangeNotifier {
             'profiles': _profiles.map((e) => e.toJson()).toList(),
             'keys': _keys.map((e) => e.toJson()).toList(),
             'proxies': _proxies.map((e) => e.toJson()).toList(),
+            'forwards': _forwards.map((e) => e.toJson()).toList(),
             'knownHosts': _knownHosts,
           }),
         );
@@ -180,6 +189,7 @@ class SshProfileStore extends ChangeNotifier {
         _profiles = oldProfiles;
         _keys = oldKeys;
         _proxies = oldProxies;
+        _forwards = oldForwards;
         _knownHosts = oldHosts;
         rethrow;
       }
@@ -192,8 +202,25 @@ class SshProfileStore extends ChangeNotifier {
     _profiles.removeWhere((e) => e.id == p.id);
     _profiles.add(p);
   });
-  Future<void> deleteProfile(String id) =>
-      _change(() => _profiles.removeWhere((e) => e.id == id));
+
+  /// Forwarding rules through the host go with it.
+  Future<void> deleteProfile(String id) => _change(() {
+    _profiles.removeWhere((e) => e.id == id);
+    _forwards.removeWhere((f) => f.profileId == id);
+  });
+  Future<void> saveForward(SshForward forward) => _change(() {
+    if (!forward.isValid || !_profiles.any((p) => p.id == forward.profileId)) {
+      throw const FormatException('Invalid SSH port forward.');
+    }
+    final index = _forwards.indexWhere((f) => f.id == forward.id);
+    if (index < 0) {
+      _forwards.add(forward);
+    } else {
+      _forwards[index] = forward;
+    }
+  });
+  Future<void> deleteForward(String id) =>
+      _change(() => _forwards.removeWhere((f) => f.id == id));
   Future<void> saveKey(SshStoredKey key) => _change(() => _keys.add(key));
   Future<void> saveProxy(SshProxy proxy) => _change(() {
     if (!proxy.isValid) {

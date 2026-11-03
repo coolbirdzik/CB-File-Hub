@@ -514,6 +514,110 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get sshReconnect => 'Kết nối lại';
   @override
+  String get sshFileTransfer => 'Truyền file';
+  @override
+  String get sshChooseHost => 'Chọn máy chủ';
+  @override
+  String get sshChooseHostHint =>
+      'Chọn một máy chủ SSH đã lưu để duyệt file qua SFTP.';
+  @override
+  String get sshUploadToServer => 'Tải lên máy chủ';
+  @override
+  String get sshDownloadToComputer => 'Tải về máy này';
+  @override
+  String get sshTransferCancelled => 'Đã hủy truyền file';
+  @override
+  String get sshTransferConflictTitle => 'Các mục này đã tồn tại';
+  @override
+  String get sshTransferReplace => 'Thay thế';
+  @override
+  String get sshTransferSkip => 'Bỏ qua';
+  @override
+  String get sshTransferPickFolder => 'Hãy mở thư mục đích trước';
+  @override
+  String get sshTransferInvalidName => 'Tên không hợp lệ trên máy này';
+  @override
+  String get sshTransferLinkSkipped => 'Đã bỏ qua thư mục liên kết';
+  @override
+  String get sshTransferTypeConflict => 'Một file và một thư mục trùng tên';
+  @override
+  String get sshTransferCaseConflict =>
+      'Trùng tên với một mục khác, chỉ khác chữ hoa/thường';
+  @override
+  String get sshInvalidFolderName => 'Nhập tên thư mục hợp lệ';
+  @override
+  String sshTransferProgress(int done, int total) => 'Đang truyền $done/$total';
+  @override
+  String sshTransferComplete(int count) => 'Đã truyền $count file';
+  @override
+  String sshTransferFailed(int count) => 'Không truyền được $count mục';
+  @override
+  String sshPaneStatus(int total, int selected) =>
+      selected == 0 ? '$total mục' : 'Đã chọn $selected/$total';
+  @override
+  String get sshPortForwarding => 'Chuyển tiếp cổng';
+  @override
+  String get sshAddForward => 'Thêm chuyển tiếp';
+  @override
+  String get sshEditForward => 'Sửa chuyển tiếp';
+  @override
+  String get sshNoForwards =>
+      'Chưa có chuyển tiếp cổng nào. Thêm một mục để truy cập dịch vụ qua máy chủ SSH.';
+  @override
+  String get sshForwardType => 'Kiểu chuyển tiếp';
+  @override
+  String get sshForwardLocal => 'Cục bộ (-L)';
+  @override
+  String get sshForwardRemote => 'Từ xa (-R)';
+  @override
+  String get sshForwardDynamic => 'SOCKS5 động (-D)';
+  @override
+  String get sshForwardVia => 'Máy chủ SSH';
+  @override
+  String get sshBindAddress => 'Địa chỉ lắng nghe';
+  @override
+  String get sshBindPort => 'Cổng lắng nghe';
+  @override
+  String get sshTargetHost => 'Máy đích';
+  @override
+  String get sshTargetPort => 'Cổng đích';
+  @override
+  String get sshForwardLocalHint =>
+      'Lắng nghe trên máy này. Mỗi kết nối đi tới máy đích theo góc nhìn của '
+      'máy chủ SSH, nên "localhost" là chính máy chủ.';
+  @override
+  String get sshForwardRemoteHint =>
+      'Máy chủ SSH lắng nghe. Mỗi kết nối quay về máy đích theo góc nhìn của '
+      'máy này. Máy chủ phải cho phép chuyển tiếp TCP.';
+  @override
+  String get sshForwardDynamicHint =>
+      'Proxy SOCKS5 trên máy này. Ứng dụng dùng proxy sẽ truy cập mọi địa chỉ '
+      'thông qua máy chủ SSH.';
+  @override
+  String get sshForwardExposedWarning =>
+      'Địa chỉ này cho phép thiết bị khác trong mạng dùng tunnel. Dùng '
+      '127.0.0.1 để chỉ máy này truy cập được.';
+  @override
+  String get sshForwardInvalid =>
+      'Chọn máy chủ, địa chỉ lắng nghe và cổng từ 1 đến 65535.';
+  @override
+  String get sshForwardStart => 'Bật';
+  @override
+  String get sshForwardStop => 'Tắt';
+  @override
+  String get sshForwardStarting => 'Đang bật…';
+  @override
+  String get sshForwardRunning => 'Đang chạy';
+  @override
+  String get sshForwardStopped => 'Đã tắt';
+  @override
+  String get sshForwardRefused =>
+      'Máy chủ SSH từ chối lắng nghe trên địa chỉ và cổng này.';
+  @override
+  String sshForwardConnections(int count) => '$count kết nối';
+  @override
+  String sshForwardViaHost(String name) => 'qua $name';
+  @override
   String get sshClearTerminal => 'Xóa màn hình terminal';
   @override
   String get sshVaultHint =>

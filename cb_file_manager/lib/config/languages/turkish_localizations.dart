@@ -522,6 +522,112 @@ class TurkishLocalizations implements AppLocalizations {
   @override
   String get sshReconnect => 'Yeniden bağlan';
   @override
+  String get sshFileTransfer => 'Dosya aktarımı';
+  @override
+  String get sshChooseHost => 'Sunucu seçin';
+  @override
+  String get sshChooseHostHint =>
+      'Dosyalarına SFTP ile göz atmak için kayıtlı bir SSH sunucusu seçin.';
+  @override
+  String get sshUploadToServer => 'Sunucuya yükle';
+  @override
+  String get sshDownloadToComputer => 'Bu bilgisayara indir';
+  @override
+  String get sshTransferCancelled => 'Aktarım iptal edildi';
+  @override
+  String get sshTransferConflictTitle => 'Bu öğeler zaten var';
+  @override
+  String get sshTransferReplace => 'Değiştir';
+  @override
+  String get sshTransferSkip => 'Atla';
+  @override
+  String get sshTransferPickFolder => 'Önce bir hedef klasör açın';
+  @override
+  String get sshTransferInvalidName => 'Bu ad bu bilgisayarda kullanılamaz';
+  @override
+  String get sshTransferLinkSkipped => 'Bağlantılı klasör atlandı';
+  @override
+  String get sshTransferTypeConflict =>
+      'Bir dosya ile bir klasör aynı adı taşıyor';
+  @override
+  String get sshTransferCaseConflict =>
+      'Başka bir öğe yalnızca harf büyüklüğüyle farklı aynı adı taşıyor';
+  @override
+  String get sshInvalidFolderName => 'Geçerli bir klasör adı girin';
+  @override
+  String sshTransferProgress(int done, int total) =>
+      'Aktarılıyor: $done/$total';
+  @override
+  String sshTransferComplete(int count) => '$count dosya aktarıldı';
+  @override
+  String sshTransferFailed(int count) => '$count öğe aktarılamadı';
+  @override
+  String sshPaneStatus(int total, int selected) =>
+      selected == 0 ? '$total öğe' : '$selected/$total seçildi';
+  @override
+  String get sshPortForwarding => 'Port yönlendirme';
+  @override
+  String get sshAddForward => 'Yönlendirme ekle';
+  @override
+  String get sshEditForward => 'Yönlendirmeyi düzenle';
+  @override
+  String get sshNoForwards =>
+      'Henüz port yönlendirmesi yok. Bir SSH sunucusu üzerinden bir hizmete ulaşmak için ekleyin.';
+  @override
+  String get sshForwardType => 'Yönlendirme türü';
+  @override
+  String get sshForwardLocal => 'Yerel (-L)';
+  @override
+  String get sshForwardRemote => 'Uzak (-R)';
+  @override
+  String get sshForwardDynamic => 'Dinamik SOCKS5 (-D)';
+  @override
+  String get sshForwardVia => 'SSH sunucusu';
+  @override
+  String get sshBindAddress => 'Dinleme adresi';
+  @override
+  String get sshBindPort => 'Dinleme portu';
+  @override
+  String get sshTargetHost => 'Hedef sunucu';
+  @override
+  String get sshTargetPort => 'Hedef port';
+  @override
+  String get sshForwardLocalHint =>
+      'Bu bilgisayarda dinler. Her bağlantı hedefe SSH sunucusunun gördüğü '
+      'şekilde gider; "localhost" sunucunun kendisidir.';
+  @override
+  String get sshForwardRemoteHint =>
+      'SSH sunucusu dinler. Her bağlantı hedefe bu bilgisayarın gördüğü '
+      'şekilde döner. Sunucu TCP yönlendirmeye izin vermelidir.';
+  @override
+  String get sshForwardDynamicHint =>
+      'Bu bilgisayarda bir SOCKS5 proxy. Onu kullanan uygulamalar SSH sunucusu '
+      'üzerinden her adrese ulaşır.';
+  @override
+  String get sshForwardExposedWarning =>
+      'Bu adrese diğer cihazlar erişip tüneli kullanabilir. Yalnızca bu '
+      'bilgisayar için 127.0.0.1 kullanın.';
+  @override
+  String get sshForwardInvalid =>
+      'Bir sunucu, dinleme adresi ve 1 ile 65535 arasında portlar seçin.';
+  @override
+  String get sshForwardStart => 'Başlat';
+  @override
+  String get sshForwardStop => 'Durdur';
+  @override
+  String get sshForwardStarting => 'Başlatılıyor…';
+  @override
+  String get sshForwardRunning => 'Çalışıyor';
+  @override
+  String get sshForwardStopped => 'Durduruldu';
+  @override
+  String get sshForwardRefused =>
+      'SSH sunucusu bu adres ve portta dinlemeyi reddetti.';
+  @override
+  String sshForwardConnections(int count) => '$count bağlantı';
+  @override
+  String sshForwardViaHost(String name) => '$name üzerinden';
+  @override
   String get sshClearTerminal => 'Terminali temizle';
   @override
   String get sshVaultHint =>

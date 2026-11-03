@@ -20,6 +20,8 @@ import 'ssh_host_list_item.dart';
 import 'ssh_host_sort.dart';
 import '../network_browsing/components/network_navigation_bar.dart';
 import '../system_screen.dart';
+import '../../../services/ssh/ssh_tunnel_manager.dart';
+import 'ssh_forward_dialog.dart';
 import 'ssh_host_dialog.dart';
 import 'ssh_key_dialog.dart';
 import 'ssh_import_dialog.dart';
@@ -41,8 +43,10 @@ class SshWorkspaceScreen extends StatefulWidget {
   final LocalSshDiscovery? discovery;
   final GridListViewController? viewController;
   final SshHostSortController? sortController;
+  final SshTunnelManager? tunnels;
   const SshWorkspaceScreen({
     super.key,
+    this.tunnels,
     required this.tabId,
     this.sftpOnly = false,
     this.store,
@@ -72,6 +76,7 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
           mode,
         ),
       );
+  late final _tunnels = widget.tunnels ?? SshTunnelManager.instance;
   late final _sort =
       widget.sortController ??
       SshHostSortController(
@@ -83,6 +88,7 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
   void initState() {
     super.initState();
     store.addListener(_changed);
+    _tunnels.addListener(_changed);
     _view.addListener(_changed);
     _sort.addListener(_changed);
     _run(_view.initialize);
@@ -114,6 +120,7 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
   @override
   void dispose() {
     store.removeListener(_changed);
+    _tunnels.removeListener(_changed);
     _view.removeListener(_changed);
     if (widget.viewController == null) _view.dispose();
     _sort.removeListener(_changed);
@@ -220,6 +227,20 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
           switchToTab: true,
         ),
       );
+
+  /// Opens the two-pane transfer screen, connected to [p] when given.
+  void _openTransfer([SshProfile? p, bool openInNewTab = false]) {
+    final path = p == null ? '#ssh/transfer' : '#ssh/transfer/${p.id}';
+    final name = p == null ? context.tr.sshFileTransfer : '${p.name} · SFTP';
+    final tabs = context.read<TabManagerBloc>();
+    if (openInNewTab) {
+      tabs.add(AddTab(path: path, name: name, switchToTab: true));
+    } else {
+      navigateNetworkTab(context, widget.tabId, path);
+      tabs.add(UpdateTabName(widget.tabId, name));
+    }
+  }
+
   Future<void> _keyDialog({
     required bool generate,
     LocalSshKey? localKey,
@@ -305,8 +326,9 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
                 child: switch (_section) {
                   0 => _hostsSection(context, compact: compact),
                   1 => _keysSection(context, compact: compact),
+                  2 => _knownHostsSection(context),
                   3 => _proxiesSection(context),
-                  _ => _knownHostsSection(context),
+                  _ => _forwardsSection(context, compact: compact),
                 },
               ),
             ],
@@ -368,6 +390,12 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
                   label: tr.sshProxies,
                   count: store.proxies.length,
                 ),
+                (
+                  key: 'forwards',
+                  icon: PhosphorIconsLight.arrowsLeftRight,
+                  label: tr.sshPortForwarding,
+                  count: store.forwards.length,
+                ),
               ],
             ),
           Wrap(
@@ -423,6 +451,11 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
     );
     return switch (_section) {
       0 => [
+        action(
+          PhosphorIconsLight.arrowsLeftRight,
+          tr.sshFileTransfer,
+          _openTransfer,
+        ),
         importFromApp,
         importKey,
         action(PhosphorIconsLight.plus, tr.sshAddHost, _edit, primary: true),
@@ -442,6 +475,14 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
           PhosphorIconsLight.plus,
           tr.sshAddProxy,
           () => showSshProxyDialog(context, store),
+          primary: true,
+        ),
+      ],
+      4 => [
+        action(
+          PhosphorIconsLight.plus,
+          tr.sshAddForward,
+          () => showSshForwardDialog(context, store),
           primary: true,
         ),
       ],
@@ -709,6 +750,23 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
           () => _browse(p, openInNewTab: true),
           enabled: _connecting == null,
         ),
+        _menuItem(
+          menuContext,
+          PhosphorIconsLight.arrowsLeftRight,
+          tr.sshFileTransfer,
+          () => _openTransfer(p),
+        ),
+        _menuItem(
+          menuContext,
+          PhosphorIconsLight.arrowSquareOut,
+          '${tr.sshFileTransfer} (${tr.openInNewTab})',
+          () => _openTransfer(p, true),
+        ),
+        if (!widget.sftpOnly)
+          _menuItem(menuContext, PhosphorIconsLight.plus, tr.sshAddForward, () {
+            setState(() => _section = 4);
+            showSshForwardDialog(context, store, profileId: p.id);
+          }),
         const PopupMenuDivider(),
         _menuItem(
           menuContext,
@@ -920,6 +978,173 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
     );
   }
 
+  Widget _forwardsSection(BuildContext context, {required bool compact}) {
+    final tr = context.tr;
+    if (store.forwards.isEmpty) {
+      return _empty(
+        context,
+        icon: PhosphorIconsLight.arrowsLeftRight,
+        text: tr.sshNoForwards,
+        label: tr.sshAddForward,
+        action: () => showSshForwardDialog(context, store),
+      );
+    }
+    String title(SshForward f) => f.name.isNotEmpty
+        ? f.name
+        : f.type == SshForwardType.dynamic
+        ? 'SOCKS5 ${f.bindAddress}'
+        : '${f.bindPort} → ${f.targetAddress}';
+    final forwards = [...store.forwards]
+      ..sort((a, b) => TextUtils.compareNatural(title(a), title(b)));
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, CbSpacing.xl),
+      children: [
+        for (final f in forwards)
+          _forwardRow(context, f, title(f), compact: compact),
+      ],
+    );
+  }
+
+  Widget _forwardRow(
+    BuildContext context,
+    SshForward f,
+    String title, {
+    required bool compact,
+  }) {
+    final tr = context.tr;
+    final c = context.cbColors;
+    final state = _tunnels.state(f.id);
+    final active = state.isActive;
+    final profile = store.profiles
+        .where((p) => p.id == f.profileId)
+        .firstOrNull;
+    final route = f.type == SshForwardType.dynamic
+        ? 'SOCKS5 ${f.bindAddress}'
+        : '${f.bindAddress} → ${f.targetAddress}';
+    final (String status, Color color) = switch (state.status) {
+      SshTunnelStatus.stopped => (tr.sshForwardStopped, c.textTertiary),
+      SshTunnelStatus.starting => (tr.sshForwardStarting, c.textSecondary),
+      SshTunnelStatus.running => (
+        f.type == SshForwardType.dynamic
+            ? tr.sshForwardRunning
+            : '${tr.sshForwardRunning} · '
+                  '${tr.sshForwardConnections(state.connections)}',
+        c.status.success,
+      ),
+      SshTunnelStatus.failed => (
+        switch (state.failure) {
+          SshTunnelFailure.refused => tr.sshForwardRefused,
+          SshTunnelFailure.disconnected => tr.sshDisconnected,
+          _ => state.error ?? tr.sshDisconnected,
+        },
+        c.status.danger,
+      ),
+    };
+    final local = SshForward.address(f.bindHost, state.boundPort ?? f.bindPort);
+    void toggle() => active
+        ? _tunnels.stop(f.id)
+        : _run(
+            () => _tunnels.start(
+              f,
+              trustPrompt: (h, port, type, fp, old) =>
+                  promptSshHostTrust(context, h, port, type, fp, old),
+            ),
+          );
+    return _SshItemRow(
+      key: ValueKey('ssh-forward-${f.id}'),
+      icon: switch (f.type) {
+        SshForwardType.local => PhosphorIconsLight.signIn,
+        SshForwardType.remote => PhosphorIconsLight.signOut,
+        SshForwardType.dynamic => PhosphorIconsLight.globe,
+      },
+      muted: !active,
+      title: title,
+      badge: switch (f.type) {
+        SshForwardType.local => '-L',
+        SshForwardType.remote => '-R',
+        SshForwardType.dynamic => '-D',
+      },
+      subtitle: profile == null
+          ? route
+          : '$route · ${tr.sshForwardViaHost(profile.name)}',
+      footer: Row(
+        children: [
+          DecoratedBox(
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+            child: const SizedBox.square(dimension: 6),
+          ),
+          const SizedBox(width: CbSpacing.xs + 2),
+          Expanded(
+            child: Text(
+              state.status == SshTunnelStatus.running && state.error != null
+                  ? '$status · ${state.error}'
+                  : status,
+              style: CbTypography.caption.copyWith(color: color),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+      onPressed: active
+          ? null
+          : () => showSshForwardDialog(context, store, forward: f),
+      trailing: [
+        if (state.status == SshTunnelStatus.running &&
+            f.type != SshForwardType.remote)
+          CbButton.icon(
+            icon: PhosphorIconsLight.copy,
+            tooltip: tr.copy,
+            size: CbButtonSize.sm,
+            onPressed: () async {
+              await Clipboard.setData(ClipboardData(text: local));
+              if (context.mounted) {
+                AppToast.success(context, '${tr.copied}$local');
+              }
+            },
+          ),
+        if (compact)
+          CbButton.icon(
+            key: ValueKey('ssh-forward-toggle-${f.id}'),
+            icon: active ? PhosphorIconsLight.stop : PhosphorIconsLight.play,
+            tooltip: active ? tr.sshForwardStop : tr.sshForwardStart,
+            size: CbButtonSize.sm,
+            onPressed: profile == null ? null : toggle,
+          )
+        else
+          CbButton(
+            key: ValueKey('ssh-forward-toggle-${f.id}'),
+            icon: active ? PhosphorIconsLight.stop : PhosphorIconsLight.play,
+            label: active ? tr.sshForwardStop : tr.sshForwardStart,
+            size: CbButtonSize.sm,
+            variant: active
+                ? CbButtonVariant.secondary
+                : CbButtonVariant.primary,
+            loading: state.status == SshTunnelStatus.starting,
+            onPressed: profile == null ? null : toggle,
+          ),
+        CbButton.icon(
+          icon: PhosphorIconsLight.pencilSimple,
+          tooltip: tr.edit,
+          size: CbButtonSize.sm,
+          onPressed: active
+              ? null
+              : () => showSshForwardDialog(context, store, forward: f),
+        ),
+        CbButton.icon(
+          icon: PhosphorIconsLight.trash,
+          tooltip: tr.delete,
+          size: CbButtonSize.sm,
+          onPressed: active
+              ? null
+              : () => _run(() async {
+                  if (await _confirm(title)) await store.deleteForward(f.id);
+                }),
+        ),
+      ],
+    );
+  }
+
   Widget _empty(
     BuildContext context, {
     required IconData icon,
@@ -1123,10 +1348,12 @@ class _GroupHeader extends StatelessWidget {
 /// monospace detail line and trailing actions.
 class _SshItemRow extends StatelessWidget {
   const _SshItemRow({
+    super.key,
     required this.icon,
     required this.title,
     this.subtitle,
     this.badge,
+    this.footer,
     this.trailing = const [],
     this.onPressed,
     this.selectableSubtitle = false,
@@ -1136,6 +1363,9 @@ class _SshItemRow extends StatelessWidget {
   final IconData icon;
   final String title;
   final String? subtitle, badge;
+
+  /// A line under the subtitle, e.g. a tunnel's status.
+  final Widget? footer;
   final List<Widget> trailing;
   final VoidCallback? onPressed;
   final bool selectableSubtitle, muted;
@@ -1220,6 +1450,10 @@ class _SshItemRow extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
+                ],
+                if (footer != null) ...[
+                  const SizedBox(height: CbSpacing.xxs),
+                  footer!,
                 ],
               ],
             ),

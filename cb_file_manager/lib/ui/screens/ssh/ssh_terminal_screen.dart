@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:dartssh2/dartssh2.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:xterm/xterm.dart';
 import '../../../config/translation_helper.dart';
@@ -10,6 +11,7 @@ import '../../../design_system/cb_design_system.dart';
 import '../../../services/ssh/ssh_profile_store.dart';
 import '../../components/common/screen_scaffold.dart';
 import '../../../bloc/selection/selection.dart';
+import '../../tab_manager/core/tab_manager.dart';
 import '../network_browsing/components/network_navigation_bar.dart';
 import 'ssh_host_dialog.dart';
 
@@ -198,6 +200,17 @@ class _SshTerminalScreenState extends State<SshTerminalScreen> {
                   _disconnect();
                   setState(() => _error = tr.sshDisconnected);
                 },
+        ),
+        CbButton.icon(
+          icon: PhosphorIconsLight.arrowsLeftRight,
+          tooltip: tr.sshFileTransfer,
+          onPressed: () => context.read<TabManagerBloc>().add(
+            AddTab(
+              path: '#ssh/transfer/${widget.profileId}',
+              name: '${_profile?.name ?? 'SSH'} · SFTP',
+              switchToTab: true,
+            ),
+          ),
         ),
         CbButton.icon(
           icon: PhosphorIconsLight.eraser,

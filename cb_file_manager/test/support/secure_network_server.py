@@ -74,6 +74,9 @@ class SSHServer(asyncssh.SSHServer):
     def validate_public_key(self, username, key):
         allowed = root / 'authorized_keys'
         return username == 'developer' and allowed.exists() and key in asyncssh.read_public_key_list(allowed)
+    # asyncssh refuses direct-tcpip and tcpip-forward unless allowed.
+    def connection_requested(self, dest_host, dest_port, orig_host, orig_port): return True
+    def server_requested(self, listen_host, listen_port): return True
 
 async def shell(process):
     process.stdout.write('fixture terminal ready\r\n')

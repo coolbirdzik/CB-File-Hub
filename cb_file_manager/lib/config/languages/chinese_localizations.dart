@@ -470,6 +470,100 @@ class ChineseLocalizations implements AppLocalizations {
   @override
   String get sshReconnect => '重新连接';
   @override
+  String get sshFileTransfer => '文件传输';
+  @override
+  String get sshChooseHost => '选择主机';
+  @override
+  String get sshChooseHostHint => '选择已保存的 SSH 主机，通过 SFTP 浏览其文件。';
+  @override
+  String get sshUploadToServer => '上传到服务器';
+  @override
+  String get sshDownloadToComputer => '下载到此电脑';
+  @override
+  String get sshTransferCancelled => '传输已取消';
+  @override
+  String get sshTransferConflictTitle => '这些项目已存在';
+  @override
+  String get sshTransferReplace => '替换';
+  @override
+  String get sshTransferSkip => '跳过';
+  @override
+  String get sshTransferPickFolder => '请先打开目标文件夹';
+  @override
+  String get sshTransferInvalidName => '此电脑不允许该名称';
+  @override
+  String get sshTransferLinkSkipped => '已跳过链接文件夹';
+  @override
+  String get sshTransferTypeConflict => '文件与文件夹同名';
+  @override
+  String get sshTransferCaseConflict => '另一个项目的名称仅大小写不同';
+  @override
+  String get sshInvalidFolderName => '请输入有效的文件夹名称';
+  @override
+  String sshTransferProgress(int done, int total) => '正在传输 $done/$total';
+  @override
+  String sshTransferComplete(int count) => '已传输 $count 个文件';
+  @override
+  String sshTransferFailed(int count) => '$count 个项目传输失败';
+  @override
+  String sshPaneStatus(int total, int selected) =>
+      selected == 0 ? '$total 个项目' : '已选择 $selected/$total';
+  @override
+  String get sshPortForwarding => '端口转发';
+  @override
+  String get sshAddForward => '添加转发';
+  @override
+  String get sshEditForward => '编辑转发';
+  @override
+  String get sshNoForwards => '尚无端口转发。添加一条即可通过 SSH 主机访问服务。';
+  @override
+  String get sshForwardType => '转发类型';
+  @override
+  String get sshForwardLocal => '本地 (-L)';
+  @override
+  String get sshForwardRemote => '远程 (-R)';
+  @override
+  String get sshForwardDynamic => '动态 SOCKS5 (-D)';
+  @override
+  String get sshForwardVia => 'SSH 主机';
+  @override
+  String get sshBindAddress => '监听地址';
+  @override
+  String get sshBindPort => '监听端口';
+  @override
+  String get sshTargetHost => '目标主机';
+  @override
+  String get sshTargetPort => '目标端口';
+  @override
+  String get sshForwardLocalHint =>
+      '在此电脑上监听。每个连接按 SSH 服务器的视角到达目标，因此 "localhost" 指服务器本身。';
+  @override
+  String get sshForwardRemoteHint =>
+      '由 SSH 服务器监听。每个连接按此电脑的视角回到目标。服务器必须允许 TCP 转发。';
+  @override
+  String get sshForwardDynamicHint => '此电脑上的 SOCKS5 代理。使用它的应用可经 SSH 服务器访问任意地址。';
+  @override
+  String get sshForwardExposedWarning =>
+      '其他设备可访问此地址并使用该隧道。使用 127.0.0.1 可仅限此电脑。';
+  @override
+  String get sshForwardInvalid => '请选择主机、监听地址，并输入 1 到 65535 之间的端口。';
+  @override
+  String get sshForwardStart => '启动';
+  @override
+  String get sshForwardStop => '停止';
+  @override
+  String get sshForwardStarting => '正在启动…';
+  @override
+  String get sshForwardRunning => '运行中';
+  @override
+  String get sshForwardStopped => '已停止';
+  @override
+  String get sshForwardRefused => 'SSH 服务器拒绝在此地址和端口上监听。';
+  @override
+  String sshForwardConnections(int count) => '$count 个连接';
+  @override
+  String sshForwardViaHost(String name) => '经由 $name';
+  @override
   String get sshClearTerminal => '清除终端';
   @override
   String get sshVaultHint => '密码和私钥保存在此设备的安全存储中。';

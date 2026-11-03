@@ -2,6 +2,7 @@ import 'ssh/ssh_workspace_screen.dart';
 import 'torrent/torrent_screen.dart';
 import '../../services/torrent/torrent_launch_request.dart';
 import 'ssh/ssh_terminal_screen.dart';
+import 'ssh/sftp_transfer_screen.dart';
 import 'dart:io';
 import '../../services/disk_cleaner/cleaner_paths.dart';
 import 'package:flutter/material.dart';
@@ -154,7 +155,12 @@ class SystemScreenRouter {
         location: deviceMedia,
       );
     }
-    if (path.startsWith('#ssh/session/')) {
+    if (path == '#ssh/transfer' || path.startsWith('#ssh/transfer/')) {
+      final profileId = path.length > '#ssh/transfer/'.length
+          ? path.substring('#ssh/transfer/'.length)
+          : null;
+      return SftpTransferScreen(tabId: tabId, profileId: profileId);
+    } else if (path.startsWith('#ssh/session/')) {
       return SshTerminalScreen(
         tabId: tabId,
         profileId: path.substring('#ssh/session/'.length),

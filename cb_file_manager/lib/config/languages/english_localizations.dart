@@ -515,6 +515,117 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get sshReconnect => 'Reconnect';
   @override
+  String get sshFileTransfer => 'File transfer';
+  @override
+  String get sshChooseHost => 'Choose a host';
+  @override
+  String get sshChooseHostHint =>
+      'Choose a saved SSH host to browse its files over SFTP.';
+  @override
+  String get sshUploadToServer => 'Upload to server';
+  @override
+  String get sshDownloadToComputer => 'Download to this computer';
+  @override
+  String get sshTransferCancelled => 'Transfer cancelled';
+  @override
+  String get sshTransferConflictTitle => 'These items already exist';
+  @override
+  String get sshTransferReplace => 'Replace';
+  @override
+  String get sshTransferSkip => 'Skip';
+  @override
+  String get sshTransferPickFolder => 'Open a destination folder first';
+  @override
+  String get sshTransferInvalidName => 'Name is not allowed on this computer';
+  @override
+  String get sshTransferLinkSkipped => 'Linked folder skipped';
+  @override
+  String get sshTransferTypeConflict =>
+      'A file and a folder have the same name';
+  @override
+  String get sshTransferCaseConflict =>
+      'Another item has the same name in different letter case';
+  @override
+  String get sshInvalidFolderName => 'Enter a valid folder name';
+  @override
+  String sshTransferProgress(int done, int total) =>
+      'Transferring $done of $total';
+  @override
+  String sshTransferComplete(int count) =>
+      count == 1 ? '1 file transferred' : '$count files transferred';
+  @override
+  String sshTransferFailed(int count) => count == 1
+      ? '1 item could not be transferred'
+      : '$count items could not be transferred';
+  @override
+  String sshPaneStatus(int total, int selected) => selected == 0
+      ? (total == 1 ? '1 item' : '$total items')
+      : '$selected of $total selected';
+  @override
+  String get sshPortForwarding => 'Port forwarding';
+  @override
+  String get sshAddForward => 'Add forward';
+  @override
+  String get sshEditForward => 'Edit forward';
+  @override
+  String get sshNoForwards =>
+      'No port forwards yet. Add one to reach a service through an SSH host.';
+  @override
+  String get sshForwardType => 'Forward type';
+  @override
+  String get sshForwardLocal => 'Local (-L)';
+  @override
+  String get sshForwardRemote => 'Remote (-R)';
+  @override
+  String get sshForwardDynamic => 'Dynamic SOCKS5 (-D)';
+  @override
+  String get sshForwardVia => 'SSH host';
+  @override
+  String get sshBindAddress => 'Listen address';
+  @override
+  String get sshBindPort => 'Listen port';
+  @override
+  String get sshTargetHost => 'Destination host';
+  @override
+  String get sshTargetPort => 'Destination port';
+  @override
+  String get sshForwardLocalHint =>
+      'Listens on this computer. Each connection goes to the destination as '
+      'the SSH server sees it, so "localhost" means the server itself.';
+  @override
+  String get sshForwardRemoteHint =>
+      'The SSH server listens. Each connection comes back to the destination '
+      'as this computer sees it. The server must allow TCP forwarding.';
+  @override
+  String get sshForwardDynamicHint =>
+      'A SOCKS5 proxy on this computer. Apps that use it reach any address '
+      'through the SSH server.';
+  @override
+  String get sshForwardExposedWarning =>
+      'This address is reachable from other devices, which can then use the '
+      'tunnel. Use 127.0.0.1 to keep it on this computer.';
+  @override
+  String get sshForwardInvalid =>
+      'Choose a host, a listen address and ports from 1 to 65535.';
+  @override
+  String get sshForwardStart => 'Start';
+  @override
+  String get sshForwardStop => 'Stop';
+  @override
+  String get sshForwardStarting => 'Starting…';
+  @override
+  String get sshForwardRunning => 'Running';
+  @override
+  String get sshForwardStopped => 'Stopped';
+  @override
+  String get sshForwardRefused =>
+      'The SSH server refused to listen on this address and port.';
+  @override
+  String sshForwardConnections(int count) =>
+      count == 1 ? '1 connection' : '$count connections';
+  @override
+  String sshForwardViaHost(String name) => 'via $name';
+  @override
   String get sshClearTerminal => 'Clear terminal';
   @override
   String get sshVaultHint =>
