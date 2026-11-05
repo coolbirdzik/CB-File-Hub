@@ -693,9 +693,11 @@ IconData _categoryIcon(String categoryId) => switch (categoryId) {
   'package_download_cache' => PhosphorIconsLight.package,
   'electron_cache' => PhosphorIconsLight.code,
   'xcode_build_cache' => PhosphorIconsLight.hammer,
+  'xcode_junk' => PhosphorIconsLight.deviceMobile,
   'old_downloads_review' => PhosphorIconsLight.clock,
   'developer_analysis_cache' => PhosphorIconsLight.code,
   'developer_download_cache' => PhosphorIconsLight.package,
+  'developer_logs' => PhosphorIconsLight.fileText,
   'electron_crash_reports' => PhosphorIconsLight.warningCircle,
   _recycleBinId => PhosphorIconsLight.trash,
   _ => PhosphorIconsLight.broom,
@@ -1457,6 +1459,7 @@ IconData _kindIcon(CleanerItemKind kind) => switch (kind) {
   CleanerItemKind.packageDownload => PhosphorIconsLight.package,
   CleanerItemKind.buildCache => PhosphorIconsLight.hammer,
   CleanerItemKind.analysisCache => PhosphorIconsLight.code,
+  CleanerItemKind.deviceSymbols => PhosphorIconsLight.deviceMobile,
 };
 
 String _kindLabel(AppLocalizations l, CleanerItemKind kind) => switch (kind) {
@@ -1474,6 +1477,7 @@ String _kindLabel(AppLocalizations l, CleanerItemKind kind) => switch (kind) {
   CleanerItemKind.packageDownload => l.diskCleanerCategoryPackageDownloads,
   CleanerItemKind.buildCache => l.diskCleanerCategoryXcodeBuild,
   CleanerItemKind.analysisCache => l.cleanerDeveloperAnalysisTitle,
+  CleanerItemKind.deviceSymbols => l.cleanerSmartCleanKindDeviceSymbols,
 };
 
 String _kindInfo(AppLocalizations l, CleanerItemKind kind) => switch (kind) {
@@ -1491,6 +1495,7 @@ String _kindInfo(AppLocalizations l, CleanerItemKind kind) => switch (kind) {
   CleanerItemKind.packageDownload => l.diskCleanerReasonPackageDownloads,
   CleanerItemKind.buildCache => l.diskCleanerReasonXcodeBuild,
   CleanerItemKind.analysisCache => l.cleanerDeveloperAnalysisReason,
+  CleanerItemKind.deviceSymbols => l.cleanerSmartCleanKindDeviceSymbolsInfo,
 };
 
 String _impactLabel(AppLocalizations l, CleanerItemImpact impact) =>

@@ -19,6 +19,9 @@ enum CleanerItemKind {
   packageDownload,
   buildCache,
   analysisCache,
+
+  /// Debug symbols Xcode copied from a connected device.
+  deviceSymbols,
 }
 
 /// What removing an item costs the user.
@@ -78,6 +81,7 @@ class CleanerItemOrigin {
     CleanerItemKind.gpuCache ||
     CleanerItemKind.buildCache ||
     CleanerItemKind.analysisCache ||
+    CleanerItemKind.deviceSymbols ||
     CleanerItemKind.appCache ||
     CleanerItemKind.thumbnailCache => CleanerItemImpact.rebuilt,
     CleanerItemKind.tempFile ||
@@ -145,6 +149,27 @@ class CleanerItemOrigins {
         kind: CleanerItemKind.buildCache,
       );
     }
+    if (category == 'xcode_junk') {
+      final path = lower.join('/');
+      if (lower.any((s) => s.endsWith(' devicesupport'))) {
+        return const CleanerItemOrigin(
+          app: 'Xcode',
+          kind: CleanerItemKind.deviceSymbols,
+        );
+      }
+      if (path.contains('library/logs/coresimulator/')) {
+        return const CleanerItemOrigin(
+          app: 'Simulator',
+          kind: CleanerItemKind.log,
+        );
+      }
+      return CleanerItemOrigin(
+        app: path.contains('library/developer/coresimulator/')
+            ? 'Simulator'
+            : 'Xcode',
+        kind: CleanerItemKind.appCache,
+      );
+    }
 
     if (category == 'thumbnail_cache') {
       return const CleanerItemOrigin(
@@ -166,6 +191,12 @@ class CleanerItemOrigins {
         kind: category == 'developer_analysis_cache'
             ? CleanerItemKind.analysisCache
             : CleanerItemKind.crashReport,
+      );
+    }
+    if (category == 'developer_logs') {
+      return CleanerItemOrigin(
+        app: _ruleOwner(lower),
+        kind: CleanerItemKind.log,
       );
     }
     if (category == 'system_cache') {
@@ -476,7 +507,7 @@ class CleanerItemOrigins {
   // ---------------------------------------------------------------------------
 
   static List<CleanerPathRule> _hintedRules() => [
-    for (final os in const ['windows', 'macos'])
+    for (final os in const ['windows', 'macos', 'linux'])
       for (final category in CleanerCategories.all(operatingSystem: os))
         for (final rule in category.rules)
           if (rule.appOwnerHints.isNotEmpty) rule,

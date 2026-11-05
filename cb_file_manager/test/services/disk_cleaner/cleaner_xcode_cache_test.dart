@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:cb_file_manager/services/disk_cleaner/cleaner_categories.dart';
+import 'package:cb_file_manager/services/disk_cleaner/cleaner_item_origin.dart';
 import 'package:cb_file_manager/services/disk_cleaner/cleaner_models.dart';
 import 'package:cb_file_manager/services/disk_cleaner/cleaner_quick_clean.dart';
 import 'package:cb_file_manager/services/disk_cleaner/cleaner_xcode_cache.dart';
@@ -140,4 +142,213 @@ void main() {
     await Link(p.join(project.path, 'Build')).create(outside.path);
     expect(CleanerXcodeCache.discoverRoots(derived.path, []), isEmpty);
   }, skip: Platform.isWindows);
+
+  group('Xcode caches and device symbols', () {
+    const home = '/Users/test';
+    final now = DateTime(2026, 10, 26);
+    JunkItem junk(String path, {Duration age = const Duration(days: 120)}) =>
+        JunkItem(
+          path: path,
+          sizeBytes: 1,
+          categoryId: CleanerXcodeCache.junkCategoryId,
+          lastModified: now.subtract(age),
+        );
+
+    test('is a safe macOS quick-clean category only', () {
+      expect(
+        CleanerCategories.all(operatingSystem: 'macos').map((c) => c.id),
+        contains(CleanerXcodeCache.junkCategoryId),
+      );
+      expect(
+        CleanerCategories.all(operatingSystem: 'windows').map((c) => c.id),
+        isNot(contains(CleanerXcodeCache.junkCategoryId)),
+      );
+      expect(
+        CleanerQuickClean.categoryIds(operatingSystem: 'macos'),
+        contains(CleanerXcodeCache.junkCategoryId),
+      );
+    });
+
+    test('accepts only caches, simulator logs and symbol folders', () {
+      for (final path in [
+        '$home/Library/Caches/com.apple.dt.Xcode/fsCachedData/ABC',
+        '$home/Library/Developer/CoreSimulator/Caches/dyld/23A/sim/cache',
+        '$home/Library/Logs/CoreSimulator/UDID/system.log',
+        '$home/Library/Developer/Xcode/iOS DeviceSupport/17.5 (21F79)/Info.plist',
+        '$home/Library/Developer/Xcode/watchOS DeviceSupport/10.0 (21R5)/Symbols/usr/lib/dyld',
+        // Symbol folders are taken whole, so name filters do not split them.
+        '$home/Library/Developer/Xcode/iOS DeviceSupport/17.5 (21F79)/Symbols/System/Library/Databases/x.db',
+        '$home/Library/Developer/Xcode/iOS DeviceSupport/17.5 (21F79)/LOCK',
+      ]) {
+        expect(CleanerXcodeCache.isJunkFile(path), isTrue, reason: path);
+        expect(
+          CleanerQuickClean.isEligible(junk(path), now),
+          isTrue,
+          reason: path,
+        );
+      }
+      for (final path in [
+        '$home/Library/Caches/com.apple.dt.Xcode/Cache.db',
+        '$home/Library/Caches/com.apple.dt.Xcode/Cache.db-wal',
+        '$home/Library/Caches/com.apple.dt.Xcode/LOCK',
+        '$home/Library/Caches/com.apple.dt.Xcode.other/file',
+        '$home/Library/Developer/CoreSimulator/Devices/UDID/data/app.sqlite',
+        '$home/Library/Developer/Xcode/Archives/2026-10-26/App.xcarchive/App',
+        '$home/Library/Developer/Xcode/iOS DeviceSupport/.DS_Store',
+        '$home/Library/Developer/Xcode/iOS DeviceSupport/../Archives/App',
+        '$home/Library/Developer/Xcode/macOS DeviceSupport/14.0/Info.plist',
+      ]) {
+        expect(CleanerXcodeCache.isJunkFile(path), isFalse, reason: path);
+        expect(
+          CleanerQuickClean.isEligible(junk(path), now),
+          isFalse,
+          reason: path,
+        );
+      }
+      expect(
+        CleanerQuickClean.isEligible(
+          junk(
+            '$home/Library/Logs/CoreSimulator/UDID/system.log',
+            age: const Duration(days: 1),
+          ),
+          now,
+        ),
+        isFalse,
+      );
+    });
+
+    test('names the app and kind of each item', () {
+      CleanerItemOrigin origin(String path) =>
+          CleanerItemOrigins.of(junk(path));
+      expect(
+        origin(
+          '$home/Library/Developer/Xcode/iOS DeviceSupport/17.5 (21F79)/Info.plist',
+        ),
+        const CleanerItemOrigin(
+          app: 'Xcode',
+          kind: CleanerItemKind.deviceSymbols,
+        ),
+      );
+      expect(
+        origin('$home/Library/Logs/CoreSimulator/UDID/system.log'),
+        const CleanerItemOrigin(app: 'Simulator', kind: CleanerItemKind.log),
+      );
+      expect(
+        origin('$home/Library/Developer/CoreSimulator/Caches/dyld/x'),
+        const CleanerItemOrigin(
+          app: 'Simulator',
+          kind: CleanerItemKind.appCache,
+        ),
+      );
+      expect(
+        origin('$home/Library/Caches/com.apple.dt.Xcode/fsCachedData/A'),
+        const CleanerItemOrigin(app: 'Xcode', kind: CleanerItemKind.appCache),
+      );
+    });
+
+    test(
+      'device support keeps the newest folder and folders changed recently',
+      () async {
+        final root = await Directory.systemTemp.createTemp('cb-xcode-ds-');
+        addTearDown(() => root.delete(recursive: true));
+        final created = DateTime.now();
+        Future<void> folder(String name, {Duration? touchedAfter}) async {
+          final entry = File(p.join(root.path, name, 'Symbols', 'lib.dylib'));
+          await entry.parent.create(recursive: true);
+          await entry.writeAsString(name);
+          if (touchedAfter != null) {
+            await entry.setLastModified(created.add(touchedAfter));
+          }
+        }
+
+        await folder('16.0 (20A362)');
+        // One file changed 80 days before "now" keeps its whole folder.
+        await folder('16.4 (20E247)', touchedAfter: const Duration(days: 20));
+        await folder('17.0 (21A329)');
+        // Newest folder of the platform is always kept.
+        await folder('17.5 (21F79)', touchedAfter: const Duration(days: 50));
+        File(p.join(root.path, '.DS_Store')).writeAsStringSync('');
+
+        final stale = CleanerXcodeCache.discoverStaleDeviceSupport(
+          root.path,
+          [],
+          now: created.add(const Duration(days: 100)),
+        ).map(p.basename).toSet();
+        expect(stale, {'16.0 (20A362)', '17.0 (21A329)'});
+
+        // A folder emptied by an earlier clean is newer than every real set
+        // but must not take the "newest" slot from 17.5.
+        await Directory(
+          p.join(root.path, '18.0 (22A3354)', 'Symbols', 'usr'),
+        ).create(recursive: true);
+        expect(
+          CleanerXcodeCache.discoverStaleDeviceSupport(
+            root.path,
+            [],
+            now: created.add(const Duration(days: 200)),
+          ).map(p.basename).toSet(),
+          {'16.0 (20A362)', '16.4 (20E247)', '17.0 (21A329)'},
+        );
+        expect(
+          CleanerXcodeCache.discoverStaleDeviceSupport(root.path, []),
+          isEmpty,
+          reason: 'nothing is 90 days old yet',
+        );
+      },
+    );
+
+    for (final useNative in [true, false]) {
+      test(
+        'scan takes whole stale symbol folders only (native: $useNative)',
+        () async {
+          final temp = await Directory.systemTemp.createTemp('cb-xcode-ds-');
+          addTearDown(() => temp.delete(recursive: true));
+          final root = await Directory(
+            p.join(temp.path, 'Library/Developer/Xcode/iOS DeviceSupport'),
+          ).create(recursive: true);
+          final old = DateTime.now().subtract(const Duration(days: 120));
+          final expected = <String>{};
+          Future<void> file(String relative, {bool eligible = false}) async {
+            final entry = File(p.joinAll([root.path, ...relative.split('/')]));
+            await entry.parent.create(recursive: true);
+            await entry.writeAsString(relative);
+            await entry.setLastModified(old);
+            if (eligible) expected.add(p.normalize(entry.path));
+          }
+
+          await file('16.0 (20A362)/Info.plist', eligible: true);
+          await file('16.0 (20A362)/.finalized', eligible: true);
+          await file('16.0 (20A362)/Symbols/usr/lib/dyld', eligible: true);
+          await file('16.0 (20A362)/Symbols/LOCK', eligible: true);
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+          // Created last, so it is the newest folder and stays.
+          await file('17.5 (21F79)/Info.plist');
+          await file('17.5 (21F79)/Symbols/usr/lib/dyld');
+          await file('.DS_Store');
+
+          final rule = CleanerXcodeCache.junkCategory.rules.firstWhere(
+            (rule) => rule.scope == CleanerRuleScope.xcodeDeviceSupport,
+          );
+          final handle = await spawnScanWithResolvedRules(
+            useNativeScanner: useNative,
+            drivesScanned: [root.path],
+            rules: [
+              ResolvedRule(
+                categoryId: CleanerXcodeCache.junkCategoryId,
+                basePath: root.path,
+                scope: rule.scope,
+                // Folder mtimes cannot be backdated here; age by order only.
+                minAge: Duration.zero,
+              ),
+            ],
+          );
+          final report = await handle.future;
+          expect(
+            report.allItems.map((item) => p.normalize(item.path)).toSet(),
+            expected,
+          );
+        },
+      );
+    }
+  });
 }

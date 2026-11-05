@@ -869,35 +869,60 @@ build_android_aab() {
     cd ..
 }
 
-# Build Linux
+# Build Linux: portable tar.gz, plus a .deb when dpkg-deb is available.
+# Outputs build/linux/portable/CBFileHub-<version>-linux-<arch>.tar.gz and
+# CBFileHub-<version>-linux-<debarch>.deb. Set LINUX_ARTIFACT_SUFFIX (for
+# example "ubuntu22.04") to tell apart packages built on different distros.
 build_linux() {
     print_info "Building Linux..."
-    
+
     clean_build
     install_deps
-    
-    cd "$PROJECT_DIR"
+
     local VERSION_NAME
     local VERSION_CODE
     VERSION_NAME=$(get_version_name)
     VERSION_CODE=$(get_version_code)
-    flutter build linux --release --build-name "$VERSION_NAME" --build-number "$VERSION_CODE" "${CLOUD_DEFINES[@]}"
-    
-    if [ $? -eq 0 ]; then
-        print_info "Creating tar.gz package..."
-        mkdir -p "$BUILD_DIR/linux/portable"
-        cd "$BUILD_DIR/linux/x64/release"
-        tar -czf "../portable/CBFileHub-Linux.tar.gz" bundle/
-        cd ../../../../..
-        
-        print_success "Linux build completed!"
-        print_info "Output: $BUILD_DIR/linux/portable/CBFileHub-Linux.tar.gz"
-    else
+    if ! (cd "$PROJECT_DIR" && flutter build linux --release         --build-name "$VERSION_NAME" --build-number "$VERSION_CODE"         "${CLOUD_DEFINES[@]}"); then
         print_error "Linux build failed!"
-        cd ..
         return 1
     fi
-    cd ..
+
+    local flutter_arch deb_arch
+    case "$(uname -m)" in
+        aarch64 | arm64) flutter_arch=arm64; deb_arch=arm64 ;;
+        *) flutter_arch=x64; deb_arch=amd64 ;;
+    esac
+    local bundle="$BUILD_DIR/linux/$flutter_arch/release/bundle"
+    local out="$BUILD_DIR/linux/portable"
+    local suffix="${LINUX_ARTIFACT_SUFFIX:+-$LINUX_ARTIFACT_SUFFIX}"
+    local base="CBFileHub-$VERSION_NAME-linux$suffix"
+    if [ ! -d "$bundle" ]; then
+        print_error "Linux bundle not found at $bundle"
+        return 1
+    fi
+    mkdir -p "$out"
+
+    print_info "Creating tar.gz package..."
+    local staging
+    staging="$(mktemp -d)"
+    cp -a "$bundle" "$staging/cb-file-hub"
+    tar -C "$staging" -czf "$out/$base-$flutter_arch.tar.gz" cb-file-hub
+    rm -rf "$staging"
+    print_info "Output: $out/$base-$flutter_arch.tar.gz"
+
+    if command -v dpkg-deb >/dev/null 2>&1; then
+        print_info "Creating .deb package..."
+        if ! DEB_ARCH="$deb_arch" bash "$SCRIPT_DIR/package_linux_deb.sh"             "$bundle" "$VERSION_NAME" "$out/$base-$deb_arch.deb"; then
+            print_error "Debian packaging failed!"
+            return 1
+        fi
+        print_info "Output: $out/$base-$deb_arch.deb"
+    else
+        print_warning "dpkg-deb not found; skipping the .deb package."
+    fi
+
+    print_success "Linux build completed!"
 }
 
 # Code signing identity for macOS builds. A self-signed certificate, not a

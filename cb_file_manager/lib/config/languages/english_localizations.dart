@@ -4892,6 +4892,17 @@ class EnglishLocalizations implements AppLocalizations {
   String get diskCleanerReasonXcodeBuild =>
       'Generated build products, intermediates, indexes and module caches unchanged for at least 7 days. Close Xcode and stop builds first. Sources, package checkouts, archives and dSYMs are kept. The next build and indexing may take longer.';
   @override
+  String get diskCleanerCategoryXcodeJunk =>
+      'Old Xcode caches and device symbols';
+  @override
+  String get diskCleanerReasonXcodeJunk =>
+      "Xcode's download cache and Simulator caches and logs unchanged for at least 7 days, plus device debug symbols (DeviceSupport) unchanged for 90 days; the newest symbol set of each platform is kept. Close Xcode and Simulator first. Projects, archives, simulators and their apps are kept.";
+  @override
+  String get cleanerSmartCleanKindDeviceSymbols => 'Device debug symbols';
+  @override
+  String get cleanerSmartCleanKindDeviceSymbolsInfo =>
+      'Symbols Xcode copied from an iPhone, iPad, Apple Watch, Apple TV or Vision Pro to debug it. A whole OS version is removed or kept; Xcode copies it again, which takes a few minutes, the next time that device is used for debugging.';
+  @override
   String get cleanerOldFilesTitle => 'Old downloads — review only';
   @override
   String get cleanerOldFilesDescription =>
@@ -6653,12 +6664,17 @@ class EnglishLocalizations implements AppLocalizations {
       'Developer analysis and build caches';
   @override
   String get cleanerDeveloperAnalysisReason =>
-      'Dart analysis, C/C++ precompiled headers and Go build caches unchanged for at least 7 days. Close editors, language servers and builds first. The next analysis or build may take longer.';
+      'Dart analysis, C/C++ precompiled headers, Go and Gradle build caches unchanged for at least 7 days. Close editors, language servers and builds first. The next analysis or build may take longer.';
   @override
   String get cleanerDeveloperDownloadsTitle => 'Developer tool downloads';
   @override
   String get cleanerDeveloperDownloadsReason =>
       'Cached developer tool downloads unchanged for at least 7 days. Finish installs, updates and builds first. Later installs may need internet; installed extensions, environments and models are kept.';
+  @override
+  String get cleanerDeveloperLogsTitle => 'Developer tool logs';
+  @override
+  String get cleanerDeveloperLogsReason =>
+      'Editor session logs (VS Code, Cursor and similar), npm debug logs and Gradle/Kotlin daemon logs unchanged for at least 7 days. Keep logs still needed for troubleshooting. Settings, extensions and projects are kept.';
   @override
   String get cleanerElectronCrashTitle => 'Electron crash reports';
   @override

@@ -186,7 +186,7 @@ through Windows Shell. Progress is throttled and never moves backwards within
 a batch. After deletion, the scan tree is updated in short work slices and
 dashboard diagnosis is prepared in an isolate before returning to the results.
 
-**Smart Clean** is the Cleaner's start page on Windows and macOS. One scan
+**Smart Clean** is the Cleaner's start page on Windows, macOS and Linux. One scan
 checks regenerable junk (`CleanerQuickClean`,
 `lib/services/disk_cleaner/cleaner_quick_clean.dart`): temporary files untouched
 for a week, browser and app caches inside folders named as caches, thumbnail
@@ -204,14 +204,24 @@ The additional categories are:
 | Package download caches | Default npm `_cacache`, pip cache, Cargo `registry/cache`, NuGet HTTP `v3-cache`, Composer `files`; unchanged for at least seven days | Later installs/restores may need internet or rebuild wheels. Installed libraries and source trees stay in place. |
 | Electron app caches | Explicit cache subfolders in the default profiles of Discord/stable/PTB/Canary, Slack, VS Code/stable/Insiders, Cursor, Windsurf, Notion, Obsidian, Postman, Figma, Signal and GitHub Desktop; unchanged for at least one day | HTTP, compiled JavaScript and GPU caches rebuild. Cookies, preferences, Local/Session Storage, IndexedDB, Service Worker and CacheStorage remain outside the rules. |
 | Old Xcode build files (macOS) | Generated build products/intermediates, `Index.noindex` and shared module/compilation/SDK/symbol caches inside the default DerivedData; unchanged for at least seven days | Build and indexing may take longer. Close Xcode and stop builds first. Sources, `SourcePackages`, `.xcarchive` and `.dSYM` files are kept. |
+| Old Xcode caches and device symbols (macOS) | `~/Library/Caches/com.apple.dt.Xcode` (SQLite index files excluded), `~/Library/Developer/CoreSimulator/Caches` and `~/Library/Logs/CoreSimulator`, unchanged for at least seven days; whole version folders of `~/Library/Developer/Xcode/{iOS,watchOS,tvOS,visionOS} DeviceSupport` whose every file and folder is unchanged for 90 days, always keeping the newest folder per platform | Simulator caches rebuild on the next boot. Xcode copies device symbols again (several minutes) the next time that device is used for debugging. Close Xcode and Simulator first. Simulator devices and their app data, archives and projects are not included. |
+| Developer analysis and build caches | Dart `.analysis-driver`, vscode-cpptools `ipch`, Go build cache and Gradle `caches/build-cache-1`; unchanged for at least seven days | The next analysis/build may take longer. Gradle module caches (`caches/modules-2`) and transforms stay. |
+| Developer tool downloads | Cached editor VSIX installers, Electron downloads, Android SDK `~/.android/cache`, Gradle wrapper distribution `*.zip` files and rustup `downloads`/`tmp` (Windows also Comfy Desktop archives, node-gyp and electron-builder caches); unchanged for at least seven days | Later installs may need internet. Gradle keeps the unpacked distribution and its `.ok` marker, so only the archive it no longer reads goes. Installed SDKs, toolchains and extensions stay. |
+| Developer tool logs | `logs` folders of the VS Code family (VS Code, Insiders, Cursor, Windsurf, Kiro, ...), npm `_logs/*.log`, Gradle `daemon/*/*.out.log` and Kotlin daemon `*.log`; unchanged for at least seven days | Only diagnostic history is lost. Settings, `workspaceStorage`, extensions and projects are not under these rules. |
 
 The Xcode rule uses a scoped discovery pass on the scan isolate. It enumerates
 only immediate DerivedData project folders and known output locations; it never
 turns the whole DerivedData root into a Smart Clean target. Both the native and
 Dart scan paths reject archives, dSYMs and package checkout paths, and cleanup
 rechecks those exclusions. Other scanners do not reinterpret the scoped rule as
-a whole-tree rule. Custom DerivedData locations, simulator data, device support
-and archives are not included. Apple documents that
+a whole-tree rule. Custom DerivedData locations, simulator devices and archives
+are not included.
+
+DeviceSupport uses a similar scoped pass: a version folder is taken whole or
+not at all, because Xcode trusts a folder whose marker files remain and would
+not copy the missing symbols again. A folder holding a link, or one that cannot
+be read completely, is kept. Quick clean skips its name filters for these files
+so it cannot split a folder. Apple documents that
 [DerivedData can be recreated from sources](https://help.apple.com/xcode/mac/current/en.lproj/deva52afe8a4.html)
 and that [distribution dSYMs should be retained](https://developer.apple.com/documentation/xcode/building-your-app-to-include-debugging-information).
 
@@ -226,7 +236,8 @@ category is `reviewOnly`: it cannot add deletion allowlist prefixes or mark disk
 tree nodes as junk, and the cleanup service rejects it even if an item is forged
 as a user selection. This panel has no checkbox or delete action.
 
-Package downloads and Electron caches are supported on Windows and macOS.
+Package downloads and Electron caches are supported on Windows, macOS and
+Linux.
 The rules use default cache locations; custom locations and Electron session
 partitions are left alone. Electron scanning never walks an entire profile or
 all of AppData. Editor `CachedData` is included for the VS Code family. Lock
@@ -302,7 +313,28 @@ Foundation `FileManager.trashItem` on a utility queue and report each failed
 path. The result screen offers Finder Trash instead of Windows bin deletion.
 Apps inventory/uninstall remains Windows-only. Leftover app data (folders of
 uninstalled or outdated apps) works on Windows, macOS and Linux and moves
-folders to the Trash on macOS and Linux; on Linux it is the only Cleaner page.
+folders to the Trash on macOS and Linux.
+
+On Linux the Cleaner has Smart Clean and Leftover app data; Disk usage and Apps
+still need the Windows/macOS volume code. Linux Smart Clean has no system rules
+(no `/var/cache`, `/tmp`, journal or package-manager caches, which need root):
+it scans per-user developer junk under `HOME` (`CleanerCacheRules.linux`,
+`CleanerAuditedRules.linux`): `~/.npm/_cacache`, `~/.cache/pip`,
+`~/.cargo/registry/cache`, `~/.local/share/NuGet/v3-cache`, Composer `files`,
+Electron app caches and Crashpad dumps under `~/.config/<app>`, plus the three
+developer categories above at their Linux locations (`~/.cache/go-build`,
+`~/.cache/vscode-cpptools/ipch`, `~/.cache/electron`, `~/.config/Code/logs`,
+`~/.local/share/kotlin/daemon`, ...). `XDG_CACHE_HOME`/`XDG_CONFIG_HOME`
+overrides are not followed. Extracted package trees are left out on Linux
+(Yarn and Bun caches, node-gyp headers, electron-builder tools): their files
+keep the archive's old timestamps, so an age filter could remove part of an
+entry the tool still considers complete. Installed dependencies stay out on
+every platform (`~/.m2/repository`, `~/.pub-cache`, Go `pkg/mod`, pnpm/uv/conda
+stores hard-linked into environments). Deletion re-checks each path against the
+Linux rule roots and the protected system roots (`/etc`, `/usr`, `/boot`,
+`/proc`, `/sys`, `/var/lib`, ...), and moves files to the freedesktop Trash
+with `gio trash` (or `trash-put`), up to 200 paths per process; a path still
+present afterwards is reported as failed.
 Full Disk Access restrictions appear as scan coverage gaps;
 Cleaner does not change macOS permissions.
 

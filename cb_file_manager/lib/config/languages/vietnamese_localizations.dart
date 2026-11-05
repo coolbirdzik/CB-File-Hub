@@ -4876,6 +4876,17 @@ class VietnameseLocalizations implements AppLocalizations {
   String get diskCleanerReasonXcodeBuild =>
       'Build output, file trung gian, chỉ mục và cache module không thay đổi ít nhất 7 ngày. Đóng Xcode và dừng build trước khi dọn. Giữ nguyên source, package checkout, archive và dSYM. Lần build và lập chỉ mục sau có thể lâu hơn.';
   @override
+  String get diskCleanerCategoryXcodeJunk =>
+      'Cache Xcode cũ và symbol thiết bị';
+  @override
+  String get diskCleanerReasonXcodeJunk =>
+      'Cache tải về của Xcode, cache và log của Simulator không thay đổi ít nhất 7 ngày, cùng symbol debug thiết bị (DeviceSupport) không thay đổi 90 ngày; bộ symbol mới nhất của mỗi nền tảng được giữ lại. Đóng Xcode và Simulator trước khi dọn. Giữ nguyên project, archive, simulator và ứng dụng trong đó.';
+  @override
+  String get cleanerSmartCleanKindDeviceSymbols => 'Symbol debug thiết bị';
+  @override
+  String get cleanerSmartCleanKindDeviceSymbolsInfo =>
+      'Symbol mà Xcode sao chép từ iPhone, iPad, Apple Watch, Apple TV hoặc Vision Pro để debug. Mỗi phiên bản hệ điều hành được xoá trọn hoặc giữ trọn; lần sau debug trên thiết bị đó, Xcode sẽ sao chép lại (mất vài phút).';
+  @override
   String get cleanerOldFilesTitle => 'File tải về cũ — chỉ xem lại';
   @override
   String get cleanerOldFilesDescription =>
@@ -6638,13 +6649,18 @@ class VietnameseLocalizations implements AppLocalizations {
       'Bộ nhớ đệm phân tích và biên dịch';
   @override
   String get cleanerDeveloperAnalysisReason =>
-      'Bộ nhớ đệm phân tích Dart, header biên dịch sẵn C/C++ và bản dựng Go không thay đổi ít nhất 7 ngày. Đóng trình soạn thảo, máy chủ ngôn ngữ và dừng biên dịch trước. Lần phân tích hoặc biên dịch tiếp theo có thể lâu hơn.';
+      'Bộ nhớ đệm phân tích Dart, header biên dịch sẵn C/C++, bản dựng Go và Gradle không thay đổi ít nhất 7 ngày. Đóng trình soạn thảo, máy chủ ngôn ngữ và dừng biên dịch trước. Lần phân tích hoặc biên dịch tiếp theo có thể lâu hơn.';
   @override
   String get cleanerDeveloperDownloadsTitle =>
       'Tệp tải về của công cụ lập trình';
   @override
   String get cleanerDeveloperDownloadsReason =>
       'Tệp tải về được lưu đệm của công cụ lập trình không thay đổi ít nhất 7 ngày. Hoàn tất cài đặt, cập nhật và biên dịch trước. Lần cài sau có thể cần Internet; tiện ích đã cài, môi trường và mô hình được giữ lại.';
+  @override
+  String get cleanerDeveloperLogsTitle => 'Nhật ký của công cụ lập trình';
+  @override
+  String get cleanerDeveloperLogsReason =>
+      'Nhật ký phiên của trình soạn thảo (VS Code, Cursor và tương tự), nhật ký gỡ lỗi npm và nhật ký daemon Gradle/Kotlin không thay đổi ít nhất 7 ngày. Giữ lại nhật ký còn cần để chẩn đoán. Cài đặt, tiện ích và dự án được giữ nguyên.';
   @override
   String get cleanerElectronCrashTitle => 'Báo cáo sự cố Electron';
   @override

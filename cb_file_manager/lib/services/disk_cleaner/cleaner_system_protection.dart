@@ -23,6 +23,19 @@ abstract final class CleanerSystemProtection {
         '/usr',
         '/private/etc',
         '/private/var/db',
+        // Linux system roots. /opt is left out: Homebrew lives there on macOS.
+        '/etc',
+        '/boot',
+        '/dev',
+        '/proc',
+        '/sys',
+        '/run',
+        '/lib',
+        '/lib32',
+        '/lib64',
+        '/libx32',
+        '/var/lib',
+        '/snap',
       ].any(
         (root) =>
             CleanerPaths.contains(root, value) ||

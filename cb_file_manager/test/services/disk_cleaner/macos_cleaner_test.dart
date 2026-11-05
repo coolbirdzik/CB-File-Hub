@@ -28,6 +28,7 @@ void main() {
       'package_download_cache',
       'electron_cache',
       'xcode_build_cache',
+      'xcode_junk',
       'old_downloads_review',
     ]);
     const env = {'HOME': '/Users/test'};

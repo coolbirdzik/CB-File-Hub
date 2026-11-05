@@ -24,7 +24,10 @@ abstract final class CleanerReviewCandidates {
   static const minAge = Duration(days: 90);
   static const limit = 200;
 
-  static CleanerCategory category({required bool isMacOS}) => CleanerCategory(
+  static CleanerCategory category({
+    required bool isMacOS,
+    bool isLinux = false,
+  }) => CleanerCategory(
     id: categoryId,
     displayName: 'Old downloads (review only)',
     description:
@@ -33,7 +36,10 @@ abstract final class CleanerReviewCandidates {
     reviewOnly: true,
     rules: [
       CleanerPathRule(
-        source: PathSource.env(isMacOS ? 'HOME' : 'USERPROFILE', 'Downloads'),
+        source: PathSource.env(
+          isMacOS || isLinux ? 'HOME' : 'USERPROFILE',
+          'Downloads',
+        ),
         minAge: minAge,
       ),
     ],

@@ -18,11 +18,11 @@ class CleanerCategories {
 
   /// All known categories.
   static List<CleanerCategory> all({String? operatingSystem}) =>
-      List.unmodifiable(
-        (operatingSystem ?? Platform.operatingSystem) == 'macos'
-            ? _macos
-            : _all,
-      );
+      List.unmodifiable(switch (operatingSystem ?? Platform.operatingSystem) {
+        'macos' => _macos,
+        'linux' => _linux,
+        _ => _all,
+      });
 
   /// Lookup by [CleanerCategory.id]. Returns null if missing.
   static CleanerCategory? byId(String id) {
@@ -96,7 +96,17 @@ class CleanerCategories {
     ),
     ...CleanerCacheRules.macos,
     CleanerXcodeCache.category,
+    CleanerXcodeCache.junkCategory,
     CleanerReviewCandidates.category(isMacOS: true),
+  ];
+
+  /// Linux has no system-wide junk rules yet: only regenerable per-user
+  /// developer caches, downloads and logs under HOME, which Smart Clean
+  /// moves to the freedesktop Trash.
+  static final _linux = <CleanerCategory>[
+    ...CleanerCacheRules.linux,
+    ...CleanerAuditedRules.linux,
+    CleanerReviewCandidates.category(isMacOS: false, isLinux: true),
   ];
 
   static final List<CleanerCategory> _all = [

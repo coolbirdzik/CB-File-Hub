@@ -1088,8 +1088,8 @@ class DiskCleanerService {
                       item.path,
                     )
                   : _auditedCleanupFile(item))) ||
-          (item.categoryId == CleanerXcodeCache.categoryId &&
-              (!CleanerXcodeCache.isGeneratedFile(item.path) ||
+          (_xcodeScanItem(item) &&
+              (CleanerXcodeCache.rejects(item.categoryId, item.path) ||
                   FileSystemEntity.typeSync(item.path, followLinks: false) !=
                       FileSystemEntityType.file)) ||
           CleanerSystemProtection.isProtected(item.path)) {
@@ -1129,8 +1129,8 @@ class DiskCleanerService {
       if (CleanerSystemProtection.isProtected(item.path) ||
           (CleanerAuditedRules.cleanableIds.contains(item.categoryId) &&
               !_auditedCleanupFile(item)) ||
-          (item.categoryId == CleanerXcodeCache.categoryId &&
-              !CleanerXcodeCache.isGeneratedFile(item.path)) ||
+          (_xcodeScanItem(item) &&
+              CleanerXcodeCache.rejects(item.categoryId, item.path)) ||
           (!safeByRule && !item.isUserSelected)) {
         skippedUnsafe.add(item.path);
         continue;
@@ -1718,6 +1718,14 @@ class DiskCleanerService {
 
     return expanded;
   }
+
+  /// Scanner-reported Xcode files, which must pass the Xcode path checks.
+  /// Folders picked in the disk tree are explicit user choices: `xcode_junk`
+  /// has whole-tree rules, so the tree tags them with that category too.
+  static bool _xcodeScanItem(JunkItem item) =>
+      item.categoryId == CleanerXcodeCache.categoryId ||
+      (item.categoryId == CleanerXcodeCache.junkCategoryId &&
+          !item.isUserSelected);
 
   bool _auditedCleanupFile(JunkItem item) {
     try {
@@ -2417,8 +2425,10 @@ class DiskCleanerService {
     bool Function(String categoryId, CleanerPathRule rule)? ruleFilter,
   }) async {
     if (_activeScan != null) throw CleanerScanBusyError();
-    if (!CleanerPaths.isSupported) {
-      throw StateError('DiskCleanerService is supported on Windows and macOS.');
+    if (!CleanerPaths.isJunkScanSupported) {
+      throw StateError(
+        'DiskCleanerService junk scans are supported on Windows, macOS and Linux.',
+      );
     }
 
     final selected = _resolveCategories(categoryIds);

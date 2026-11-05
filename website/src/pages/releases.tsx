@@ -10,6 +10,7 @@ import {
   DownloadSimple,
   GithubLogo,
   Lightning,
+  LinuxLogo,
   Sparkle,
   Wrench,
   WindowsLogo,
@@ -96,7 +97,14 @@ function Downloads({ release }: { release: Release }) {
       </h4>
       <ul className="mt-3 flex flex-wrap gap-2">
         {release.assets.map((a) => {
-          const PlatformIcon = a.platform === "windows" ? WindowsLogo : a.platform === "macos" ? AppleLogo : AndroidLogo;
+          const PlatformIcon =
+            a.platform === "windows"
+              ? WindowsLogo
+              : a.platform === "macos"
+                ? AppleLogo
+                : a.platform === "linux"
+                  ? LinuxLogo
+                  : AndroidLogo;
           return (
             <li key={a.name}>
               <a

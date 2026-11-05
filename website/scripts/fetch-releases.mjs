@@ -81,6 +81,15 @@ function describeAsset(name) {
   if (lower.endsWith(".msi")) return { platform: "windows", label: "Installer", ext: "msi" };
   if (lower.endsWith(".msix")) return { platform: "windows", label: "MSIX", ext: "msix" };
   if (lower.endsWith(".dmg")) return { platform: "macos", label: "macOS DMG", ext: "dmg" };
+  if (lower.includes("linux") && (lower.endsWith(".deb") || lower.endsWith(".tar.gz"))) {
+    // The ubuntu22.04 build links libmpv1; the default one targets Debian 12+ / Ubuntu 24.04+.
+    const legacy = lower.includes("ubuntu22.04");
+    const ext = lower.endsWith(".deb") ? "deb" : "tar.gz";
+    const label = ext === "deb"
+      ? (legacy ? "Ubuntu 22.04 (.deb)" : "Debian 12+ / Ubuntu 24.04+ (.deb)")
+      : (legacy ? "Linux portable (Ubuntu 22.04)" : "Linux portable");
+    return { platform: "linux", label, ext };
+  }
   if (lower.endsWith(".apk")) {
     const arch = lower.match(/(arm64-v8a|armeabi-v7a|x86_64)/)?.[1] ?? "universal";
     return { platform: "android", label: `APK ${arch}`, ext: "apk" };

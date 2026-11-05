@@ -40,6 +40,7 @@ class CleanerQuickClean {
     'package_download_cache',
     'electron_cache',
     CleanerXcodeCache.categoryId,
+    CleanerXcodeCache.junkCategoryId,
     ...CleanerAuditedRules.cleanableIds,
   };
 
@@ -124,18 +125,23 @@ class CleanerQuickClean {
       'windows_temp' => tempMinAge,
       'system_cache' ||
       'package_download_cache' => CleanerCacheRules.downloadMinAge,
-      CleanerXcodeCache.categoryId => CleanerXcodeCache.minAge,
+      CleanerXcodeCache.categoryId ||
+      CleanerXcodeCache.junkCategoryId => CleanerXcodeCache.minAge,
       'developer_analysis_cache' ||
       'developer_download_cache' ||
+      CleanerAuditedRules.developerLogsId ||
       'electron_crash_reports' => CleanerAuditedRules.minAge,
       _ => minAge,
     };
     if (now.difference(modified) < floor) return false;
 
     final segments = _segments(item.path);
-    if (item.categoryId == CleanerXcodeCache.categoryId &&
-        !CleanerXcodeCache.isGeneratedFile(item.path)) {
-      return false;
+    if (CleanerXcodeCache.rejects(item.categoryId, item.path)) return false;
+    // Symbol trees are taken whole or not at all; the scan already aged the
+    // version folder, so name filters below must not split one.
+    if (item.categoryId == CleanerXcodeCache.junkCategoryId &&
+        CleanerXcodeCache.isDeviceSupportFile(item.path)) {
+      return true;
     }
     if (segments.any(_databaseSegments.contains)) return false;
     final name = segments.lastOrNull;
@@ -146,22 +152,12 @@ class CleanerQuickClean {
       return false;
     }
     if (CleanerAuditedRules.cleanableIds.contains(item.categoryId)) {
-      if (!CleanerAuditedRules.matchesCleanablePath(
+      // Also rechecks name-limited rules: only `*.dmp` crash reports, Gradle
+      // distribution zips (never the unpacked distribution), daemon logs.
+      return CleanerAuditedRules.matchesCleanablePath(
         item.categoryId,
         item.path,
-      )) {
-        return false;
-      }
-      if (item.categoryId == 'electron_crash_reports') {
-        return name.endsWith('.dmp');
-      }
-      if (item.path
-          .replaceAll(r'\', '/')
-          .toLowerCase()
-          .contains('/comfy desktop/download-cache/')) {
-        return const ['.7z', '.zip', '.tar.gz', '.tar.zst'].any(name.endsWith);
-      }
-      return true;
+      );
     }
     if (const {
       'system_cache',

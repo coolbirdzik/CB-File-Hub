@@ -4931,6 +4931,18 @@ class TurkishLocalizations implements AppLocalizations {
   String get diskCleanerReasonXcodeBuild =>
       'En az 7 gündür değişmeyen derleme çıktıları, ara dosyalar, indeksler ve modül önbellekleri. Önce Xcode uygulamasını kapatıp derlemeleri durdurun. Kaynaklar, paketler, arşivler ve dSYM korunur. Sonraki derleme ve indeksleme uzayabilir.';
   @override
+  String get diskCleanerCategoryXcodeJunk =>
+      'Eski Xcode önbellekleri ve cihaz sembolleri';
+  @override
+  String get diskCleanerReasonXcodeJunk =>
+      'En az 7 gündür değişmeyen Xcode indirme önbelleği ile Simulator önbellekleri ve günlükleri, ayrıca 90 gündür değişmeyen cihaz hata ayıklama sembolleri (DeviceSupport); her platformun en yeni sembol seti korunur. Önce Xcode ve Simulator uygulamalarını kapatın. Projeler, arşivler, simülatörler ve içindeki uygulamalar korunur.';
+  @override
+  String get cleanerSmartCleanKindDeviceSymbols =>
+      'Cihaz hata ayıklama sembolleri';
+  @override
+  String get cleanerSmartCleanKindDeviceSymbolsInfo =>
+      "Xcode'un hata ayıklamak için iPhone, iPad, Apple Watch, Apple TV veya Vision Pro'dan kopyaladığı semboller. Her işletim sistemi sürümü bütün olarak silinir ya da korunur; cihaz bir sonraki hata ayıklamada kullanıldığında Xcode bunları yeniden kopyalar (birkaç dakika sürer).";
+  @override
   String get cleanerOldFilesTitle => 'Eski indirmeler — yalnızca inceleme';
   @override
   String get cleanerOldFilesDescription =>
@@ -6707,13 +6719,18 @@ class TurkishLocalizations implements AppLocalizations {
       'Geliştirici analiz ve derleme önbellekleri';
   @override
   String get cleanerDeveloperAnalysisReason =>
-      'En az 7 gündür değişmeyen Dart analiz, C/C++ önceden derlenmiş başlık ve Go derleme önbellekleri. Önce düzenleyicileri, dil sunucularını ve derlemeleri kapatın. Sonraki analiz veya derleme daha uzun sürebilir.';
+      'En az 7 gündür değişmeyen Dart analiz, C/C++ önceden derlenmiş başlık, Go ve Gradle derleme önbellekleri. Önce düzenleyicileri, dil sunucularını ve derlemeleri kapatın. Sonraki analiz veya derleme daha uzun sürebilir.';
   @override
   String get cleanerDeveloperDownloadsTitle =>
       'Geliştirici araçlarının indirmeleri';
   @override
   String get cleanerDeveloperDownloadsReason =>
       'En az 7 gündür değişmeyen geliştirici aracı indirme önbellekleri. Önce kurulumları, güncellemeleri ve derlemeleri tamamlayın. Sonraki kurulumlar internet gerektirebilir; yüklü eklentiler, ortamlar ve modeller korunur.';
+  @override
+  String get cleanerDeveloperLogsTitle => 'Geliştirici araçlarının günlükleri';
+  @override
+  String get cleanerDeveloperLogsReason =>
+      'En az 7 gündür değişmeyen düzenleyici oturum günlükleri (VS Code, Cursor ve benzerleri), npm hata ayıklama günlükleri ve Gradle/Kotlin daemon günlükleri. Sorun gidermek için hâlâ gereken günlükleri saklayın. Ayarlar, eklentiler ve projeler korunur.';
   @override
   String get cleanerElectronCrashTitle => 'Electron çökme raporları';
   @override

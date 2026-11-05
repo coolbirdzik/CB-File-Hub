@@ -160,15 +160,19 @@ enum _TreePreset { none, largeFiles, logsAndCaches, installers }
 
 enum _CleanerSubFeature { smartClean, diskCleaner, appInsights, appLeftovers }
 
-/// Disk usage and App Insights need the Windows/macOS scanners; Linux only
-/// has the leftover app data page.
+/// Disk usage and App Insights need the Windows/macOS scanners; Linux has
+/// Smart Clean and the leftover app data page.
 bool get _hasDiskTools => defaultTargetPlatform != TargetPlatform.linux;
+
+/// Smart Clean only needs the per-user rule scan, which Linux has too.
+bool get _hasSmartClean =>
+    _hasDiskTools || defaultTargetPlatform == TargetPlatform.linux;
 
 bool get _hasAppInsights =>
     defaultTargetPlatform != TargetPlatform.macOS &&
     defaultTargetPlatform != TargetPlatform.linux;
 
-_CleanerSubFeature get _initialSubFeature => _hasDiskTools
+_CleanerSubFeature get _initialSubFeature => _hasSmartClean
     ? _CleanerSubFeature.smartClean
     : _CleanerSubFeature.appLeftovers;
 
@@ -418,7 +422,11 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
         final List<InstalledAppInfo> apps;
         if (Platform.isWindows) {
           apps = (await _loadInstalledAppInventory()).apps;
-        } else if (Platform.isMacOS) {
+        } else if (Platform.isMacOS ||
+            // Widget tests on a Linux host keep the default (non-Linux)
+            // target platform and must not read the host's app inventory.
+            (Platform.isLinux &&
+                defaultTargetPlatform == TargetPlatform.linux)) {
           apps = (await PosixAppInventoryLoader(
             environment: Map<String, String>.from(Platform.environment),
             operatingSystem: Platform.operatingSystem,
@@ -517,7 +525,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     });
     _loadSetup();
     // Read ahead so Smart Clean's scan never waits on the registry.
-    if (_hasDiskTools) unawaited(_smartCleanInstalledApps());
+    if (_hasSmartClean) unawaited(_smartCleanInstalledApps());
     _agentActivitySub = _service.agentActivityStream.listen(_onAgentActivity);
   }
 
@@ -2173,7 +2181,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
         valueListenable: _subFeatureListenable,
         builder: (context, feature, child) {
           final destinations = <CleanerUtilityDestination>[
-            if (_hasDiskTools)
+            if (_hasSmartClean)
               CleanerUtilityDestination(
                 id: _CleanerSubFeature.smartClean.name,
                 title: l.cleanerSmartCleanTitle,
@@ -2247,7 +2255,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
                 ),
                 RepaintBoundary(
                   key: const ValueKey<String>('cleaner-smart-clean-pane'),
-                  child: _hasDiskTools
+                  child: _hasSmartClean
                       ? _buildSmartCleanFeature(l)
                       : const SizedBox.shrink(),
                 ),
@@ -4742,7 +4750,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
                           : PhosphorIconsLight.recycle,
                       label: _selectedCleanMode == _CleanDeleteMode.permanent
                           ? l.diskCleanerPermanentDeleteLabel
-                          : (Platform.isMacOS
+                          : (!Platform.isWindows
                                 ? l.trashBin
                                 : l.diskCleanerRecycleBinLabel),
                     ),
@@ -5076,6 +5084,8 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
         return l.diskCleanerCategoryElectronCache;
       case 'xcode_build_cache':
         return l.diskCleanerCategoryXcodeBuild;
+      case 'xcode_junk':
+        return l.diskCleanerCategoryXcodeJunk;
       case 'old_downloads_review':
         return l.cleanerOldFilesTitle;
       default:
@@ -5117,6 +5127,8 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
         return l.diskCleanerReasonElectronCache;
       case 'xcode_build_cache':
         return l.diskCleanerReasonXcodeBuild;
+      case 'xcode_junk':
+        return l.diskCleanerReasonXcodeJunk;
       case 'old_downloads_review':
         return l.cleanerOldFilesDescription;
       default:
@@ -5167,7 +5179,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     _cleanProgress.value = _CleanProgressSnapshot(
       status: permanent
           ? l.diskCleanerPermanentlyDeleting
-          : (Platform.isMacOS
+          : (!Platform.isWindows
                 ? l.moveToTrash
                 : l.diskCleanerMovingToRecycleBin),
     );
@@ -5196,7 +5208,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
             currentPath: currentPath ?? '',
             status: permanent
                 ? l.diskCleanerPermanentlyDeleting
-                : (Platform.isMacOS
+                : (!Platform.isWindows
                       ? l.moveToTrash
                       : l.diskCleanerMovingToRecycleBin),
           );
@@ -5524,7 +5536,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     final fileName = _fileBasename(details.item.path);
     final actionLabel = details.permanent
         ? l.diskCleanerPermanentDeleteLabel
-        : (Platform.isMacOS ? l.trashBin : l.diskCleanerRecycleBinLabel);
+        : (!Platform.isWindows ? l.trashBin : l.diskCleanerRecycleBinLabel);
     final reasonText = details.isInUse
         ? l.diskCleanerFileInUse
         : details.canRetryAsAdministrator
@@ -5632,7 +5644,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
         currentPath: prev.currentPath,
         status: details.permanent
             ? l.diskCleanerPermanentlyDeleting
-            : (Platform.isMacOS
+            : (!Platform.isWindows
                   ? l.moveToTrash
                   : l.diskCleanerMovingToRecycleBin),
       );
@@ -6191,7 +6203,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
                     icon: const Icon(PhosphorIconsLight.trash, size: 16),
                     label: Text('${l.open} ${l.trashBin}'),
                   ),
-                if (_cleanedItems.isNotEmpty && !Platform.isMacOS)
+                if (_cleanedItems.isNotEmpty && Platform.isWindows)
                   FilledButton.icon(
                     style: FilledButton.styleFrom(
                       backgroundColor: Colors.red.shade700,
@@ -6222,10 +6234,10 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
   }
 
   static String _trashAction(AppLocalizations l) =>
-      Platform.isMacOS ? l.moveToTrash : l.diskCleanerMoveToRecycleBin;
+      !Platform.isWindows ? l.moveToTrash : l.diskCleanerMoveToRecycleBin;
 
   static String _trashActionWithSize(AppLocalizations l, String size) =>
-      Platform.isMacOS
+      !Platform.isWindows
       ? '${l.moveToTrash} ($size)'
       : l.diskCleanerMoveToRecycleBinButton(size);
 
@@ -7038,6 +7050,8 @@ class _TreeRowState extends State<_TreeRow> {
         return context.tr.diskCleanerCategoryElectronCache;
       case 'xcode_build_cache':
         return context.tr.diskCleanerCategoryXcodeBuild;
+      case 'xcode_junk':
+        return context.tr.diskCleanerCategoryXcodeJunk;
       default:
         return CleanerAuditLabels.title(context.tr, categoryId) ??
             context.tr.jlJunk;
@@ -7583,6 +7597,8 @@ class _FlatTreeRowWidgetState extends State<_FlatTreeRowWidget> {
         return context.tr.diskCleanerCategoryElectronCache;
       case 'xcode_build_cache':
         return context.tr.diskCleanerCategoryXcodeBuild;
+      case 'xcode_junk':
+        return context.tr.diskCleanerCategoryXcodeJunk;
       default:
         return CleanerAuditLabels.title(context.tr, categoryId) ??
             context.tr.jlJunk;

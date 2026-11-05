@@ -42,15 +42,21 @@ class CleanerPathSafety {
     bool recycleBinItem = false,
   }) {
     if (CleanerSystemProtection.isProtected(absolutePath)) return false;
-    if (Platform.isMacOS) {
+    if (Platform.isMacOS || Platform.isLinux) {
       if (recycleBinItem) return false;
-      if (!isMacosPathSafeToDelete(absolutePath, Platform.environment)) {
+      final os = Platform.operatingSystem;
+      if (!isPosixPathSafeToDelete(
+        absolutePath,
+        Platform.environment,
+        operatingSystem: os,
+      )) {
         return false;
       }
       try {
-        return isMacosPathSafeToDelete(
+        return isPosixPathSafeToDelete(
           File(absolutePath).resolveSymbolicLinksSync(),
           Platform.environment,
+          operatingSystem: os,
         );
       } catch (_) {
         return false;
@@ -94,14 +100,25 @@ class CleanerPathSafety {
   static bool isMacosPathSafeToDelete(
     String path,
     Map<String, String> environment,
-  ) {
+  ) => isPosixPathSafeToDelete(path, environment, operatingSystem: 'macos');
+
+  /// Whether [path] lies under a cleanable rule root of [operatingSystem]
+  /// (`macos` or `linux`), resolved against [environment].
+  static bool isPosixPathSafeToDelete(
+    String path,
+    Map<String, String> environment, {
+    required String operatingSystem,
+  }) {
     if (!path.startsWith('/') ||
         path.split('/').contains('..') ||
         path.contains('*') ||
-        path.contains('?')) {
+        path.contains('?') ||
+        CleanerSystemProtection.isProtected(path)) {
       return false;
     }
-    for (final category in CleanerCategories.all(operatingSystem: 'macos')) {
+    for (final category in CleanerCategories.all(
+      operatingSystem: operatingSystem,
+    )) {
       if (category.reviewOnly) continue;
       for (final rule in category.rules) {
         final base = WindowsKnownFolders.resolvePosix(rule.source, environment);

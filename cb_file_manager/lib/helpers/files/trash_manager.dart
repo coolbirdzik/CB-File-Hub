@@ -568,6 +568,106 @@ class TrashManager {
     }
   }
 
+  /// `gio trash` (GLib, present on GNOME/most desktops) or `trash-put`
+  /// (trash-cli), both freedesktop Trash implementations taking many paths.
+  /// Looked up once on PATH; null when neither is installed.
+  static List<String>? _linuxTrashCommand;
+  static bool _linuxTrashLookedUp = false;
+
+  static List<String>? _linuxTrashTool() {
+    if (_linuxTrashLookedUp) return _linuxTrashCommand;
+    _linuxTrashLookedUp = true;
+    final dirs = (Platform.environment['PATH'] ?? '/usr/bin:/bin').split(':');
+    String? find(String name) {
+      for (final dir in dirs) {
+        if (dir.isEmpty) continue;
+        final candidate = '$dir/$name';
+        if (File(candidate).existsSync()) return candidate;
+      }
+      return null;
+    }
+
+    final gio = find('gio');
+    if (gio != null) return _linuxTrashCommand = [gio, 'trash', '--'];
+    final trashPut = find('trash-put');
+    if (trashPut != null) return _linuxTrashCommand = [trashPut, '--'];
+    return null;
+  }
+
+  /// Linux batches: one trash process per chunk instead of one per file.
+  /// Both tools keep going past a failed path and exit non-zero, so success
+  /// is read back per path: a path that no longer exists was moved.
+  Future<Set<String>> _linuxTrashBatched(
+    List<String> command,
+    List<String> filePaths, {
+    required int chunkSize,
+    void Function(String currentPath, int done, int total)? onChunkStart,
+    void Function(int done, int total)? onChunkDone,
+    void Function(String path, Object error)? onError,
+  }) async {
+    // Stay far below ARG_MAX (often 2 MB, but 128 KB per argument string on
+    // some kernels) so a chunk of long cache paths never fails to spawn.
+    const maxChunkChars = 96 * 1024;
+    final size = chunkSize.clamp(1, 200);
+    final succeeded = <String>{};
+    var start = 0;
+    while (start < filePaths.length) {
+      var end = start;
+      var chars = 0;
+      while (end < filePaths.length &&
+          end - start < size &&
+          (end == start || chars + filePaths[end].length < maxChunkChars)) {
+        chars += filePaths[end].length + 1;
+        end++;
+      }
+      final chunk = filePaths.sublist(start, end);
+      onChunkStart?.call(chunk.first, start, filePaths.length);
+      final present = <String>[];
+      for (final path in chunk) {
+        if (FileSystemEntity.typeSync(path, followLinks: false) ==
+            FileSystemEntityType.notFound) {
+          onError?.call(path, FileSystemException('Not found', path));
+        } else {
+          present.add(path);
+        }
+      }
+      var detail = '';
+      if (present.isNotEmpty) {
+        try {
+          final result = await Process.run(command.first, [
+            ...command.skip(1),
+            ...present,
+          ]);
+          if (result.exitCode != 0) detail = '${result.stderr}'.trim();
+        } catch (error) {
+          detail = '$error';
+        }
+      }
+      for (final path in present) {
+        if (FileSystemEntity.typeSync(path, followLinks: false) ==
+            FileSystemEntityType.notFound) {
+          succeeded.add(path);
+        } else {
+          onError?.call(
+            path,
+            FileSystemException(
+              detail.isEmpty ? 'Could not move to Trash' : detail,
+              path,
+            ),
+          );
+        }
+      }
+      if (detail.isNotEmpty) {
+        AppLogger.warning(
+          '[TrashManager] Linux Trash reported failures: $detail',
+        );
+      }
+      onChunkDone?.call(end, filePaths.length);
+      start = end;
+    }
+    return succeeded;
+  }
+
   /// Move multiple files to trash.
   ///
   /// On Windows, this uses a single native `IFileOperation` batch call which
@@ -623,6 +723,20 @@ class TrashManager {
         onChunkDone?.call(end, filePaths.length);
       }
       return succeeded;
+    }
+
+    if (Platform.isLinux) {
+      final tool = _linuxTrashTool();
+      if (tool != null) {
+        return _linuxTrashBatched(
+          tool,
+          filePaths,
+          chunkSize: chunkSize,
+          onChunkStart: onChunkStart,
+          onChunkDone: onChunkDone,
+          onError: onError,
+        );
+      }
     }
 
     final succeeded = <String>{};

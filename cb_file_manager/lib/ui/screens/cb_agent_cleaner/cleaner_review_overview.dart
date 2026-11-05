@@ -429,6 +429,7 @@ class _CleanerReviewOverviewState extends State<CleanerReviewOverview> {
         'package_download_cache' => l.diskCleanerCategoryPackageDownloads,
         'electron_cache' => l.diskCleanerCategoryElectronCache,
         'xcode_build_cache' => l.diskCleanerCategoryXcodeBuild,
+        'xcode_junk' => l.diskCleanerCategoryXcodeJunk,
         _ =>
           CleanerAuditLabels.title(l, group.categoryId) ??
               group.representative.name,

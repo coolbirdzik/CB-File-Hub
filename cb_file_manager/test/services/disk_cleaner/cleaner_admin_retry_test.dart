@@ -136,6 +136,34 @@ void main() {
     },
   );
 
+  test(
+    'a folder picked in the disk tree under an Xcode cache rule is cleaned',
+    () async {
+      final root = await Directory.systemTemp.createTemp('cb-cleaner-xcode-');
+      addTearDown(() => root.delete(recursive: true));
+      final cache = Directory('${root.path}/Library/Caches/com.apple.dt.Xcode');
+      await File('${cache.path}/fsCachedData/blob').create(recursive: true);
+      final trash = _Trash();
+      final service = DiskCleanerService.forTesting(
+        fullDiskScanSpawner: spawnFullDiskScan,
+        trashManager: trash,
+      );
+      final result = await service.cleanJunk(
+        items: [
+          JunkItem(
+            path: cache.path,
+            sizeBytes: 1,
+            categoryId: 'xcode_junk',
+            isUserSelected: true,
+          ),
+        ],
+        permanent: false,
+      );
+      expect(result.skippedUnsafe, isEmpty);
+      expect(trash.attempts.expand((attempt) => attempt.paths), [cache.path]);
+    },
+  );
+
   for (final permanent in [false, true]) {
     test(
       'system protection cannot be bypassed by manual selection or admin retry ($permanent)',

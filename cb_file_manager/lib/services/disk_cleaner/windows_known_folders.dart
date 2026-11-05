@@ -12,7 +12,9 @@ class WindowsKnownFolders {
   WindowsKnownFolders._();
 
   static String? resolve(PathSource source) {
-    if (Platform.isMacOS) return resolvePosix(source, Platform.environment);
+    if (Platform.isMacOS || Platform.isLinux) {
+      return resolvePosix(source, Platform.environment);
+    }
     switch (source.kind) {
       case PathSourceKind.absolute:
         final abs = source.absolutePath;

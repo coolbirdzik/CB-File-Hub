@@ -4609,6 +4609,16 @@ class ChineseLocalizations implements AppLocalizations {
   String get diskCleanerReasonXcodeBuild =>
       '至少 7 天未修改的构建产物、中间文件、索引和模块缓存。请先关闭 Xcode 并停止构建。保留源码、软件包检出、归档和 dSYM。下次构建和索引可能更慢。';
   @override
+  String get diskCleanerCategoryXcodeJunk => '旧 Xcode 缓存和设备符号';
+  @override
+  String get diskCleanerReasonXcodeJunk =>
+      '至少 7 天未修改的 Xcode 下载缓存、模拟器缓存和日志，以及 90 天未修改的设备调试符号（DeviceSupport）；每个平台最新的一组符号会保留。请先关闭 Xcode 和模拟器。保留项目、归档、模拟器及其中的应用。';
+  @override
+  String get cleanerSmartCleanKindDeviceSymbols => '设备调试符号';
+  @override
+  String get cleanerSmartCleanKindDeviceSymbolsInfo =>
+      'Xcode 为调试而从 iPhone、iPad、Apple Watch、Apple TV 或 Vision Pro 复制的符号。每个系统版本要么整体删除，要么整体保留；下次用该设备调试时，Xcode 会重新复制（需要几分钟）。';
+  @override
   String get cleanerOldFilesTitle => '旧下载文件 — 仅供检查';
   @override
   String get cleanerOldFilesDescription =>
@@ -6245,12 +6255,17 @@ class ChineseLocalizations implements AppLocalizations {
   String get cleanerDeveloperAnalysisTitle => '开发工具分析和构建缓存';
   @override
   String get cleanerDeveloperAnalysisReason =>
-      '至少 7 天未更改的 Dart 分析、C/C++ 预编译头和 Go 构建缓存。请先关闭编辑器、语言服务器并停止构建。下次分析或构建可能需要更长时间。';
+      '至少 7 天未更改的 Dart 分析、C/C++ 预编译头、Go 和 Gradle 构建缓存。请先关闭编辑器、语言服务器并停止构建。下次分析或构建可能需要更长时间。';
   @override
   String get cleanerDeveloperDownloadsTitle => '开发工具下载缓存';
   @override
   String get cleanerDeveloperDownloadsReason =>
       '至少 7 天未更改的开发工具下载缓存。请先完成安装、更新和构建。下次安装可能需要联网；已安装的扩展、环境和模型将保留。';
+  @override
+  String get cleanerDeveloperLogsTitle => '开发工具日志';
+  @override
+  String get cleanerDeveloperLogsReason =>
+      '至少 7 天未更改的编辑器会话日志（VS Code、Cursor 等）、npm 调试日志以及 Gradle/Kotlin 守护进程日志。请保留排查问题仍需的日志。设置、扩展和项目将保留。';
   @override
   String get cleanerElectronCrashTitle => 'Electron 崩溃报告';
   @override

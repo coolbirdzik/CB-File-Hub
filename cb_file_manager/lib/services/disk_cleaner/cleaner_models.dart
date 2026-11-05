@@ -78,7 +78,14 @@ class PathSource {
   }
 }
 
-enum CleanerRuleScope { tree, xcodeBuildOutputs, folderSummary }
+enum CleanerRuleScope {
+  tree,
+  xcodeBuildOutputs,
+
+  /// Whole Xcode DeviceSupport version folders, all files or none.
+  xcodeDeviceSupport,
+  folderSummary,
+}
 
 /// A single rule describing a directory tree to scan and how to filter it.
 class CleanerPathRule {

@@ -7,6 +7,13 @@ abstract final class CleanerPaths {
   static bool supports(String operatingSystem) =>
       operatingSystem == 'windows' || operatingSystem == 'macos';
   static bool get isSupported => supports(Platform.operatingSystem);
+
+  /// Rule-based junk scans (Smart Clean). Linux has these without the
+  /// drive-based disk usage tools, which need volume and drive-space code.
+  static bool supportsJunkScan(String operatingSystem) =>
+      supports(operatingSystem) || operatingSystem == 'linux';
+  static bool get isJunkScanSupported =>
+      supportsJunkScan(Platform.operatingSystem);
   static String get defaultRoot => Platform.isWindows ? r'C:\' : '/';
   static bool isPosix(String path) => path.startsWith('/');
   static String key(String path) {

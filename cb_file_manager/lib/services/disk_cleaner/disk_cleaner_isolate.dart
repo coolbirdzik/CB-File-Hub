@@ -181,6 +181,24 @@ void _scanWorker(_SpawnArgs args) async {
       }
       continue;
     }
+    if (rule.scope == CleanerRuleScope.xcodeDeviceSupport) {
+      for (final folder in CleanerXcodeCache.discoverStaleDeviceSupport(
+        rule.basePath,
+        warnings,
+        minAge: rule.minAge ?? CleanerXcodeCache.deviceSupportMinAge,
+      )) {
+        // Discovery already aged the whole folder; a per-file age or glob
+        // here could take only part of it.
+        expandedRules.add(
+          ResolvedRule(
+            categoryId: rule.categoryId,
+            basePath: folder,
+            emptyOnly: rule.emptyOnly,
+          ),
+        );
+      }
+      continue;
+    }
     if (rule.scope != CleanerRuleScope.xcodeBuildOutputs) {
       expandedRules.add(rule);
       continue;
@@ -328,8 +346,7 @@ void _scanWorker(_SpawnArgs args) async {
           final modified = DateTime.fromMillisecondsSinceEpoch(hit.modifiedMs);
           for (final index in hit.ruleIndices) {
             final categoryId = group.rules[index].source.categoryId;
-            if (categoryId == CleanerXcodeCache.categoryId &&
-                !CleanerXcodeCache.isGeneratedFile(hit.path)) {
+            if (CleanerXcodeCache.rejects(categoryId, hit.path)) {
               continue;
             }
             final seen = seenByCategory.putIfAbsent(
@@ -399,8 +416,10 @@ void _scanWorker(_SpawnArgs args) async {
           final fileName = _basename(entity.path);
           matchingRules.clear();
           for (final candidate in group.rules) {
-            if (candidate.source.categoryId == CleanerXcodeCache.categoryId &&
-                !CleanerXcodeCache.isGeneratedFile(entity.path)) {
+            if (CleanerXcodeCache.rejects(
+              candidate.source.categoryId,
+              entity.path,
+            )) {
               continue;
             }
             if (_matchesRule(candidate, entityPath, fileName)) {

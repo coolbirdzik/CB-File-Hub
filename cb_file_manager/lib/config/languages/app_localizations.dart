@@ -2054,6 +2054,10 @@ abstract class AppLocalizations {
   String get cleanerSmartCleanImpactRedownload;
   String get diskCleanerCategoryXcodeBuild;
   String get diskCleanerReasonXcodeBuild;
+  String get diskCleanerCategoryXcodeJunk;
+  String get diskCleanerReasonXcodeJunk;
+  String get cleanerSmartCleanKindDeviceSymbols;
+  String get cleanerSmartCleanKindDeviceSymbolsInfo;
   String get cleanerOldFilesTitle;
   String get cleanerOldFilesDescription;
   String cleanerOldFilesCount(int count);
@@ -2067,6 +2071,8 @@ abstract class AppLocalizations {
   String get cleanerDeveloperAnalysisReason;
   String get cleanerDeveloperDownloadsTitle;
   String get cleanerDeveloperDownloadsReason;
+  String get cleanerDeveloperLogsTitle;
+  String get cleanerDeveloperLogsReason;
   String get cleanerElectronCrashTitle;
   String get cleanerElectronCrashReason;
   String get cleanerCppDatabaseReason;

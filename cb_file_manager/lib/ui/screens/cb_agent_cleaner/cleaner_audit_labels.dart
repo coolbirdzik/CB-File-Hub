@@ -4,6 +4,7 @@ abstract final class CleanerAuditLabels {
   static String? title(AppLocalizations l, String? id) => switch (id) {
     'developer_analysis_cache' => l.cleanerDeveloperAnalysisTitle,
     'developer_download_cache' => l.cleanerDeveloperDownloadsTitle,
+    'developer_logs' => l.cleanerDeveloperLogsTitle,
     'electron_crash_reports' => l.cleanerElectronCrashTitle,
     'cpp_database_review' => l.cleanerReviewTitle('C/C++'),
     'vcpkg_artifacts_review' => l.cleanerReviewTitle('vcpkg'),
@@ -19,6 +20,7 @@ abstract final class CleanerAuditLabels {
   static String? reason(AppLocalizations l, String? id) => switch (id) {
     'developer_analysis_cache' => l.cleanerDeveloperAnalysisReason,
     'developer_download_cache' => l.cleanerDeveloperDownloadsReason,
+    'developer_logs' => l.cleanerDeveloperLogsReason,
     'electron_crash_reports' => l.cleanerElectronCrashReason,
     'cpp_database_review' => l.cleanerCppDatabaseReason,
     'vcpkg_artifacts_review' => l.cleanerVcpkgReason,

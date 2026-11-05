@@ -25,16 +25,21 @@ abstract final class CleanerCacheRules {
         ),
       ],
     ),
-    _downloads(isMacOS: false),
-    _electron(isMacOS: false),
+    _downloads('windows'),
+    _electron('windows'),
   ];
 
   static final List<CleanerCategory> macos = [
-    _downloads(isMacOS: true),
-    _electron(isMacOS: true),
+    _downloads('macos'),
+    _electron('macos'),
   ];
 
-  static CleanerCategory _downloads({required bool isMacOS}) => CleanerCategory(
+  static final List<CleanerCategory> linux = [
+    _downloads('linux'),
+    _electron('linux'),
+  ];
+
+  static CleanerCategory _downloads(String os) => CleanerCategory(
     id: 'package_download_cache',
     displayName: 'Package download caches',
     description:
@@ -42,12 +47,19 @@ abstract final class CleanerCacheRules {
     safety: CleanerSafety.safe,
     defaultEnabled: true,
     rules: [
-      if (isMacOS) ...[
+      if (os == 'macos') ...[
         _download('HOME', '.npm/_cacache', 'npm'),
         _download('HOME', 'Library/Caches/pip', 'pip'),
         _download('HOME', '.cargo/registry/cache', 'Cargo'),
         _download('HOME', '.local/share/NuGet/v3-cache', 'NuGet'),
         _download('HOME', 'Library/Caches/composer/files', 'Composer'),
+      ] else if (os == 'linux') ...[
+        _download('HOME', '.npm/_cacache', 'npm'),
+        _download('HOME', '.cache/pip', 'pip'),
+        _download('HOME', '.cargo/registry/cache', 'Cargo'),
+        _download('HOME', '.local/share/NuGet/v3-cache', 'NuGet'),
+        _download('HOME', '.cache/composer/files', 'Composer'),
+        _download('HOME', '.composer/cache/files', 'Composer'),
       ] else ...[
         _download('LOCALAPPDATA', 'npm-cache/_cacache', 'npm'),
         _download('APPDATA', 'npm-cache/_cacache', 'npm'),
@@ -149,7 +161,7 @@ abstract final class CleanerCacheRules {
     'code/cacheddata',
   };
 
-  static CleanerCategory _electron({required bool isMacOS}) => CleanerCategory(
+  static CleanerCategory _electron(String os) => CleanerCategory(
     id: 'electron_cache',
     displayName: 'Electron app caches',
     description:
@@ -162,17 +174,19 @@ abstract final class CleanerCacheRules {
           ..._electronCacheFolders,
           if (editorFolders.contains(folder)) 'CachedData',
         ])
-          if (isMacOS ||
+          if (os != 'windows' ||
               !_existingWindowsAppCache.contains(
                 '$folder/$cache'.toLowerCase(),
               ))
             CleanerPathRule(
-              source: isMacOS
-                  ? PathSource.env(
-                      'HOME',
-                      'Library/Application Support/$folder/$cache',
-                    )
-                  : PathSource.env('APPDATA', '$folder/$cache'),
+              source: switch (os) {
+                'macos' => PathSource.env(
+                  'HOME',
+                  'Library/Application Support/$folder/$cache',
+                ),
+                'linux' => PathSource.env('HOME', '.config/$folder/$cache'),
+                _ => PathSource.env('APPDATA', '$folder/$cache'),
+              },
               excludeGlobs: _locks,
               minAge: const Duration(days: 1),
               appOwnerHints: hints,
@@ -209,7 +223,7 @@ abstract final class CleanerCacheRules {
   // comparing every rule again for every file in a large npm/pip cache.
   static final _patterns = () {
     final result = <String, Map<String, List<List<String>>>>{};
-    for (final category in [...windows, ...macos]) {
+    for (final category in [...windows, ...macos, ...linux]) {
       final byFolder = result.putIfAbsent(category.id, () => {});
       for (final rule in category.rules) {
         final parts = _segments(rule.source.relative);

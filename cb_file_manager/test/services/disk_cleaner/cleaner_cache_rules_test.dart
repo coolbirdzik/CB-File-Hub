@@ -12,7 +12,7 @@ void main() {
   test(
     'new rule roots are narrow, age limited and never scan a whole profile',
     () {
-      for (final os in ['windows', 'macos']) {
+      for (final os in ['windows', 'macos', 'linux']) {
         final categories = CleanerCategories.all(operatingSystem: os);
         final quickIds = CleanerQuickClean.categoryIds(operatingSystem: os);
         final electronPaths = <String>{};

@@ -227,11 +227,9 @@ android: clean deps
 android-aab: clean deps
     cd {{project_dir}} && {{flutter}} build appbundle --release {{dart_env}}
 
-# Build Linux
-linux: clean deps
-    cd {{project_dir}} && {{flutter}} build linux --release {{dart_env}}
-    mkdir -p {{build_dir}}/linux/portable
-    cd {{build_dir}}/linux/x64/release && tar -czf ../portable/CBFileHub-Linux.tar.gz bundle/
+# Build Linux portable tar.gz and .deb (Debian/Ubuntu; .deb needs dpkg-deb)
+linux:
+    bash scripts/build.sh linux
 
 # Build macOS DMG (signed with "CB File Hub Signing" if in the keychain, else ad-hoc; output: build/macos/dmg/*.dmg)
 macos:

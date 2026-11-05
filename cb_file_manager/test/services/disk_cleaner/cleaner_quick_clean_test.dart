@@ -38,6 +38,7 @@ void main() {
       'electron_cache',
       'developer_analysis_cache',
       'developer_download_cache',
+      'developer_logs',
       'electron_crash_reports',
     ]);
     // macOS app_cache covers all of ~/Library/Caches and is `careful`.
@@ -47,6 +48,7 @@ void main() {
       'package_download_cache',
       'electron_cache',
       'xcode_build_cache',
+      'xcode_junk',
     ]);
     expect(
       eligible(item('recycle_bin', r'C:\$Recycle.Bin\S-1\$R1.txt')),
