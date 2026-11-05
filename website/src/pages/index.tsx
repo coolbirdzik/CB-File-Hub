@@ -8,6 +8,33 @@ import { Bento } from "../components/Bento";
 import { Platforms } from "../components/Platforms";
 import { Download } from "../components/Download";
 import { pageTitle } from "../components/lang";
+import { links } from "../components/site";
+
+const description =
+  "CB File Hub is an all-in-one file manager for Windows, macOS and Android: tabs and split panes, an SSH client with SFTP and tunnels, SMB, FTP and WebDAV, an AI file assistant, a disk cleaner, photo and video library, file tags and torrents.";
+
+// Structured data so search engines can show CB File Hub as an app with its platforms.
+const softwareApp = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "CB File Hub",
+  url: "https://coolbird.net/",
+  description,
+  applicationCategory: "UtilitiesApplication",
+  operatingSystem: links.linux ? "Windows, macOS, Linux, Android" : "Windows, macOS, Android",
+  image: "https://coolbird.net/media/hero-browser.webp",
+  downloadUrl: "https://coolbird.net/#download",
+  featureList: [
+    "Tabbed file manager with split panes",
+    "SSH client, SFTP transfers and SSH tunnels",
+    "SMB, FTP and WebDAV network shares",
+    "AI file assistant with local GGUF models",
+    "Disk cleaner with Smart Clean",
+    "Photo and video library",
+    "Hierarchical file tags",
+    "Torrent library",
+  ],
+};
 
 export default function IndexPage() {
   return (
@@ -24,10 +51,8 @@ export default function IndexPage() {
 
 export const Head: HeadFC = () => (
   <>
-    <Seo
-      title={pageTitle.en}
-      description="CB File Hub brings files, media, tags, network locations and an AI assistant into one focused workspace for Windows and Android."
-    />
+    <Seo title={pageTitle.en} description={description} />
+    <script type="application/ld+json">{JSON.stringify(softwareApp)}</script>
     <link rel="preload" as="image" href="/media/hero-browser.webp" />
   </>
 );

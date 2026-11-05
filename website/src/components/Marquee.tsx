@@ -1,10 +1,13 @@
 import * as React from "react";
 import {
   CloudArrowUp,
+  Broom,
   Cpu,
+  FileArchive,
   FilePdf,
   Globe,
   LockKey,
+  Path,
   PictureInPicture,
   ShareNetwork,
   Tag,
@@ -20,6 +23,9 @@ const items: Array<Copy & { icon: Icon }> = [
   { icon: LockKey, en: "SFTP", vi: "SFTP" },
   { icon: Globe, en: "WebDAV", vi: "WebDAV" },
   { icon: TerminalWindow, en: "SSH terminal", vi: "Terminal SSH" },
+  { icon: Path, en: "SSH tunnels", vi: "Tunnel SSH" },
+  { icon: FileArchive, en: "Zip, 7z and tar", vi: "Zip, 7z và tar" },
+  { icon: Broom, en: "Developer cache cleanup", vi: "Dọn cache lập trình" },
   { icon: PictureInPicture, en: "Picture-in-picture", vi: "Cửa sổ PiP" },
   { icon: FilePdf, en: "PDF preview", vi: "Xem trước PDF" },
   { icon: Tag, en: "Nested tags", vi: "Thẻ lồng nhau" },

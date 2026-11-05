@@ -1,6 +1,6 @@
 import * as React from "react";
 import { motion } from "motion/react";
-import { AppleLogo, ArrowUpRight, GooglePlayLogo, WindowsLogo, type Icon } from "@phosphor-icons/react";
+import { AppleLogo, ArrowUpRight, GooglePlayLogo, LinuxLogo, WindowsLogo, type Icon } from "@phosphor-icons/react";
 import { T } from "./lang";
 import { Reveal, SplitText, easeOut } from "./motion";
 import { links } from "./site";
@@ -61,8 +61,8 @@ export function Download() {
         <Reveal delay={0.15}>
           <p className="mx-auto mt-5 max-w-[48ch] text-lg leading-relaxed text-[#7e92a8]">
             <T
-              en="Bring your folders, media and connected places into one workspace."
-              vi="Đưa thư mục, media và các kết nối vào cùng một không gian."
+              en="Bring your folders, media, servers and connected places into one workspace."
+              vi="Đưa thư mục, media, máy chủ và các kết nối vào cùng một không gian."
             />
           </p>
         </Reveal>
@@ -77,6 +77,9 @@ export function Download() {
           <StoreButton href={links.windows} icon={WindowsLogo} small={{ en: "Download for", vi: "Tải cho" }} name="Windows" />
           <StoreButton href={links.googlePlay} icon={GooglePlayLogo} small={{ en: "Get it on", vi: "Tải trên" }} name="Google Play" />
           <StoreButton href={links.macos} icon={AppleLogo} small={{ en: "Download for", vi: "Tải cho" }} name="macOS" />
+          {links.linux && (
+            <StoreButton href={links.linux} icon={LinuxLogo} small={{ en: "Debian/Ubuntu .deb", vi: "Gói .deb Debian/Ubuntu" }} name="Linux" />
+          )}
         </motion.div>
       </div>
     </section>

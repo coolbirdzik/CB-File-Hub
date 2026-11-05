@@ -35,10 +35,11 @@ export function Seo({ title, description, path = "/" }: { title: string; descrip
       <meta name="viewport" content="width=device-width, initial-scale=1" />
       <meta name="theme-color" content="#05080d" />
       <meta property="og:type" content="website" />
-      <meta property="og:title" content="CB File Hub" />
-      <meta property="og:description" content="One place for your files, media and ideas." />
+      <meta property="og:title" content={title} />
+      <meta property="og:description" content={description} />
       <meta property="og:url" content={url} />
       <meta property="og:image" content="https://coolbird.net/media/hero-browser.webp" />
+      <meta property="og:site_name" content="CB File Hub" />
       <meta name="twitter:card" content="summary_large_image" />
       <link rel="canonical" href={url} />
       <link rel="icon" type="image/png" href="/logo-badge.png?v=2" />

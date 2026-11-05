@@ -6,8 +6,8 @@ export type Copy = { en: string; vi: string };
 const STORAGE_KEY = "cbfh-lang";
 
 const titles: Copy = {
-  en: "CB File Hub - Your files, in flow",
-  vi: "CB File Hub - Mọi tệp tin, trong tầm tay",
+  en: "CB File Hub - All-in-one file manager with SSH, SFTP and AI",
+  vi: "CB File Hub - Trình quản lý tệp tất cả trong một, có SSH, SFTP và AI",
 };
 
 type LangState = { lang: Lang; setLang: (lang: Lang) => void };

@@ -1,9 +1,10 @@
 import * as React from "react";
 import { motion, useReducedMotion, useScroll, useTransform } from "motion/react";
-import { AndroidLogo, AppleLogo, WindowsLogo } from "@phosphor-icons/react";
+import { AndroidLogo, AppleLogo, LinuxLogo, WindowsLogo } from "@phosphor-icons/react";
 import { T, useCopy } from "./lang";
 import { Reveal, SplitText } from "./motion";
 import { Eyebrow } from "./Eyebrow";
+import { links } from "./site";
 
 export function Platforms() {
   const ref = React.useRef<HTMLElement>(null);
@@ -27,8 +28,8 @@ export function Platforms() {
           <Reveal delay={0.15}>
             <p className="mt-5 max-w-[52ch] text-lg leading-relaxed text-muted">
               <T
-                en="A roomy workspace on Windows and a touch-first app on Android, with the same tabs, tags and previews."
-                vi="Không gian rộng rãi trên Windows và ứng dụng tối ưu cảm ứng trên Android, cùng tab, thẻ và xem trước quen thuộc."
+                en="A roomy workspace on Windows and macOS and a touch-first app on Android, with the same tabs, tags and previews."
+                vi="Không gian rộng rãi trên Windows và macOS, ứng dụng tối ưu cảm ứng trên Android, cùng tab, thẻ và xem trước quen thuộc."
               />
             </p>
             <ul className="mt-7 flex flex-wrap gap-3 text-sm font-semibold">
@@ -40,6 +41,12 @@ export function Platforms() {
                 <AppleLogo size={18} weight="fill" className="text-accent" />
                 macOS
               </li>
+              {links.linux && (
+                <li className="glass inline-flex h-10 items-center gap-2 rounded-full px-4">
+                  <LinuxLogo size={18} weight="fill" className="text-accent" />
+                  Linux
+                </li>
+              )}
               <li className="glass inline-flex h-10 items-center gap-2 rounded-full px-4">
                 <AndroidLogo size={18} weight="fill" className="text-accent" />
                 Android

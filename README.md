@@ -1,174 +1,93 @@
-# CB File Hub
+# CB File Hub: All-in-One File Manager for Windows, macOS, Linux and Android
 
-**Your ALL-IN-ONE file manager for Windows, macOS, Linux, and Android.**
-
-Files, media, network access, torrents, backups, storage cleanup, and AI assistance — together in one app across desktop and mobile.
+**One app for your files, servers and storage.** CB File Hub combines a tabbed file manager, an SSH client with SFTP, network shares (SMB, FTP, WebDAV), an AI file assistant, a disk cleaner, a photo and video library, file tags and a torrent library, so you do not need a separate tool for each job.
 
 [![Build and Test](https://github.com/coolbirdzik/cb-file-hub/actions/workflows/build-test.yml/badge.svg)](https://github.com/coolbirdzik/cb-file-hub/actions/workflows/build-test.yml)
 [![Build and Release](https://github.com/coolbirdzik/CB-File-Hub/actions/workflows/release.yml/badge.svg)](https://github.com/coolbirdzik/CB-File-Hub/actions/workflows/release.yml)
 
 <p align="center">
-  <img src="cb_file_manager/assets/images/logo_circle.png" alt="CB File Hub logo" width="120" />
+  <a href="https://apps.microsoft.com/detail/9nchpzkc4m5c?referrer=appbadge&mode=full"><img src="https://get.microsoft.com/images/en-us%20dark.svg" alt="Download CB File Hub from the Microsoft Store" width="200" /></a>
+  &nbsp;
+  <a href="https://play.google.com/store/apps/details?id=com.cbv.filehub"><img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" alt="Get CB File Hub on Google Play" width="220" /></a>
 </p>
 
-<table align="center">
+<p align="center">
+  <a href="https://coolbird.net">Website</a> ·
+  <a href="https://github.com/coolbirdzik/cb-file-hub/releases/latest">Download</a> ·
+  <a href="docs/index.md">Documentation</a> ·
+  <a href="README.vi.md">Tiếng Việt</a>
+</p>
+
+<p align="center">
+  <img src="screenshots/promo/desktop/01_file_browser.png" alt="CB File Hub desktop file manager with tabs, tags and file preview" />
+</p>
+
+## Features
+
+### File manager
+Tabs and tear-off windows, split panes, grid and list views with previews, pinned locations, archive browsing (zip, 7z, tar), keyboard shortcuts and a fast recursive search.
+
+### CB Agent: AI file assistant
+Ask in plain language: *"find duplicate videos"*, *"show large files from last year"*, *"tag these photos"*. The agent searches file names and document text, explains what it found and **asks before it moves, renames or deletes anything**. Use OpenAI, Anthropic, OpenRouter, Ollama or LM Studio, or run a local GGUF model on your own device with no cloud.
+
+### SSH manager and network files
+- **SSH client:** saved hosts and keys, built-in terminal, trusted hosts, connections through HTTP or SOCKS proxies.
+- **SFTP:** browse and transfer files on your servers.
+- **SSH tunnels:** local, remote and SOCKS5 port forwarding.
+- **Import:** hosts from Termius, OpenSSH, PuTTY, WinSCP, SecureCRT and Tabby.
+- **Network shares:** SMB/CIFS, FTP and WebDAV, with media streaming from network shares.
+
+### Disk cleaner
+Smart Clean removes only junk that apps can recreate: temporary files, browser and app caches, crash dumps, and developer caches (npm, pip, Cargo, Gradle, Go, Xcode). Disk usage shows a full-drive tree, and you review every item before it goes to the Recycle Bin or Trash.
+
+### Photos, videos and tags
+Gallery and video library, built-in player with picture-in-picture, image editor, albums and rule-based smart albums, and hierarchical tags you can search across every folder.
+
+### Torrents and backup
+A searchable torrent library with qBittorrent and Transmission import and built-in downloads. Back up settings and tags to Google Drive, Dropbox or OneDrive.
+
+Heavy work (disk scans, search, thumbnails, hashing, archives) runs on Rust worker threads: a full rescan of 100,000 files took **84.9 ms, 3.3× faster than TreeSize Free** in [our benchmark](docs/quality/03-rust-benchmarks.md#folder-scan-ui-comparison-with-treesize-free).
+
+## Screenshots
+
+<table>
   <tr>
-    <td align="center" valign="middle">
-      <a href="https://apps.microsoft.com/detail/9nchpzkc4m5c?referrer=appbadge&mode=full" target="_blank" rel="noopener noreferrer">
-        <img src="https://get.microsoft.com/images/en-us%20dark.svg" alt="Download from Microsoft Store" width="200" />
-      </a>
-    </td>
-    <td align="center" valign="middle">
-      <a href="https://play.google.com/store/apps/details?id=com.cbv.filehub" target="_blank" rel="noopener noreferrer">
-        <img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" alt="Get it on Google Play" width="220" />
-      </a>
-    </td>
+    <td width="50%"><img src="screenshots/promo/desktop/04_ai_search.png" alt="AI file search in the CB Agent side panel" /></td>
+    <td width="50%"><img src="screenshots/promo/desktop/05_ai_approval.png" alt="CB Agent asks for approval before changing files" /></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="screenshots/promo/desktop/10_disk_cleaner.png" alt="Disk cleaner scan results with category review" /></td>
+    <td width="50%"><img src="screenshots/promo/desktop/07_tag_management.png" alt="Hierarchical file tags and tag management" /></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="screenshots/promo/desktop/02_gallery_hub.png" alt="Photo and video gallery hub" /></td>
+    <td width="50%"><img src="screenshots/promo/desktop/11_torrent_library.png" alt="Torrent library with qBittorrent import" /></td>
   </tr>
 </table>
 
-[Website](https://coolbird.net) · [Releases](https://github.com/coolbirdzik/cb-file-hub/releases/latest) · [Documentation](docs/index.md) · [Tiếng Việt](README.vi.md)
+<p align="center">
+  <img src="screenshots/promo/mobile/01_mobile_home.png" alt="CB File Hub Android home screen" width="22%" />
+  <img src="screenshots/promo/mobile/02_mobile_grid.png" alt="CB File Hub Android file grid" width="22%" />
+  <img src="screenshots/promo/mobile/03_mobile_tabs.png" alt="CB File Hub Android tabs" width="22%" />
+  <img src="screenshots/promo/mobile/04_mobile_tags.png" alt="CB File Hub Android file tags" width="22%" />
+</p>
 
-## Platforms
+[More screenshots](screenshots/)
 
-| Platform | Get the app |
-|----------|-------------|
-| **Windows** | [Microsoft Store](https://apps.microsoft.com/detail/9nchpzkc4m5c) or [MSI / portable ZIP](https://github.com/coolbirdzik/cb-file-hub/releases/latest) |
-| **macOS** | [Universal DMG](https://github.com/coolbirdzik/cb-file-hub/releases/latest) for Apple Silicon and Intel, macOS 12+ |
-| **Linux** | [Build from source](docs/guides/04-installation.md#linux) |
+## Download
+
+| Platform | Get CB File Hub |
+|----------|-----------------|
+| **Windows** | [Microsoft Store](https://apps.microsoft.com/detail/9nchpzkc4m5c), or the [MSI installer / portable ZIP](https://github.com/coolbirdzik/cb-file-hub/releases/latest) |
+| **macOS 12+** | [Universal DMG](https://github.com/coolbirdzik/cb-file-hub/releases/latest) for Apple Silicon and Intel |
+| **Linux** | [.deb for Debian/Ubuntu, or tar.gz](https://github.com/coolbirdzik/cb-file-hub/releases/latest) |
 | **Android** | [Google Play](https://play.google.com/store/apps/details?id=com.cbv.filehub) or [APK](https://github.com/coolbirdzik/cb-file-hub/releases/latest) |
 
-## Highlights
+Some features depend on the platform; see the [installation guide](docs/guides/04-installation.md) and the [feature guides](docs/features/).
 
-- **Flexible browsing:** tabs on desktop and mobile, desktop split panes, pinned locations, and multiple file views.
-- **Media tools:** thumbnails, photo and video galleries, image editing, and built-in playback.
-- **Tags and albums:** hierarchical tags, search, curated collections, and rule-based smart albums.
-- **Network and SSH:** SMB, FTP, SFTP, WebDAV, saved hosts, keys, and an in-app terminal.
-- **CB Agent:** natural-language file search, guided organization, and cleanup review.
-- **Disk Cleaner:** scan large folders, review cleanup candidates, and manage storage on Windows, macOS, and Android.
-- **Rust acceleration:** heavy scans, search, thumbnails, hashing, and archive processing run on native worker threads. See [measured performance](#rust-powered-performance).
-- **Library tools:** torrent indexing and desktop downloads, archive browsing, settings/tag backups, and themes.
+## Build from source
 
-Features vary by platform. See the [feature guides](docs/features/) for requirements and setup.
-
-## Rust-powered performance
-
-CB File Hub uses Rust worker threads for disk scans, folder listings and sizes, recursive search, image thumbnails and editing, hashing, archives, and document text extraction.
-
-**3.3× faster full rescans than TreeSize Free in our 100,000-file benchmark:**
-
-| Application | Scan technology | Full rescan, 100,000 files | Relative speed |
-|-------------|-----------------|--------------------------:|---------------:|
-| **CB File Hub** | Rust workers + Win32 directory enumeration | **84.9 ms** | **3.3×** |
-| TreeSize Free 4.8.1.609 | NTFS MFT / two-thread filesystem traversal¹ | 283.3 ms | 1.0× (baseline) |
-
-Measured on 2026-10-22: Core i5-14600K, NVMe SSD, Windows 11; median of five alternating runs after warm-up, with warm OS caches. CB used its production Cleaner screen in a standalone release benchmark launcher. Both counted 100,000 files and 12,800,000 logical bytes. Results apply to this synthetic folder-scan workflow; whole-drive performance varies. [Timing boundaries, raw samples, screenshots, and reproduction](docs/quality/03-rust-benchmarks.md#folder-scan-ui-comparison-with-treesize-free).
-
-¹ TreeSize's listed technologies are [documented by JAM Software](https://www.jam-software.com/treesize/features.shtml); the internal scan strategy selected during this run was not instrumented.
-
-## Preview
-
-### Desktop workflow
-
-<table>
-  <tr>
-    <td colspan="4">
-      <img src="screenshots/promo/desktop/01_file_browser.png" alt="CB File Hub desktop file browser preview" />
-      <p align="center"><sub>Desktop file browsing with tabs, tags, and rich previews</sub></p>
-    </td>
-  </tr>
-  <tr>
-    <td colspan="4">
-      <img src="screenshots/promo/desktop/04_ai_search.png" alt="CB File Hub AI-assisted search preview" />
-      <p align="center"><sub>AI-assisted search beside the file browser</sub></p>
-    </td>
-  </tr>
-  <tr>
-    <td colspan="4">
-      <img src="screenshots/promo/desktop/10_disk_cleaner.png" alt="CB File Hub disk cleaner scan results" />
-      <p align="center"><sub>Disk cleanup with scan results, category review, and CB Agent guidance</sub></p>
-    </td>
-  </tr>
-  <tr>
-    <td align="center" width="50%">
-      <img src="screenshots/auto/desktop/014_showcase_tag_management_result.png" alt="CB File Hub tag management workspace" />
-      <p align="center"><sub>Tag library and tag management</sub></p>
-    </td>
-    <td align="center" width="50%">
-      <img src="screenshots/auto/desktop/ssh_workspace.png" alt="CB File Hub SSH workspace with a saved host" />
-      <p align="center"><sub>SSH workspace with saved hosts, keys, and trusted-host access</sub></p>
-    </td>
-  </tr>
-  <tr>
-    <td align="center" width="50%">
-      <img src="screenshots/auto/desktop/018_showcase_tag_tree_result.png" alt="CB File Hub hierarchical tag tree" />
-      <p align="center"><sub>Parent and child tag hierarchy</sub></p>
-    </td>
-    <td align="center" width="50%">
-      <img src="screenshots/auto/desktop/tag_assignment.png" alt="CB File Hub manage tags dialog for assigning tags to a file" />
-      <p align="center"><sub>Assign tags directly from a file context menu</sub></p>
-    </td>
-  </tr>
-  <tr>
-    <td align="center" width="50%">
-      <img src="screenshots/auto/desktop/network_connections.png" alt="CB File Hub network connections with SMB and WebDAV services" />
-      <p align="center"><sub>Network connections with SMB, WebDAV, FTP, and SFTP services</sub></p>
-    </td>
-    <td align="center" width="50%">
-      <img src="screenshots/auto/desktop/020_showcase_disk_cleaner_result.png" alt="CB File Hub disk cleaner results" />
-      <p align="center"><sub>Disk cleaner results and review workflow</sub></p>
-    </td>
-  </tr>
-</table>
-
-### Torrent library and downloads
-
-<table>
-  <tr>
-    <td width="50%"><img src="screenshots/features/torrents/en/qbittorrent.png" alt="Import qBittorrent backups with an optional confirmed cleanup of source files" /><p>Import qBittorrent backups and review optional source cleanup.</p></td>
-    <td width="50%"><img src="screenshots/features/torrents/en/client-import.png" alt="Import saved torrent files from a Transmission profile or custom folder" /><p>Import other clients from a detected profile or a custom folder.</p></td>
-  </tr>
-  <tr>
-    <td width="50%"><img src="screenshots/features/torrents/en/add-link.png" alt="Add a torrent link with a valid clipboard magnet filled in" /><p>Open Add link with a valid clipboard magnet filled in.</p></td>
-    <td width="50%"><img src="screenshots/features/torrents/en/download.png" alt="Choose a torrent download folder and whether to start immediately" /><p>Choose the download folder and whether to start immediately.</p></td>
-  </tr>
-</table>
-
-These images render the production Flutter dialogs with sample data. [Vietnamese previews](README.vi.md#thư-viện-torrent-và-tải-xuống) are also available.
-
-### Mobile workflow
-
-<table>
-  <tr>
-    <td align="center" width="50%">
-      <img src="screenshots/promo/mobile/01_mobile_home.png" alt="CB File Hub mobile home preview" width="320" />
-      <p align="center"><sub>Mobile home</sub></p>
-    </td>
-    <td align="center" width="50%">
-      <img src="screenshots/promo/mobile/02_mobile_grid.png" alt="CB File Hub mobile file grid preview" width="320" />
-      <p align="center"><sub>File grid</sub></p>
-    </td>
-  </tr>
-  <tr>
-    <td align="center" width="50%">
-      <img src="screenshots/promo/mobile/03_mobile_tabs.png" alt="CB File Hub mobile tabs preview" width="320" />
-      <p align="center"><sub>Tabs and saved locations</sub></p>
-    </td>
-    <td align="center" width="50%">
-      <img src="screenshots/promo/mobile/04_mobile_tags.png" alt="CB File Hub mobile tags preview" width="320" />
-      <p align="center"><sub>Tags and tag browsing</sub></p>
-    </td>
-  </tr>
-</table>
-
-[More screenshots](screenshots/) · [Torrent guide](docs/features/10-torrent-library.md) · [AI Agent guide](docs/features/05-ai-agent.md)
-
-## Quick Start
-
-Install the app for your platform, open a folder, and pin your favorite locations. Follow the [installation guide](docs/guides/04-installation.md) for platform-specific steps, including macOS permissions and Linux setup.
-
-## Development
-
-Use **Flutter 3.47.8 stable** and `just`:
+Requires **Flutter 3.47.8 stable** and [`just`](https://github.com/casey/just):
 
 ```bash
 git clone https://github.com/coolbirdzik/cb-file-hub.git
@@ -176,8 +95,8 @@ cd cb-file-hub
 just deps
 ```
 
-Run `just` recipes from the repository root and direct Flutter/Dart commands from `cb_file_manager/`. See [development setup](docs/contributing/04-development-setup.md) for platform toolchains, builds, tests, and screenshot automation.
+See [development setup](docs/contributing/04-development-setup.md) for each platform's toolchain, builds and tests.
 
 ## Contributing
 
-[Open an issue](https://github.com/coolbirdzik/cb-file-hub/issues) for bugs or feature requests, or submit a pull request. Read the [contribution guide](docs/contributing/01-contribution-guide.md) and [technical documentation](docs/technical/index.md) to get started.
+[Open an issue](https://github.com/coolbirdzik/cb-file-hub/issues) for bugs and feature requests, or send a pull request. Start with the [contribution guide](docs/contributing/01-contribution-guide.md) and the [technical docs](docs/technical/index.md).

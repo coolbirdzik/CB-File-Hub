@@ -12,8 +12,10 @@ import {
   GoogleDriveLogo,
   HardDrives,
   Keyboard,
+  Lightning,
   ShieldCheck,
   Sparkle,
+  TerminalWindow,
   type Icon,
 } from "@phosphor-icons/react";
 import { T, type Copy, useCopy } from "./lang";
@@ -23,10 +25,12 @@ import { Orbits } from "./Cosmos";
 
 /** Panel with a cursor-following highlight. Pointer position lives in motion values, never React state. */
 function Cell({
+  id,
   className = "",
   delay = 0,
   children,
 }: {
+  id?: string;
   className?: string;
   delay?: number;
   children: React.ReactNode;
@@ -37,6 +41,7 @@ function Cell({
 
   return (
     <motion.article
+      id={id}
       initial={{ opacity: 0, y: 36 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, amount: 0.2 }}
@@ -96,6 +101,49 @@ function RuntimePanel() {
     </div>
   );
 }
+
+/** Mock of an SSH session with its active tunnels. */
+function TerminalPanel() {
+  const tunnels = [
+    { kind: "L", from: "localhost:5432", to: "db.internal:5432" },
+    { kind: "R", from: "server:8080", to: "localhost:3000" },
+    { kind: "D", from: "localhost:1080", to: "SOCKS5" },
+  ];
+  return (
+    <div aria-hidden className="rounded-2xl border border-white/10 bg-[#04070d] p-4 font-mono text-[12px] leading-relaxed text-[#7e92a8] shadow-tinted">
+      <div className="flex items-center gap-1.5 border-b border-white/10 pb-3">
+        <span className="size-2.5 rounded-full bg-white/15" />
+        <span className="size-2.5 rounded-full bg-white/15" />
+        <span className="size-2.5 rounded-full bg-white/15" />
+        <span className="ml-2 text-[#e6f0fa]">deploy@staging</span>
+        <span className="ml-auto inline-flex items-center gap-1.5 rounded-full bg-[#38a9ff]/15 px-2 py-0.5 text-[11px] text-[#38a9ff]">SFTP</span>
+      </div>
+      <p className="mt-3">
+        <span className="text-[#38a9ff]">deploy@staging</span>:~$ <span className="text-[#e6f0fa]">df -h /var</span>
+      </p>
+      <p className="whitespace-pre">/dev/sda1   80G  41G  39G  52% /var</p>
+      <p>
+        <span className="text-[#38a9ff]">deploy@staging</span>:~$ <span className="animate-pulse text-[#e6f0fa]">▍</span>
+      </p>
+      <ul className="mt-3 space-y-1.5 border-t border-white/10 pt-3">
+        {tunnels.map((t) => (
+          <li key={t.kind} className="flex items-center gap-2">
+            <span className="grid size-5 shrink-0 place-items-center rounded bg-white/10 text-[10px] text-[#e6f0fa]">{t.kind}</span>
+            <span className="truncate">
+              {t.from} → {t.to}
+            </span>
+            <span className="relative ml-auto flex size-1.5 shrink-0">
+              <span className="animate-ping-soft absolute inset-0 rounded-full bg-[#38a9ff]" />
+              <span className="relative size-1.5 rounded-full bg-[#38a9ff]" />
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+const sshImports = ["Termius", "OpenSSH", "PuTTY", "WinSCP", "SecureCRT", "Tabby"];
 
 const providers: Array<{ icon: Icon; label: string }> = [
   { icon: HardDrives, label: "Local" },
@@ -179,7 +227,7 @@ export function Bento() {
           <SplitText copy={{ en: "Everything you need to stay *in* *motion.*", vi: "Đủ công cụ để công việc *liền* *mạch.*" }} inView />
         </h2>
 
-        {/* 6 cells with no gaps. lg (4 cols): 2x2, 2x1, 2x1, 1x1, 1x1, 2x1. md (2 cols): 2, 1+1, 1+1, 2. Stacked below md. */}
+        {/* 8 cells with no gaps. lg (4 cols): 2x2, 2x1, 2x1, 1x1, 1x1, 2x1, then 2x1 + 2x1. md (2 cols): 2, 1+1, 1+1, 2, 2, 2. Stacked below md. */}
         <div className="mt-14 grid auto-rows-[minmax(18rem,auto)] gap-4 md:grid-cols-2 lg:grid-cols-4">
           {/* Assistant, the largest cell, with the real chat panel. */}
           <Cell className="bg-accent-soft md:col-span-2 lg:row-span-2">
@@ -222,8 +270,8 @@ export function Bento() {
                   </h3>
                   <p className="mt-3 max-w-[48ch] leading-relaxed text-[#7e92a8]">
                     <T
-                      en="On Windows, load a GGUF model and CB Agent runs it on your GPU. Or connect the cloud provider you already use."
-                      vi="Trên Windows, nạp mô hình GGUF để CB Agent chạy bằng GPU của bạn. Hoặc kết nối nhà cung cấp đám mây bạn đang dùng."
+                      en="Load a GGUF model and CB Agent runs it on your own device, on the GPU where available. Or connect OpenAI, Anthropic, OpenRouter, Ollama or LM Studio."
+                      vi="Nạp mô hình GGUF để CB Agent chạy ngay trên thiết bị của bạn, dùng GPU khi có. Hoặc kết nối OpenAI, Anthropic, OpenRouter, Ollama hay LM Studio."
                     />
                   </p>
                 </div>
@@ -239,8 +287,8 @@ export function Bento() {
                 icon={Broom}
                 title={{ en: "See what fills your disk.", vi: "Biết ổ đĩa đầy vì đâu." }}
                 body={{
-                  en: "Explore usage folder by folder, spot caches and temp files, and review everything before it is cleaned.",
-                  vi: "Xem dung lượng theo từng thư mục, nhận ra bộ nhớ đệm, tệp tạm và kiểm tra kỹ trước khi dọn.",
+                  en: "Explore usage folder by folder. Smart Clean finds temp files, app caches and developer caches (npm, pip, Cargo, Gradle, Go, Xcode), and you review everything before it is cleaned.",
+                  vi: "Xem dung lượng theo từng thư mục. Smart Clean tìm tệp tạm, cache ứng dụng và cache lập trình (npm, pip, Cargo, Gradle, Go, Xcode), và bạn duyệt lại mọi thứ trước khi dọn.",
                 }}
               />
               <div className="relative min-h-[180px] xl:-mr-9 xl:-mb-9">
@@ -331,6 +379,60 @@ export function Bento() {
                     en="Local first. Your library lives on your device and on the servers you choose to connect."
                     vi="Ưu tiên dữ liệu tại máy. Thư viện nằm trên thiết bị của bạn và những máy chủ bạn chọn kết nối."
                   />
+                </p>
+              </div>
+            </div>
+          </Cell>
+
+          {/* SSH manager with a mock session and its tunnels. */}
+          <Cell id="ssh" delay={0.08} className="scroll-mt-24 bg-surface md:col-span-2">
+            <div className="grid h-full gap-8 p-7 sm:p-9 xl:grid-cols-[1fr_1.05fr] xl:items-center">
+              <div className="relative z-20">
+                <Heading
+                  icon={TerminalWindow}
+                  title={{ en: "Your servers, one click away.", vi: "Máy chủ của bạn, chỉ một cú nhấp." }}
+                  body={{
+                    en: "Save hosts and keys, open a terminal, move files over SFTP and forward ports with local, remote or SOCKS5 tunnels, also through HTTP or SOCKS proxies.",
+                    vi: "Lưu host và khóa, mở terminal, chuyển tệp qua SFTP và chuyển tiếp cổng bằng tunnel local, remote hoặc SOCKS5, kể cả qua proxy HTTP hay SOCKS.",
+                  }}
+                />
+                <p className="mt-5 text-sm text-muted">
+                  <T en="Import hosts from" vi="Nhập host từ" />
+                </p>
+                <ul className="mt-2 flex flex-wrap gap-1.5">
+                  {sshImports.map((name) => (
+                    <li key={name} className="rounded-full border border-line bg-surface-2 px-2.5 py-1 text-xs font-semibold text-ink/80">
+                      {name}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <TerminalPanel />
+            </div>
+          </Cell>
+
+          {/* Native speed: the measured folder-scan result. */}
+          <Cell delay={0.16} className="bg-[radial-gradient(120%_90%_at_0%_100%,var(--c-accent-soft),var(--c-surface))] md:col-span-2">
+            <div className="relative z-20 flex h-full flex-col justify-between gap-8 p-7 sm:p-9">
+              <IconTile icon={Lightning} />
+              <div>
+                <p className="text-6xl font-extrabold tracking-[-0.03em] text-accent sm:text-7xl">3.3×</p>
+                <h3 className="mt-3 text-2xl leading-tight font-semibold tracking-[-0.025em]">
+                  <T en="Rust under the hood." vi="Sức mạnh từ Rust." />
+                </h3>
+                <p className="mt-3 max-w-[52ch] leading-relaxed text-muted">
+                  <T
+                    en="Disk scans, search, thumbnails, hashing and archives run on native Rust threads. A full rescan of 100,000 files took 84.9 ms, 3.3× faster than TreeSize Free in our benchmark."
+                    vi="Quét ổ đĩa, tìm kiếm, ảnh thu nhỏ, băm và giải nén chạy trên luồng Rust gốc. Quét lại 100.000 tệp mất 84,9 ms, nhanh hơn TreeSize Free 3,3 lần trong bài đo của chúng tôi."
+                  />{" "}
+                  <a
+                    href="https://github.com/coolbirdzik/CB-File-Hub/blob/main/docs/quality/03-rust-benchmarks.md"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-semibold text-accent underline-offset-4 hover:underline"
+                  >
+                    <T en="See the method" vi="Xem cách đo" />
+                  </a>
                 </p>
               </div>
             </div>

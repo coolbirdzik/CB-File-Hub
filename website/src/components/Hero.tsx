@@ -4,6 +4,7 @@ import {
   AppleLogo,
   ArrowRight,
   DownloadSimple,
+  LinuxLogo,
   ShieldCheck,
   Sparkle,
   Translate,
@@ -11,7 +12,7 @@ import {
 } from "@phosphor-icons/react";
 import { T, useCopy } from "./lang";
 import { Rise, SplitText } from "./motion";
-import { download } from "./site";
+import { download, links } from "./site";
 import { AppDemo } from "./demo/AppDemo";
 
 /**
@@ -42,7 +43,7 @@ export function Hero() {
     <section aria-labelledby="hero-title" className="relative isolate overflow-hidden pt-28 sm:pt-32 lg:pt-36">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <a
-          href="#features"
+          href="#ssh"
           className="rise glass group inline-flex items-center gap-2.5 rounded-full py-1.5 pr-4 pl-1.5 text-sm font-medium transition-colors hover:border-accent/40"
         >
           <span className="inline-flex items-center gap-1.5 rounded-full bg-accent px-2.5 py-1 text-xs font-semibold text-accent-ink">
@@ -50,7 +51,7 @@ export function Hero() {
             <T en="New" vi="Mới" />
           </span>
           <span className="text-muted transition-colors group-hover:text-ink">
-            <T en="CB Agent now runs GGUF models on your GPU" vi="CB Agent chạy mô hình GGUF ngay trên GPU của bạn" />
+            <T en="SSH manager with SFTP, tunnels and Termius import" vi="Quản lý SSH với SFTP, tunnel và nhập từ Termius" />
           </span>
           <ArrowRight size={14} weight="bold" className="text-muted transition-transform duration-300 group-hover:translate-x-0.5" />
         </a>
@@ -67,8 +68,8 @@ export function Hero() {
           <Rise delay={0.35} className="lg:col-span-5 lg:pb-2">
             <p className="max-w-[46ch] text-lg leading-relaxed text-muted">
               <T
-                en="Browse, tag, preview and play everything in one fast workspace for Windows and Android."
-                vi="Duyệt, gắn thẻ, xem trước và phát mọi tệp trong một không gian làm việc nhanh, trên Windows và Android."
+                en="The all-in-one file manager: browse, tag and play your files, manage SSH servers, clean your disk and ask an AI assistant, in one fast app."
+                vi="Trình quản lý tệp tất cả trong một: duyệt, gắn thẻ, phát tệp, quản lý máy chủ SSH, dọn ổ đĩa và hỏi trợ lý AI, trong một ứng dụng nhanh."
               />
             </p>
             <div className="mt-7 flex flex-wrap items-center gap-3">
@@ -86,8 +87,9 @@ export function Hero() {
               <li className="inline-flex items-center gap-1.5">
                 <WindowsLogo size={16} weight="fill" className="text-accent" />
                 <AppleLogo size={16} weight="fill" className="-ml-0.5 text-accent" />
+                {links.linux && <LinuxLogo size={16} weight="fill" className="-ml-0.5 text-accent" />}
                 <AndroidLogo size={16} weight="fill" className="-ml-0.5 text-accent" />
-                Windows · macOS · Android
+                {links.linux ? "Windows · macOS · Linux · Android" : "Windows · macOS · Android"}
               </li>
               <li className="inline-flex items-center gap-1.5">
                 <ShieldCheck size={16} weight="fill" className="text-accent" />
