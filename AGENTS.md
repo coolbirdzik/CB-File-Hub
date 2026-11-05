@@ -248,5 +248,5 @@ calling isolate:
 
 - Version lives in `cb_file_manager/pubspec.yaml`. Use `just release-patch`, `just release-minor`, or `just release-major`.
 - Tags matching `v*.*.*` trigger the release CI pipeline (GitHub Actions + GitLab CI).
-- Build number is auto-incremented in CI.
+- Build number: the workflow computes `pubspec build + 1`, passes it to every desktop build as `CB_BUILD_NUMBER`, and commits it to `main` (`bump-build-number`) only after the GitHub Release exists. Google Play and Microsoft Store submissions (`publish-*` jobs) also run only after the release; the `quality` job gates everything. See `docs/contributing/03-release-guide.md`.
 - Linux: `just linux` (= `scripts/build.sh linux`) writes `build/linux/portable/CBFileHub-<ver>-linux-x64.tar.gz` and, when `dpkg-deb` exists, a `.deb` via `scripts/package_linux_deb.sh` (installs to `/opt/cb-file-hub`, Depends from `dpkg-shlibdeps`). Build deps: `scripts/ci/setup_linux_build.sh`. Release CI builds inside `debian:12` (Debian 12+/Ubuntu 24.04, libmpv2) and `ubuntu:22.04` (`-ubuntu22.04` assets, libmpv1) because glibc and the libmpv soname differ, then installs each `.deb` on clean images (`scripts/ci/smoke_test_linux_deb.sh`).

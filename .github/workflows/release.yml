@@ -19,6 +19,12 @@ on:
         required: false
         default: "completed"
 
+# One release at a time: two tags pushed close together must not interleave
+# store submissions. A queued run waits instead of cancelling a running one.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 env:
   FLUTTER_VERSION: "3.47.8"
   PROJECT_DIR: "cb_file_manager"
@@ -35,6 +41,7 @@ env:
 jobs:
   validate-store-listings:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: actions/setup-node@v7.0.0
@@ -52,6 +59,7 @@ jobs:
   # Generate release notes from commits
   generate-release-notes:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     outputs:
       release_notes: ${{ steps.notes.outputs.notes }}
       version_name: ${{ steps.version.outputs.version_name }}
@@ -64,8 +72,11 @@ jobs:
           fetch-depth: 0 # Fetch all history for changelog
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Get and auto-increment version
+      - name: Resolve version and build number
         id: version
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_VERSION: ${{ github.event.inputs.version }}
         run: |
           PUBSPEC="${{ env.PROJECT_DIR }}/pubspec.yaml"
 
@@ -79,7 +90,7 @@ jobs:
           fi
 
           # Validate tag matches version name
-          if [ "${{ github.event_name }}" == "push" ]; then
+          if [ "$EVENT_NAME" == "push" ]; then
             TAG_REF="${GITHUB_REF#refs/tags/}"
             if [ "$TAG_REF" != "v$VERSION_NAME" ]; then
               echo "::error::Tag $TAG_REF does not match pubspec version v$VERSION_NAME"
@@ -87,33 +98,18 @@ jobs:
             fi
           fi
 
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            INPUT_VERSION="${{ github.event.inputs.version }}"
+          if [ "$EVENT_NAME" == "workflow_dispatch" ]; then
             if [ -n "$INPUT_VERSION" ] && [ "$INPUT_VERSION" != "v$VERSION_NAME" ] && [ "$INPUT_VERSION" != "$VERSION_NAME" ]; then
               echo "::error::Input version $INPUT_VERSION does not match pubspec version v$VERSION_NAME"
               exit 1
             fi
           fi
 
-          # Increment build number
+          # Every desktop build gets this number through CB_BUILD_NUMBER, and it
+          # is the floor for the Android versionCode. Nothing is pushed here:
+          # bump-build-number commits it to main only after the release exists,
+          # so a failed run leaves main untouched and a rerun reuses the number.
           NEW_BUILD=$((CURRENT_BUILD + 1))
-
-          # Write back to pubspec.yaml
-          sed -i "s/^version:.*/version: $VERSION_NAME+$NEW_BUILD/" "$PUBSPEC"
-
-          # Commit to persist build_number in repo
-          # Push to main branch (works even from detached HEAD / tag checkout)
-          git config user.email "ci@github.com"
-          git config user.name "GitHub CI"
-          git add "$PUBSPEC"
-          git commit -m "ci: auto bump build number to $NEW_BUILD"
-
-          # Fetch latest main and rebase our bump commit on top of it.
-          # This prevents non-fast-forward rejection when the version bump
-          # commit from 'make release-patch' is already on remote main.
-          git fetch origin main
-          git rebase origin/main
-          git push origin HEAD:refs/heads/main
 
           echo "version_name=$VERSION_NAME" >> $GITHUB_OUTPUT
           echo "version_code=$NEW_BUILD" >> $GITHUB_OUTPUT
@@ -131,8 +127,7 @@ jobs:
           fi
 
           # Find the nearest previous tag from the parent of the tagged commit.
-          # The build-number bump above moves HEAD, so release notes must use
-          # the commit pointed to by the current release tag instead of HEAD.
+          # Release notes use the commit the release tag points to, not HEAD.
           PREV_TAG=""
           if git rev-parse "${CURRENT_REF}^" >/dev/null 2>&1; then
             PREV_TAG=$(git describe --tags --abbrev=0 "${CURRENT_REF}^" 2>/dev/null || true)
@@ -192,6 +187,10 @@ jobs:
           echo "### macOS" >> release_notes.md
           echo "- **DMG**: \`CBFileHub-$VERSION-macos.dmg\` - Universal (Apple Silicon + Intel), macOS 12+" >> release_notes.md
           echo "" >> release_notes.md
+          echo "### Linux (x64)" >> release_notes.md
+          echo "- **Debian 12+, Ubuntu 24.04+, Mint 22**: \`CBFileHub-$VERSION-linux-amd64.deb\` or portable \`CBFileHub-$VERSION-linux-x64.tar.gz\`" >> release_notes.md
+          echo "- **Ubuntu 22.04, Mint 21**: \`CBFileHub-$VERSION-linux-ubuntu22.04-amd64.deb\` or portable \`CBFileHub-$VERSION-linux-ubuntu22.04-x64.tar.gz\`" >> release_notes.md
+          echo "" >> release_notes.md
           echo "## 🚀 Installation" >> release_notes.md
           echo "" >> release_notes.md
           echo "### Windows" >> release_notes.md
@@ -219,6 +218,11 @@ jobs:
           echo "2. Open the app; when macOS says it cannot verify it, click **Done**" >> release_notes.md
           echo "3. Go to **System Settings → Privacy & Security** and click **Open Anyway** next to the CB File Hub message" >> release_notes.md
           echo "4. Confirm **Open Anyway** and enter your password" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "### Linux" >> release_notes.md
+          echo "**.deb (Debian/Ubuntu):** \`sudo apt install ./CBFileHub-$VERSION-linux-amd64.deb\`, then start **CB File Hub** from the app menu or run \`cb-file-hub\`." >> release_notes.md
+          echo "" >> release_notes.md
+          echo "**Portable tar.gz:** install \`libgtk-3-0\`, \`libmpv2\` (\`libmpv1\` on Ubuntu 22.04) and \`libsecret-1-0\`, extract the archive and run \`cb-file-hub/cb-file-hub\`. Trash moves need \`gio\` (libglib2.0-bin) or \`trash-cli\`; torrents need \`aria2\`." >> release_notes.md
 
           # Save to output
           {
@@ -233,11 +237,32 @@ jobs:
           name: release-notes
           path: release_notes.md
 
+  # Format check, static analysis and unit/widget tests on the release commit
+  # (scripts/check_quality.sh, the same as the build-test analyze job). Runs
+  # beside the builds; nothing is released or published unless it passes.
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7.0.1
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: "stable"
+          cache: true
+
+      - name: Check formatting, analysis and unit/widget tests
+        run: bash scripts/check_quality.sh
+
   # Resolve Android versionCode against Google Play before building Android artifacts
   resolve-android-version-code:
     runs-on: ubuntu-latest
     needs: generate-release-notes
     environment: Production
+    timeout-minutes: 10
     outputs:
       version_code: ${{ steps.android_version.outputs.version_code }}
     steps:
@@ -264,6 +289,7 @@ jobs:
   build-windows:
     runs-on: windows-latest
     needs: generate-release-notes
+    timeout-minutes: 90
     steps:
       - name: Checkout code
         uses: actions/checkout@v7.0.1
@@ -273,6 +299,18 @@ jobs:
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: "stable"
+          cache: true
+
+      # Crate downloads for cb_native (the build hook compiles it with cargo).
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: cargo-${{ runner.os }}-${{ hashFiles('cb_native/rust/Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-
 
       - name: Ensure build script is executable
         shell: bash
@@ -280,6 +318,8 @@ jobs:
 
       - name: Build Windows Portable
         shell: bash
+        env:
+          CB_BUILD_NUMBER: ${{ needs.generate-release-notes.outputs.version_code }}
         run: ./scripts/build.sh windows-portable
 
       - name: Rename Portable ZIP
@@ -317,6 +357,7 @@ jobs:
   build-windows-msi:
     runs-on: windows-latest
     needs: generate-release-notes
+    timeout-minutes: 90
     steps:
       - name: Checkout code
         uses: actions/checkout@v7.0.1
@@ -326,6 +367,18 @@ jobs:
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: "stable"
+          cache: true
+
+      # Crate downloads for cb_native (the build hook compiles it with cargo).
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: cargo-${{ runner.os }}-${{ hashFiles('cb_native/rust/Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-
 
       - name: Install WiX Toolset
         run: |
@@ -339,6 +392,8 @@ jobs:
 
       - name: Build MSI
         shell: bash
+        env:
+          CB_BUILD_NUMBER: ${{ needs.generate-release-notes.outputs.version_code }}
         run: ./scripts/build.sh windows-msi
 
       - name: Rename MSI
@@ -377,6 +432,9 @@ jobs:
     runs-on: windows-latest
     needs: [generate-release-notes, validate-store-listings]
     environment: Production
+    timeout-minutes: 90
+    outputs:
+      msix_version: ${{ steps.msix_version.outputs.msix_version }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v7.0.1
@@ -386,6 +444,18 @@ jobs:
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: "stable"
+          cache: true
+
+      # Crate downloads for cb_native (the build hook compiles it with cargo).
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: cargo-${{ runner.os }}-${{ hashFiles('cb_native/rust/Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-
 
       - name: Setup Node
         uses: actions/setup-node@v7.0.0
@@ -394,21 +464,25 @@ jobs:
 
       - name: Restore MSIX signing certificate
         shell: pwsh
+        # Secrets arrive as environment variables, never spliced into the script.
+        env:
+          MSIX_CERT_BASE64: ${{ secrets.MSIX_CERT_BASE64 }}
+          MSIX_CERT_PASSWORD: ${{ secrets.MSIX_CERT_PASSWORD }}
         run: |
-          if ([string]::IsNullOrWhiteSpace("${{ secrets.MSIX_CERT_BASE64 }}")) {
+          if ([string]::IsNullOrWhiteSpace($env:MSIX_CERT_BASE64)) {
             throw "Missing required secret: MSIX_CERT_BASE64"
           }
-          if ([string]::IsNullOrWhiteSpace("${{ secrets.MSIX_CERT_PASSWORD }}")) {
+          if ([string]::IsNullOrWhiteSpace($env:MSIX_CERT_PASSWORD)) {
             throw "Missing required secret: MSIX_CERT_PASSWORD"
           }
 
           $certPath = Join-Path $env:RUNNER_TEMP "cb-file-hub-signing.pfx"
-          $bytes = [Convert]::FromBase64String("${{ secrets.MSIX_CERT_BASE64 }}")
+          $bytes = [Convert]::FromBase64String($env:MSIX_CERT_BASE64)
           [IO.File]::WriteAllBytes($certPath, $bytes)
 
           $certificate = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2(
             $certPath,
-            "${{ secrets.MSIX_CERT_PASSWORD }}"
+            $env:MSIX_CERT_PASSWORD
           )
           $actualPublisher = $certificate.Subject
 
@@ -426,6 +500,7 @@ jobs:
           "MSIX_CERT_SUBJECT=$actualPublisher" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Resolve Microsoft Store MSIX version
+        id: msix_version
         shell: bash
         env:
           PARTNER_CENTER_TENANT_ID: ${{ secrets.PARTNER_CENTER_TENANT_ID }}
@@ -436,6 +511,7 @@ jobs:
         run: |
           MSIX_VERSION="$(node scripts/partner_center_msix.mjs resolve-version)"
           echo "MSIX_VERSION=$MSIX_VERSION" >> "$GITHUB_ENV"
+          echo "msix_version=$MSIX_VERSION" >> "$GITHUB_OUTPUT"
           echo "Microsoft Store MSIX version resolved to $MSIX_VERSION"
 
       - name: Ensure build script is executable
@@ -447,6 +523,7 @@ jobs:
         env:
           MSIX_CERT_PASSWORD: ${{ secrets.MSIX_CERT_PASSWORD }}
           MSIX_REQUIRE_SIGNING: "true"
+          CB_BUILD_NUMBER: ${{ needs.generate-release-notes.outputs.version_code }}
         run: MSIX_PUBLISHER="$MSIX_CERT_SUBJECT" MSIX_VERSION_OVERRIDE="$MSIX_VERSION" ./scripts/build.sh windows-msix
 
       - name: Upload MSIX artifact
@@ -455,36 +532,6 @@ jobs:
           name: windows-msix
           path: ${{ env.PROJECT_DIR }}/build/windows/msix/*.msix
 
-      - name: Locate MSIX for Partner Center submission
-        shell: pwsh
-        run: |
-          $version = "${{ needs.generate-release-notes.outputs.version_name }}"
-          $msixVersion = $env:MSIX_VERSION
-          $source = Get-ChildItem "${{ env.PROJECT_DIR }}/build/windows/msix" -Filter "*.msix" | Select-Object -First 1
-          if (-not $source) {
-            throw "MSIX package not found in ${{ env.PROJECT_DIR }}/build/windows/msix"
-          }
-
-          # partner_center_msix.mjs builds the submission ZIP (package + listing images).
-          "PARTNER_CENTER_PACKAGE_PATH=$($source.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          "PARTNER_CENTER_PACKAGE_FILE_NAME=CBFileHub-$version-$msixVersion.msix" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-
-      - name: Submit MSIX, listings and images to Microsoft Store for automatic publishing
-        shell: bash
-        env:
-          PARTNER_CENTER_TENANT_ID: ${{ secrets.PARTNER_CENTER_TENANT_ID }}
-          PARTNER_CENTER_CLIENT_ID: ${{ secrets.PARTNER_CENTER_CLIENT_ID }}
-          PARTNER_CENTER_CLIENT_SECRET: ${{ secrets.PARTNER_CENTER_CLIENT_SECRET }}
-          PARTNER_CENTER_APP_ID: ${{ vars.PARTNER_CENTER_APP_ID }}
-          PARTNER_CENTER_LISTINGS_DIR: store/listings
-          # Release builds always submit for certification and publish once approved.
-          PARTNER_CENTER_COMMIT_SUBMISSION: "true"
-          PARTNER_CENTER_TARGET_PUBLISH_MODE: "Immediate"
-        run: |
-          # Waits for Partner Center to finish processing the commit and fails on CommitFailed.
-          SUBMISSION_ID="$(node scripts/partner_center_msix.mjs submit)"
-          echo "Partner Center submission committed for automatic publishing after certification: $SUBMISSION_ID"
-
   # Build macOS DMG (signed with a self-signed certificate, not notarized: users
   # allow it once via System Settings > Privacy & Security > Open Anyway). The
   # certificate must stay the same across releases, or installs lose their
@@ -492,6 +539,7 @@ jobs:
   build-macos:
     runs-on: macos-latest
     needs: generate-release-notes
+    timeout-minutes: 120
     steps:
       - name: Checkout code
         uses: actions/checkout@v7.0.1
@@ -501,6 +549,18 @@ jobs:
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: "stable"
+          cache: true
+
+      # Crate downloads for cb_native (the build hook compiles it with cargo).
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: cargo-${{ runner.os }}-${{ hashFiles('cb_native/rust/Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-
 
       - name: Import signing certificate
         env:
@@ -539,6 +599,7 @@ jobs:
       - name: Build macOS DMG
         env:
           MACOS_REQUIRE_SIGN_IDENTITY: "1"
+          CB_BUILD_NUMBER: ${{ needs.generate-release-notes.outputs.version_code }}
         run: bash scripts/build.sh macos
 
       - name: Remove signing keychain
@@ -572,6 +633,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: generate-release-notes
     container: ${{ matrix.image }}
+    timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
@@ -603,11 +665,24 @@ jobs:
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: "stable"
+          cache: true
+
+      # Crate downloads for cb_native (the build hook compiles it with cargo).
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: cargo-${{ runner.os }}-${{ hashFiles('cb_native/rust/Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-
 
       - name: Build Linux packages
         shell: bash
         env:
           LINUX_ARTIFACT_SUFFIX: ${{ matrix.suffix }}
+          CB_BUILD_NUMBER: ${{ needs.generate-release-notes.outputs.version_code }}
         run: bash scripts/build.sh linux
 
       - name: Check package names and linked libraries
@@ -642,6 +717,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: build-linux
     container: ${{ matrix.image }}
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -674,6 +750,7 @@ jobs:
     needs:
       - generate-release-notes
       - resolve-android-version-code
+    timeout-minutes: 90
     steps:
       - name: Checkout code
         uses: actions/checkout@v7.0.1
@@ -689,6 +766,18 @@ jobs:
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: "stable"
+          cache: true
+
+      # Crate downloads for cb_native (the build hook compiles it with cargo).
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: cargo-${{ runner.os }}-${{ hashFiles('cb_native/rust/Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-
 
       - name: Install dependencies
         run: |
@@ -732,6 +821,7 @@ jobs:
       - resolve-android-version-code
       - validate-store-listings
     environment: Production
+    timeout-minutes: 90
     steps:
       - name: Checkout code
         uses: actions/checkout@v7.0.1
@@ -752,6 +842,18 @@ jobs:
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: "stable"
+          cache: true
+
+      # Crate downloads for cb_native (the build hook compiles it with cargo).
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: cargo-${{ runner.os }}-${{ hashFiles('cb_native/rust/Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-
 
       - name: Install dependencies
         run: |
@@ -822,45 +924,18 @@ jobs:
           name: android-aab
           path: ${{ env.PROJECT_DIR }}/build/app/outputs/bundle/release/*.aab
 
-      - name: Prepare Google Play descriptions and images in the release edit
-        id: play_listing
-        if: (github.event.inputs.play_track || vars.GOOGLE_PLAY_TRACK || 'internal') != 'internalsharing'
-        env:
-          GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
-          GOOGLE_PLAY_PACKAGE_NAME: ${{ vars.GOOGLE_PLAY_PACKAGE_NAME || 'com.cbv.filehub' }}
-          STORE_LISTINGS_DIR: store/listings
-          GOOGLE_PLAY_UPDATE_IMAGES: ${{ vars.GOOGLE_PLAY_UPDATE_IMAGES || 'true' }}
-        run: |
-          EDIT_ID="$(node scripts/google_play_listings.mjs prepare)"
-          echo "edit_id=$EDIT_ID" >> "$GITHUB_OUTPUT"
-
-      - name: Submit AAB, descriptions and images to Google Play
-        id: submit_play
-        uses: r0adkll/upload-google-play@v1.1.5
-        with:
-          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
-          packageName: ${{ vars.GOOGLE_PLAY_PACKAGE_NAME || 'com.cbv.filehub' }}
-          releaseFiles: ${{ env.PROJECT_DIR }}/build/app/outputs/bundle/release/*.aab
-          tracks: ${{ github.event.inputs.play_track || vars.GOOGLE_PLAY_TRACK || 'internal' }}
-          status: ${{ github.event.inputs.play_status || vars.GOOGLE_PLAY_STATUS || 'completed' }}
-          releaseName: ${{ needs.generate-release-notes.outputs.version_tag }}
-          existingEditId: ${{ steps.play_listing.outputs.edit_id }}
-
-      - name: Discard uncommitted Google Play edit after a failed upload
-        if: always() && steps.play_listing.outputs.edit_id != '' && steps.submit_play.outcome != 'success'
-        env:
-          GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
-          GOOGLE_PLAY_PACKAGE_NAME: ${{ vars.GOOGLE_PLAY_PACKAGE_NAME || 'com.cbv.filehub' }}
-          GOOGLE_PLAY_EDIT_ID: ${{ steps.play_listing.outputs.edit_id }}
-        run: node scripts/google_play_listings.mjs discard
-
   # Create GitHub Release
+  # Everything below runs only after every build and check passed, so a failed
+  # platform never leaves the stores on a version the GitHub release lacks.
   create-release:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs:
+      - quality
       - generate-release-notes
       - build-windows
       - build-windows-msi
+      - build-windows-msix
       - build-macos
       - build-android-apk
       - build-android-aab
@@ -896,6 +971,154 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  # Store submissions, after the GitHub release exists.
+  publish-google-play:
+    runs-on: ubuntu-latest
+    needs: [generate-release-notes, create-release]
+    environment: Production
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7.0.1
+
+      - name: Setup Node
+        uses: actions/setup-node@v7.0.0
+        with:
+          node-version: "22"
+
+      - name: Download AAB
+        uses: actions/download-artifact@v8.0.1
+        with:
+          name: android-aab
+          path: android-aab
+
+      - name: Prepare Google Play descriptions and images in the release edit
+        id: play_listing
+        if: (github.event.inputs.play_track || vars.GOOGLE_PLAY_TRACK || 'internal') != 'internalsharing'
+        env:
+          GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          GOOGLE_PLAY_PACKAGE_NAME: ${{ vars.GOOGLE_PLAY_PACKAGE_NAME || 'com.cbv.filehub' }}
+          STORE_LISTINGS_DIR: store/listings
+          GOOGLE_PLAY_UPDATE_IMAGES: ${{ vars.GOOGLE_PLAY_UPDATE_IMAGES || 'true' }}
+        run: |
+          EDIT_ID="$(node scripts/google_play_listings.mjs prepare)"
+          echo "edit_id=$EDIT_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Submit AAB, descriptions and images to Google Play
+        id: submit_play
+        uses: r0adkll/upload-google-play@v1.1.5
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: ${{ vars.GOOGLE_PLAY_PACKAGE_NAME || 'com.cbv.filehub' }}
+          releaseFiles: android-aab/*.aab
+          tracks: ${{ github.event.inputs.play_track || vars.GOOGLE_PLAY_TRACK || 'internal' }}
+          status: ${{ github.event.inputs.play_status || vars.GOOGLE_PLAY_STATUS || 'completed' }}
+          releaseName: ${{ needs.generate-release-notes.outputs.version_tag }}
+          existingEditId: ${{ steps.play_listing.outputs.edit_id }}
+
+      - name: Discard uncommitted Google Play edit after a failed upload
+        if: always() && steps.play_listing.outputs.edit_id != '' && steps.submit_play.outcome != 'success'
+        env:
+          GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          GOOGLE_PLAY_PACKAGE_NAME: ${{ vars.GOOGLE_PLAY_PACKAGE_NAME || 'com.cbv.filehub' }}
+          GOOGLE_PLAY_EDIT_ID: ${{ steps.play_listing.outputs.edit_id }}
+        run: node scripts/google_play_listings.mjs discard
+
+  publish-microsoft-store:
+    runs-on: windows-latest
+    needs: [generate-release-notes, build-windows-msix, create-release]
+    environment: Production
+    # Partner Center commit processing alone may take up to 30 minutes.
+    timeout-minutes: 60
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7.0.1
+
+      - name: Setup Node
+        uses: actions/setup-node@v7.0.0
+        with:
+          node-version: "22"
+
+      - name: Download MSIX
+        uses: actions/download-artifact@v8.0.1
+        with:
+          name: windows-msix
+          path: windows-msix
+
+      - name: Locate MSIX for Partner Center submission
+        shell: pwsh
+        run: |
+          $version = "${{ needs.generate-release-notes.outputs.version_name }}"
+          $msixVersion = "${{ needs.build-windows-msix.outputs.msix_version }}"
+          $source = Get-ChildItem "windows-msix" -Filter "*.msix" | Select-Object -First 1
+          if (-not $source) {
+            throw "MSIX package not found in the windows-msix artifact"
+          }
+
+          # partner_center_msix.mjs builds the submission ZIP (package + listing images).
+          "PARTNER_CENTER_PACKAGE_PATH=$($source.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "PARTNER_CENTER_PACKAGE_FILE_NAME=CBFileHub-$version-$msixVersion.msix" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Submit MSIX, listings and images to Microsoft Store for automatic publishing
+        shell: bash
+        env:
+          PARTNER_CENTER_TENANT_ID: ${{ secrets.PARTNER_CENTER_TENANT_ID }}
+          PARTNER_CENTER_CLIENT_ID: ${{ secrets.PARTNER_CENTER_CLIENT_ID }}
+          PARTNER_CENTER_CLIENT_SECRET: ${{ secrets.PARTNER_CENTER_CLIENT_SECRET }}
+          PARTNER_CENTER_APP_ID: ${{ vars.PARTNER_CENTER_APP_ID }}
+          PARTNER_CENTER_LISTINGS_DIR: store/listings
+          # Release builds always submit for certification and publish once approved.
+          PARTNER_CENTER_COMMIT_SUBMISSION: "true"
+          PARTNER_CENTER_TARGET_PUBLISH_MODE: "Immediate"
+        run: |
+          # Waits for Partner Center to finish processing the commit and fails on CommitFailed.
+          SUBMISSION_ID="$(node scripts/partner_center_msix.mjs submit)"
+          echo "Partner Center submission committed for automatic publishing after certification: $SUBMISSION_ID"
+
+  # Persist the released build number on main, only once the release exists.
+  # Keeps main's version name (it may already be the next version) and only
+  # ever raises the build number, so reruns and races cannot lower it.
+  bump-build-number:
+    runs-on: ubuntu-latest
+    needs: [generate-release-notes, create-release]
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v7.0.1
+        with:
+          ref: main
+
+      - name: Commit build number to main
+        env:
+          RELEASED_BUILD: ${{ needs.generate-release-notes.outputs.version_code }}
+        run: |
+          PUBSPEC="${{ env.PROJECT_DIR }}/pubspec.yaml"
+          git config user.email "ci@github.com"
+          git config user.name "GitHub CI"
+          for attempt in 1 2 3; do
+            git fetch origin main
+            git reset --hard origin/main
+            LINE=$(grep "^version:" "$PUBSPEC" | sed 's/version: //')
+            NAME="${LINE%%+*}"
+            BUILD=0
+            if [[ "$LINE" == *"+"* ]]; then BUILD="${LINE##*+}"; fi
+            if [ "$BUILD" -ge "$RELEASED_BUILD" ]; then
+              echo "main already has build $BUILD (released $RELEASED_BUILD); nothing to do."
+              exit 0
+            fi
+            sed -i "s/^version:.*/version: $NAME+$RELEASED_BUILD/" "$PUBSPEC"
+            git add "$PUBSPEC"
+            git commit -m "ci: auto bump build number to $RELEASED_BUILD"
+            if git push origin HEAD:refs/heads/main; then
+              exit 0
+            fi
+            echo "main moved during the push; retrying ($attempt/3)"
+          done
+          echo "::error::Could not push the build number to main"
+          exit 1
+
   # Rebuild the website (Cloudflare Pages) so /releases and the download
   # buttons, including the macOS DMG link, pick up the release just published.
   # Auth: CLOUDFLARE_API_TOKEN (Account > Cloudflare Pages > Edit) and
@@ -903,6 +1126,7 @@ jobs:
   deploy-website:
     runs-on: ubuntu-latest
     needs: create-release
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: website

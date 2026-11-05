@@ -221,7 +221,13 @@ get_version_name() {
     echo "${version_line%%+*}"
 }
 
+# CB_BUILD_NUMBER (set by the release workflow) overrides the pubspec build
+# number, so every platform of one release is built with the same number.
 get_version_code() {
+    if [ -n "${CB_BUILD_NUMBER:-}" ]; then
+        echo "$CB_BUILD_NUMBER"
+        return
+    fi
     local version_line
     version_line=$(get_version_line)
     if [[ "$version_line" == *"+"* ]]; then

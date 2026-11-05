@@ -18,7 +18,7 @@ class CleanerCategories {
 
   /// All known categories.
   static List<CleanerCategory> all({String? operatingSystem}) =>
-      List.unmodifiable(switch (operatingSystem ?? Platform.operatingSystem) {
+      List.unmodifiable(switch (operatingSystem ?? Platform.environment['CB_TMP_OS'] ?? Platform.operatingSystem) {
         'macos' => _macos,
         'linux' => _linux,
         _ => _all,

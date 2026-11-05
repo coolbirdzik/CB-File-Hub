@@ -134,27 +134,36 @@ make android
 git push tag "v1.2.3"
     │
     ▼
-generate-release-notes job:
+generate-release-notes job (pushes nothing):
     │
     ├─ Read pubspec: version: 1.2.3+5
     ├─ Validate tag "v1.2.3" == "v1.2.3" ✅
-    ├─ NEW_BUILD = 5 + 1 = 6
-    ├─ Update pubspec: version: 1.2.3+6
-    ├─ git commit & push: "ci: auto bump build number to 6"
+    └─ NEW_BUILD = 5 + 1 = 6
     │
     ▼
-Build jobs receive:
-    version_name  = "1.2.3"
-    version_code  = 6
+quality job (format, analyze, unit/widget tests) and all build jobs.
+Every desktop build gets CB_BUILD_NUMBER=6 (scripts/build.sh reads it);
+Android uses max(6, next Google Play versionCode):
     │
-    ├─ Android:  versionName=1.2.3, versionCode=6
-    ├─ Windows:  --build-name=1.2.3, --build-number=6
+    ├─ Android:  versionName=1.2.3, versionCode=6 or higher
+    ├─ Windows:  portable/MSI/MSIX built from build number 6
     ├─ macOS:    CFBundleShortVersion=1.2.3, CFBundleVersion=6
-    └─ Linux:    build-name=1.2.3, build-number=6
+    └─ Linux:    .deb + tar.gz (Debian 12 and Ubuntu 22.04 containers),
+                 each .deb installed on clean images by test-linux-packages
     │
-    ▼
-GitHub Release created with all artifacts
+    ▼  only when quality, every build and the Linux package tests passed
+create-release: GitHub Release with all artifacts
+    │
+    ├─ publish-google-play:      upload the AAB, descriptions and images
+    ├─ publish-microsoft-store:  submit the MSIX for certification
+    ├─ bump-build-number:        commit "version: 1.2.3+6" to main
+    └─ deploy-website:           refresh coolbird.net download links
 ```
+
+Nothing reaches a store before the GitHub Release exists, and `main` is only
+changed after it. A failed run therefore leaves stores and `main` untouched;
+fix the problem and rerun, which reuses the same build number. Only one
+release workflow runs at a time (`concurrency: release`).
 
 ### Retagging Same Version
 
@@ -162,9 +171,8 @@ GitHub Release created with all artifacts
 # Recreate annotated tag and force-push
 bash scripts/retag.sh v1.2.3
 
-# CI reads pubspec: version: 1.2.3+6
-# CI bumps to: version: 1.2.3+7
-# Build: versionCode=7 ✅
+# Previous run failed before create-release: main is still +5, so CI builds 6 again.
+# Previous run succeeded: bump-build-number set +6, so CI builds 7.
 ```
 
 This is fully **repo-based** — no dependency on GitHub Run IDs, works with any git provider.
