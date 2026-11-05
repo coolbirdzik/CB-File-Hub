@@ -625,7 +625,7 @@ jobs:
             fi
           done
           dpkg-deb -I "$OUT/$BASE-amd64.deb"
-          ldd "${{ env.PROJECT_DIR }}/build/linux/x64/release/bundle/CB File Hub"
+          ldd "${{ env.PROJECT_DIR }}/build/linux/x64/release/bundle/cb-file-hub"
 
       - name: Upload Linux artifact
         uses: actions/upload-artifact@v7.0.1

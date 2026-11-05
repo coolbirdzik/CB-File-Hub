@@ -31,7 +31,7 @@ REPO_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 
 PACKAGE=cb-file-hub
 APP_ID=com.cb.cbfilehub
-BINARY_NAME="CB File Hub"
+BINARY_NAME="cb-file-hub"
 INSTALL_DIR=/opt/$PACKAGE
 ICON_PNG="$REPO_DIR/cb_file_manager/assets/images/logo512.png"
 ICON_SVG="$REPO_DIR/cb_file_manager/assets/images/logo.svg"
@@ -72,7 +72,7 @@ if [ -f "$ICON_SVG" ]; then
     install -m 644 "$ICON_SVG" "$ROOT/usr/share/icons/hicolor/scalable/apps/$APP_ID.svg"
 fi
 
-# Exec uses the /usr/bin link: the executable name has spaces.
+# Exec uses the /usr/bin link to the bundled executable.
 cat >"$ROOT/usr/share/applications/$APP_ID.desktop" <<EOF
 [Desktop Entry]
 Type=Application

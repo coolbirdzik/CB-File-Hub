@@ -16,8 +16,8 @@ apt-get install -y --no-install-recommends "$DEB"
 
 . /etc/os-release
 echo "==> Installed on $PRETTY_NAME"
-test -x "$APP_DIR/CB File Hub"
-test "$(readlink -f /usr/bin/cb-file-hub)" = "$APP_DIR/CB File Hub"
+test -x "$APP_DIR/cb-file-hub"
+test "$(readlink -f /usr/bin/cb-file-hub)" = "$APP_DIR/cb-file-hub"
 test -f /usr/share/applications/com.cb.cbfilehub.desktop
 
 missing=0
@@ -31,7 +31,7 @@ while IFS= read -r -d '' elf; do
     echo "$unresolved"
     missing=1
   fi
-done < <(find "$APP_DIR" -type f \( -name 'CB File Hub' -o -name '*.so*' \) -print0)
+done < <(find "$APP_DIR" -type f \( -name 'cb-file-hub' -o -name '*.so*' \) -print0)
 
 if [ "$missing" -ne 0 ]; then
   exit 1
