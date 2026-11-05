@@ -229,12 +229,14 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(cleaned.single.map((i) => i.path), [_temp]);
-    expect(find.text('Clean complete'), findsOneWidget);
-    expect(find.textContaining('Moved 3.0 MB'), findsOneWidget);
-
-    await tester.tap(find.byKey(const ValueKey('cleaner-smart-clean-done')));
-    await tester.pumpAndSettle();
-    expect(cubit.state.status, CleanerSmartCleanStatus.idle);
+    expect(find.text('Clean complete'), findsNothing);
+    expect(
+      find.byKey(const ValueKey('cleaner-smart-clean-done')),
+      findsNothing,
+    );
+    expect(cubit.state.status, CleanerSmartCleanStatus.ready);
+    expect(find.text('Permanent'), findsOneWidget);
+    expect(cubit.state.groups.single.categoryId, 'recycle_bin');
   });
 
   testWidgets('a group lists who made its files, each one can be left out', (
@@ -501,6 +503,12 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(cleaned.single.map((i) => i.path), unorderedEquals([_temp, _bin]));
-    expect(find.textContaining('Permanently deleted'), findsOneWidget);
+    expect(find.textContaining('Permanently deleted'), findsNothing);
+    expect(find.text('Clean complete'), findsNothing);
+    expect(cubit.state.groups, isEmpty);
+    expect(
+      find.byKey(const ValueKey('cleaner-smart-clean-list')),
+      findsOneWidget,
+    );
   });
 }

@@ -3,6 +3,7 @@ import 'package:equatable/equatable.dart';
 import '../../services/disk_cleaner/cleaner_installed_apps.dart';
 import '../../services/disk_cleaner/cleaner_item_origin.dart';
 import '../../services/disk_cleaner/cleaner_models.dart';
+import '../../services/disk_cleaner/cleaner_paths.dart';
 import '../../services/disk_cleaner/cleaner_review_candidates.dart';
 
 enum CleanerSmartCleanStatus { idle, scanning, ready, cleaning, done, failure }
@@ -140,6 +141,34 @@ class CleanerSmartCleanGroup extends Equatable {
     return names;
   }
 
+  CleanerSmartCleanGroup withoutPaths(Set<String> paths) {
+    if (paths.isEmpty) return this;
+    final keys = paths.map(CleanerPaths.key).toSet();
+    final sources = <CleanerSmartCleanSource>[];
+    for (final source in this.sources) {
+      final items = source.items
+          .where(
+            (item) => !CleanerPaths.ancestors(item.path).any(keys.contains),
+          )
+          .toList();
+      if (items.isEmpty) continue;
+      sources.add(
+        CleanerSmartCleanSource(
+          key: source.key,
+          origin: source.origin,
+          items: items,
+          mergedCount: source.mergedCount,
+        ),
+      );
+    }
+    return CleanerSmartCleanGroup._(
+      categoryId,
+      List.unmodifiable(sources.expand((source) => source.items)),
+      List.unmodifiable(sources),
+      isPermanent,
+    );
+  }
+
   @override
   List<Object?> get props => [categoryId, items, sources, isPermanent];
 }
@@ -185,6 +214,7 @@ class CleanerSmartCleanState extends Equatable {
 
   /// [sourceId]s of the sources the user unchecked.
   final Set<String> excluded;
+  final Set<String> pendingPaths;
 
   /// Category being scanned, null before the first progress event.
   final String? scanCategoryId;
@@ -207,6 +237,7 @@ class CleanerSmartCleanState extends Equatable {
     this.reviewCandidates = const [],
     this.scanWarnings = const [],
     this.excluded = const <String>{},
+    this.pendingPaths = const <String>{},
     this.scanCategoryId,
     this.scanPath = '',
     this.scanFraction,
@@ -243,7 +274,9 @@ class CleanerSmartCleanState extends Equatable {
   }
 
   List<CleanerSmartCleanSource> selectedSources(CleanerSmartCleanGroup group) =>
-      group.sources
+      group
+          .withoutPaths(pendingPaths)
+          .sources
           .where((source) => isSourceSelected(group.categoryId, source.key))
           .toList(growable: false);
 
@@ -285,6 +318,7 @@ class CleanerSmartCleanState extends Equatable {
     List<CleanerFileReviewCandidate>? reviewCandidates,
     List<String>? scanWarnings,
     Set<String>? excluded,
+    Set<String>? pendingPaths,
     Object? scanCategoryId = _notSet,
     String? scanPath,
     Object? scanFraction = _notSet,
@@ -301,6 +335,7 @@ class CleanerSmartCleanState extends Equatable {
       reviewCandidates: reviewCandidates ?? this.reviewCandidates,
       scanWarnings: scanWarnings ?? this.scanWarnings,
       excluded: excluded ?? this.excluded,
+      pendingPaths: pendingPaths ?? this.pendingPaths,
       scanCategoryId: identical(scanCategoryId, _notSet)
           ? this.scanCategoryId
           : scanCategoryId as String?,
@@ -330,6 +365,7 @@ class CleanerSmartCleanState extends Equatable {
     reviewCandidates,
     scanWarnings,
     excluded,
+    pendingPaths,
     scanCategoryId,
     scanPath,
     scanFraction,

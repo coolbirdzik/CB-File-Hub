@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cb_file_manager/bloc/cleaner_app_leftovers/cleaner_app_leftovers.dart';
 import 'package:cb_file_manager/config/languages/app_localizations_delegate.dart';
 import 'package:cb_file_manager/services/app_insights/app_leftover_finder.dart';
@@ -224,6 +226,54 @@ void main() {
       find.byKey(const ValueKey<String>('cleaner-leftover-open-$_oldTool')),
     );
     expect(opened, _oldTool);
+  });
+
+  testWidgets('can submit another folder while an earlier cleanup is pending', (
+    tester,
+  ) async {
+    final cubit = CleanerAppLeftoversCubit(nowProvider: () => now)
+      ..setReport(fixtureReport())
+      ..addMeasurements({_oldGame: measured(300), _oldTool: measured(50)});
+    addTearDown(cubit.close);
+    final requests = <List<JunkItem>>[];
+    final completions = [Completer<CleanReport>(), Completer<CleanReport>()];
+    await pumpView(
+      tester,
+      cubit: cubit,
+      onClean: (items, _) {
+        requests.add(items);
+        return completions[requests.length - 1].future;
+      },
+    );
+
+    Future<void> submit(String group) async {
+      await tester.tap(
+        find.byKey(
+          ValueKey('cleaner-leftovers-group-check-noInstalledApp-$group'),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.tap(find.byKey(const ValueKey('cleaner-leftovers-clean')));
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.tap(
+        find.byKey(const ValueKey('cleaner-leftovers-confirm-clean')),
+      );
+      await tester.pump(const Duration(milliseconds: 300));
+    }
+
+    await submit('localAppData');
+    await submit('roamingAppData');
+    expect(requests.map((items) => items.single.path), [_oldGame, _oldTool]);
+    expect(cubit.state.selectedPaths, isEmpty);
+    completions[0].complete(succeededReport(requests[0]));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('OldGame'), findsNothing);
+    expect(find.text('OldTool'), findsOneWidget);
+    completions[1].complete(succeededReport(requests[1]));
+    await tester.pumpAndSettle();
+    expect(find.text('OldTool'), findsNothing);
+    expect(find.byType(SnackBar), findsNothing);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('macOS and Linux move folders to the Trash', (tester) async {

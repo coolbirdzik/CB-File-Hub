@@ -940,6 +940,9 @@ class DiskCleanerService {
   ///  - spawns the worker
   ///  - bridges progress + failure prompts back through SendPort messages
   ///  - awaits the final [CleanReport]
+  /// During preparation, [onProgress] uses total == 0 and done is the number
+  /// of discovered targets, not deletions. Once the total is known, done
+  /// restarts at the number of completed/skipped deletion targets.
   Future<CleanReport> cleanJunk({
     required List<JunkItem> items,
     required bool permanent,
@@ -1100,11 +1103,11 @@ class DiskCleanerService {
     }
     final expandedItems = await _expandDirectoryTargets(
       eligibleItems,
-      onPreparing: (currentPath) {
+      onPreparing: (found, currentPath) {
         // Surface the directory being expanded so the UI can show
         // "Preparing files…" instead of appearing frozen on huge junk
         // folders (e.g. %TEMP% with tens of thousands of children).
-        onProgress?.call(0, 0, currentPath);
+        onProgress?.call(found, 0, currentPath);
       },
     );
     final total = expandedItems.length + skippedUnsafe.length;
@@ -1618,7 +1621,7 @@ class DiskCleanerService {
 
   Future<List<JunkItem>> _expandDirectoryTargets(
     List<JunkItem> items, {
-    void Function(String currentPath)? onPreparing,
+    void Function(int found, String currentPath)? onPreparing,
   }) async {
     final expanded = <JunkItem>[];
 
@@ -1627,12 +1630,14 @@ class DiskCleanerService {
           item.isRecycleBinItem || item.categoryId == 'recycle_bin';
       if (isBinItem) {
         expanded.add(item);
+        onPreparing?.call(expanded.length, item.path);
         continue;
       }
 
       final type = FileSystemEntity.typeSync(item.path, followLinks: false);
       if (type != FileSystemEntityType.directory) {
         expanded.add(item);
+        onPreparing?.call(expanded.length, item.path);
         continue;
       }
 
@@ -1641,29 +1646,44 @@ class DiskCleanerService {
       // descendant files while preserving the folder itself.
       if (!item.isContainerOnly) {
         expanded.add(item);
+        onPreparing?.call(expanded.length, item.path);
         continue;
       }
 
       AppLogger.info('[DiskCleaner] Expanding directory target: ${item.path}');
-      onPreparing?.call(item.path);
+      onPreparing?.call(expanded.length, item.path);
       var childCount = 0;
       // Rust walks and stats the tree when package:cb_native is built.
-      final native = await NativeFs.walk(roots: [item.path], stats: true);
-      if (native != null) {
-        for (final entry in native) {
-          expanded.add(
-            JunkItem(
-              path: entry.path,
-              sizeBytes: entry.size,
-              lastModified: DateTime.fromMillisecondsSinceEpoch(
-                entry.modifiedMs,
+      final baseCount = expanded.length;
+      final native = await NativeFs.walk(
+        roots: [item.path],
+        stats: true,
+        parallel: true,
+        onProgress: (progress) => onPreparing?.call(
+          baseCount + progress.counters[0],
+          progress.currentPath,
+        ),
+        onEntries: (entries) {
+          for (final entry in entries) {
+            expanded.add(
+              JunkItem(
+                path: entry.path,
+                sizeBytes: entry.size,
+                lastModified: DateTime.fromMillisecondsSinceEpoch(
+                  entry.modifiedMs,
+                ),
+                categoryId: item.categoryId,
               ),
-              categoryId: item.categoryId,
-            ),
-          );
-        }
-        childCount = native.length;
+            );
+          }
+        },
+      );
+      if (native != null) {
+        childCount = expanded.length - baseCount;
       } else {
+        // A cancelled/unavailable walk may have streamed partial output.
+        // Preparation is read-only, so discard it before the Dart fallback.
+        expanded.length = baseCount;
         try {
           await for (final entity in Directory(
             item.path,
@@ -1698,7 +1718,7 @@ class DiskCleanerService {
             // "Preparing files…" status update instead of a frozen screen
             // while we walk huge junk directories (e.g. %TEMP%).
             if (childCount % 500 == 0) {
-              onPreparing?.call(entity.path);
+              onPreparing?.call(expanded.length, entity.path);
               await Future<void>.delayed(Duration.zero);
             }
           }
@@ -1710,6 +1730,7 @@ class DiskCleanerService {
           );
         }
       }
+      onPreparing?.call(expanded.length, item.path);
 
       AppLogger.info(
         '[DiskCleaner] Expanded directory target: ${item.path} -> $childCount file(s)',

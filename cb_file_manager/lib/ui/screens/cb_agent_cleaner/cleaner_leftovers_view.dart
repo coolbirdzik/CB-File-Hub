@@ -42,7 +42,7 @@ class CleanerLeftoversView extends StatefulWidget {
   final VoidCallback? onCancel;
   final AppLeftoverPathAction? onOpenFolder;
 
-  /// Null while another Cleaner cleanup is running.
+  /// Adds the approved batch to the shared Cleaner queue.
   final AppLeftoverCleanAction? onClean;
 
   /// macOS and Linux move to the Trash instead of the Recycle Bin.
@@ -74,7 +74,9 @@ class _CleanerLeftoversViewState extends State<CleanerLeftoversView> {
   );
   final Set<String> _toggledGroups = <String>{};
   Timer? _searchDebounceTimer;
-  bool _cleaning = false;
+  final Set<String> _pendingPaths = {};
+  int _pendingCleans = 0;
+  bool get _cleaning => _pendingCleans > 0;
 
   @override
   void initState() {
@@ -105,8 +107,10 @@ class _CleanerLeftoversViewState extends State<CleanerLeftoversView> {
 
   Future<void> _cleanSelected() async {
     final onClean = widget.onClean;
-    final selected = widget.cubit.state.selectedCandidates;
-    if (onClean == null || selected.isEmpty || _cleaning) return;
+    final selected = widget.cubit.state.selectedCandidates
+        .where((candidate) => !_pendingPaths.contains(candidate.path))
+        .toList();
+    if (onClean == null || selected.isEmpty) return;
     final l = AppLocalizations.of(context)!;
     final destination = _destination(l);
     final size = FormatUtils.formatFileSize(
@@ -146,7 +150,14 @@ class _CleanerLeftoversViewState extends State<CleanerLeftoversView> {
     if (confirmed != true || !mounted) return;
 
     _cleanProgress.value = null;
-    setState(() => _cleaning = true);
+    setState(() {
+      _pendingCleans++;
+      _pendingPaths.addAll(selected.map((candidate) => candidate.path));
+    });
+    widget.cubit.setSelected(
+      selected.map((candidate) => candidate.path),
+      false,
+    );
     CleanReport? result;
     try {
       result = await onClean(
@@ -166,20 +177,12 @@ class _CleanerLeftoversViewState extends State<CleanerLeftoversView> {
         },
       );
     } finally {
-      if (mounted) setState(() => _cleaning = false);
+      _pendingCleans--;
+      _pendingPaths.removeAll(selected.map((candidate) => candidate.path));
+      if (mounted) setState(() {});
     }
     if (!mounted || result == null) return;
     widget.cubit.removePaths(result.succeeded);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          l.cleanerLeftoversCleaned(
-            FormatUtils.formatFileSize(result.freedBytes),
-            destination,
-          ),
-        ),
-      ),
-    );
   }
 
   @override
@@ -425,12 +428,12 @@ class _CleanerLeftoversViewState extends State<CleanerLeftoversView> {
                         value: allChecked
                             ? true
                             : (checked == 0 ? false : null),
-                        onChanged: _cleaning
-                            ? null
-                            : (_) => widget.cubit.setSelected(
-                                folders.map((c) => c.path),
-                                !allChecked,
-                              ),
+                        onChanged: (_) => widget.cubit.setSelected(
+                          folders
+                              .where((c) => !_pendingPaths.contains(c.path))
+                              .map((c) => c.path),
+                          !allChecked,
+                        ),
                       ),
                     ),
                     Expanded(
@@ -481,7 +484,7 @@ class _CleanerLeftoversViewState extends State<CleanerLeftoversView> {
                   measurement: state.measurements[folder.path],
                   now: state.evaluatedAt,
                   selected: state.selectedPaths.contains(folder.path),
-                  enabled: !_cleaning,
+                  enabled: !_pendingPaths.contains(folder.path),
                   onToggle: () => widget.cubit.toggleSelected(folder.path),
                   onOpenFolder: widget.onOpenFolder == null
                       ? null
@@ -497,9 +500,15 @@ class _CleanerLeftoversViewState extends State<CleanerLeftoversView> {
 
   Widget _buildFooter(AppLocalizations l, CleanerAppLeftoversState state) {
     final theme = Theme.of(context);
-    final selected = state.selectedCandidates;
+    final selected = state.selectedCandidates
+        .where((candidate) => !_pendingPaths.contains(candidate.path))
+        .toList();
+    final selectedBytes = selected.fold<int>(
+      0,
+      (sum, candidate) => sum + candidate.sizeBytes,
+    );
     final summary = l.cleanerLeftoversSelected(
-      FormatUtils.formatFileSize(state.selectedBytes),
+      FormatUtils.formatFileSize(selectedBytes),
       selected.length,
     );
     final summaryText = AnimatedSwitcher(
@@ -516,14 +525,14 @@ class _CleanerLeftoversViewState extends State<CleanerLeftoversView> {
     );
     final cleanButton = FilledButton.icon(
       key: const ValueKey<String>('cleaner-leftovers-clean'),
-      onPressed: selected.isEmpty || _cleaning || widget.onClean == null
+      onPressed: selected.isEmpty || widget.onClean == null
           ? null
           : _cleanSelected,
       icon: const Icon(Icons.cleaning_services_outlined, size: 18),
       label: Text(
         l.cleanerLeftoversMoveTo(
           selected.length,
-          FormatUtils.formatFileSize(state.selectedBytes),
+          FormatUtils.formatFileSize(selectedBytes),
           _destination(l),
         ),
         maxLines: 1,

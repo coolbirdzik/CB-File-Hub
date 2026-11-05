@@ -129,7 +129,8 @@ class _CleanerSmartCleanViewState extends State<CleanerSmartCleanView> {
     CleanerSmartCleanStatus.ready || CleanerSmartCleanStatus.cleaning =>
       state.groups.isEmpty &&
               state.reviewCandidates.isEmpty &&
-              state.scanWarnings.isEmpty
+              state.scanWarnings.isEmpty &&
+              state.result == null
           ? 'cleaner-smart-clean-phase-empty'
           : 'cleaner-smart-clean-phase-list',
     CleanerSmartCleanStatus.done => 'cleaner-smart-clean-phase-done',
@@ -205,7 +206,8 @@ class _CleanerSmartCleanViewState extends State<CleanerSmartCleanView> {
       case CleanerSmartCleanStatus.cleaning:
         if (state.groups.isEmpty &&
             state.reviewCandidates.isEmpty &&
-            state.scanWarnings.isEmpty) {
+            state.scanWarnings.isEmpty &&
+            state.result == null) {
           return _CenteredCard(
             child: _Message(
               icon: PhosphorIconsLight.checkCircle,
@@ -413,7 +415,6 @@ class _CleanerSmartCleanViewState extends State<CleanerSmartCleanView> {
   // ---------------------------------------------------------------------------
 
   Widget _buildList(AppLocalizations l, CleanerSmartCleanState state) {
-    final cleaning = state.status == CleanerSmartCleanStatus.cleaning;
     final total = state.groups.fold<int>(0, (sum, g) => sum + g.bytes);
     final recycleNote = widget.usesTrash
         ? l.cleanerSmartCleanDoneHint(_destination(l))
@@ -449,7 +450,7 @@ class _CleanerSmartCleanViewState extends State<CleanerSmartCleanView> {
                           : widget.categoryReason(group.categoryId),
                       apps: group.isPermanent ? const [] : group.topApps(),
                       icon: _categoryIcon(group.categoryId),
-                      enabled: !cleaning,
+                      enabled: true,
                       expanded: _expanded.contains(group.categoryId),
                       onToggle: () => _cubit.toggleGroup(group.categoryId),
                       onExpand: () => setState(() {
@@ -501,7 +502,7 @@ class _CleanerSmartCleanViewState extends State<CleanerSmartCleanView> {
       key: const ValueKey<String>('cleaner-smart-clean-clean'),
       variant: CbButtonVariant.primary,
       size: CbButtonSize.lg,
-      onPressed: widget.enabled && !cleaning && state.selectedCount > 0
+      onPressed: widget.enabled && state.selectedCount > 0
           ? () => _clean(state)
           : null,
       icon: PhosphorIconsLight.broom,
@@ -1566,25 +1567,28 @@ class _CleanProgress extends StatelessWidget {
             children: [
               AppWaveLoader(size: 18, color: c.accent.base),
               const SizedBox(width: 8),
-              Text(
-                total > 0
-                    ? l.diskCleanerProcessedCount(done, total)
-                    : l.diskCleanerPreparingFiles,
-                style: CbTypography.labelSm.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  path,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: CbTypography.bodySm.copyWith(color: c.textSecondary),
+                  total > 0
+                      ? l.diskCleanerProcessedCount(done, total)
+                      : l.diskCleanerPreparingProgress(done),
+                  style: CbTypography.labelSm.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ],
           ),
+          if (path.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                path,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: CbTypography.bodySm.copyWith(color: c.textSecondary),
+              ),
+            ),
           const SizedBox(height: 8),
           ClipRRect(
             borderRadius: BorderRadius.circular(999),

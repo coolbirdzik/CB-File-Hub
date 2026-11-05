@@ -13,8 +13,7 @@ import 'cleaner_smart_clean_state.dart';
 typedef CleanerSmartCleanScan =
     Future<ScanReport> Function(void Function(ScanProgress) onProgress);
 
-/// Returns null when the clean did not run (another cleanup was active or it
-/// failed; the caller reports why).
+/// Waits for the queued batch; null when it failed or did not run.
 typedef CleanerSmartCleanClean =
     Future<CleanReport?> Function(
       List<JunkItem> items,
@@ -45,6 +44,7 @@ class CleanerSmartCleanCubit extends Cubit<CleanerSmartCleanState> {
 
   /// Bumped on every scan and cancel so a stale scan cannot publish.
   int _generation = 0;
+  int _pendingCleans = 0;
 
   /// Progress arrives per file; the view only needs a few frames' worth.
   static const Duration _progressInterval = Duration(milliseconds: 80);
@@ -228,7 +228,10 @@ class CleanerSmartCleanCubit extends Cubit<CleanerSmartCleanState> {
   /// Unchecks the whole group when all of it is checked, checks all of it
   /// otherwise.
   void toggleGroup(String categoryId) {
-    if (state.status != CleanerSmartCleanStatus.ready) return;
+    if (state.status != CleanerSmartCleanStatus.ready &&
+        state.status != CleanerSmartCleanStatus.cleaning) {
+      return;
+    }
     final ids = [
       for (final group in state.groups)
         if (group.categoryId == categoryId)
@@ -246,7 +249,10 @@ class CleanerSmartCleanCubit extends Cubit<CleanerSmartCleanState> {
   }
 
   void toggleSource(String categoryId, String sourceKey) {
-    if (state.status != CleanerSmartCleanStatus.ready) return;
+    if (state.status != CleanerSmartCleanStatus.ready &&
+        state.status != CleanerSmartCleanStatus.cleaning) {
+      return;
+    }
     final id = CleanerSmartCleanState.sourceId(categoryId, sourceKey);
     final excluded = {...state.excluded};
     if (!excluded.remove(id)) excluded.add(id);
@@ -254,16 +260,24 @@ class CleanerSmartCleanCubit extends Cubit<CleanerSmartCleanState> {
   }
 
   Future<void> clean() async {
-    if (state.status != CleanerSmartCleanStatus.ready) return;
+    if (state.status != CleanerSmartCleanStatus.ready &&
+        state.status != CleanerSmartCleanStatus.cleaning) {
+      return;
+    }
     final items = state.selectedItems;
     if (items.isEmpty) return;
     final ready = state;
+    _pendingCleans++;
     emit(
       state.copyWith(
         status: CleanerSmartCleanStatus.cleaning,
         cleanDone: 0,
-        cleanTotal: items.length,
+        cleanTotal: 0,
         cleanPath: '',
+        pendingPaths: {
+          ...state.pendingPaths,
+          ...items.map((item) => item.path),
+        },
       ),
     );
 
@@ -285,11 +299,21 @@ class CleanerSmartCleanCubit extends Cubit<CleanerSmartCleanState> {
     } catch (_) {
       report = null;
     }
+    _pendingCleans--;
     if (isClosed) return;
+    final pendingPaths = {...state.pendingPaths}
+      ..removeAll(items.map((item) => item.path));
     if (report == null) {
       // Nothing ran, or the caller already reported a failure: keep the
       // results so the user can retry or rescan.
-      emit(ready);
+      emit(
+        state.copyWith(
+          status: _pendingCleans > 0
+              ? CleanerSmartCleanStatus.cleaning
+              : CleanerSmartCleanStatus.ready,
+          pendingPaths: pendingPaths,
+        ),
+      );
       return;
     }
 
@@ -310,10 +334,16 @@ class CleanerSmartCleanCubit extends Cubit<CleanerSmartCleanState> {
       }
     }
     emit(
-      CleanerSmartCleanState(
-        status: CleanerSmartCleanStatus.done,
-        reviewCandidates: ready.reviewCandidates,
-        scanWarnings: ready.scanWarnings,
+      state.copyWith(
+        status: _pendingCleans > 0
+            ? CleanerSmartCleanStatus.cleaning
+            : CleanerSmartCleanStatus.ready,
+        pendingPaths: pendingPaths,
+        groups: [
+          for (final group in state.groups)
+            if (group.withoutPaths(succeeded).items.isNotEmpty)
+              group.withoutPaths(succeeded),
+        ],
         result: CleanerSmartCleanResult(
           movedBytes: movedBytes,
           movedCount: movedCount,

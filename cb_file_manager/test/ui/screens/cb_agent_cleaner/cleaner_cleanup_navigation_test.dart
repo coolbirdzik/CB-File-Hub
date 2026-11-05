@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cb_file_manager/config/languages/app_localizations_delegate.dart';
 import 'package:cb_file_manager/services/disk_cleaner/cleaner_models.dart';
 import 'package:cb_file_manager/services/disk_cleaner/disk_cleaner_service.dart';
@@ -73,6 +75,9 @@ class _Cleaner extends DiskCleanerService {
   bool failDelete = false;
   bool requiresAdmin = false;
   final failureActions = <CleanFailureAction>[];
+  final holds = <Completer<void>>[];
+  int? throwOnRequest;
+  bool reportPreparation = false;
 
   @override
   Future<List<DriveSpace>> getDriveSpace() async => const [
@@ -110,6 +115,10 @@ class _Cleaner extends DiskCleanerService {
     onDeleteFailure,
   }) async {
     requests.add((items: items, permanent: permanent));
+    final index = requests.length - 1;
+    if (reportPreparation) onProgress?.call(1234, 0, r'C:\cache\reading');
+    if (index < holds.length) await holds[index].future;
+    if (throwOnRequest == index) throw StateError('Test cleanup failed');
     if (failDelete && onDeleteFailure != null) {
       failureActions.add(
         await onDeleteFailure(
@@ -362,57 +371,188 @@ void main() {
     });
   }
 
-  testWidgets('continue reuses results and dashboard after cleanup', (
-    tester,
-  ) async {
-    final cleaner = _Cleaner();
-    await _pumpCleaner(tester, cleaner);
-    await tester.tap(
-      find.byKey(const ValueKey('cleaner-dashboard-card-largeFiles')),
-    );
-    await tester.pumpAndSettle();
-    final dashboard = tester.state(find.byType(CleanerDashboard));
-    final results = tester.element(find.byKey(const ValueKey('results')));
+  testWidgets(
+    'cleanup keeps results and dashboard visible without a success screen',
+    (tester) async {
+      final cleaner = _Cleaner();
+      await _pumpCleaner(tester, cleaner);
+      await tester.tap(
+        find.byKey(const ValueKey('cleaner-dashboard-card-largeFiles')),
+      );
+      await tester.pumpAndSettle();
+      final dashboard = tester.state(find.byType(CleanerDashboard));
+      final results = tester.element(find.byKey(const ValueKey('results')));
 
-    await _select(tester);
-    await tester.tap(find.byKey(const ValueKey('cleaner-review-and-clean')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('cleaner-confirm-clean')));
-    await _finishCleanup(tester);
-    expect(cleaner.requests, hasLength(1));
-    expect(
-      find.byKey(const ValueKey('cleaner-continue-results')),
-      findsOneWidget,
-    );
-    expect(find.byType(CleanerDashboard), findsNothing);
-    expect(
-      tester.state(find.byType(CleanerDashboard, skipOffstage: false)),
-      same(dashboard),
-    );
+      await _select(tester);
+      await tester.tap(find.byKey(const ValueKey('cleaner-review-and-clean')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('cleaner-confirm-clean')));
+      await _finishCleanup(tester);
+      expect(cleaner.requests, hasLength(1));
+      expect(
+        find.byKey(const ValueKey('cleaner-continue-results')),
+        findsNothing,
+      );
+      expect(find.byType(CleanerDashboard), findsOneWidget);
+      expect(
+        tester.state(find.byType(CleanerDashboard, skipOffstage: false)),
+        same(dashboard),
+      );
 
-    cleaner.kept.childrenReads = 0;
-    await tester.tap(find.byKey(const ValueKey('cleaner-continue-results')));
-    await tester.pumpAndSettle();
-    expect(
-      cleaner.kept.childrenReads,
-      0,
-      reason: 'Continue must not traverse the unchanged collapsed subtree',
+      cleaner.kept.childrenReads = 0;
+      await tester.pumpAndSettle();
+      expect(
+        cleaner.kept.childrenReads,
+        0,
+        reason: 'Continue must not traverse the unchanged collapsed subtree',
+      );
+      expect(tester.state(find.byType(CleanerDashboard)), same(dashboard));
+      expect(
+        tester.element(find.byKey(const ValueKey('results'))),
+        same(results),
+      );
+      expect(
+        find.byKey(const ValueKey('cleaner-dashboard-detail-largeFiles')),
+        findsOneWidget,
+      );
+      expect(find.text('remove.iso'), findsNothing);
+      expect(find.text('keep.mkv'), findsWidgets);
+      expect(cleaner.root.sizeBytes, _gb);
+      expect(cleaner.root.fileCount, 1);
+      expect(cleaner.scans, 1);
+    },
+  );
+
+  for (final language in ['en', 'vi']) {
+    testWidgets(
+      'preparing files shows discovered count without a false remaining total ($language)',
+      (tester) async {
+        final cleaner = _Cleaner()..reportPreparation = true;
+        final hold = Completer<void>();
+        cleaner.holds.add(hold);
+        await _pumpCleaner(tester, cleaner, languageCode: language);
+        await _select(tester);
+        await tester.sendKeyEvent(LogicalKeyboardKey.delete);
+        await tester.pumpAndSettle();
+        await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+        expect(
+          find.text(
+            language == 'vi'
+                ? 'Đang chuẩn bị · đã tìm thấy 1234 mục'
+                : 'Preparing files · 1234 found',
+          ),
+          findsOneWidget,
+        );
+        final progress = find.byKey(
+          const ValueKey('cleaner-cleaning-progress'),
+        );
+        final bar = find.descendant(
+          of: progress,
+          matching: find.byType(LinearProgressIndicator),
+        );
+        expect(tester.widget<LinearProgressIndicator>(bar).value, isNull);
+        expect(find.textContaining('-1234'), findsNothing);
+        expect(find.textContaining(r'C:\cache\reading'), findsOneWidget);
+        hold.complete();
+        await _finishCleanup(tester);
+        expect(tester.takeException(), isNull);
+      },
     );
-    expect(tester.state(find.byType(CleanerDashboard)), same(dashboard));
-    expect(
-      tester.element(find.byKey(const ValueKey('results'))),
-      same(results),
+  }
+
+  for (final failFirst in [false, true]) {
+    testWidgets(
+      'Delete queues distinct batches and continues after failure: $failFirst',
+      (tester) async {
+        final cleaner = _Cleaner();
+        final second = DiskTreeNode(
+          name: 'second.iso',
+          fullPath: r'C:\second.iso',
+          isFile: true,
+          sizeBytes: _gb,
+          fileCount: 1,
+        );
+        cleaner.root.replaceChildren([...cleaner.root.children, second]);
+        final firstHold = Completer<void>();
+        final secondHold = Completer<void>();
+        cleaner.holds.addAll([firstHold, secondHold]);
+        if (failFirst) cleaner.throwOnRequest = 0;
+        await _pumpCleaner(tester, cleaner);
+
+        Future<void> queue(String path, {bool permanent = false}) async {
+          await tester.tap(find.byKey(ValueKey('cleaner-tree-row-idle-$path')));
+          await tester.pump(const Duration(milliseconds: 300));
+          if (permanent) {
+            await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+          }
+          await tester.sendKeyEvent(LogicalKeyboardKey.delete);
+          if (permanent) {
+            await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+          }
+          await tester.pump(const Duration(milliseconds: 300));
+          expect(find.byType(AlertDialog), findsOneWidget);
+          await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 300));
+        }
+
+        await queue(cleaner.removed.fullPath);
+        expect(cleaner.requests, hasLength(1));
+        await queue(second.fullPath, permanent: true);
+        expect(
+          cleaner.requests,
+          hasLength(1),
+          reason: 'Only one service cleanup runs at a time',
+        );
+        expect(find.text('1 cleanup(s) queued'), findsOneWidget);
+        // Repeated Delete on the same reserved target cannot add another batch.
+        await queue(second.fullPath);
+        expect(cleaner.requests, hasLength(1));
+        expect(find.text('1 cleanup(s) queued'), findsOneWidget);
+
+        // A fresh selection made while deleting must survive completion.
+        final archive = find.byKey(
+          const ValueKey(r'cleaner-tree-row-idle-C:\Archive'),
+        );
+        await tester.tap(archive);
+        await tester.pump();
+        firstHold.complete();
+        final deadline = Stopwatch()..start();
+        while (cleaner.requests.length < 2) {
+          if (deadline.elapsed > const Duration(seconds: 10)) {
+            fail('Second cleanup did not start');
+          }
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 10)),
+          );
+          await tester.pump(const Duration(milliseconds: 16));
+        }
+        expect(cleaner.requests[0].permanent, isFalse);
+        expect(cleaner.requests[1].permanent, isTrue);
+        expect(cleaner.requests[1].items.single.path, second.fullPath);
+        expect(
+          find.byKey(const ValueKey(r'cleaner-tree-row-selected-C:\Archive')),
+          findsOneWidget,
+        );
+        secondHold.complete();
+        await _finishCleanup(tester);
+        expect(cleaner.requests, hasLength(2));
+        expect(
+          find.byKey(const ValueKey('cleaner-continue-results')),
+          findsNothing,
+        );
+        expect(find.text('second.iso'), findsNothing);
+        expect(
+          find.text('remove.iso'),
+          failFirst ? findsWidgets : findsNothing,
+        );
+        expect(cleaner.scans, 1);
+        expect(tester.takeException(), isNull);
+      },
     );
-    expect(
-      find.byKey(const ValueKey('cleaner-dashboard-detail-largeFiles')),
-      findsOneWidget,
-    );
-    expect(find.text('remove.iso'), findsNothing);
-    expect(find.text('keep.mkv'), findsWidgets);
-    expect(cleaner.root.sizeBytes, _gb);
-    expect(cleaner.root.fileCount, 1);
-    expect(cleaner.scans, 1);
-  });
+  }
 }
 
 /// The Cleaner opens on Smart Clean; these tests drive Disk usage.

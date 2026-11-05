@@ -286,6 +286,12 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
 
   // Cleanup progress
   bool _isCleaningJunk = false;
+  Future<void> _cleanupTail = Future<void>.value();
+  final Set<String> _queuedCleanupPaths = {};
+  final Map<String, int> _queuedCleanupAncestors = {};
+  int _cleanupCount = 0;
+  int _activeCleanupBytes = 0;
+  bool _activeCleanupPermanent = false;
   // Hot progress data lives in a ValueNotifier so only the progress bar
   // rebuilds during cleanup. Calling setState on every progress tick used
   // to rebuild the entire 2900-line screen — including the disk tree and
@@ -405,7 +411,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       onProgress: onProgress,
     ),
     // Browsers and Explorer keep some caches open; skip those instead of
-    // asking about each one. The done screen reports the skipped count.
+    // asking about each one. A snackbar reports the skipped count.
     clean: (items, onProgress) =>
         _cleanSelectedItems(items, onProgress, autoSkipFailures: true),
     cancelScan: _service.cancelActiveScan,
@@ -2218,7 +2224,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
             subtitle: l.cleanerUtilitiesSubtitle,
             selectedId: feature.name,
             destinations: destinations,
-            navigationEnabled: !_reviewMode && !_isCleaningJunk,
+            navigationEnabled: !_reviewMode,
             onSelected: (id) {
               final selected = _CleanerSubFeature.values.firstWhere(
                 (candidate) => candidate.name == id,
@@ -2507,7 +2513,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
                 FilledButton.tonalIcon(
                   key: const ValueKey<String>('cleaner-open-smart-clean'),
                   style: FilledButton.styleFrom(shape: _cleanerButtonShape),
-                  onPressed: _isCleaningJunk ? null : _openSmartClean,
+                  onPressed: _openSmartClean,
                   icon: const Icon(PhosphorIconsLight.sparkle, size: 16),
                   label: Text(l.cleanerSmartCleanTitle),
                 ),
@@ -2561,8 +2567,6 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
   Future<void> _deleteCurrentSelectionImmediately({
     required bool permanent,
   }) async {
-    if (_isCleaningJunk) return;
-
     final nodes = _selectedTreeNodes();
     if (nodes.isEmpty) return;
 
@@ -2629,7 +2633,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     _service.pendingCleanupItems = items;
     _service.pendingCleanupBytes = totalBytes;
 
-    await _cleanJunk(permanent: permanent, showCleanedResult: false);
+    await _cleanJunk(permanent: permanent);
   }
 
   List<DiskTreeNode> _selectedTreeNodes() {
@@ -3041,7 +3045,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
   }
 
   KeyEventResult _handleResultsKeyEvent(FocusNode node, KeyEvent event) {
-    if (_isCleaningJunk || _rootNode == null) return KeyEventResult.ignored;
+    if (_rootNode == null) return KeyEventResult.ignored;
     if (BrowserLikeKeyboardShortcuts.isTextInputFocused()) {
       return KeyEventResult.ignored;
     }
@@ -3423,7 +3427,6 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
         categoryIds: _smartCleanCategoryIds,
         categoryTitle: (id) => _junkCategoryTitle(l, id),
         categoryReason: (id) => _junkReason(l, id),
-        enabled: !_isCleaningJunk,
         usesTrash: !Platform.isWindows,
         onOpenReviewFile: (path) => EntityOpenActions.openInNewTab(
           context,
@@ -3453,7 +3456,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
         onScan: _isCleaningJunk ? null : () => unawaited(_startLeftoverScan()),
         onCancel: _cancelLeftoverScan,
         onOpenFolder: _openLeftoverFolder,
-        onClean: _isCleaningJunk ? null : _cleanSelectedItems,
+        onClean: _cleanSelectedItems,
       ),
     );
   }
@@ -4653,19 +4656,23 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
   // Bottom action bar
   // ---------------------------------------------------------------------------
 
-  Widget _buildBottomBar(ThemeData theme, AppLocalizations l) {
+  Widget _buildBottomBar(
+    ThemeData theme,
+    AppLocalizations l, {
+    bool showProgress = true,
+  }) {
     final root = _rootNode;
     if (root != null) _ensureCleanerAggregates(root);
     final junkBytes = root == null ? 0 : _cachedJunkBytes;
     final selectedBytes = _selectedJunkBytes(root);
-    final cleaningBytes = _isCleaningJunk ? _pendingCleanBytes : selectedBytes;
+    final cleaningBytes = _activeCleanupBytes;
 
-    if (_isCleaningJunk) {
+    if (_isCleaningJunk && showProgress && !_reviewMode) {
       // Drive the entire progress bar from the ValueNotifier so the disk
       // tree and pie chart panels (sitting in the same Scaffold) are NOT
       // rebuilt on every progress tick. This is what fixes the visible
       // stutter on the bar.
-      return ValueListenableBuilder<_CleanProgressSnapshot>(
+      final progressBar = ValueListenableBuilder<_CleanProgressSnapshot>(
         key: const ValueKey('cleaner-cleaning-progress'),
         valueListenable: _cleanProgress,
         builder: (context, snap, _) {
@@ -4743,12 +4750,18 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
+                    if (_cleanupCount > 1)
+                      _buildProgressStatChip(
+                        theme: theme,
+                        icon: PhosphorIconsLight.listNumbers,
+                        label: l.diskCleanerQueuedCleanups(_cleanupCount - 1),
+                      ),
                     _buildProgressStatChip(
                       theme: theme,
-                      icon: _selectedCleanMode == _CleanDeleteMode.permanent
+                      icon: _activeCleanupPermanent
                           ? PhosphorIconsLight.trash
                           : PhosphorIconsLight.recycle,
-                      label: _selectedCleanMode == _CleanDeleteMode.permanent
+                      label: _activeCleanupPermanent
                           ? l.diskCleanerPermanentDeleteLabel
                           : (!Platform.isWindows
                                 ? l.trashBin
@@ -4757,7 +4770,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
                     _buildProgressStatChip(
                       theme: theme,
                       icon: PhosphorIconsLight.chartBar,
-                      label: l.diskCleanerProcessedCount(snap.done, snap.total),
+                      label: isPreparing
+                          ? l.diskCleanerPreparingProgress(snap.done)
+                          : l.diskCleanerProcessedCount(snap.done, snap.total),
                     ),
                     _buildProgressStatChip(
                       theme: theme,
@@ -4784,26 +4799,31 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
                 Row(
                   children: [
                     Text(
-                      progressPercent == null
-                          ? l.diskCleanerDeletingItems
+                      isPreparing
+                          ? l.diskCleanerScanningSelectedDirs
                           : '$progressPercent% ${l.diskCleanerCleaning}',
                       style: theme.textTheme.bodySmall?.copyWith(
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                     const Spacer(),
-                    Text(
-                      '${snap.total - snap.done} ${l.diskCleanerRemaining}',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
+                    if (!isPreparing)
+                      Text(
+                        '${snap.total - snap.done} ${l.diskCleanerRemaining}',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ],
             ),
           );
         },
+      );
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [progressBar, _buildBottomBar(theme, l, showProgress: false)],
       );
     }
 
@@ -5155,17 +5175,97 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     );
   }
 
-  Future<void> _cleanJunk({
+  /// Snapshots each approved batch before waiting for earlier cleanups. Paths
+  /// stay reserved until completion, including parents/children, so repeated
+  /// Delete presses cannot schedule overlapping destructive operations.
+  Future<CleanReport?> _enqueueCleanup(
+    List<JunkItem> requested,
+    Future<CleanReport?> Function(List<JunkItem>) run,
+  ) {
+    final items = <JunkItem>[];
+    for (final item in requested) {
+      final key = CleanerPaths.key(item.path);
+      if (_queuedCleanupAncestors.containsKey(key) ||
+          CleanerPaths.ancestors(key).any(_queuedCleanupPaths.contains)) {
+        continue;
+      }
+      _queuedCleanupPaths.add(key);
+      for (final ancestor in CleanerPaths.ancestors(key)) {
+        _queuedCleanupAncestors.update(
+          ancestor,
+          (count) => count + 1,
+          ifAbsent: () => 1,
+        );
+      }
+      items.add(item);
+    }
+    if (items.isEmpty) return Future<CleanReport?>.value();
+    setState(() {
+      _cleanupCount++;
+      _isCleaningJunk = true;
+      _replaceTreeTargets(
+        _selectedTreeTargets.where(
+          (node) => !CleanerPaths.ancestors(
+            node.fullPath,
+          ).any(_queuedCleanupPaths.contains),
+        ),
+      );
+      _flatRowsValid = false;
+    });
+    final completion = _cleanupTail.then((_) async {
+      try {
+        if (!mounted) return null;
+        return await run(List<JunkItem>.unmodifiable(items));
+      } finally {
+        for (final item in items) {
+          _queuedCleanupPaths.remove(CleanerPaths.key(item.path));
+          for (final ancestor in CleanerPaths.ancestors(item.path)) {
+            final count = _queuedCleanupAncestors[ancestor]!;
+            if (count == 1) {
+              _queuedCleanupAncestors.remove(ancestor);
+            } else {
+              _queuedCleanupAncestors[ancestor] = count - 1;
+            }
+          }
+        }
+        _cleanupCount--;
+        if (mounted) setState(() => _isCleaningJunk = _cleanupCount > 0);
+      }
+    });
+    // A failed batch must never prevent a later approved batch from running.
+    _cleanupTail = completion.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace _) {},
+    );
+    return completion;
+  }
+
+  Future<void> _cleanJunk({required bool permanent}) async {
+    final items = List<JunkItem>.of(_pendingCleanItems);
+    if (items.isEmpty) return;
+    setState(() {
+      _pendingCleanItems = [];
+      _pendingCleanBytes = 0;
+    });
+    _service.pendingCleanupItems = const [];
+    _service.pendingCleanupBytes = 0;
+    await _enqueueCleanup(
+      items,
+      (batch) => _runCleanJunk(batch, permanent: permanent),
+    );
+  }
+
+  Future<CleanReport?> _runCleanJunk(
+    List<JunkItem> items, {
     required bool permanent,
-    bool showCleanedResult = true,
   }) async {
-    if (_isCleaningJunk || _pendingCleanItems.isEmpty) return;
     final l = AppLocalizations.of(context)!;
     _freeBytesBeforeClean = await _currentFreeBytes();
     _freeBytesAfterClean = null;
-    if (!mounted) return;
+    if (!mounted) return null;
     setState(() {
-      _isCleaningJunk = true;
+      _activeCleanupBytes = items.fold(0, (sum, item) => sum + item.sizeBytes);
+      _activeCleanupPermanent = permanent;
       _cleanedSkippedInUseCount = 0;
       _cleanedSkippedByUserCount = 0;
       _skipAllDeleteFailures = false;
@@ -5185,7 +5285,6 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     );
 
     try {
-      final items = List<JunkItem>.from(_pendingCleanItems);
       final result = await _service.cleanJunk(
         items: items,
         permanent: permanent,
@@ -5215,35 +5314,24 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
         },
       );
 
-      if (!mounted) return;
+      if (!mounted) return result;
       final succeededSet = result.succeeded.toSet();
-      final cleanedItems = items
-          .where((i) => succeededSet.contains(i.path))
-          .toList();
 
       await _pruneCleanedFromTree(succeededSet);
-      if (!mounted) return;
+      if (!mounted) return result;
       _appLeftoversCubit.removePaths(succeededSet);
 
       setState(() {
-        _isCleaningJunk = false;
-        _pendingCleanItems = [];
-        _pendingCleanBytes = 0;
-        _cleanedItems = showCleanedResult && !permanent
-            ? cleanedItems
-            : const [];
+        _cleanedItems = const [];
         _cleanedFreedBytes = result.freedBytes;
         _cleanedFailureCount = result.failureCount;
         _cleanedSkippedInUseCount = result.skippedInUseCount;
         _cleanedSkippedByUserCount = result.skippedByUserCount;
         _lastCleanSuccessCount = result.successCount;
         _lastCleanWasPermanent = permanent;
-        _phase = showCleanedResult ? _Phase.cleaned : _Phase.results;
         _cachedFlatRoot = null;
         _flatRowsValid = false;
       });
-      _service.pendingCleanupItems = const [];
-      _service.pendingCleanupBytes = 0;
       unawaited(_refreshFreeSpaceAfterClean());
       if (result.skippedInUseCount > 0) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -5266,11 +5354,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
           ),
         );
       }
+      return result;
     } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _isCleaningJunk = false;
-      });
+      if (!mounted) return null;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -5278,6 +5364,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
           ),
         ),
       );
+      return null;
     }
   }
 
@@ -5305,7 +5392,14 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       _selectedNode = _rootNode;
       _chartNode = _rootNode;
     }
-    _selectedTreeTargets.clear();
+    _selectedTreeTargets.removeWhere(
+      (node) => deletedUpper.any(
+        (path) => CleanerPaths.contains(path, node.fullPath),
+      ),
+    );
+    for (final target in _selectedTreeTargets) {
+      target.isSelectedForDeletion = true;
+    }
     _rebuildReviewVisibleTreePaths();
     _publishTreeSelection();
     if (_selectionAnchorPath != null &&
@@ -5320,18 +5414,44 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     List<JunkItem> items,
     void Function(int done, int total, String? path) onProgress, {
     bool autoSkipFailures = false,
+  }) => _enqueueCleanup(
+    items,
+    (batch) => _runSelectedCleanup(
+      batch,
+      onProgress,
+      autoSkipFailures: autoSkipFailures,
+    ),
+  );
+
+  Future<CleanReport?> _runSelectedCleanup(
+    List<JunkItem> items,
+    void Function(int done, int total, String? path) onProgress, {
+    required bool autoSkipFailures,
   }) async {
-    if (_isCleaningJunk || items.isEmpty) return null;
-    setState(() => _isCleaningJunk = true);
+    setState(() {
+      _activeCleanupBytes = items.fold(0, (sum, item) => sum + item.sizeBytes);
+      _activeCleanupPermanent = false;
+    });
+    _cleanProgress.value = const _CleanProgressSnapshot();
     _skipAllDeleteFailures = autoSkipFailures;
     try {
       final result = await _service.cleanJunk(
         items: items,
         permanent: false,
         onDeleteFailure: _promptDeleteFailureAction,
-        onProgress: onProgress,
+        onProgress: (done, total, path) {
+          onProgress(done, total, path);
+          if (mounted) {
+            _cleanProgress.value = _CleanProgressSnapshot(
+              done: done,
+              total: total,
+              currentPath: path ?? '',
+            );
+          }
+        },
       );
       if (!mounted) return result;
+      _appLeftoversCubit.removePaths(result.succeeded);
       await _pruneCleanedFromTree(result.succeeded.toSet());
       if (!mounted) return result;
       setState(() {
@@ -5367,7 +5487,6 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     } finally {
       // Later deletes must prompt again.
       _skipAllDeleteFailures = false;
-      if (mounted) setState(() => _isCleaningJunk = false);
     }
   }
 

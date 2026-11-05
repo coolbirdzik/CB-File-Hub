@@ -1867,6 +1867,8 @@ abstract class AppLocalizations {
   String get diskCleanerOldLargeEmpty;
   String get diskCleanerPreparingFiles;
   String get diskCleanerCleaning;
+  String diskCleanerQueuedCleanups(int count);
+  String diskCleanerPreparingProgress(int count);
   String get diskCleanerScanningSelectedDirs;
   String get diskCleanerDeletingJunkHint;
   String get diskCleanerPermanentDeleteLabel;

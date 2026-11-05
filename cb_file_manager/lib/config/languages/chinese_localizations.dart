@@ -4191,6 +4191,10 @@ class ChineseLocalizations implements AppLocalizations {
   @override
   String get diskCleanerCleaning => '正在清理...';
   @override
+  String diskCleanerQueuedCleanups(int count) => '$count 个清理任务等待中';
+  @override
+  String diskCleanerPreparingProgress(int count) => '正在准备文件 · 已找到 $count 个';
+  @override
   String get diskCleanerScanningSelectedDirs => '正在扫描所选目录...';
   @override
   String get diskCleanerDeletingJunkHint => '正在删除所选项目。如果某个文件删除失败，您可以跳过或重试。';

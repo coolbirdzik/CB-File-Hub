@@ -4417,6 +4417,11 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get diskCleanerCleaning => 'Đang dọn dẹp...';
   @override
+  String diskCleanerQueuedCleanups(int count) => '$count lượt dọn đang chờ';
+  @override
+  String diskCleanerPreparingProgress(int count) =>
+      'Đang chuẩn bị · đã tìm thấy $count mục';
+  @override
   String get diskCleanerScanningSelectedDirs =>
       'Đang quét các thư mục đã chọn...';
   @override

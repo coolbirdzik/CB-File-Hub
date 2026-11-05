@@ -31,27 +31,30 @@ class CleanerCleanProgress extends StatelessWidget {
                 children: [
                   AppWaveLoader(size: 18, color: theme.colorScheme.primary),
                   const SizedBox(width: 8),
-                  Text(
-                    total > 0
-                        ? l.diskCleanerProcessedCount(done, total)
-                        : l.diskCleanerPreparingFiles,
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      path ?? '',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
+                      total > 0
+                          ? l.diskCleanerProcessedCount(done, total)
+                          : l.diskCleanerPreparingProgress(done),
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ),
                 ],
               ),
+              if (path != null && path.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    path,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
               const SizedBox(height: 8),
               ClipRRect(
                 borderRadius: BorderRadius.circular(999),

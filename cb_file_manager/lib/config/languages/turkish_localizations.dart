@@ -4467,6 +4467,11 @@ class TurkishLocalizations implements AppLocalizations {
   @override
   String get diskCleanerCleaning => 'Temizleniyor...';
   @override
+  String diskCleanerQueuedCleanups(int count) => '$count temizlik sırada';
+  @override
+  String diskCleanerPreparingProgress(int count) =>
+      'Dosyalar hazırlanıyor · $count bulundu';
+  @override
   String get diskCleanerScanningSelectedDirs => 'Seçilen dizinler taranıyor...';
   @override
   String get diskCleanerDeletingJunkHint =>

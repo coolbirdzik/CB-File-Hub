@@ -4436,6 +4436,11 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get diskCleanerCleaning => 'Cleaning...';
   @override
+  String diskCleanerQueuedCleanups(int count) => '$count cleanup(s) queued';
+  @override
+  String diskCleanerPreparingProgress(int count) =>
+      'Preparing files · $count found';
+  @override
   String get diskCleanerScanningSelectedDirs =>
       'Scanning selected directories...';
   @override

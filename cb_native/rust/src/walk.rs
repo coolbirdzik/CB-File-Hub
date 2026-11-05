@@ -354,6 +354,7 @@ pub fn start_dir_size(port: i64, config: &[u8]) -> Option<Arc<Job>> {
 const EXT_NONE: u8 = 0;
 const EXT_LAST_DOT: u8 = 1;
 const EXT_PATH: u8 = 2;
+const WALK_PARALLEL: u8 = 64;
 
 const WALK_FILES: u8 = 1;
 const WALK_DIRS: u8 = 2;
@@ -578,7 +579,13 @@ pub fn start_walk(port: i64, config: &[u8]) -> WalkStart {
         visited_links: Mutex::new(HashSet::new()),
     };
     let roots = roots.into_iter().map(|path| Task::dir(path, 0)).collect();
-    WalkStart::Started(start(port, roots, Box::new(kind)))
+    let job = start(port, roots, Box::new(kind));
+    // Cleaner preparation is a foreground walk. Reuse the bounded shared
+    // pool so a single large root can use its idle workers too.
+    if flags & WALK_PARALLEL != 0 {
+        widen_pool();
+    }
+    WalkStart::Started(job)
 }
 
 // ---------------------------------------------------------------------------
@@ -908,6 +915,32 @@ mod tests {
         assert_eq!(state, JOB_DONE);
         assert_eq!(out, 4u64.to_le_bytes());
         fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn foreground_parallel_walk_preserves_results_and_progress() {
+        let root = temp_tree("parallel");
+        let mut config = walk_config(&root, 0, &[]);
+        let flags_at = 4 + 4 + root.to_string_lossy().len() + 1 + 4;
+        config[flags_at] |= WALK_PARALLEL;
+        let WalkStart::Started(job) = start_walk(0, &config) else {
+            panic!("walk did not start");
+        };
+        let (state, output) = wait(&job);
+        assert_eq!(state, JOB_DONE);
+        let mut reader = Reader::new(&output);
+        let mut files = 0;
+        let mut bytes = 0;
+        while !reader.is_empty() {
+            assert_eq!(reader.u8().unwrap(), KIND_FILE);
+            bytes += reader.u64().unwrap();
+            reader.i64().unwrap();
+            reader.str().unwrap();
+            files += 1;
+        }
+        assert_eq!(files, 4);
+        assert_eq!(job.progress().0, [4, 4, 0, bytes]);
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

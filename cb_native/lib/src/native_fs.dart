@@ -314,6 +314,11 @@ abstract final class NativeFs {
   /// (both need stats, which are then read). The walk stops after about
   /// [maxResults] hits when it is above 0 (a few more can arrive from
   /// folders read in parallel). Traversal order is unspecified.
+  /// [onProgress] reports (entries found, folders read, unreadable folders,
+  /// bytes) while walking. With [onEntries], decoded batches are delivered
+  /// immediately and the returned list is empty, avoiding a second full copy.
+  /// A cancelled walk can already have delivered partial batches.
+  /// [parallel] lets this walk use all idle threads in the shared pool.
   static Future<List<NativeWalkEntry>?> walk({
     required List<String> roots,
     bool recursive = true,
@@ -323,6 +328,7 @@ abstract final class NativeFs {
     bool skipDotNames = false,
     bool stats = false,
     bool followLinks = false,
+    bool parallel = false,
     NativeExtensionMode extensionMode = NativeExtensionMode.none,
     Iterable<String> extensions = const [],
     List<String> excludeNameRegexes = const [],
@@ -330,7 +336,33 @@ abstract final class NativeFs {
     int minSize = 0,
     int? maxModifiedMs,
     bool Function()? shouldContinue,
+    void Function(NativeJobProgress progress)? onProgress,
+    void Function(List<NativeWalkEntry> entries)? onEntries,
   }) async {
+    final entries = <NativeWalkEntry>[];
+    void decode(Uint8List bytes) {
+      final batch = <NativeWalkEntry>[];
+      final r = WireReader(bytes);
+      while (!r.isDone) {
+        final kind = r.u8();
+        final size = r.i64();
+        final modified = r.i64();
+        batch.add(
+          NativeWalkEntry(
+            path: r.str(),
+            isDirectory: kind == b.kindDirectory,
+            size: size,
+            modifiedMs: modified,
+          ),
+        );
+      }
+      if (onEntries != null) {
+        onEntries(batch);
+      } else {
+        entries.addAll(batch);
+      }
+    }
+
     final out = await _walk(
       roots: roots,
       recursive: recursive,
@@ -340,7 +372,8 @@ abstract final class NativeFs {
           (directories ? 2 : 0) |
           (skipDotNames ? 4 : 0) |
           (stats ? 8 : 0) |
-          (followLinks ? 16 : 0),
+          (followLinks ? 16 : 0) |
+          (parallel ? 64 : 0),
       extensionMode: extensionMode,
       extensions: extensions,
       excludeNameRegexes: excludeNameRegexes,
@@ -348,23 +381,11 @@ abstract final class NativeFs {
       minSize: minSize,
       maxModifiedMs: maxModifiedMs,
       shouldContinue: shouldContinue,
+      onProgress: onProgress,
+      onOutput: onEntries == null ? null : decode,
     );
     if (out == null) return null;
-    final entries = <NativeWalkEntry>[];
-    final r = WireReader(out);
-    while (!r.isDone) {
-      final kind = r.u8();
-      final size = r.i64();
-      final modified = r.i64();
-      entries.add(
-        NativeWalkEntry(
-          path: r.str(),
-          isDirectory: kind == b.kindDirectory,
-          size: size,
-          modifiedMs: modified,
-        ),
-      );
-    }
+    if (onEntries == null) decode(out);
     return entries;
   }
 
@@ -408,6 +429,8 @@ abstract final class NativeFs {
     required int minSize,
     required int? maxModifiedMs,
     required bool Function()? shouldContinue,
+    void Function(NativeJobProgress progress)? onProgress,
+    void Function(Uint8List chunk)? onOutput,
   }) {
     final config = WireWriter()
       ..strs(roots)
@@ -423,7 +446,11 @@ abstract final class NativeFs {
       ..i64(maxModifiedMs ?? 0x7FFFFFFFFFFFFFFF);
     final job = NativeJob.start(b.jobWalk, config.takeBytes());
     if (job == null) return Future.value();
-    return job.result(shouldContinue: shouldContinue);
+    return job.result(
+      shouldContinue: shouldContinue,
+      onProgress: onProgress,
+      onOutput: onOutput,
+    );
   }
 
   /// Walks one junk-scan group root and returns every file the [rules]

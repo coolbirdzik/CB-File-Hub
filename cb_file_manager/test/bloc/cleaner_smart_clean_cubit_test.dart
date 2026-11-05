@@ -114,7 +114,8 @@ void main() {
     await cubit.clean();
     expect(cleaned.single.map((i) => i.path), unorderedEquals([_temp, _bin]));
     final result = cubit.state.result!;
-    expect(cubit.state.status, CleanerSmartCleanStatus.done);
+    expect(cubit.state.status, CleanerSmartCleanStatus.ready);
+    expect(cubit.state.groups.single.categoryId, 'browser_cache');
     expect(result.movedBytes, 10);
     expect(result.permanentBytes, 7000);
     expect(result.skippedCount, 0);
@@ -305,6 +306,69 @@ void main() {
     expect(cubit.state.groups, hasLength(1));
     await cubit.close();
   });
+
+  test(
+    'accepts another selection while cleaning and excludes queued paths',
+    () async {
+      final first = Completer<CleanReport?>();
+      final second = Completer<CleanReport?>();
+      final cubit = build(
+        scan: () async => _report({
+          'windows_temp': [_item('windows_temp', _temp, 10)],
+          'browser_cache': [_item('browser_cache', _cache, 500)],
+        }),
+        clean: (items) =>
+            items.single.path == _temp ? first.future : second.future,
+      );
+      await cubit.scan();
+      cubit.toggleGroup('browser_cache');
+      final firstRun = cubit.clean();
+      expect(cubit.state.selectedCount, 0);
+      cubit.toggleGroup('browser_cache');
+      expect(cubit.state.selectedItems.single.path, _cache);
+      final secondRun = cubit.clean();
+      await cubit.clean();
+      expect(cleaned, hasLength(2));
+      expect(cubit.state.pendingPaths, {_temp, _cache});
+      first.complete(_cleanReport([_temp]));
+      await firstRun;
+      expect(cubit.state.status, CleanerSmartCleanStatus.cleaning);
+      expect(cubit.state.groups.single.categoryId, 'browser_cache');
+      expect(cubit.state.selectedCount, 0);
+      second.complete(_cleanReport([_cache]));
+      await secondRun;
+      expect(cubit.state.status, CleanerSmartCleanStatus.ready);
+      expect(cubit.state.groups, isEmpty);
+      expect(cubit.state.pendingPaths, isEmpty);
+      await cubit.close();
+    },
+  );
+
+  test(
+    'failed items stay available and newer selection changes survive',
+    () async {
+      final pending = Completer<CleanReport?>();
+      final cubit = build(
+        scan: () async => _report({
+          'windows_temp': [_item('windows_temp', _temp, 10)],
+          'browser_cache': [_item('browser_cache', _cache, 500)],
+        }),
+        clean: (_) => pending.future,
+      );
+      await cubit.scan();
+      cubit.toggleGroup('browser_cache');
+      final run = cubit.clean();
+      cubit.toggleGroup('browser_cache');
+      pending.complete(null);
+      await run;
+      expect(
+        cubit.state.selectedItems.map((item) => item.path),
+        unorderedEquals([_temp, _cache]),
+      );
+      expect(cubit.state.pendingPaths, isEmpty);
+      await cubit.close();
+    },
+  );
 
   test('a busy scanner becomes a failure, not a crash', () async {
     final cubit = build(scan: () async => throw CleanerScanBusyError());
