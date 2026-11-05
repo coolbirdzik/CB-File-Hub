@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/services/disk_cleaner/cleaner_categories.dart';
 import 'dart:io';
 import 'dart:ui' as ui;
 
@@ -98,6 +99,11 @@ Future<CleanerFullReview> fixture() async {
 }
 
 void main() {
+  // These tests are written against the Windows rule table; without this the
+  // Linux/macOS CI runners resolve a different category set.
+  setUpAll(() => CleanerCategories.debugOperatingSystem = 'windows');
+  tearDownAll(() => CleanerCategories.debugOperatingSystem = null);
+
   for (final scenario in [
     (width: 900.0, height: 120.0, scale: 1.0),
     (width: 900.0, height: 210.0, scale: 1.5),

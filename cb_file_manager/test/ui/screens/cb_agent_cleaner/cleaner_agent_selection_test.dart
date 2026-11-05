@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/services/disk_cleaner/cleaner_categories.dart';
 import 'dart:io';
 import 'dart:ui' as ui;
 
@@ -109,6 +110,11 @@ class _Panel extends AiPanelController {
 }
 
 void main() {
+  // These tests are written against the Windows rule table; without this the
+  // Linux/macOS CI runners resolve a different category set.
+  setUpAll(() => CleanerCategories.debugOperatingSystem = 'windows');
+  tearDownAll(() => CleanerCategories.debugOperatingSystem = null);
+
   _toolbarTests();
   testWidgets(
     'agent selection checks and reveals exact scan rows and keeps deletion behind review',

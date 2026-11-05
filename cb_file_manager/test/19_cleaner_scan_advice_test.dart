@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/services/disk_cleaner/cleaner_categories.dart';
 import 'package:cb_file_manager/services/ai/disk_cleaner_skill.dart';
 import 'package:cb_file_manager/services/ai/tool_executor.dart';
 import 'package:cb_file_manager/services/disk_cleaner/cleaner_models.dart';
@@ -6,6 +7,11 @@ import 'package:cb_file_manager/services/disk_cleaner/disk_tree_node.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  // These tests are written against the Windows rule table; without this the
+  // Linux/macOS CI runners resolve a different category set.
+  setUpAll(() => CleanerCategories.debugOperatingSystem = 'windows');
+  tearDownAll(() => CleanerCategories.debugOperatingSystem = null);
+
   const tabId = 'cleaner-scan-advice-test-tab';
   final service = DiskCleanerService.instance;
 

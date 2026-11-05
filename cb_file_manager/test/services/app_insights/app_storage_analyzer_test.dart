@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/services/disk_cleaner/cleaner_categories.dart';
 import 'package:cb_file_manager/services/app_insights/app_insights_models.dart';
 import 'package:cb_file_manager/services/app_insights/app_storage_analyzer.dart';
 import 'package:cb_file_manager/services/disk_cleaner/disk_tree_node.dart';
@@ -21,6 +22,11 @@ DiskTreeNode _directory(
 }
 
 void main() {
+  // These tests are written against the Windows rule table; without this the
+  // Linux/macOS CI runners resolve a different category set.
+  setUpAll(() => CleanerCategories.debugOperatingSystem = 'windows');
+  tearDownAll(() => CleanerCategories.debugOperatingSystem = null);
+
   test('uses a Windows estimate when a partial path has no measured bytes', () {
     const profile = AppStorageProfile(
       app: InstalledAppInfo(

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import '../app_insights/app_insights_models.dart';
 import 'cleaner_models.dart';
 import 'cleaner_cache_rules.dart';
@@ -16,9 +17,16 @@ import 'cleaner_audited_rules.dart';
 class CleanerCategories {
   CleanerCategories._();
 
+  /// Test hook: makes [all] and [byId] use another platform's rule table, so
+  /// tests written against the Windows rules also pass on Linux/macOS CI.
+  @visibleForTesting
+  static String? debugOperatingSystem;
+
   /// All known categories.
   static List<CleanerCategory> all({String? operatingSystem}) =>
-      List.unmodifiable(switch (operatingSystem ?? Platform.environment['CB_TMP_OS'] ?? Platform.operatingSystem) {
+      List.unmodifiable(switch (operatingSystem ??
+      debugOperatingSystem ??
+      Platform.operatingSystem) {
         'macos' => _macos,
         'linux' => _linux,
         _ => _all,

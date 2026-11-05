@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/services/disk_cleaner/cleaner_categories.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:cb_file_manager/bloc/ai_agent/ai_agent_bloc.dart';
@@ -17,6 +18,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  // These tests are written against the Windows rule table; without this the
+  // Linux/macOS CI runners resolve a different category set.
+  setUpAll(() => CleanerCategories.debugOperatingSystem = 'windows');
+  tearDownAll(() => CleanerCategories.debugOperatingSystem = null);
+
   TestWidgetsFlutterBinding.ensureInitialized();
   Future<AiAgentBloc> createBloc(
     _ConversationRuntime runtime,

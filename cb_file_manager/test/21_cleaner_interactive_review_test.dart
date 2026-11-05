@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/services/disk_cleaner/cleaner_categories.dart';
 import 'dart:convert';
 
 import 'package:cb_file_manager/services/ai/agent_tool_catalog.dart';
@@ -9,6 +10,11 @@ import 'package:cb_file_manager/services/disk_cleaner/disk_tree_node.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  // These tests are written against the Windows rule table; without this the
+  // Linux/macOS CI runners resolve a different category set.
+  setUpAll(() => CleanerCategories.debugOperatingSystem = 'windows');
+  tearDownAll(() => CleanerCategories.debugOperatingSystem = null);
+
   const tabId = 'interactive-review-test';
   final cleaner = DiskCleanerService.instance;
   late DiskTreeNode junk;
