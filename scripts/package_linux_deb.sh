@@ -110,6 +110,30 @@ if command -v dpkg-shlibdeps >/dev/null; then
         echo "package_linux_deb: dpkg-shlibdeps failed, using fallback Depends" >&2
         cat "$STAGE/shlibdeps.log" >&2 || true
     fi
+
+    # A file using GLIBC_PRIVATE symbols makes dpkg-shlibdeps pin the build
+    # host's exact glibc (`libc6 (<< 2.37)` on Debian 12), so the package would
+    # not install on any newer distro. Name those files in the log, then drop
+    # upper bounds: a prebuilt app bundle must accept newer libraries. The
+    # smoke test (scripts/ci/smoke_test_linux_deb.sh) resolves every symbol on
+    # newer distros, so a private symbol that really disappeared still fails.
+    if command -v objdump >/dev/null; then
+        for elf in "${ELF_FILES[@]}"; do
+            private="$(objdump -T "$elf" 2>/dev/null |
+                awk '/GLIBC_PRIVATE/ {print $NF}' | sort -u | tr '\n' ' ')"
+            if [ -n "$private" ]; then
+                echo "package_linux_deb: warning: ${elf#"$ROOT"} uses GLIBC_PRIVATE symbols: $private" >&2
+            fi
+        done
+    fi
+    if [ -n "$DEPENDS" ]; then
+        stripped="$(printf '%s\n' "$DEPENDS" | tr ',' '\n' | sed 's/^ *//; s/ *$//' |
+            { grep -Ev '\(<<? ' || true; } | paste -sd ',' - | sed 's/,/, /g')"
+        if [ "$stripped" != "$DEPENDS" ]; then
+            echo "package_linux_deb: dropped upper-bound dependencies from: $DEPENDS" >&2
+        fi
+        DEPENDS=$stripped
+    fi
 fi
 [ -n "$DEPENDS" ] || DEPENDS=$FALLBACK_DEPENDS
 

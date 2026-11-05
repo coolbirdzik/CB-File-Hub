@@ -24,8 +24,11 @@ missing=0
 while IFS= read -r -d '' elf; do
   if ! head -c 4 "$elf" | grep -q $'\x7fELF'; then continue; fi
   # Plugins resolve libflutter_linux_gtk.so through the executable's RUNPATH
-  # at run time; give ldd the same directory.
-  unresolved=$(LD_LIBRARY_PATH="$APP_DIR/lib" ldd "$elf" 2>/dev/null | grep 'not found' || true)
+  # at run time; give ldd the same directory. -r also binds every symbol, so a
+  # glibc symbol (versioned or GLIBC_PRIVATE) missing on this distro shows up;
+  # other undefined symbols can be satisfied by the executable at run time.
+  unresolved=$(LD_LIBRARY_PATH="$APP_DIR/lib" ldd -r "$elf" 2>&1 |
+    grep -E 'not found|undefined symbol: .*GLIBC' || true)
   if [ -n "$unresolved" ]; then
     echo "::error::$elf has unresolved libraries:"
     echo "$unresolved"
