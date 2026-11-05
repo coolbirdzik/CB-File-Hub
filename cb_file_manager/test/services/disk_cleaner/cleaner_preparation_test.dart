@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:cb_file_manager/helpers/files/trash_manager.dart';
 import 'package:cb_file_manager/services/disk_cleaner/cleaner_models.dart';
+import 'package:cb_file_manager/services/disk_cleaner/cleaner_safety.dart';
 import 'package:cb_file_manager/services/disk_cleaner/disk_cleaner_service.dart';
 import 'package:cb_file_manager/services/disk_cleaner/full_disk_scan_isolate.dart';
 import 'package:cb_native/cb_native.dart';
@@ -33,7 +34,14 @@ class _Trash implements TrashManager {
 void main() {
   late Directory root;
   setUp(() async {
-    root = await Directory.systemTemp.createTemp('cb_cleaner_preparation_');
+    // All desktop rule tables allow this npm download-cache root. System
+    // temp is not a cleanable rule root on Linux/macOS.
+    final home =
+        Platform.environment[Platform.isWindows ? 'USERPROFILE' : 'HOME']!;
+    final cache = await Directory(
+      p.join(home, '.npm', '_cacache'),
+    ).create(recursive: true);
+    root = await cache.createTemp('cb_cleaner_preparation_');
     for (var i = 0; i < 4; i++) {
       final dir = Directory(p.join(root.path, 'folder$i'))..createSync();
       for (var j = 0; j < 4; j++) {
@@ -62,18 +70,24 @@ void main() {
         fullDiskScanSpawner: spawnFullDiskScan,
         trashManager: trash,
       );
+      expect(
+        CleanerPathSafety.isPathSafeToDelete(root.path),
+        isTrue,
+        reason: 'The fixture must be under an allowed cache root on this host',
+      );
       final report = await service.cleanJunk(
         items: [
           JunkItem(
             path: root.path,
             sizeBytes: 80,
-            categoryId: 'windows_temp',
+            categoryId: 'package_download_cache',
             isContainerOnly: true,
           ),
         ],
         permanent: true,
         onProgress: (done, total, path) => events.add((done, total, path)),
       );
+      expect(report.skippedUnsafe, isEmpty);
       expect(report.succeeded, hasLength(16));
       expect(trash.paths.toSet(), report.succeeded.toSet());
       expect(trash.paths, isNot(contains(root.path)));
