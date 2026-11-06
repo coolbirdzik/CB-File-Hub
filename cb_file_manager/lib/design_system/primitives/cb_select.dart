@@ -408,14 +408,19 @@ class _CbSelectState<T> extends State<CbSelect<T>> {
           decoration: BoxDecoration(
             color: paint.background,
             borderRadius: CbRadii.smAll,
-            // Open reads as focused: the same bottom indicator a text field
+            // Open reads as focused: the same hairline edge a text field
             // shows, so a select and an input side by side stay in step.
-            border: CbDecorations.fieldIndicator(
-              c,
-              focused: _isOpen && widget.variant == CbSelectVariant.filled,
-              error: hasError,
-              enabled: !state.disabled,
-            ),
+            // Only the filled variant is field-shaped; the others stay
+            // edgeless like a ghost button.
+            border: widget.variant == CbSelectVariant.filled || hasError
+                ? CbDecorations.fieldIndicator(
+                    c,
+                    focused: _isOpen,
+                    hovered: state.hovered,
+                    error: hasError,
+                    enabled: !state.disabled,
+                  )
+                : null,
             // Like CbButton, the keyboard focus ring sits outside the shape.
             boxShadow: state.focused ? CbDecorations.focusRing(c) : null,
           ),

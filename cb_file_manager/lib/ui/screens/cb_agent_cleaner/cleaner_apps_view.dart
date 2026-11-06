@@ -665,6 +665,7 @@ enum _ViewOption {
   sortSize,
   sortName,
   sortLastOpened,
+  sortInstalledNewest,
   large500Mb,
   large1Gb,
   large5Gb,
@@ -757,6 +758,8 @@ class _ViewOptionsMenu extends StatelessWidget {
         return _ViewOption.sortName;
       case CleanerAppSort.lastOpenedOldest:
         return _ViewOption.sortLastOpened;
+      case CleanerAppSort.installedNewest:
+        return _ViewOption.sortInstalledNewest;
     }
   }
 
@@ -773,6 +776,9 @@ class _ViewOptionsMenu extends StatelessWidget {
         break;
       case _ViewOption.sortLastOpened:
         cubit.setSort(CleanerAppSort.lastOpenedOldest);
+        break;
+      case _ViewOption.sortInstalledNewest:
+        cubit.setSort(CleanerAppSort.installedNewest);
         break;
       case _ViewOption.large500Mb:
         cubit.setLargeThresholdBytes(cleanerAppLargeThresholdPresets[0]);
@@ -987,6 +993,15 @@ class _AppRow extends StatelessWidget {
                         ),
                       ],
                     ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _installedDateLabel(context, app),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -1162,6 +1177,13 @@ class _DetailsHeader extends StatelessWidget {
                   ),
                 ),
               ],
+              const SizedBox(height: 3),
+              Text(
+                _installedDateLabel(context, app),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
             ],
           ),
         ),
@@ -1537,7 +1559,19 @@ String _sortLabel(AppLocalizations l10n, CleanerAppSort sort) {
       return l10n.cleanerAppsSortName;
     case CleanerAppSort.lastOpenedOldest:
       return l10n.cleanerAppsSortLastOpened;
+    case CleanerAppSort.installedNewest:
+      return l10n.cleanerAppsSortInstalledNewest;
   }
+}
+
+String _installedDateLabel(BuildContext context, InstalledAppInfo app) {
+  final l10n = AppLocalizations.of(context)!;
+  final date = app.installedOrUpdatedAt;
+  return l10n.cleanerAppsInstalledOrUpdated(
+    date == null
+        ? l10n.cleanerAppsUnknown
+        : MaterialLocalizations.of(context).formatMediumDate(date.toLocal()),
+  );
 }
 
 String _measurementLabel(AppLocalizations l10n, MeasurementQuality quality) {

@@ -16,6 +16,7 @@ import 'package:cb_file_manager/ui/widgets/drawer/cubit/drawer_cubit.dart';
 import 'package:cb_file_manager/services/home_content_service.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 
+import 'home_keyboard_tip.dart';
 import 'home_media_card.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -187,6 +188,8 @@ class _HomeScreenState extends State<HomeScreen>
                       children: [
                         _enter(0, _buildWelcomeSection(theme)),
                         const SizedBox(height: 28),
+                        // Desktop keyboard tip; adds its own bottom gap.
+                        _enter(1, const HomeKeyboardTip()),
                         _enter(1, _buildQuickAccessSection(theme, l10n)),
                         const SizedBox(height: 28),
                         if (_showRecentFolders) ...[
@@ -408,7 +411,7 @@ class _HomeScreenState extends State<HomeScreen>
                       margin: EdgeInsets.only(right: i == 0 ? 12 : 0),
                       decoration: BoxDecoration(
                         color: cs.surface.withValues(alpha: 0.45),
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: CbRadii.lgAll,
                       ),
                     ),
                   ),
@@ -436,7 +439,7 @@ class _HomeScreenState extends State<HomeScreen>
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               color: cs.surface.withValues(alpha: 0.45),
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: CbRadii.lgAll,
             ),
             child: Text(
               l10n.homeRecentEmpty,
@@ -469,11 +472,11 @@ class _HomeScreenState extends State<HomeScreen>
                           padding: const EdgeInsets.all(14),
                           decoration: BoxDecoration(
                             color: state.pressed
-                                ? cs.primary.withValues(alpha: 0.13)
+                                ? context.cbColors.fillPressed
                                 : (state.hovered
-                                      ? cs.primary.withValues(alpha: 0.08)
+                                      ? context.cbColors.fillHover
                                       : cs.surface.withValues(alpha: 0.55)),
-                            borderRadius: BorderRadius.circular(14),
+                            borderRadius: CbRadii.lgAll,
                             border: Border.all(
                               color: state.focused
                                   ? cs.primary
@@ -542,7 +545,7 @@ class _HomeScreenState extends State<HomeScreen>
               color: isLightMode
                   ? cs.surface.withValues(alpha: isDesktopPlatform ? 0.46 : 1.0)
                   : cs.surface,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: CbRadii.lgAll,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -573,7 +576,7 @@ class _HomeScreenState extends State<HomeScreen>
             color: isLightMode
                 ? cs.surface.withValues(alpha: isDesktopPlatform ? 0.46 : 1.0)
                 : cs.surface,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: CbRadii.lgAll,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -634,13 +637,13 @@ class _HomeScreenState extends State<HomeScreen>
                 alpha: isDesktopPlatform ? 0.46 : 1.0,
               )
             : theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: CbRadii.lgAll,
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: CbRadii.lgAll,
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Row(
@@ -648,10 +651,10 @@ class _HomeScreenState extends State<HomeScreen>
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(16),
+                    color: context.cbColors.fill,
+                    borderRadius: CbRadii.mdAll,
                   ),
-                  child: Icon(icon, color: theme.colorScheme.primary, size: 20),
+                  child: Icon(icon, color: context.cbColors.icon, size: 20),
                 ),
                 const SizedBox(width: 16),
                 Expanded(

@@ -5,6 +5,10 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:cb_file_manager/design_system/cb_page_transitions.dart';
 import 'package:cb_file_manager/design_system/tokens/cb_geometry_tokens.dart';
+import 'package:cb_file_manager/design_system/cb_tokens.dart';
+import 'package:cb_file_manager/design_system/primitives/cb_decorations.dart';
+import 'package:cb_file_manager/design_system/primitives/cb_pressable.dart';
+import 'package:cb_file_manager/design_system/tokens/cb_type_tokens.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:cb_file_manager/ui/components/common/app_toast.dart';
@@ -531,7 +535,8 @@ Future<void> showContextMenuPopup({
   ];
   final cursor = overlay.globalToLocal(globalPosition);
   final opensUp = cursor.dy > overlay.size.height / 2;
-  final menuColor = Theme.of(context).colorScheme.surface.withAlpha(255);
+  final menuColors = context.cbColors;
+  final menuColor = menuColors.surfaceOverlay;
   final popupItems = <PopupMenuEntry<String>>[];
 
   for (
@@ -551,7 +556,7 @@ Future<void> showContextMenuPopup({
           PopupMenuItem<String>(
             enabled: false,
             padding: EdgeInsets.zero,
-            height: 36,
+            height: _kContextMenuRowHeight,
             child: _ContextMenuPopupSubmenuTrigger(
               actionContext: context,
               overlayBox: overlay,
@@ -561,19 +566,7 @@ Future<void> showContextMenuPopup({
         );
       } else {
         popupItems.add(
-          PopupMenuItem<String>(
-            value: action.id,
-            enabled: action.isEnabled,
-            height: 36,
-            child: MouseRegion(
-              onEnter: (_) => _scheduleContextSubmenuRemoval(),
-              child: _buildContextMenuActionRow(
-                context,
-                action,
-                forPopup: true,
-              ),
-            ),
-          ),
+          _ContextMenuRowEntry(actionContext: context, action: action),
         );
       }
     }
@@ -627,8 +620,8 @@ Future<void> showContextMenuPopup({
     color: menuColor,
     items: popupItems,
     initialValue: quickActions.isEmpty ? null : _ContextMenuQuickActions.value,
-    menuPadding: const EdgeInsets.symmetric(vertical: 4),
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+    menuPadding: const EdgeInsets.symmetric(vertical: CbSpacing.xs),
+    shape: CbDecorations.floatingShape(menuColors),
     constraints: BoxConstraints(
       minWidth: 244,
       maxWidth: 300,
@@ -657,6 +650,82 @@ Future<void> showContextMenuPopup({
   await action.onSelected!(context);
 }
 
+/// Height of one context-menu row: dense, Raycast-style.
+const double _kContextMenuRowHeight = 32;
+
+/// The highlight behind a context-menu row: an inset, rounded neutral wash
+/// rather than Material's edge-to-edge hover rectangle.
+class _ContextMenuRowChrome extends StatelessWidget {
+  final bool highlighted;
+  final Widget child;
+
+  const _ContextMenuRowChrome({required this.highlighted, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.cbColors;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: CbSpacing.xs),
+      child: Container(
+        height: _kContextMenuRowHeight,
+        padding: const EdgeInsets.symmetric(horizontal: CbSpacing.sm + 2),
+        alignment: AlignmentDirectional.centerStart,
+        decoration: BoxDecoration(
+          color: highlighted ? c.surfaceSelected : Colors.transparent,
+          borderRadius: CbRadii.smAll,
+        ),
+        child: child,
+      ),
+    );
+  }
+}
+
+/// A plain action row in the root context menu.
+///
+/// A custom entry rather than [PopupMenuItem] so the hover highlight can be
+/// the inset rounded [_ContextMenuRowChrome]; [PopupMenuItem]'s ink always
+/// spans the full menu width. Pointer, Enter/Space and arrow-key focus all
+/// still work through [CbPressable].
+class _ContextMenuRowEntry extends PopupMenuEntry<String> {
+  final BuildContext actionContext;
+  final ContextMenuAction action;
+
+  const _ContextMenuRowEntry({
+    required this.actionContext,
+    required this.action,
+  });
+
+  @override
+  double get height => _kContextMenuRowHeight;
+
+  @override
+  bool represents(String? value) => value == action.id;
+
+  @override
+  State<_ContextMenuRowEntry> createState() => _ContextMenuRowEntryState();
+}
+
+class _ContextMenuRowEntryState extends State<_ContextMenuRowEntry> {
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => _scheduleContextSubmenuRemoval(),
+      child: CbPressable(
+        enabled: widget.action.isEnabled,
+        onPressed: () => Navigator.of(context).pop(widget.action.id),
+        builder: (context, state) => _ContextMenuRowChrome(
+          highlighted: state.hovered || state.focused || state.pressed,
+          child: _buildContextMenuActionRow(
+            widget.actionContext,
+            widget.action,
+            forPopup: true,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _ContextMenuQuickActions extends PopupMenuEntry<String> {
   static const value = '__context_menu_quick_actions__';
   final List<ContextMenuAction> actions;
@@ -679,8 +748,7 @@ class _ContextMenuQuickActionsState extends State<_ContextMenuQuickActions> {
   Widget build(BuildContext context) {
     return MouseRegion(
       onEnter: (_) => _removeContextSubmenu(),
-      child: Container(
-        color: Theme.of(context).colorScheme.surface.withAlpha(255),
+      child: SizedBox(
         key: const ValueKey('context-menu-quick-actions'),
         height: widget.height,
         child: Padding(
@@ -709,8 +777,8 @@ class _ContextMenuQuickActionsState extends State<_ContextMenuQuickActions> {
                           vertical: 6,
                         ),
                         foregroundColor: action.isDestructive
-                            ? Theme.of(context).colorScheme.error
-                            : Theme.of(context).colorScheme.onSurface,
+                            ? context.cbColors.status.danger
+                            : context.cbColors.textSecondary,
                         shape: const RoundedRectangleBorder(
                           borderRadius: CbRadii.buttonAll,
                         ),
@@ -718,8 +786,8 @@ class _ContextMenuQuickActionsState extends State<_ContextMenuQuickActions> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(action.icon, size: 20),
-                          const SizedBox(height: 4),
+                          Icon(action.icon, size: CbSizes.iconLg),
+                          const SizedBox(height: CbSpacing.xs),
                           Text(
                             action.id == 'delete'
                                 ? AppLocalizations.of(context)!.delete
@@ -774,15 +842,17 @@ Widget _buildContextMenuActionRow(
   bool forPopup = false,
   bool isLoading = false,
 }) {
-  final theme = Theme.of(context);
+  final c = context.cbColors;
   final bool isDestructive = action.isDestructive;
   final Color color = !action.isEnabled
-      ? theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)
+      ? c.textDisabled
       : isDestructive
-      ? theme.colorScheme.error
-      : theme.colorScheme.onSurface;
+      ? c.status.danger
+      : c.textPrimary;
+  // Raycast-style: icons sit one step quieter than the label.
+  final Color iconColor = !action.isEnabled || isDestructive ? color : c.icon;
 
-  final iconSize = forPopup ? 18.0 : 20.0;
+  final iconSize = forPopup ? CbSizes.iconMd : CbSizes.iconLg;
   final Widget icon;
   if (isLoading || action.isLoading) {
     icon = SizedBox.square(
@@ -796,30 +866,32 @@ Widget _buildContextMenuActionRow(
       height: iconSize,
       filterQuality: FilterQuality.medium,
       errorBuilder: (_, _, _) =>
-          Icon(action.icon, size: iconSize, color: color),
+          Icon(action.icon, size: iconSize, color: iconColor),
     );
   } else {
-    icon = Icon(action.icon, size: iconSize, color: color);
+    icon = Icon(action.icon, size: iconSize, color: iconColor);
   }
   final text = Text(
     action.label,
-    style: TextStyle(
+    maxLines: 1,
+    overflow: TextOverflow.ellipsis,
+    style: (forPopup ? CbTypography.body : CbTypography.bodyLg).copyWith(
       color: color,
-      fontWeight: action.isChecked ? FontWeight.w600 : FontWeight.w500,
+      fontWeight: action.isChecked ? CbTypography.medium : CbTypography.regular,
     ),
   );
   final Widget? trailing;
   if (_contextMenuActionHasSubmenu(action)) {
     trailing = Icon(
       PhosphorIconsLight.caretRight,
-      size: forPopup ? 16 : 18,
-      color: color,
+      size: forPopup ? CbSizes.iconSm : CbSizes.iconMd,
+      color: c.iconSubtle,
     );
   } else if (action.isChecked) {
     trailing = Icon(
       PhosphorIconsLight.check,
-      size: forPopup ? 16 : 18,
-      color: theme.colorScheme.primary,
+      size: forPopup ? CbSizes.iconSm : CbSizes.iconMd,
+      color: c.textPrimary,
     );
   } else {
     trailing = null;
@@ -830,7 +902,7 @@ Widget _buildContextMenuActionRow(
     child: Row(
       children: [
         icon,
-        const SizedBox(width: 12),
+        const SizedBox(width: CbSpacing.sm + 2),
         Expanded(child: text),
         ?trailing,
       ],
@@ -919,6 +991,7 @@ class _ContextMenuPopupSubmenuTriggerState
     extends State<_ContextMenuPopupSubmenuTrigger> {
   final GlobalKey _itemKey = GlobalKey();
   final Object _submenuOwner = Object();
+  bool _hovered = false;
   Future<List<ContextMenuSection>>? _sectionsFuture;
   List<ContextMenuSection>? _resolvedSections;
 
@@ -1051,12 +1124,16 @@ class _ContextMenuPopupSubmenuTriggerState
     return MouseRegion(
       key: _itemKey,
       cursor: isLoading ? SystemMouseCursors.progress : MouseCursor.defer,
-      onEnter: (_) => _openSubmenu(),
+      onEnter: (_) {
+        setState(() => _hovered = true);
+        _openSubmenu();
+      },
+      onExit: (_) => setState(() => _hovered = false),
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: _openSubmenu,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: _ContextMenuRowChrome(
+          highlighted: _hovered,
           child: _buildContextMenuActionRow(
             widget.actionContext,
             widget.action,
@@ -1180,51 +1257,63 @@ class _ContextSubmenuPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = actionContext.cb;
+    final c = tokens.colors;
     return MouseRegion(
       onEnter: (_) => _cancelContextSubmenuRemoval(),
-      child: Material(
-        color: Theme.of(actionContext).colorScheme.surface.withAlpha(255),
-        elevation: 4,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        clipBehavior: Clip.antiAlias,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxHeight: maxHeight),
-          child: Scrollbar(
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  for (
-                    var sectionIndex = 0;
-                    sectionIndex < sections.length;
-                    sectionIndex++
-                  ) ...[
-                    if (sectionIndex > 0) const Divider(height: 1),
-                    if (sections[sectionIndex].title != null &&
-                        sections[sectionIndex].title!.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
-                        child: Text(
-                          sections[sectionIndex].title!,
-                          style: Theme.of(actionContext).textTheme.labelSmall
-                              ?.copyWith(
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 0.4,
-                              ),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: CbRadii.lgAll,
+          boxShadow: tokens.shadowLevel3,
+        ),
+        child: Material(
+          color: c.surfaceOverlay,
+          shape: CbDecorations.floatingShape(c),
+          clipBehavior: Clip.antiAlias,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: maxHeight),
+            child: Scrollbar(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(vertical: CbSpacing.xs),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (
+                      var sectionIndex = 0;
+                      sectionIndex < sections.length;
+                      sectionIndex++
+                    ) ...[
+                      if (sectionIndex > 0)
+                        const Divider(height: CbSpacing.sm + 1),
+                      if (sections[sectionIndex].title != null &&
+                          sections[sectionIndex].title!.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(
+                            CbSpacing.md + 2,
+                            CbSpacing.sm,
+                            CbSpacing.md + 2,
+                            CbSpacing.xs,
+                          ),
+                          child: Text(
+                            sections[sectionIndex].title!,
+                            style: CbTypography.labelXs.copyWith(
+                              color: c.textTertiary,
+                            ),
+                          ),
                         ),
-                      ),
-                    for (final childAction in sections[sectionIndex].actions)
-                      _ContextSubmenuActionRow(
-                        key: ValueKey(childAction.id),
-                        actionContext: actionContext,
-                        rootMenuContext: rootMenuContext,
-                        overlayBox: overlayBox,
-                        action: childAction,
-                        depth: depth,
-                      ),
+                      for (final childAction in sections[sectionIndex].actions)
+                        _ContextSubmenuActionRow(
+                          key: ValueKey(childAction.id),
+                          actionContext: actionContext,
+                          rootMenuContext: rootMenuContext,
+                          overlayBox: overlayBox,
+                          action: childAction,
+                          depth: depth,
+                        ),
+                    ],
                   ],
-                ],
+                ),
               ),
             ),
           ),
@@ -1403,20 +1492,44 @@ class _ContextSubmenuActionRowState extends State<_ContextSubmenuActionRow> {
           _removeContextSubmenusFrom(_childDepth);
         }
       },
-      child: InkWell(
-        mouseCursor: isLoading ? SystemMouseCursors.progress : null,
-        key: ValueKey<String>('context-menu-action-tap-${widget.action.id}'),
-        onTap: widget.action.isEnabled ? _selectAction : null,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-          child: _buildContextMenuActionRow(
-            widget.actionContext,
-            widget.action,
-            forPopup: true,
-            isLoading: isLoading,
-          ),
-        ),
-      ),
+      child: widget.action.isEnabled
+          ? CbPressable(
+              key: ValueKey<String>(
+                'context-menu-action-tap-${widget.action.id}',
+              ),
+              cursor: isLoading
+                  ? SystemMouseCursors.progress
+                  : SystemMouseCursors.basic,
+              onPressed: _selectAction,
+              builder: (context, state) => _ContextMenuRowChrome(
+                highlighted: state.hovered || state.focused || state.pressed,
+                child: _buildContextMenuActionRow(
+                  widget.actionContext,
+                  widget.action,
+                  forPopup: true,
+                  isLoading: isLoading,
+                ),
+              ),
+            )
+          // Inert rows (the "Loading..." placeholder, empty submenus) keep
+          // the busy cursor and draw no highlight.
+          : MouseRegion(
+              key: ValueKey<String>(
+                'context-menu-action-tap-${widget.action.id}',
+              ),
+              cursor: isLoading
+                  ? SystemMouseCursors.progress
+                  : MouseCursor.defer,
+              child: _ContextMenuRowChrome(
+                highlighted: false,
+                child: _buildContextMenuActionRow(
+                  widget.actionContext,
+                  widget.action,
+                  forPopup: true,
+                  isLoading: isLoading,
+                ),
+              ),
+            ),
     );
   }
 }

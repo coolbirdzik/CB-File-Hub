@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:cb_file_manager/helpers/core/desktop_shortcuts.dart';
+import 'package:cb_file_manager/ui/components/common/search_text_field.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
@@ -14,6 +17,24 @@ abstract final class FileKeyboardShortcuts {
         onSearch != null &&
         DesktopShortcuts.matchesPrimary(event, LogicalKeyboardKey.keyF)) {
       onSearch();
+      // A hidden search input mounts this frame. Wait for its autofocus and
+      // pending focus changes before selecting, including repeated Ctrl+F.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        scheduleMicrotask(() {
+          final context = FocusManager.instance.primaryFocus?.context;
+          if (context == null ||
+              !context.mounted ||
+              context.findAncestorWidgetOfExactType<SearchTextField>() ==
+                  null) {
+            return;
+          }
+          Actions.maybeInvoke(
+            context,
+            const SelectAllTextIntent(SelectionChangedCause.keyboard),
+          );
+        });
+      });
+      WidgetsBinding.instance.ensureVisualUpdate();
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;

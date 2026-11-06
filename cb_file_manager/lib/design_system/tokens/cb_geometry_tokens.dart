@@ -43,8 +43,8 @@ class CbSpacing {
 /// The single biggest tell of a Material app is its radius: M3's 20px pill on
 /// every card and panel reads as consumer-mobile. This scale tops out far
 /// lower for those surfaces. Buttons get their own step, [button]: square
-/// rather than round, but with the corner softened enough to read as a
-/// deliberate shape rather than a sharp rectangle — every button in the app
+/// rather than round, with the same 8px corner as list rows and cards so a
+/// row of controls and the rows of content share one shape — every button in the app
 /// (filled/tonal/outlined/text, and their icon-only cousins) draws with
 /// [buttonAll]. [full] is reserved for the handful of things that are
 /// genuinely pill/circle-shaped: chips, avatars, progress tracks.
@@ -54,29 +54,27 @@ class CbRadii {
   /// 0 — flush edges, table cells.
   static const double none = 0;
 
-  /// 3 — tiny chrome: checkbox, tag dot, thumbnail badge.
-  static const double xs = 3;
+  /// 4 — tiny chrome: checkbox, tag dot, thumbnail badge, keyboard chip.
+  static const double xs = 4;
 
-  /// 5 — inputs, list-row selection.
-  static const double sm = 5;
+  /// 6 — inputs, menu items, list-row selection.
+  static const double sm = 6;
 
-  /// 7 — cards, menu items, and the smallest buttons (under ~26px tall,
-  /// where [button]'s 10px would read as almost fully round).
-  static const double md = 7;
+  /// 8 — cards, grid tiles, buttons.
+  static const double md = 8;
 
-  /// 10 — panels, popovers, toasts. Also the standard button radius — see
-  /// [button], which is this same value named for that use.
-  static const double lg = 10;
+  /// 12 — panels, popovers, menus, toasts, the command palette.
+  static const double lg = 12;
 
-  /// 14 — dialogs, sheets, the window shell.
-  static const double xl = 14;
+  /// 16 — dialogs, sheets, the window shell.
+  static const double xl = 16;
 
   /// Fully round — chips, avatars, progress tracks. Not used for buttons.
   static const double full = 999;
 
-  /// 10 — every button in the app: a soft, square corner rather than a pill.
-  /// Named separately from [lg] because the two scales can diverge later.
-  static const double button = 10;
+  /// 8 — every button in the app: a soft, square corner rather than a pill.
+  /// Named separately from [md] because the two scales can diverge later.
+  static const double button = 8;
 
   static BorderRadius all(double r) => BorderRadius.circular(r);
 

@@ -32,7 +32,14 @@ Elevation comes from `CbElevation` shadows and 1px `c.stroke` borders, applied
 through `CbSurface`'s levels — **not** from tinted surfaces. Keep surfaces
 neutral; do not reintroduce `surfaceTint`. Flat (`CbSurfaceLevel.flat`) remains
 the default for in-page content; reserve shadows for things that genuinely
-float (menus, popovers, dialogs, toasts).
+float (menus, popovers, dialogs, toasts). Floating layers use
+`CbDecorations.floating` / `floatingShape`, which carry the hairline edge.
+
+### 6. Selection is neutral, the accent is rare
+Selected rows, tiles, tabs, chips and sidebar items use a grey wash
+(`CbDecorations.selectionFill`, `c.surfaceSelected`) and `c.textPrimary`, never
+an accent tint. Keep the accent for the one primary action per screen and for
+state: focus, toggles, progress, drop targets.
 
 ## Color System
 
@@ -250,7 +257,8 @@ Avoid borders on tiles/cards; use spacing, background tones, and radius.
 - No borders — flat look by default
 - Border radius: 8; clip thumbnail to radius
 - Separation via grid spacing and subtle background tones when needed
-- Selected state: background tint (primary 0.2 alpha) and check icon; no border
+- Selected state: `ItemInteractionStyle.gridForeground` — a neutral wash plus
+  a 2px ring in the primary text colour (`CbDecorations.selectedOverlay`)
 ```dart
 // Flat tile (no border/shadow)
 ClipRRect(

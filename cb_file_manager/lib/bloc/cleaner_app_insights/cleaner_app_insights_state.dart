@@ -12,6 +12,7 @@ enum CleanerAppSort {
   sizeDescending,
   nameAscending,
   lastOpenedOldest,
+  installedNewest,
 }
 
 const List<int> cleanerAppLargeThresholdPresets = <int>[
@@ -253,6 +254,15 @@ List<AppStorageProfile> filterAndSortAppProfiles({
         break;
       case CleanerAppSort.lastOpenedOldest:
         comparison = _compareLastOpened(left, right);
+        break;
+      case CleanerAppSort.installedNewest:
+        final leftDate = left.app.installedOrUpdatedAt;
+        final rightDate = right.app.installedOrUpdatedAt;
+        comparison = leftDate == null
+            ? (rightDate == null ? 0 : 1)
+            : rightDate == null
+            ? -1
+            : rightDate.compareTo(leftDate);
         break;
     }
 

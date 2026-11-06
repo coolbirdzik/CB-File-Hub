@@ -1,5 +1,10 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
+import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:sqflite_common/sqflite_logger.dart';
 import 'package:cb_file_manager/services/torrent/torrent_metainfo.dart';
 import 'package:cb_file_manager/services/torrent/torrent_repository.dart';
 import 'package:cb_file_manager/services/torrent/magnet_link.dart';
@@ -16,6 +21,50 @@ void main() {
     await repo.initialize();
   });
   tearDown(() => db.close());
+
+  test('ready startup does not wait for another process write lock', () async {
+    final root = await Directory.systemTemp.createTemp('cb-startup-lock-');
+    final databasePath = p.join(root.path, 'startup.sqlite');
+    final holder = await databaseFactoryFfiNoIsolate.openDatabase(
+      databasePath,
+      options: OpenDatabaseOptions(singleInstance: false),
+    );
+    await holder.execute('PRAGMA journal_mode = WAL');
+    await holder.execute('CREATE TABLE counter (value INTEGER)');
+    final reader = await databaseFactoryFfi.openDatabase(
+      databasePath,
+      options: OpenDatabaseOptions(singleInstance: false),
+    );
+    final repository = TorrentRepository(reader);
+    await repository.initialize();
+    // A fully migrated library from previous builds has no progress table.
+    await reader.execute('DROP TABLE torrent_index_migrations');
+    await reader.execute('PRAGMA busy_timeout = 100');
+    final locked = Completer<void>();
+    final release = Completer<void>();
+    final writing = holder.transaction((txn) async {
+      await txn.insert('counter', {'value': 1});
+      locked.complete();
+      await release.future;
+    });
+    try {
+      await locked.future;
+      // An unnecessary BEGIN IMMEDIATE here fails as locked, despite having
+      // no schema/data work to do. A normal startup needs only WAL reads.
+      await expectLater(
+        reader.transaction((_) async {}),
+        throwsA(isA<DatabaseException>()),
+      );
+      await repository.initialize().timeout(const Duration(seconds: 2));
+      expect(release.isCompleted, isFalse);
+    } finally {
+      release.complete();
+      await writing;
+      await reader.close();
+      await holder.close();
+      await root.delete(recursive: true);
+    }
+  });
 
   test('scan fingerprints and stored paths include every index page', () async {
     final batch = db.batch();
@@ -94,6 +143,128 @@ void main() {
     }
     expect((await repo.page(query: 'torrent existing')).total, 1);
   });
+
+  test('startup readers proceed between torrent migration commits', () async {
+    Future<List<Map<String, Object?>>>? concurrentRead;
+    late Database migrating;
+    // Test-only SQL events expose when a reader is queued behind a migration.
+    // ignore: experimental_member_use
+    final factory = SqfliteDatabaseFactoryLogger(
+      databaseFactoryFfi,
+      options: SqfliteLoggerOptions(
+        log: (event) {
+          if (event is SqfliteLoggerBatchEvent &&
+              event.operations.any(
+                (operation) => operation.sql.contains('search_name'),
+              )) {
+            concurrentRead ??= migrating.rawQuery(
+              'SELECT COUNT(*) AS remaining FROM torrents WHERE search_name IS NULL',
+            );
+          }
+        },
+      ),
+    );
+    migrating = await factory.openDatabase(
+      inMemoryDatabasePath,
+      options: OpenDatabaseOptions(singleInstance: false),
+    );
+    addTearDown(migrating.close);
+    await migrating.execute('''CREATE TABLE torrents (
+      hash TEXT PRIMARY KEY, name TEXT NOT NULL, torrent_path TEXT NOT NULL,
+      category TEXT NOT NULL, group_name TEXT NOT NULL DEFAULT '',
+      total_bytes INTEGER NOT NULL, file_count INTEGER NOT NULL,
+      status TEXT NOT NULL DEFAULT 'library', download_dir TEXT, gid TEXT,
+      completed_bytes INTEGER NOT NULL DEFAULT 0,
+      download_speed INTEGER NOT NULL DEFAULT 0, error TEXT,
+      added_at INTEGER NOT NULL)''');
+    final batch = migrating.batch();
+    for (var i = 0; i < 700; i++) {
+      batch.insert('torrents', {
+        'hash': i.toString().padLeft(40, '0'),
+        'name': 'Torrent $i',
+        'torrent_path': '/$i.torrent',
+        'category': 'other',
+        'total_bytes': 1,
+        'file_count': 1,
+        'added_at': i,
+      });
+    }
+    await batch.commit(noResult: true);
+    await TorrentRepository(migrating).initialize();
+    expect(concurrentRead, isNotNull);
+    final remaining = (await concurrentRead!).single['remaining'] as int;
+    // A reader queued by the first batch must not wait for every row to migrate.
+    expect(remaining, greaterThan(0));
+    expect(remaining, lessThan(700));
+    expect(
+      (await migrating.rawQuery(
+        'SELECT COUNT(*) AS remaining FROM torrents WHERE search_name IS NULL',
+      )).single['remaining'],
+      0,
+    );
+    expect(
+      (await migrating.query(
+        'torrent_index_migrations',
+      )).every((row) => row['completed'] == 1),
+      isTrue,
+    );
+  });
+
+  test(
+    'interrupted migration retains committed pages and resumes on startup',
+    () async {
+      final batch = db.batch();
+      for (var i = 0; i < 600; i++) {
+        batch.insert('torrents', {
+          'hash': i.toString().padLeft(40, '0'),
+          'name': 'Café $i',
+          'torrent_path': '/$i.torrent',
+          'category': 'other',
+          'total_bytes': 1,
+          'file_count': 1,
+          'added_at': i,
+        });
+      }
+      batch.update(
+        'torrent_index_migrations',
+        {'completed': 0, 'last_hash': ''},
+        where: 'name = ?',
+        whereArgs: ['search'],
+      );
+      await batch.commit(noResult: true);
+      await db.execute('''CREATE TRIGGER interrupt_search_migration
+      BEFORE UPDATE OF search_name ON torrents
+      WHEN NEW.hash = '${300.toString().padLeft(40, '0')}'
+      BEGIN SELECT RAISE(ABORT, 'interrupted migration'); END''');
+      await expectLater(repo.initialize(), throwsA(isA<DatabaseException>()));
+      final progress = (await db.query(
+        'torrent_index_migrations',
+        where: 'name = ?',
+        whereArgs: ['search'],
+      )).single;
+      expect(progress['completed'], 0);
+      expect(progress['last_hash'], 255.toString().padLeft(40, '0'));
+      expect(
+        (await db.rawQuery(
+          'SELECT COUNT(*) AS n FROM torrents WHERE search_name IS NOT NULL',
+        )).single['n'],
+        256,
+      );
+      await db.execute('DROP TRIGGER interrupt_search_migration');
+      await repo.initialize();
+      expect((await repo.page(query: 'cafe')).total, 600);
+      expect(
+        (await db.query(
+          'torrent_index_migrations',
+          where: 'name = ?',
+          whereArgs: ['search'],
+        )).single['completed'],
+        1,
+      );
+      await repo.initialize();
+      expect((await repo.page(query: 'cafe')).total, 600);
+    },
+  );
 
   test(
     'deduplicates by info hash and retains source locations and task state',

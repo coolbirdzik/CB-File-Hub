@@ -105,9 +105,10 @@ class FluentSurfaceTokens {
   static bool get isMacOS => defaultTargetPlatform == TargetPlatform.macOS;
   static double get tabBarHeight => isMacOS ? 60 : 48;
   static double get tabWidth => isMacOS ? 240 : 210;
-  static double get drawerWidth => isMacOS ? 260 : 288;
-  static double get drawerItemHeight => isMacOS ? 36 : 42;
-  static double get drawerItemRadius => isMacOS ? 8 : 6;
+  static double get drawerWidth => isMacOS ? 260 : 272;
+  // Dense Raycast-style rows on every platform.
+  static double get drawerItemHeight => isMacOS ? 32 : 34;
+  static double get drawerItemRadius => CbRadii.md;
 
   static const double toolbarHeight = 52;
   static const double controlHeight = 34;

@@ -19,7 +19,7 @@ void main() {
       isPartial: true,
       apps: <AppStorageProfile>[
         AppStorageProfile(
-          app: const InstalledAppInfo(
+          app: InstalledAppInfo(
             id: 'alpha',
             displayName: 'Alpha Editor',
             publisher: 'Acme',
@@ -27,6 +27,7 @@ void main() {
             source: InstalledAppSource.win32,
             canManage: true,
             uninstallCommand: 'uninstall.exe',
+            installedOrUpdatedAt: now.subtract(const Duration(days: 30)),
           ),
           usage: AppUsageEvidence(
             lastOpenedAt: now.subtract(const Duration(days: 220)),
@@ -311,5 +312,38 @@ void main() {
       findsOneWidget,
     );
     expect(find.textContaining('inventory unavailable'), findsOneWidget);
+  });
+
+  testWidgets('shows install dates and offers newest install sorting', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1400, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final cubit = CleanerAppInsightsCubit(nowProvider: () => now)
+      ..setReport(fixtureReport());
+    addTearDown(cubit.close);
+    await pumpView(tester, cubit: cubit);
+    final context = tester.element(find.byType(CleanerAppsView));
+    final date = MaterialLocalizations.of(
+      context,
+    ).formatMediumDate(now.subtract(const Duration(days: 30)));
+    expect(find.text('Installed or updated: $date'), findsWidgets);
+    expect(find.text('Installed or updated: Unknown'), findsWidgets);
+    await tester.tap(find.byKey(const ValueKey('cleaner-apps-view-options')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.ancestor(
+        of: find.text('Newest install/update'),
+        matching: find.byWidgetPredicate(
+          (widget) => widget is CheckedPopupMenuItem,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(cubit.state.sort, CleanerAppSort.installedNewest);
+    expect(cubit.state.visibleApps.first.app.id, 'alpha');
+    expect(tester.takeException(), isNull);
   });
 }

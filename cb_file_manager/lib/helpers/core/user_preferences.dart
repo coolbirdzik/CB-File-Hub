@@ -52,6 +52,10 @@ class UserPreferences {
   final ValueNotifier<FileThumbnailFitMode> fileThumbnailFitMode =
       ValueNotifier<FileThumbnailFitMode>(FileThumbnailFitMode.cover);
   final ValueNotifier<bool> showRecentFoldersOnHome = ValueNotifier<bool>(true);
+
+  /// Whether Home shows the keyboard tip card (desktop). Dismissing the card
+  /// clears it; the keyboard shortcuts page turns it back on.
+  final ValueNotifier<bool> showHomeKeyboardTip = ValueNotifier<bool>(true);
   final ValueNotifier<bool> videoThumbnailViewportOnly = ValueNotifier<bool>(
     true,
   );
@@ -104,6 +108,7 @@ class UserPreferences {
   static const String _recentPathsKey = 'recent_paths';
   static const String _showRecentFoldersOnHomeKey =
       'show_recent_folders_on_home';
+  static const String _showHomeKeyboardTipKey = 'show_home_keyboard_tip_v1';
   static const String _rememberTabWorkspaceKey = 'remember_tab_workspace';
   static const String _lastOpenedTabPathKey = 'last_opened_tab_path';
   static const String _lastOpenedTabsListKey = 'last_opened_tabs_list';
@@ -449,6 +454,24 @@ class UserPreferences {
       enabled,
     );
     if (saved) showRecentFoldersOnHome.value = enabled;
+    return saved;
+  }
+
+  /// Loads [showHomeKeyboardTip] (default on).
+  Future<bool> getShowHomeKeyboardTip() async {
+    final enabled =
+        await _getPreference<bool>(
+          _showHomeKeyboardTipKey,
+          defaultValue: true,
+        ) ??
+        true;
+    showHomeKeyboardTip.value = enabled;
+    return enabled;
+  }
+
+  Future<bool> setShowHomeKeyboardTip(bool enabled) async {
+    final saved = await _savePreference<bool>(_showHomeKeyboardTipKey, enabled);
+    if (saved) showHomeKeyboardTip.value = enabled;
     return saved;
   }
 

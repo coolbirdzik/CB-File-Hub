@@ -5204,6 +5204,10 @@ class TurkishLocalizations implements AppLocalizations {
   String get cleanerAppsSortName => 'Ad';
   @override
   String get cleanerAppsSortLastOpened => 'En eski etkinlik';
+
+  @override
+  String get cleanerAppsSortInstalledNewest => 'En yeni kurulum/güncelleme';
+
   @override
   String get cleanerAppsLargeThresholdLabel => 'Büyük uygulama';
   @override
@@ -6872,4 +6876,109 @@ class TurkishLocalizations implements AppLocalizations {
   @override
   String get cleanerInstallerReason =>
       'Visual Studio ve Windows kurulum paketleri. Yalnızca inceleme; yazılımı onarmak, güncellemek veya kaldırmak için gerekli olabilir. Temizlik için asla seçilmez.';
+
+  // Command palette (Ctrl+K)
+  @override
+  String get commandPaletteTitle => 'Komut paleti';
+  @override
+  String get commandPaletteHint => 'Sekme, konum ve komut ara…';
+  @override
+  String get commandPaletteGoTo => 'Git';
+  @override
+  String get commandPalettePlaces => 'Konumlar';
+  @override
+  String get commandPaletteCommands => 'Komutlar';
+  @override
+  String get commandPaletteNavigate => 'Gezin';
+  @override
+  String get commandPaletteTabLabel => 'Sekme';
+  @override
+  String get commandPaletteFolderLabel => 'Klasör';
+  @override
+  String get commandPaletteToggleTheme => 'Açık / koyu temayı değiştir';
+  @override
+  String get commandPaletteToggleSplit => 'Bölünmüş görünümü değiştir';
+  @override
+  String get commandPaletteOpenPath => 'Bu yolu aç';
+
+  // Keyboard shortcuts reference and the Home keyboard tip
+  @override
+  String get shortcutsTitle => 'Klavye kısayolları';
+  @override
+  String get shortcutsSubtitle => 'Uygulamadaki tüm kısayolları gör';
+  @override
+  String get shortcutsSearchHint => 'Kısayol ara…';
+  @override
+  String get shortcutsGroupTabs => 'Sekmeler ve pencereler';
+  @override
+  String get shortcutsGroupFiles => 'Dosya listesinde';
+  @override
+  String get shortcutsGroupImageViewer => 'Görüntü görüntüleyici';
+  @override
+  String get shortcutsGroupVideoPlayer => 'Video oynatıcı';
+  @override
+  String get shortcutsGroupImageEditor => 'Görüntü düzenleyici';
+  @override
+  String get shortcutNextTab => 'Sonraki sekme';
+  @override
+  String get shortcutPreviousTab => 'Önceki sekme';
+  @override
+  String get shortcutSwitchToTab => '1–9. sekmeye git';
+  @override
+  String get shortcutPaste => 'Yapıştır';
+  @override
+  String get shortcutRedo => 'Yinele';
+  @override
+  String get shortcutDeletePermanently => 'Kalıcı olarak sil';
+  @override
+  String get shortcutOpenSelected => 'Seçili öğeyi aç';
+  @override
+  String get shortcutOpenInNewWindow => 'Yeni pencerede aç';
+  @override
+  String get shortcutMoveSelection => 'Seçimi taşı';
+  @override
+  String get shortcutTypeToFind => 'Adını yazarak öğeye atla';
+  @override
+  String get shortcutPreviousNext => 'Önceki / sonraki';
+  @override
+  String get shortcutFirstLast => 'İlk / son';
+  @override
+  String get shortcutZoomIn => 'Yakınlaştır';
+  @override
+  String get shortcutZoomOut => 'Uzaklaştır';
+  @override
+  String get shortcutZoomReset => 'Yakınlaştırmayı sıfırla';
+  @override
+  String get shortcutRotate => 'Sağa / sola döndür';
+  @override
+  String get shortcutInfo => 'Bilgiyi göster';
+  @override
+  String get shortcutFullscreen => 'Tam ekran';
+  @override
+  String get shortcutExitFullscreen => 'Tam ekrandan çık';
+  @override
+  String get shortcutSlideshow => 'Slayt gösterisi';
+  @override
+  String get shortcutPrint => 'Yazdır';
+  @override
+  String get shortcutPlayPause => 'Oynat / duraklat';
+  @override
+  String get shortcutSeek => 'Geri / ileri sar';
+  @override
+  String get shortcutSeekFar => '30 saniye sar';
+  @override
+  String get shortcutVolume => 'Sesi aç / kıs';
+  @override
+  String get shortcutMute => 'Sessiz';
+  @override
+  String get shortcutRunSelected => 'Seçili öğeyi çalıştır';
+  @override
+  String get homeTipTitle => 'Klavyeyle daha hızlı çalışın';
+  @override
+  String get homeTipPalette =>
+      'Herhangi bir sekmeye, klasöre veya komuta atlayın';
+  @override
+  String get homeTipOpenPalette => 'Komut paletini aç';
+  @override
+  String get homeTipShowOnHome => 'Ana sayfada klavye ipuçlarını göster';
 }

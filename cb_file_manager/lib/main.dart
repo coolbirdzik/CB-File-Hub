@@ -638,15 +638,6 @@ Future<void> runCbFileApp() async {
   }
   debugPrint('Service locator initialized successfully');
 
-  // One download owner per app, never a player/spare window or E2E sandbox.
-  if (!isSecondaryWindow && !isPip && !isDedicatedVideoWindow && !kCbE2E) {
-    unawaited(
-      locator<TorrentService>().initialize().catchError((Object error) {
-        debugPrint('Torrent initialization failed: $error');
-      }),
-    );
-  }
-
   // Initialize preferences first for theme and language.
   if (isSecondaryWindow && !isPip) {
     deferredSecondaryInitializers.add(() async {
@@ -860,6 +851,18 @@ Future<void> runCbFileApp() async {
   }
 
   debugPrint('Startup: runApp after ${startupStopwatch.elapsedMilliseconds}ms');
+  // Preferences, tags and the first frame must not wait behind torrent index
+  // upgrades or automatic imports on the same SQLite connection.
+  // One download owner per app, never a player/spare window or E2E sandbox.
+  if (!isSecondaryWindow && !isPip && !isDedicatedVideoWindow && !kCbE2E) {
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      unawaited(
+        locator<TorrentService>().initialize().catchError((Object error) {
+          debugPrint('Torrent initialization failed: $error');
+        }),
+      );
+    });
+  }
   if (TorrentOptionsWindowService.isSupported &&
       !isSecondaryWindow &&
       !isPip &&

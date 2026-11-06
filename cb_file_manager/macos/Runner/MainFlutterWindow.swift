@@ -8,6 +8,7 @@ class MainFlutterWindow: NSWindow {
   private var trafficLightBarHeight: CGFloat = 0
   private var trafficLightLeading: CGFloat = 0
   private var glassBackground: NSVisualEffectView?
+  private var cleanerVolumeEvents: CleanerVolumeEvents?
 
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
@@ -18,6 +19,12 @@ class MainFlutterWindow: NSWindow {
     RegisterGeneratedPlugins(registry: flutterViewController)
     LocalAiRuntimeChannel.register(with: flutterViewController.engine.binaryMessenger)
     FolderOpenChannel.register(with: flutterViewController.engine.binaryMessenger)
+    let volumeEvents = CleanerVolumeEvents()
+    cleanerVolumeEvents = volumeEvents
+    FlutterEventChannel(
+      name: "cb_file_manager/cleaner_volumes",
+      binaryMessenger: flutterViewController.engine.binaryMessenger
+    ).setStreamHandler(volumeEvents)
 
     let channel = FlutterMethodChannel(
       name: "cb_file_manager/macos_window",
@@ -43,16 +50,21 @@ class MainFlutterWindow: NSWindow {
           let data = "/System/Volumes/Data"
           let primary = URL(fileURLWithPath: manager.fileExists(atPath: data) ? data : "/", isDirectory: true)
           let keys: Set<URLResourceKey> = [.volumeNameKey, .volumeTotalCapacityKey,
-            .volumeAvailableCapacityKey, .volumeIsLocalKey, .volumeIsReadOnlyKey]
-          let mounted = manager.mountedVolumeURLs(includingResourceValuesForKeys: Array(keys), options: [.skipHiddenVolumes]) ?? []
+            .volumeAvailableCapacityKey, .volumeIsLocalKey]
+          let mounted = manager.mountedVolumeURLs(includingResourceValuesForKeys: Array(keys), options: []) ?? []
           var seen = Set<String>()
           let rows: [[String: Any]] = ([primary] + mounted.filter { $0.path.hasPrefix("/Volumes/") }).compactMap { url in
-            guard seen.insert(url.standardizedFileURL.path).inserted,
-              let values = try? url.resourceValues(forKeys: keys),
-              values.volumeIsLocal == true, values.volumeIsReadOnly != true else { return nil }
-            return ["path": url.standardizedFileURL.path, "label": values.volumeName ?? url.lastPathComponent,
-              "totalBytes": values.volumeTotalCapacity ?? 0,
-              "freeBytes": values.volumeAvailableCapacity ?? 0]
+            let path = url.resolvingSymlinksInPath().standardizedFileURL.path
+            // /Volumes/Macintosh HD can be an alias for the system volume.
+            guard !(path == "/" && primary.path != "/"),
+              seen.insert(path).inserted else { return nil }
+            let values = try? url.resourceValues(forKeys: keys)
+            guard values?.volumeIsLocal != false else { return nil }
+            // Read-only volumes (for example NTFS) can still be scanned.
+            // Missing capacity metadata must not hide a mounted disk either.
+            return ["path": path, "label": values?.volumeName ?? url.lastPathComponent,
+              "totalBytes": values?.volumeTotalCapacity ?? 0,
+              "freeBytes": values?.volumeAvailableCapacity ?? 0]
           }
           DispatchQueue.main.async { result(rows) }
         }
@@ -212,6 +224,38 @@ class MainFlutterWindow: NSWindow {
     }
     return Double(zoom.convert(zoom.bounds, to: nil).maxX)
   }
+}
+
+/// Mount events are scoped to Flutter listeners and delivered on the UI thread.
+private final class CleanerVolumeEvents: NSObject, FlutterStreamHandler {
+  private var observers: [NSObjectProtocol] = []
+
+  func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {
+    removeObservers()
+    let center = NSWorkspace.shared.notificationCenter
+    for name in [NSWorkspace.didMountNotification, NSWorkspace.didUnmountNotification,
+      NSWorkspace.didRenameVolumeNotification] {
+      observers.append(center.addObserver(forName: name, object: nil, queue: .main) { _ in
+        events("changed")
+      })
+    }
+    // Refresh after registration so a mount during initial loading is not lost.
+    events("changed")
+    return nil
+  }
+
+  func onCancel(withArguments arguments: Any?) -> FlutterError? {
+    removeObservers()
+    return nil
+  }
+
+  private func removeObservers() {
+    let center = NSWorkspace.shared.notificationCenter
+    for observer in observers { center.removeObserver(observer) }
+    observers.removeAll()
+  }
+
+  deinit { removeObservers() }
 }
 
 /// Decorative window material stays outside Flutter's platform-view hierarchy

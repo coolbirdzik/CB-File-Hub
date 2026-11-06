@@ -18,7 +18,7 @@ Future<void> pressSearch(WidgetTester tester) async {
 }
 
 void main() {
-  testWidgets('Ctrl+F opens search and refocuses without changing its query', (
+  testWidgets('Ctrl+F opens search, focuses and selects the entire query', (
     tester,
   ) async {
     final searchFocus = FocusNode();
@@ -55,6 +55,7 @@ void main() {
                 focusNode: searchFocus,
                 currentPath: 'C:/',
                 tabId: 'test',
+                initialQuery: 'initial query',
                 onCloseSearch: () => update(() => visible = false),
                 onQueryChanged: (_) => queries++,
                 showTagSearch: false,
@@ -87,6 +88,10 @@ void main() {
       of: find.byType(search.SearchBar),
       matching: find.byType(TextField),
     );
+    expect(
+      tester.widget<TextField>(input).controller!.selection,
+      const TextSelection(baseOffset: 0, extentOffset: 13),
+    );
     await tester.enterText(input, 'holiday');
     await tester.pump();
     final editable = tester.widget<EditableText>(
@@ -95,7 +100,6 @@ void main() {
         matching: find.byType(EditableText),
       ),
     );
-    final value = editable.controller.value;
     final queriesBefore = queries;
     otherFocus.requestFocus();
     await tester.pump();
@@ -104,12 +108,21 @@ void main() {
     await tester.pump();
     expect(searchFocus.hasFocus, isTrue);
     expect(visible, isTrue);
-    expect(editable.controller.value, value);
+    expect(editable.controller.text, 'holiday');
+    expect(
+      editable.controller.selection,
+      const TextSelection(baseOffset: 0, extentOffset: 7),
+    );
     expect(queries, queriesBefore);
+    editable.controller.selection = const TextSelection.collapsed(offset: 3);
     await pressSearch(tester);
     expect(searchFocus.hasFocus, isTrue);
     expect(visible, isTrue);
     expect(editable.controller.text, 'holiday');
+    expect(
+      editable.controller.selection,
+      const TextSelection(baseOffset: 0, extentOffset: 7),
+    );
     expect(queries, queriesBefore);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());

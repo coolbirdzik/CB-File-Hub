@@ -158,7 +158,7 @@ void main() {
       tester.widget<FluentChromeSurface>(surface).borderRadius,
       BorderRadius.circular(16),
     );
-    expect(FluentSurfaceTokens.drawerItemHeight, 36);
+    expect(FluentSurfaceTokens.drawerItemHeight, 32);
     expect(find.byType(AppKitView), findsNothing);
     await tester.tap(find.text('Home'));
     await tester.pumpAndSettle();

@@ -18,9 +18,10 @@ class ItemInteractionStyle {
   /// Background of a file/folder row or tile.
   ///
   /// Flat: selection and hover are carried entirely by the fill — no item
-  /// draws an outline. Hover is a neutral wash; selection is the accent
-  /// [CbDecorations.selectionFill], a clearly stronger step than hover so it
-  /// stays unmistakable in a dense listing.
+  /// draws an outline. Hover is a light neutral wash; selection is the
+  /// stronger neutral [CbDecorations.selectionFill] (Raycast-style), at least
+  /// twice as far off the canvas as hover so it stays unmistakable in a dense
+  /// listing.
   static Color backgroundColor({
     required ThemeData theme,
     required bool isDesktopMode,

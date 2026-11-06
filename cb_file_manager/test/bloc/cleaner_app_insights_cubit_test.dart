@@ -178,4 +178,44 @@ void main() {
     expect(cubit.state.status, CleanerAppInsightsStatus.idle);
     expect(cubit.state.report, isNull);
   });
+
+  test(
+    'newest installs sort by date, with unknown dates last and stable ties',
+    () {
+      final cubit = CleanerAppInsightsCubit(nowProvider: () => now);
+      addTearDown(cubit.close);
+      AppStorageProfile app(String id, String name, DateTime? date) =>
+          AppStorageProfile(
+            app: InstalledAppInfo(
+              id: id,
+              displayName: name,
+              source: InstalledAppSource.win32,
+              installedOrUpdatedAt: date,
+            ),
+          );
+      cubit.setReport(
+        AppStorageReport(
+          drivePath: 'C:\\',
+          generatedAt: now,
+          apps: [
+            app('unknown', 'A unknown', null),
+            app('old', 'Older', now.subtract(const Duration(days: 90))),
+            app('b', 'Beta', now),
+            app('a2', 'Alpha', now),
+            app('a1', 'Alpha', now),
+          ],
+        ),
+      );
+      cubit.setSort(CleanerAppSort.installedNewest);
+      expect(cubit.state.visibleApps.map((profile) => profile.app.id), [
+        'a1',
+        'a2',
+        'b',
+        'old',
+        'unknown',
+      ]);
+      cubit.setSearchQuery('unknown');
+      expect(cubit.state.visibleApps.single.app.id, 'unknown');
+    },
+  );
 }

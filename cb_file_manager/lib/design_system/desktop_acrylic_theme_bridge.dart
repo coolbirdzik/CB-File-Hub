@@ -27,7 +27,7 @@ ThemeData createDesktopAcrylicMaterialBridgeTheme({
     dynamicBackdrop: preferTransparentBackdrop,
   );
   final bool isLightMode = brightness == Brightness.light;
-  const Color fluentLightBackground2 = Color(0xFFF3F4F7);
+  const Color fluentLightBackground2 = Color(0xFFF4F4F5);
   const Color fluentLightBackground3 = Color(0xFFFFFFFF);
   final scaffoldOpacity = glass?.canvasOpacity ?? acrylic.canvasOpacity;
   final appBarOpacity = glass?.chromeOpacity ?? acrylic.chromeOpacity;
@@ -88,8 +88,8 @@ ThemeData createDesktopAcrylicMaterialBridgeTheme({
   );
 
   // Dialogs, menus and dropdown overlays stay solid even when page chrome
-  // uses acrylic, and sit one tonal step above the canvas so they still read
-  // as separate layers without an outline.
+  // uses acrylic, and sit one tonal step above the canvas; their hairline
+  // edge (from the base theme's shapes) finishes the separation.
   final Color dialogColor = colorScheme.surfaceContainer;
   final Color menuColor = colorScheme.surfaceContainer;
 

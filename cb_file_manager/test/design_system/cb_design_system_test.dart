@@ -32,7 +32,7 @@ void main() {
       }
     });
 
-    test('chrome is flat: no outline on cards, dialogs, menus, chips', () {
+    test('resting chrome is borderless; floating layers carry a hairline', () {
       BorderSide sideOf(ShapeBorder? shape) =>
           shape is OutlinedBorder ? shape.side : BorderSide.none;
 
@@ -40,34 +40,53 @@ void main() {
         ThemeConfig.getLightTheme(),
         ThemeConfig.getDarkTheme(),
       ]) {
+        final c = theme.cb.colors;
+        final hairline = BorderSide(color: CbDecorations.floatingEdge(c));
+
+        // Resting: cards, chips and buttons separate by fill, not outline.
         expect(sideOf(theme.cardTheme.shape), BorderSide.none);
-        expect(sideOf(theme.dialogTheme.shape), BorderSide.none);
-        expect(sideOf(theme.popupMenuTheme.shape), BorderSide.none);
-        expect(sideOf(theme.snackBarTheme.shape), BorderSide.none);
         expect(theme.chipTheme.side, BorderSide.none);
         expect(theme.tabBarTheme.dividerColor, Colors.transparent);
-        expect(
-          sideOf(theme.menuTheme.style!.shape!.resolve(const {})),
-          BorderSide.none,
-        );
-        // OutlinedButton keeps its name but renders as a tonal button.
         final outlined = theme.outlinedButtonTheme.style!;
         expect(
           outlined.side?.resolve(const {}),
           anyOf(isNull, BorderSide.none),
         );
-        expect(
-          outlined.backgroundColor!.resolve(const {}),
-          theme.cb.colors.fill,
-        );
-        // Inputs show no line at rest; focus is a bottom accent indicator.
+        expect(outlined.backgroundColor!.resolve(const {}), c.fill);
+
+        // Floating: one shared 1px edge on dialogs, menus and snackbars.
+        expect(sideOf(theme.dialogTheme.shape), hairline);
+        expect(sideOf(theme.popupMenuTheme.shape), hairline);
+        expect(sideOf(theme.snackBarTheme.shape), hairline);
+        expect(theme.menuTheme.style!.side!.resolve(const {}), hairline);
+
+        // Inputs are hairline fields that brighten (neutrally) on focus.
         final inputs = theme.inputDecorationTheme;
-        expect(inputs.enabledBorder!.borderSide, BorderSide.none);
-        expect(inputs.focusedBorder, isA<UnderlineInputBorder>());
+        expect(inputs.enabledBorder, isA<OutlineInputBorder>());
+        expect(inputs.enabledBorder!.borderSide.color, c.stroke);
+        expect(inputs.focusedBorder!.borderSide.color, c.textTertiary);
+        expect(inputs.errorBorder!.borderSide.color, c.status.danger);
+      }
+    });
+
+    test('selection is neutral: no accent on selected rows, chips, tabs', () {
+      for (final theme in [
+        ThemeConfig.getLightTheme(),
+        ThemeConfig.getDarkTheme(),
+      ]) {
+        final c = theme.cb.colors;
+        expect(theme.listTileTheme.selectedColor, c.textPrimary);
+        expect(theme.listTileTheme.selectedTileColor, c.surfaceSelected);
+        expect(theme.chipTheme.selectedColor, c.surfaceSelected);
         expect(
-          inputs.focusedBorder!.borderSide.color,
-          theme.cb.colors.accent.base,
+          theme.colorScheme.primaryContainer,
+          Color.alphaBlend(c.surfaceSelected, c.surface),
         );
+        expect(theme.tabBarTheme.labelColor, c.textPrimary);
+        final selection = CbDecorations.selectionFill(theme.cb);
+        // A grey wash: equal channels, whatever the accent.
+        expect(selection.r, closeTo(selection.g, 0.02));
+        expect(selection.g, closeTo(selection.b, 0.02));
       }
     });
 

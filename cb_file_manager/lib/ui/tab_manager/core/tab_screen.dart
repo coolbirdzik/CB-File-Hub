@@ -14,6 +14,7 @@ import 'tab_paths.dart';
 import 'tab_content_overlay.dart';
 import 'tab_focus_gate.dart';
 import 'tab_keyboard_shortcuts.dart';
+import 'tab_command_palette.dart';
 import 'tab_pane_state.dart';
 import '../../drawer.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
@@ -723,21 +724,24 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                 ),
                 CreateNewWindowIntent: CallbackAction<CreateNewWindowIntent>(
                   onInvoke: (CreateNewWindowIntent intent) {
-                    if (!_isDesktop) return null;
-                    HapticFeedback.mediumImpact();
-                    SchedulerBinding.instance.addPostFrameCallback((_) async {
-                      await locator<DesktopWindowingService>().openNewWindow(
-                        tabs: [
-                          WindowTabPayload(
-                            path: '#home',
-                            name: context.tr.homeTab,
-                          ),
-                        ],
-                      );
-                    });
+                    _handleNewWindow();
                     return null;
                   },
                 ),
+                OpenCommandPaletteIntent:
+                    CallbackAction<OpenCommandPaletteIntent>(
+                      onInvoke: (OpenCommandPaletteIntent intent) {
+                        if (!_isDesktop) return null;
+                        showTabCommandPalette(
+                          context,
+                          onNewTab: _handleAddNewTab,
+                          onCloseTab: _handleCloseCurrentTab,
+                          onNewWindow: _handleNewWindow,
+                          onToggleSplitView: _handleToggleSplitView,
+                        );
+                        return null;
+                      },
+                    ),
                 CloseTabIntent: CallbackAction<CloseTabIntent>(
                   onInvoke: (CloseTabIntent intent) => _handleCloseCurrentTab(),
                 ),
@@ -1530,6 +1534,17 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
         );
       },
     );
+  }
+
+  void _handleNewWindow() {
+    if (!_isDesktop) return;
+    HapticFeedback.mediumImpact();
+    SchedulerBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      await locator<DesktopWindowingService>().openNewWindow(
+        tabs: [WindowTabPayload(path: '#home', name: context.tr.homeTab)],
+      );
+    });
   }
 
   void _handleAddNewTab() {

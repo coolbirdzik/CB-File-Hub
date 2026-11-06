@@ -474,8 +474,8 @@ class _PathNavigationBarState extends State<PathNavigationBar> {
               decoration: BoxDecoration(
                 color: surfaces.control,
                 borderRadius: FluentSurfaceTokens.controlRadius,
-                // Flat field: no outline at rest, the shared bottom
-                // indicator while the path has focus.
+                // The shared field hairline: quiet at rest, brighter while
+                // the path has focus.
                 border: CbDecorations.fieldIndicator(
                   context.cbColors,
                   focused: _pathHasFocus,

@@ -127,7 +127,6 @@ class _FluentDrawerSectionState extends State<FluentDrawerSection> {
   Widget build(BuildContext context) {
     final theme = fluent.FluentTheme.of(context);
     final resources = theme.resources;
-    final accent = theme.accentColor.defaultBrushFor(theme.brightness);
     final icon = widget.icon;
     final selected = widget.selected;
     final isMacOS = FluentSurfaceTokens.isMacOS;
@@ -145,8 +144,10 @@ class _FluentDrawerSectionState extends State<FluentDrawerSection> {
               ),
               child: Icon(
                 icon,
-                size: 18,
-                color: selected ? accent : resources.textFillColorSecondary,
+                size: 16,
+                color: selected
+                    ? resources.textFillColorPrimary
+                    : resources.textFillColorSecondary,
               ),
             ),
       header: Text(
@@ -155,8 +156,8 @@ class _FluentDrawerSectionState extends State<FluentDrawerSection> {
           color: isMacOS
               ? resources.textFillColorSecondary
               : resources.textFillColorPrimary,
-          fontSize: isMacOS ? 12 : 13.5,
-          fontWeight: isMacOS || selected ? FontWeight.w600 : FontWeight.w500,
+          fontSize: isMacOS ? 12 : 13,
+          fontWeight: isMacOS || selected ? FontWeight.w600 : FontWeight.w400,
         ),
       ),
       content: widget.content,
@@ -182,43 +183,26 @@ class _FluentDrawerSectionState extends State<FluentDrawerSection> {
   }
 }
 
+/// Fill behind a drawer row. Raycast-style on every platform: a neutral wash
+/// in the primary text colour — selection one clear step above hover, no
+/// accent tint — so the sidebar stays calm and the content carries colour.
 Color _fluentDrawerStateFill(
   fluent.FluentThemeData theme,
   Set<WidgetState> states, {
   required bool selected,
 }) {
-  final resources = theme.resources;
-  final accent = theme.accentColor.defaultBrushFor(theme.brightness);
-  if (FluentSurfaceTokens.isMacOS) {
-    if (states.contains(WidgetState.pressed)) {
-      return resources.textFillColorPrimary.withValues(alpha: 0.12);
-    }
-    if (selected) {
-      return resources.textFillColorPrimary.withValues(alpha: 0.08);
-    }
-    if (states.contains(WidgetState.hovered)) {
-      return resources.textFillColorPrimary.withValues(alpha: 0.04);
-    }
-    return Colors.transparent;
-  }
+  final ink = theme.resources.textFillColorPrimary;
+  final bool dark = theme.brightness == Brightness.dark;
   if (states.contains(WidgetState.pressed)) {
-    return selected
-        ? Color.alphaBlend(
-            accent.withValues(alpha: 0.18),
-            resources.solidBackgroundFillColorBase,
-          )
-        : resources.subtleFillColorTertiary;
+    return ink.withValues(alpha: dark ? 0.14 : 0.10);
   }
   if (selected) {
-    return Color.alphaBlend(
-      accent.withValues(alpha: theme.brightness == Brightness.dark ? 0.2 : 0.1),
-      resources.solidBackgroundFillColorBase,
-    );
+    return ink.withValues(alpha: dark ? 0.10 : 0.07);
   }
   if (states.contains(WidgetState.hovered)) {
-    return resources.subtleFillColorSecondary;
+    return ink.withValues(alpha: dark ? 0.05 : 0.04);
   }
-  return resources.subtleFillColorTransparent;
+  return Colors.transparent;
 }
 
 class CBDrawer extends StatelessWidget {
@@ -938,7 +922,6 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
   }) {
     final theme = fluent.FluentTheme.of(context);
     final resources = theme.resources;
-    final accent = theme.accentColor.defaultBrushFor(theme.brightness);
     final isMacOS = FluentSurfaceTokens.isMacOS;
 
     return fluent.HoverButton(
@@ -948,7 +931,7 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
       builder: (context, states) {
         final isPressed = states.contains(WidgetState.pressed);
         final iconColor = selected || isPressed
-            ? accent
+            ? resources.textFillColorPrimary
             : resources.textFillColorSecondary;
 
         return Padding(
@@ -974,28 +957,16 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
                   ),
                 ),
               ),
-              padding: const EdgeInsetsDirectional.only(start: 10, end: 8),
+              // No accent pill: the neutral fill alone marks the active row.
+              // The start inset keeps icons on the Expander leading column.
+              padding: EdgeInsetsDirectional.only(
+                start: isMacOS ? 10 : 24,
+                end: 8,
+              ),
               child: Row(
                 children: [
-                  if (!isMacOS)
-                    SizedBox(
-                      width: 4,
-                      child: Center(
-                        child: AnimatedContainer(
-                          duration: _FluentDrawerTokens.stateTransition,
-                          curve: Curves.easeOutCubic,
-                          width: selected ? 3 : 0,
-                          height: 20,
-                          decoration: BoxDecoration(
-                            color: accent,
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
-                      ),
-                    ),
-                  if (!isMacOS) const SizedBox(width: 10),
-                  Icon(icon, size: isMacOS ? 17 : 18, color: iconColor),
-                  SizedBox(width: isMacOS ? 10 : 12),
+                  Icon(icon, size: 16, color: iconColor),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       title,
@@ -1003,12 +974,10 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: resources.textFillColorPrimary,
-                        fontSize: isMacOS ? 13 : 13.5,
+                        fontSize: 13,
                         fontWeight: selected
-                            ? FontWeight.w600
-                            : isMacOS
-                            ? FontWeight.w400
-                            : FontWeight.w500,
+                            ? FontWeight.w500
+                            : FontWeight.w400,
                       ),
                     ),
                   ),

@@ -5161,6 +5161,10 @@ class EnglishLocalizations implements AppLocalizations {
   String get cleanerAppsSortName => 'Name';
   @override
   String get cleanerAppsSortLastOpened => 'Oldest activity';
+
+  @override
+  String get cleanerAppsSortInstalledNewest => 'Newest install/update';
+
   @override
   String get cleanerAppsLargeThresholdLabel => 'Large app';
   @override
@@ -6814,4 +6818,108 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get cleanerInstallerReason =>
       'Visual Studio and Windows installer packages. Review only; they may be needed to repair, update or uninstall software. Never selected for cleanup.';
+
+  // Command palette (Ctrl+K)
+  @override
+  String get commandPaletteTitle => 'Command palette';
+  @override
+  String get commandPaletteHint => 'Search tabs, places and commands…';
+  @override
+  String get commandPaletteGoTo => 'Go to';
+  @override
+  String get commandPalettePlaces => 'Places';
+  @override
+  String get commandPaletteCommands => 'Commands';
+  @override
+  String get commandPaletteNavigate => 'Navigate';
+  @override
+  String get commandPaletteTabLabel => 'Tab';
+  @override
+  String get commandPaletteFolderLabel => 'Folder';
+  @override
+  String get commandPaletteToggleTheme => 'Toggle light / dark theme';
+  @override
+  String get commandPaletteToggleSplit => 'Toggle split view';
+  @override
+  String get commandPaletteOpenPath => 'Open this path';
+
+  // Keyboard shortcuts reference and the Home keyboard tip
+  @override
+  String get shortcutsTitle => 'Keyboard shortcuts';
+  @override
+  String get shortcutsSubtitle => 'See every shortcut in the app';
+  @override
+  String get shortcutsSearchHint => 'Search shortcuts…';
+  @override
+  String get shortcutsGroupTabs => 'Tabs & windows';
+  @override
+  String get shortcutsGroupFiles => 'In the file list';
+  @override
+  String get shortcutsGroupImageViewer => 'Image viewer';
+  @override
+  String get shortcutsGroupVideoPlayer => 'Video player';
+  @override
+  String get shortcutsGroupImageEditor => 'Image editor';
+  @override
+  String get shortcutNextTab => 'Next tab';
+  @override
+  String get shortcutPreviousTab => 'Previous tab';
+  @override
+  String get shortcutSwitchToTab => 'Go to tab 1–9';
+  @override
+  String get shortcutPaste => 'Paste';
+  @override
+  String get shortcutRedo => 'Redo';
+  @override
+  String get shortcutDeletePermanently => 'Delete permanently';
+  @override
+  String get shortcutOpenSelected => 'Open the selected item';
+  @override
+  String get shortcutOpenInNewWindow => 'Open in a new window';
+  @override
+  String get shortcutMoveSelection => 'Move the selection';
+  @override
+  String get shortcutTypeToFind => 'Jump to an item by typing its name';
+  @override
+  String get shortcutPreviousNext => 'Previous / next';
+  @override
+  String get shortcutFirstLast => 'First / last';
+  @override
+  String get shortcutZoomIn => 'Zoom in';
+  @override
+  String get shortcutZoomOut => 'Zoom out';
+  @override
+  String get shortcutZoomReset => 'Reset zoom';
+  @override
+  String get shortcutRotate => 'Rotate right / left';
+  @override
+  String get shortcutInfo => 'Show info';
+  @override
+  String get shortcutFullscreen => 'Full screen';
+  @override
+  String get shortcutExitFullscreen => 'Exit full screen';
+  @override
+  String get shortcutSlideshow => 'Slideshow';
+  @override
+  String get shortcutPrint => 'Print';
+  @override
+  String get shortcutPlayPause => 'Play / pause';
+  @override
+  String get shortcutSeek => 'Seek back / forward';
+  @override
+  String get shortcutSeekFar => 'Seek 30 seconds';
+  @override
+  String get shortcutVolume => 'Volume up / down';
+  @override
+  String get shortcutMute => 'Mute';
+  @override
+  String get shortcutRunSelected => 'Run the selected item';
+  @override
+  String get homeTipTitle => 'Work faster with the keyboard';
+  @override
+  String get homeTipPalette => 'Jump to any tab, folder or command';
+  @override
+  String get homeTipOpenPalette => 'Open command palette';
+  @override
+  String get homeTipShowOnHome => 'Show keyboard tips on Home';
 }

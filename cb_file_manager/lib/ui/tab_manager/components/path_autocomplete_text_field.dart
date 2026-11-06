@@ -6,6 +6,7 @@ import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:flutter/material.dart';
 import 'package:cb_file_manager/helpers/core/text_utils.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:cb_file_manager/design_system/cb_tokens.dart';
 
 enum PathSuggestionType { recent, filesystem }
 
@@ -260,8 +261,9 @@ class _PathAutocompleteTextFieldState extends State<PathAutocompleteTextField> {
                           : PhosphorIconsLight.clockCounterClockwise;
 
                       return Material(
+                        // Neutral selection, like every other list.
                         color: selected
-                            ? theme.colorScheme.primary.withValues(alpha: 0.12)
+                            ? context.cbColors.surfaceSelected
                             : Colors.transparent,
                         child: InkWell(
                           onTap: () => _applySuggestion(index),

@@ -1,4 +1,8 @@
+import 'dart:async';
+
 import 'package:cb_file_manager/config/languages/app_localizations_delegate.dart';
+import 'package:cb_file_manager/services/app_insights/app_insights_models.dart';
+import 'package:cb_file_manager/services/app_insights/windows_app_inventory_service.dart';
 import 'package:cb_file_manager/services/disk_cleaner/cleaner_models.dart';
 import 'package:cb_file_manager/services/disk_cleaner/disk_cleaner_service.dart';
 import 'package:cb_file_manager/services/disk_cleaner/disk_tree_node.dart';
@@ -9,11 +13,20 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+class _EmptyInventory extends WindowsAppInventoryService {
+  @override
+  Future<InstalledAppInventoryResult> loadInventory({
+    void Function(InstalledAppInventoryResult)? onSnapshot,
+  }) async => const InstalledAppInventoryResult(apps: []);
+}
+
 class _MacCleaner extends DiskCleanerService {
   _MacCleaner() : super.forTesting(fullDiskScanSpawner: spawnFullDiskScan);
   String? scannedPath;
+  final changes = StreamController<void>.broadcast();
   @override
-  Future<List<DriveSpace>> getDriveSpace() async => const [
+  Stream<void> get driveChanges => changes.stream;
+  List<DriveSpace> drives = const [
     DriveSpace(
       path: '/System/Volumes/Data',
       label: 'Macintosh HD',
@@ -21,6 +34,8 @@ class _MacCleaner extends DiskCleanerService {
       freeBytes: 40000,
     ),
   ];
+  @override
+  Future<List<DriveSpace>> getDriveSpace() async => drives;
   @override
   Future<FullDiskScanHandle> scanFullDisk({
     required String drivePath,
@@ -71,6 +86,7 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
       final cleaner = _MacCleaner();
+      addTearDown(cleaner.changes.close);
       await tester.pumpWidget(
         MaterialApp(
           locale: const Locale('en'),
@@ -81,7 +97,12 @@ void main() {
             GlobalWidgetsLocalizations.delegate,
             GlobalCupertinoLocalizations.delegate,
           ],
-          home: Scaffold(body: CbAgentCleanerScreen(cleanerService: cleaner)),
+          home: Scaffold(
+            body: CbAgentCleanerScreen(
+              cleanerService: cleaner,
+              appInventoryService: _EmptyInventory(),
+            ),
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -112,6 +133,65 @@ void main() {
     },
     variant: TargetPlatformVariant.only(TargetPlatform.macOS),
   );
+
+  testWidgets('mounted external disks appear, unmount, and can be scanned', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    tester.view.physicalSize = const Size(1500, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final cleaner = _MacCleaner();
+    addTearDown(cleaner.changes.close);
+    final internal = cleaner.drives.single;
+    const external = DriveSpace(
+      path: '/Volumes/My External SSD',
+      label: 'External SSD',
+      totalBytes: 200000,
+      freeBytes: 100000,
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('en'),
+        supportedLocales: const [Locale('en')],
+        localizationsDelegates: const [
+          AppLocalizationsDelegate(),
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        home: Scaffold(
+          body: CbAgentCleanerScreen(
+            cleanerService: cleaner,
+            appInventoryService: _EmptyInventory(),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await _openDiskUsage(tester);
+    final externalTile = find.text('/Volumes/My External SSD (External SSD)');
+    expect(externalTile, findsNothing);
+    cleaner.drives = [internal, external];
+    cleaner.changes.add(null);
+    await tester.pumpAndSettle();
+    expect(externalTile, findsOneWidget);
+    await tester.tap(externalTile);
+    cleaner.drives = [internal];
+    cleaner.changes.add(null);
+    await tester.pumpAndSettle();
+    expect(externalTile, findsNothing);
+    cleaner.drives = [internal, external];
+    cleaner.changes.add(null);
+    await tester.pumpAndSettle();
+    await tester.tap(externalTile);
+    await tester.tap(find.byKey(const ValueKey('cleaner-scan-cta')));
+    await tester.pumpAndSettle();
+    expect(cleaner.scannedPath, external.path);
+    await tester.pumpWidget(const SizedBox());
+    expect(cleaner.changes.hasListener, isFalse);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
 }
 
 /// The Cleaner opens on Smart Clean; these tests drive Disk usage.

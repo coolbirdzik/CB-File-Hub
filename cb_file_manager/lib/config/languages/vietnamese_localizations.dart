@@ -5145,6 +5145,10 @@ class VietnameseLocalizations implements AppLocalizations {
   String get cleanerAppsSortName => 'Tên';
   @override
   String get cleanerAppsSortLastOpened => 'Hoạt động cũ nhất';
+
+  @override
+  String get cleanerAppsSortInstalledNewest => 'Cài/cập nhật mới nhất';
+
   @override
   String get cleanerAppsLargeThresholdLabel => 'Ứng dụng lớn';
   @override
@@ -6801,4 +6805,108 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get cleanerInstallerReason =>
       'Gói cài đặt Visual Studio và Windows. Chỉ xem xét; có thể cần để sửa chữa, cập nhật hoặc gỡ phần mềm. Không bao giờ được chọn để dọn.';
+
+  // Command palette (Ctrl+K)
+  @override
+  String get commandPaletteTitle => 'Bảng lệnh';
+  @override
+  String get commandPaletteHint => 'Tìm tab, vị trí và lệnh…';
+  @override
+  String get commandPaletteGoTo => 'Đi tới';
+  @override
+  String get commandPalettePlaces => 'Vị trí';
+  @override
+  String get commandPaletteCommands => 'Lệnh';
+  @override
+  String get commandPaletteNavigate => 'Di chuyển';
+  @override
+  String get commandPaletteTabLabel => 'Tab';
+  @override
+  String get commandPaletteFolderLabel => 'Thư mục';
+  @override
+  String get commandPaletteToggleTheme => 'Chuyển giao diện sáng / tối';
+  @override
+  String get commandPaletteToggleSplit => 'Bật/tắt chia đôi màn hình';
+  @override
+  String get commandPaletteOpenPath => 'Mở đường dẫn này';
+
+  // Keyboard shortcuts reference and the Home keyboard tip
+  @override
+  String get shortcutsTitle => 'Phím tắt';
+  @override
+  String get shortcutsSubtitle => 'Xem tất cả phím tắt trong ứng dụng';
+  @override
+  String get shortcutsSearchHint => 'Tìm phím tắt…';
+  @override
+  String get shortcutsGroupTabs => 'Tab & cửa sổ';
+  @override
+  String get shortcutsGroupFiles => 'Trong danh sách file';
+  @override
+  String get shortcutsGroupImageViewer => 'Trình xem ảnh';
+  @override
+  String get shortcutsGroupVideoPlayer => 'Trình phát video';
+  @override
+  String get shortcutsGroupImageEditor => 'Trình chỉnh sửa ảnh';
+  @override
+  String get shortcutNextTab => 'Tab kế tiếp';
+  @override
+  String get shortcutPreviousTab => 'Tab trước';
+  @override
+  String get shortcutSwitchToTab => 'Chuyển tới tab 1–9';
+  @override
+  String get shortcutPaste => 'Dán';
+  @override
+  String get shortcutRedo => 'Làm lại';
+  @override
+  String get shortcutDeletePermanently => 'Xoá vĩnh viễn';
+  @override
+  String get shortcutOpenSelected => 'Mở mục đang chọn';
+  @override
+  String get shortcutOpenInNewWindow => 'Mở trong cửa sổ mới';
+  @override
+  String get shortcutMoveSelection => 'Di chuyển vùng chọn';
+  @override
+  String get shortcutTypeToFind => 'Gõ tên để nhảy tới mục';
+  @override
+  String get shortcutPreviousNext => 'Trước / sau';
+  @override
+  String get shortcutFirstLast => 'Đầu / cuối';
+  @override
+  String get shortcutZoomIn => 'Phóng to';
+  @override
+  String get shortcutZoomOut => 'Thu nhỏ';
+  @override
+  String get shortcutZoomReset => 'Đặt lại thu phóng';
+  @override
+  String get shortcutRotate => 'Xoay phải / trái';
+  @override
+  String get shortcutInfo => 'Hiện thông tin';
+  @override
+  String get shortcutFullscreen => 'Toàn màn hình';
+  @override
+  String get shortcutExitFullscreen => 'Thoát toàn màn hình';
+  @override
+  String get shortcutSlideshow => 'Trình chiếu';
+  @override
+  String get shortcutPrint => 'In';
+  @override
+  String get shortcutPlayPause => 'Phát / tạm dừng';
+  @override
+  String get shortcutSeek => 'Tua lùi / tới';
+  @override
+  String get shortcutSeekFar => 'Tua 30 giây';
+  @override
+  String get shortcutVolume => 'Tăng / giảm âm lượng';
+  @override
+  String get shortcutMute => 'Tắt tiếng';
+  @override
+  String get shortcutRunSelected => 'Chạy mục đang chọn';
+  @override
+  String get homeTipTitle => 'Làm việc nhanh hơn với bàn phím';
+  @override
+  String get homeTipPalette => 'Tới nhanh tab, thư mục hoặc lệnh bất kỳ';
+  @override
+  String get homeTipOpenPalette => 'Mở bảng lệnh';
+  @override
+  String get homeTipShowOnHome => 'Hiện mẹo bàn phím trên trang chủ';
 }

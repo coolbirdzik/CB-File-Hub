@@ -14,7 +14,32 @@ import 'qbittorrent_resume.dart';
 /// The index lives in the app database; metainfo and payloads may live on any
 /// user-selected volume. Queries never materialize the whole library.
 class TorrentRepository {
-  static const schemaVersion = 4;
+  static const schemaVersion = 5;
+  static const _additionalColumns = {
+    'upload_speed': 'INTEGER NOT NULL DEFAULT 0',
+    'uploaded_bytes': 'INTEGER',
+    'seeders': 'INTEGER',
+    'connections': 'INTEGER',
+    'trackers': 'TEXT',
+    'comment': 'TEXT',
+    'created_by': 'TEXT',
+    'torrent_created_at': 'INTEGER',
+    'is_private': 'INTEGER',
+    'piece_length': 'INTEGER',
+    'piece_count': 'INTEGER',
+    'metainfo_bytes': 'INTEGER',
+    'metainfo_version': 'INTEGER NOT NULL DEFAULT 0',
+    'qbittorrent_resume_path': 'TEXT',
+    'qbittorrent_resume_digest': 'TEXT',
+    'source_uris': 'TEXT',
+    'sort_tracker': 'TEXT',
+    'sort_tracker_count': 'INTEGER',
+    'source_uri': 'TEXT',
+    'modified_at': 'INTEGER',
+    'search_name': 'TEXT',
+    'search_group': 'TEXT',
+    'sort_name': 'TEXT',
+  };
   static const maxPageSize = 1000;
   static const sortOptions = {
     SortOption.nameAsc,
@@ -32,6 +57,7 @@ class TorrentRepository {
   TorrentRepository(this.db);
 
   Future<void> initialize() async {
+    if (await _hasCurrentSchema()) return;
     await db.execute('''CREATE TABLE IF NOT EXISTS torrents (
       hash TEXT PRIMARY KEY, name TEXT NOT NULL, torrent_path TEXT NOT NULL,
       category TEXT NOT NULL, group_name TEXT NOT NULL DEFAULT '',
@@ -40,109 +66,47 @@ class TorrentRepository {
       completed_bytes INTEGER NOT NULL DEFAULT 0,
       download_speed INTEGER NOT NULL DEFAULT 0, error TEXT,
       added_at INTEGER NOT NULL, source_uri TEXT)''');
-    await db.transaction((txn) async {
+    final pendingMigrations = await db.transaction((txn) async {
       final columns = await txn.rawQuery('PRAGMA table_info(torrents)');
-      for (final definition in {
-        'upload_speed': 'INTEGER NOT NULL DEFAULT 0',
-        'uploaded_bytes': 'INTEGER',
-        'seeders': 'INTEGER',
-        'connections': 'INTEGER',
-        'trackers': 'TEXT',
-        'comment': 'TEXT',
-        'created_by': 'TEXT',
-        'torrent_created_at': 'INTEGER',
-        'is_private': 'INTEGER',
-        'piece_length': 'INTEGER',
-        'piece_count': 'INTEGER',
-        'metainfo_bytes': 'INTEGER',
-        'metainfo_version': 'INTEGER NOT NULL DEFAULT 0',
-        'qbittorrent_resume_path': 'TEXT',
-        'qbittorrent_resume_digest': 'TEXT',
-        'source_uris': 'TEXT',
-        'sort_tracker': 'TEXT',
-        'sort_tracker_count': 'INTEGER',
-      }.entries) {
-        if (!columns.any((column) => column['name'] == definition.key)) {
+      final existing = columns.map((column) => column['name']).toSet();
+      for (final definition in _additionalColumns.entries) {
+        if (!existing.contains(definition.key)) {
           await txn.execute(
             'ALTER TABLE torrents ADD COLUMN ${definition.key} ${definition.value}',
           );
         }
       }
-      if (!columns.any((column) => column['name'] == 'sort_tracker') ||
-          !columns.any((column) => column['name'] == 'sort_tracker_count')) {
-        var after = '';
-        while (true) {
-          final rows = await txn.query(
-            'torrents',
-            columns: ['hash', 'trackers'],
-            where: 'hash > ?',
-            whereArgs: [after],
-            orderBy: 'hash',
-            limit: 256,
-          );
-          if (rows.isEmpty) break;
-          final batch = txn.batch();
-          for (final row in rows) {
-            after = row['hash'] as String;
-            batch.update(
-              'torrents',
-              _trackerSort(row['trackers'] as String?),
-              where: 'hash = ?',
-              whereArgs: [after],
-            );
-          }
-          await batch.commit(noResult: true);
-        }
-      }
-      if (!columns.any((column) => column['name'] == 'source_uri')) {
-        await txn.execute('ALTER TABLE torrents ADD COLUMN source_uri TEXT');
-      }
-      if (!columns.any((column) => column['name'] == 'modified_at')) {
-        await txn.execute(
-          'ALTER TABLE torrents ADD COLUMN modified_at INTEGER',
+      // Schema changes are short. Persist unfinished work in the same commit
+      // so a restart resumes it rather than treating new columns as migrated.
+      await txn.execute('''CREATE TABLE IF NOT EXISTS torrent_index_migrations (
+        name TEXT PRIMARY KEY, completed INTEGER NOT NULL,
+        last_hash TEXT NOT NULL DEFAULT '')''');
+      for (final migration in {
+        'trackers': ['sort_tracker', 'sort_tracker_count'],
+        'search': ['search_name', 'search_group', 'sort_name'],
+      }.entries) {
+        final addedColumns = migration.value.any(
+          (column) => !existing.contains(column),
+        );
+        await txn.insert(
+          'torrent_index_migrations',
+          {'name': migration.key, 'completed': addedColumns ? 0 : 1},
+          conflictAlgorithm: addedColumns
+              ? ConflictAlgorithm.replace
+              : ConflictAlgorithm.ignore,
         );
       }
-      if (!columns.any((column) => column['name'] == 'search_name')) {
-        await txn.execute('ALTER TABLE torrents ADD COLUMN search_name TEXT');
-        await txn.execute('ALTER TABLE torrents ADD COLUMN search_group TEXT');
-      }
-      if (!columns.any((column) => column['name'] == 'sort_name')) {
-        await txn.execute('ALTER TABLE torrents ADD COLUMN sort_name TEXT');
-      }
-      if (!columns.any((column) => column['name'] == 'search_name') ||
-          !columns.any((column) => column['name'] == 'sort_name')) {
-        // Upgrade old indexes in bounded batches without touching source files.
-        var after = '';
-        while (true) {
-          final rows = await txn.query(
-            'torrents',
-            columns: ['hash', 'name', 'group_name'],
-            where: 'hash > ?',
-            whereArgs: [after],
-            orderBy: 'hash',
-            limit: 256,
-          );
-          if (rows.isEmpty) break;
-          final batch = txn.batch();
-          for (final row in rows) {
-            after = row['hash'] as String;
-            batch.update(
-              'torrents',
-              {
-                'search_name': TextUtils.searchKey(row['name'] as String),
-                'sort_name': (row['name'] as String).toLowerCase(),
-                'search_group': TextUtils.searchKey(
-                  row['group_name'] as String,
-                ),
-              },
-              where: 'hash = ?',
-              whereArgs: [after],
-            );
-          }
-          await batch.commit(noResult: true);
-        }
-      }
+      return (await txn.query(
+        'torrent_index_migrations',
+        columns: ['name'],
+        where: 'completed = 0',
+      )).map((row) => row['name'] as String).toList();
     });
+    for (final migration in pendingMigrations) {
+      if (migration == 'trackers' || migration == 'search') {
+        await _backfillIndexKeys(migration);
+      }
+    }
     await db.execute(
       'CREATE INDEX IF NOT EXISTS torrent_status ON torrents(status, hash)',
     );
@@ -164,6 +128,110 @@ class TorrentRepository {
     await db.execute(
       'CREATE INDEX IF NOT EXISTS torrent_source_hash ON torrent_sources(hash)',
     );
+  }
+
+  Future<bool> _hasCurrentSchema() async {
+    const objects = {
+      'torrents',
+      'torrent_sources',
+      'torrent_status',
+      'torrent_category',
+      'torrent_name_sort',
+      'torrent_size',
+      'torrent_added',
+      'torrent_modified',
+      'torrent_type_sort',
+      'torrent_source_hash',
+    };
+    final found = await db.rawQuery(
+      'SELECT name FROM sqlite_master WHERE name IN '
+      '(${List.filled(objects.length + 1, '?').join(',')})',
+      [...objects, 'torrent_index_migrations'],
+    );
+    final names = found.map((row) => row['name']).toSet();
+    if (!names.containsAll(objects)) return false;
+    final columns = (await db.rawQuery(
+      'PRAGMA table_info(torrents)',
+    )).map((row) => row['name']).toSet();
+    if (!columns.containsAll(_additionalColumns.keys)) return false;
+    // Previous builds committed schema and backfills atomically. Their ready
+    // libraries also need no write just to add our new migration bookkeeping.
+    if (!names.contains('torrent_index_migrations')) return true;
+    final rows = await db.query(
+      'torrent_index_migrations',
+      columns: ['name', 'completed'],
+      where: 'name IN (?, ?)',
+      whereArgs: ['trackers', 'search'],
+    );
+    final completed = {
+      for (final row in rows)
+        if (row['completed'] == 1) row['name'],
+    };
+    // Opening an up-to-date library is read-only: it must not request a write
+    // lock while another app window/process is importing or updating progress.
+    return completed.containsAll({'trackers', 'search'});
+  }
+
+  Future<void> _backfillIndexKeys(String migration) async {
+    final trackers = migration == 'trackers';
+    while (true) {
+      // A batch inside one outer transaction still holds SQLite's lock for
+      // the entire library. Commit each page so preferences/tags can proceed.
+      final hasMore = await db.transaction((txn) async {
+        final progress = (await txn.query(
+          'torrent_index_migrations',
+          where: 'name = ?',
+          whereArgs: [migration],
+        )).single;
+        if (progress['completed'] == 1) return false;
+        final rows = await txn.query(
+          'torrents',
+          columns: trackers
+              ? ['hash', 'trackers']
+              : ['hash', 'name', 'group_name'],
+          where: 'hash > ?',
+          whereArgs: [progress['last_hash']],
+          orderBy: 'hash',
+          limit: 256,
+        );
+        if (rows.isEmpty) {
+          await txn.update(
+            'torrent_index_migrations',
+            {'completed': 1},
+            where: 'name = ?',
+            whereArgs: [migration],
+          );
+          return false;
+        }
+        final batch = txn.batch();
+        for (final row in rows) {
+          batch.update(
+            'torrents',
+            trackers
+                ? _trackerSort(row['trackers'] as String?)
+                : {
+                    'search_name': TextUtils.searchKey(row['name'] as String),
+                    'sort_name': (row['name'] as String).toLowerCase(),
+                    'search_group': TextUtils.searchKey(
+                      row['group_name'] as String,
+                    ),
+                  },
+            where: 'hash = ?',
+            whereArgs: [row['hash']],
+          );
+        }
+        batch.update(
+          'torrent_index_migrations',
+          {'last_hash': rows.last['hash']},
+          where: 'name = ?',
+          whereArgs: [migration],
+        );
+        await batch.commit(noResult: true);
+        return true;
+      });
+      if (!hasMore) return;
+      await Future<void>.delayed(Duration.zero);
+    }
   }
 
   Future<bool> sourceUnchanged(String path, int modified, int size) async {

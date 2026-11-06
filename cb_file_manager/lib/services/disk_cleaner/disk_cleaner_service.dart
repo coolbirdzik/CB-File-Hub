@@ -728,7 +728,12 @@ class DiskCleanerService {
     return CleanerCategories.all();
   }
 
-  /// Returns free / total / used info for every Windows fixed drive.
+  /// Changes to mounted volumes, including external disks attached on macOS.
+  Stream<void> get driveChanges => Platform.isMacOS
+      ? MacosCleanerPlatform.volumeChanges
+      : const Stream<void>.empty();
+
+  /// Returns free / total / used info for every supported mounted drive.
   Future<List<DriveSpace>> getDriveSpace() async {
     if (Platform.isMacOS) {
       _macosVolumes = await MacosCleanerPlatform.volumes();

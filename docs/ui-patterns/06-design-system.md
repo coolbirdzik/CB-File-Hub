@@ -37,7 +37,7 @@ Container(
   padding: const EdgeInsets.all(CbSpacing.md),   // 12 — compile-time constant
   decoration: BoxDecoration(
     color: c.surfaceRaised,
-    borderRadius: CbRadii.mdAll,                 // 7
+    borderRadius: CbRadii.mdAll,                 // 8
     border: Border.all(color: c.stroke),
     boxShadow: tokens.shadowLevel1,
   ),
@@ -50,13 +50,27 @@ Container(
 | Family | File | Values |
 | --- | --- | --- |
 | Spacing | `tokens/cb_geometry_tokens.dart` | `xxs` 2 · `xs` 4 · `sm` 8 · `md` 12 · `lg` 16 · `xl` 24 · `xxl` 32 · `xxxl` 48 |
-| Radius | same | `xs` 3 · `sm` 5 · `md` 7 · `lg` 10 · `xl` 14 · `full` |
+| Radius | same | `xs` 4 · `sm` 6 · `md` 8 · `lg` 12 · `xl` 16 · `button` 8 · `full` |
 | Control height | same | `controlXs` 24 · `controlSm` 28 · `controlMd` 32 · `controlLg` 40 |
 | Type | `tokens/cb_type_tokens.dart` | Inter 400/500/600; `body` is **13/18** — the app's default UI size |
 | Motion | `tokens/cb_motion_tokens.dart` | `instant` 80ms · `fast` 140ms · `normal` 220ms · `slow` 320ms |
 | Elevation | `tokens/cb_elevation_tokens.dart` | `level0`–`level4`, two-part shadows |
 
-The radius and spacing scales top out much lower than Material's. M3's 20px pill on every button and card is the single most recognisable tell of a Material app; 5–7px is the working range here, and `full` is reserved for genuinely pill-shaped things (chips, avatars, progress tracks).
+The radius and spacing scales top out much lower than Material's. M3's 20px pill on every button and card is the single most recognisable tell of a Material app; 6–8px is the working range for rows, inputs, cards and buttons, 12px for menus and popovers, 16px for dialogs and the command palette, and `full` is reserved for genuinely pill-shaped things (chips, avatars, progress tracks).
+
+### The look: Raycast-style
+
+| Rule | Where it lives |
+| --- | --- |
+| **Neutral greys.** `CbNeutral` carries only a trace of blue, so panels never read as "themed". | `tokens/cb_color_tokens.dart` |
+| **Resting chrome is borderless.** Cards, buttons and chips separate from the page by a step on the translucent fill ramp. | `CbThemeBuilder`, `CbSurface` |
+| **Floating layers get a hairline.** Menus, popovers, dialogs, tooltips, snackbars and the palette draw a 1px `c.stroke` edge (`CbDecorations.floatingEdge`) plus a soft, wide shadow, so they read on the acrylic backdrop. | `CbDecorations.floating`, `floatingShape` |
+| **Selection is neutral.** Selected rows, tabs, chips, segments and sidebar items use a grey wash and primary text. `selectionFill` stays at least twice as far off the canvas as hover. Media tiles add a 2px primary-text ring (`selectedOverlay`). | `CbDecorations.selectionFill`, `ItemInteractionStyle` |
+| **The accent is rare.** One primary action per screen, plus state: focus ring, switches, checkboxes, progress, drop targets. | — |
+| **Fields are hairline boxes** that brighten on hover and focus (`c.textTertiary`) and turn danger on error — no Windows-style bottom indicator. | `CbDecorations.field`, `inputBorder` |
+| **Rows inside menus are inset and rounded**, 32px tall, with icons one step quieter than labels. | `shared_file_context_menu.dart` |
+
+`test/design_system/cb_design_system_test.dart` asserts the borderless/hairline split and neutral selection.
 
 ### Colour
 
@@ -80,6 +94,23 @@ Status colours (`c.status.danger`, `.success`, …) are independent of the accen
 | `CbSurface` | `Card`, `Material`, ad-hoc `Container(decoration:)` | 5 depth levels; neutral at every level |
 | `CbTextField` | `TextField` + `InputDecoration` | 32px tall, static label above the field, no floating label |
 | `CbDialog` | `AlertDialog` | Built on `CbSurface`; `showCbConfirmDialog` covers the common case |
+| `CbKbd` | hand-drawn shortcut labels | Key caps (`Ctrl` `K`, `↵`, `Esc`) for menus and the command palette |
+
+## Command palette (Ctrl/⌘+K)
+
+`ui/components/command_palette/` is the Raycast-style launcher: a frosted, hairline-edged window with a borderless search row, grouped results and a footer of key hints. `showCommandPalette` takes items that are ready now, a `deferredItems` future merged in when it resolves (so the palette opens instantly), and `itemsForQuery` for query-dependent rows. `rankCommandPaletteItems` keeps section order and ranks titles by prefix, word start, then substring, using `TextUtils.searchKey`, so matching is accent-insensitive.
+
+The tab shell wires it in `ui/tab_manager/core/tab_command_palette.dart`: open tabs, the entries of the active tab's folder (only once the user types; capped per section), places (Home, Drives, Gallery, …, Settings), pinned and recent folders, tab commands (new tab/window, close tab, split view, theme, keyboard shortcuts) and a "go to" row whenever the query looks like a path. Nothing on the per-keystroke path touches the disk; the path is resolved when the row runs. Files open the way a double-click does (images in the app viewer, videos in the app player). The shortcut is `OpenCommandPaletteIntent` in `tab_keyboard_shortcuts.dart`; Ctrl+K again, or Esc, closes it. Tests: `test/ui/components/command_palette_test.dart`.
+
+## Keyboard shortcuts reference
+
+`ui/components/keyboard_shortcuts/` holds the shortcut reference shown in **Settings → Keyboard shortcuts**, from the palette ("Keyboard shortcuts") and from the Home keyboard tip.
+
+- `KeyCaps` renders every combo — palette rows, the Home tip, the reference — so they look the same everywhere: ⌘ ⌥ ⇧ ⌃ on macOS, Ctrl/Alt/Shift elsewhere.
+- `keyboard_shortcut_catalog.dart`: the **tabs & windows** group is generated from `tabKeyboardShortcuts()`, the map the shell installs, and `tabShortcutLabel` must name every intent in it (`test/ui/components/keyboard_shortcuts_test.dart` fails otherwise). The file list, image viewer, video player and editor groups are hand-listed from their handlers — update them when a handler changes.
+- `KeyboardShortcutsView` is one view with two hosts: `KeyboardShortcutsScreen` (Settings page) and `showKeyboardShortcutsDialog` (floating window).
+
+The Home tip (`ui/screens/home/home_keyboard_tip.dart`, desktop only) teaches Ctrl+K, Ctrl+T and type-to-find. Its button opens the palette through `Actions.maybeInvoke(OpenCommandPaletteIntent)`, so it uses the shell's own action. Dismissing it clears `UserPreferences.showHomeKeyboardTip`; the switch at the top of the shortcuts reference turns it back on.
 
 ```dart
 CbButton(

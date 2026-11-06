@@ -213,9 +213,7 @@ class _ScrollableTabBarState extends State<ScrollableTabBar> {
                         viewportWidth: constraints.maxWidth,
                         controller: widget.controller,
                         tabs: widget.tabs,
-                        labelColor: isDarkMode
-                            ? Colors.white
-                            : theme.colorScheme.primary,
+                        labelColor: theme.colorScheme.onSurface,
                         unselectedLabelColor: isDarkMode
                             ? Colors.white70
                             : theme.colorScheme.onSurface,
@@ -948,13 +946,13 @@ class _ModernTabBarState extends State<_ModernTabBar> {
                   child: ConstrainedBox(
                     constraints: const BoxConstraints.tightFor(
                       width: 210,
-                      height: 38,
+                      height: 34,
                     ),
                     child: DecoratedBox(
-                      // A dragged tab floats: shadow, no outline.
+                      // A dragged tab floats: hairline edge plus shadow.
                       decoration: CbDecorations.floating(
                         context,
-                        radius: 16.0,
+                        radius: CbRadii.md,
                         color: widget.activeTabColor,
                       ),
                       child: Center(
@@ -1200,23 +1198,15 @@ class _ExternalTabGhost extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = theme.colorScheme;
-    final isMacOS = FluentSurfaceTokens.isMacOS;
     final isDark = theme.brightness == Brightness.dark;
     return Container(
       width: FluentSurfaceTokens.tabWidth,
-      height: 40,
-      margin: isMacOS
-          ? const EdgeInsets.symmetric(horizontal: 3, vertical: 6)
-          : const EdgeInsets.only(left: 2, right: 2, top: 6),
+      height: 34,
+      margin: const EdgeInsets.symmetric(horizontal: 2, vertical: 7),
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
         color: cs.primary.withValues(alpha: isDark ? 0.22 : 0.12),
-        borderRadius: isMacOS
-            ? BorderRadius.circular(10)
-            : const BorderRadius.only(
-                topLeft: Radius.circular(10),
-                topRight: Radius.circular(10),
-              ),
+        borderRadius: CbRadii.mdAll,
       ),
       child: Row(
         children: [
@@ -1259,14 +1249,13 @@ class _CaptionStyleAddTabButtonState extends State<_CaptionStyleAddTabButton> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = widget.theme.brightness == Brightness.dark;
-    final accentColor = widget.theme.colorScheme.primary;
-    final idleBg = isDark
-        ? accentColor.withValues(alpha: 0.06)
-        : accentColor.withValues(alpha: 0.07);
-    final hoverBg = isDark
-        ? accentColor.withValues(alpha: 0.16)
-        : accentColor.withValues(alpha: 0.14);
+    // Neutral, Raycast-style: a quiet glyph that gains a grey wash on hover.
+    final cs = widget.theme.colorScheme;
+    final iconColor = _isHovered ? cs.onSurface : cs.onSurfaceVariant;
+    const idleBg = Colors.transparent;
+    final hoverBg = cs.onSurface.withValues(
+      alpha: widget.theme.brightness == Brightness.dark ? 0.08 : 0.06,
+    );
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -1280,12 +1269,12 @@ class _CaptionStyleAddTabButtonState extends State<_CaptionStyleAddTabButton> {
           HapticFeedback.lightImpact();
         },
         builder: (context, state) => Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          padding: const EdgeInsets.all(7),
           decoration: BoxDecoration(
             color: _isHovered ? hoverBg : idleBg,
-            borderRadius: BorderRadius.circular(16.0),
+            borderRadius: CbRadii.mdAll,
           ),
-          child: Icon(PhosphorIconsLight.plus, size: 18, color: accentColor),
+          child: Icon(PhosphorIconsLight.plus, size: 16, color: iconColor),
         ),
       ),
     );
@@ -1373,20 +1362,19 @@ class _ModernTabState extends State<_ModernTab>
   @override
   Widget build(BuildContext context) {
     final tabWidth = FluentSurfaceTokens.tabWidth;
-    final isMacOS = FluentSurfaceTokens.isMacOS;
-    const tabHeight = 40.0;
+    const tabHeight = 34.0;
     final isDarkMode = widget.theme.brightness == Brightness.dark;
     final cs = widget.theme.colorScheme;
-    final primaryColor = cs.primary;
-    final hoverColor = isDarkMode
-        ? cs.surfaceContainerHighest.withValues(alpha: 0.75)
-        : cs.surfaceContainerHighest.withValues(alpha: 0.95);
-    final selectedFillColor = primaryColor.withValues(
-      alpha: isDarkMode ? 0.22 : 0.12,
+    // Raycast-style pill tabs on every platform: neutral washes only. The
+    // active tab is one clear step above hover; a multi-selected tab one
+    // more. No accent fill and no accent rule.
+    final hoverColor = cs.onSurface.withValues(alpha: isDarkMode ? 0.05 : 0.04);
+    final activeFillColor = cs.onSurface.withValues(
+      alpha: isDarkMode ? 0.10 : 0.07,
     );
-    final activeFillColor = isMacOS
-        ? cs.onSurface.withValues(alpha: isDarkMode ? 0.10 : 0.07)
-        : widget.activeTabColor;
+    final selectedFillColor = cs.onSurface.withValues(
+      alpha: isDarkMode ? 0.16 : 0.12,
+    );
     const inactiveFillColor = Colors.transparent;
 
     return MouseRegion(
@@ -1416,9 +1404,10 @@ class _ModernTabState extends State<_ModernTab>
                   curve: Curves.easeOutCubic,
                   width: tabWidth,
                   height: tabHeight,
-                  margin: isMacOS
-                      ? const EdgeInsets.symmetric(horizontal: 3, vertical: 6)
-                      : const EdgeInsets.only(left: 2, right: 2, top: 6),
+                  margin: const EdgeInsets.symmetric(
+                    horizontal: 2,
+                    vertical: 7,
+                  ),
                   clipBehavior: Clip.hardEdge,
                   decoration: BoxDecoration(
                     color: widget.isSelected
@@ -1429,12 +1418,7 @@ class _ModernTabState extends State<_ModernTab>
                                         !_isCloseButtonHovered
                                     ? hoverColor
                                     : inactiveFillColor)),
-                    borderRadius: isMacOS
-                        ? BorderRadius.circular(10)
-                        : const BorderRadius.only(
-                            topLeft: Radius.circular(10),
-                            topRight: Radius.circular(10),
-                          ),
+                    borderRadius: CbRadii.mdAll,
                   ),
                   child: Stack(
                     children: [
@@ -1451,8 +1435,8 @@ class _ModernTabState extends State<_ModernTab>
                                 color: effectiveLabelColor,
                                 fontSize: 13,
                                 fontWeight: widget.isActive
-                                    ? FontWeight.w600
-                                    : FontWeight.w500,
+                                    ? FontWeight.w500
+                                    : FontWeight.w400,
                               ).merge(widget.labelStyle),
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
@@ -1471,18 +1455,6 @@ class _ModernTabState extends State<_ModernTab>
                           ),
                         ),
                       ),
-                      if (widget.isActive && !isMacOS)
-                        Positioned(
-                          left: 8,
-                          right: 8,
-                          top: 0,
-                          height: 2,
-                          child: ColoredBox(
-                            color: cs.primary.withValues(
-                              alpha: isDarkMode ? 0.75 : 0.65,
-                            ),
-                          ),
-                        ),
                     ],
                   ),
                 ),
@@ -1490,13 +1462,15 @@ class _ModernTabState extends State<_ModernTab>
                 // Close button - positioned on top of tab
                 if (widget.onClose != null)
                   Positioned(
-                    top: 6 + (tabHeight - 22) / 2,
-                    right: 12, // Position from right edge
+                    top: 7 + (tabHeight - 22) / 2,
+                    right: 10, // Position from right edge
                     child: AnimatedOpacity(
+                      // Raycast-style: the close glyph only appears on the
+                      // active or hovered tab, so the strip reads as titles.
                       opacity:
                           (_isHovered || widget.forceHovered || widget.isActive)
                           ? 1.0
-                          : 0.5,
+                          : 0.0,
                       duration: const Duration(milliseconds: 150),
                       child: Material(
                         color: Colors.transparent,
@@ -1530,7 +1504,7 @@ class _ModernTabState extends State<_ModernTab>
                               ),
                               child: Icon(
                                 PhosphorIconsLight.x,
-                                size: 16,
+                                size: 14,
                                 color: widget.isActive
                                     ? cs.onSurface
                                     : cs.onSurfaceVariant,

@@ -4833,6 +4833,10 @@ class ChineseLocalizations implements AppLocalizations {
   String get cleanerAppsSortName => '名称';
   @override
   String get cleanerAppsSortLastOpened => '最久未活动';
+
+  @override
+  String get cleanerAppsSortInstalledNewest => '最新安装/更新';
+
   @override
   String get cleanerAppsLargeThresholdLabel => '大型应用';
   @override
@@ -6387,4 +6391,108 @@ class ChineseLocalizations implements AppLocalizations {
   @override
   String get cleanerInstallerReason =>
       'Visual Studio 和 Windows 安装包。仅供检查；修复、更新或卸载软件时可能需要这些文件。绝不会被选中清理。';
+
+  // Command palette (Ctrl+K)
+  @override
+  String get commandPaletteTitle => '命令面板';
+  @override
+  String get commandPaletteHint => '搜索标签页、位置和命令…';
+  @override
+  String get commandPaletteGoTo => '前往';
+  @override
+  String get commandPalettePlaces => '位置';
+  @override
+  String get commandPaletteCommands => '命令';
+  @override
+  String get commandPaletteNavigate => '导航';
+  @override
+  String get commandPaletteTabLabel => '标签页';
+  @override
+  String get commandPaletteFolderLabel => '文件夹';
+  @override
+  String get commandPaletteToggleTheme => '切换浅色/深色主题';
+  @override
+  String get commandPaletteToggleSplit => '切换分屏视图';
+  @override
+  String get commandPaletteOpenPath => '打开此路径';
+
+  // Keyboard shortcuts reference and the Home keyboard tip
+  @override
+  String get shortcutsTitle => '键盘快捷键';
+  @override
+  String get shortcutsSubtitle => '查看应用中的所有快捷键';
+  @override
+  String get shortcutsSearchHint => '搜索快捷键…';
+  @override
+  String get shortcutsGroupTabs => '标签页和窗口';
+  @override
+  String get shortcutsGroupFiles => '在文件列表中';
+  @override
+  String get shortcutsGroupImageViewer => '图片查看器';
+  @override
+  String get shortcutsGroupVideoPlayer => '视频播放器';
+  @override
+  String get shortcutsGroupImageEditor => '图片编辑器';
+  @override
+  String get shortcutNextTab => '下一个标签页';
+  @override
+  String get shortcutPreviousTab => '上一个标签页';
+  @override
+  String get shortcutSwitchToTab => '转到第 1–9 个标签页';
+  @override
+  String get shortcutPaste => '粘贴';
+  @override
+  String get shortcutRedo => '重做';
+  @override
+  String get shortcutDeletePermanently => '永久删除';
+  @override
+  String get shortcutOpenSelected => '打开所选项目';
+  @override
+  String get shortcutOpenInNewWindow => '在新窗口中打开';
+  @override
+  String get shortcutMoveSelection => '移动选择';
+  @override
+  String get shortcutTypeToFind => '输入名称跳转到项目';
+  @override
+  String get shortcutPreviousNext => '上一个 / 下一个';
+  @override
+  String get shortcutFirstLast => '第一个 / 最后一个';
+  @override
+  String get shortcutZoomIn => '放大';
+  @override
+  String get shortcutZoomOut => '缩小';
+  @override
+  String get shortcutZoomReset => '重置缩放';
+  @override
+  String get shortcutRotate => '向右 / 向左旋转';
+  @override
+  String get shortcutInfo => '显示信息';
+  @override
+  String get shortcutFullscreen => '全屏';
+  @override
+  String get shortcutExitFullscreen => '退出全屏';
+  @override
+  String get shortcutSlideshow => '幻灯片放映';
+  @override
+  String get shortcutPrint => '打印';
+  @override
+  String get shortcutPlayPause => '播放 / 暂停';
+  @override
+  String get shortcutSeek => '后退 / 快进';
+  @override
+  String get shortcutSeekFar => '快进或后退 30 秒';
+  @override
+  String get shortcutVolume => '增大 / 减小音量';
+  @override
+  String get shortcutMute => '静音';
+  @override
+  String get shortcutRunSelected => '运行所选项目';
+  @override
+  String get homeTipTitle => '用键盘更快地工作';
+  @override
+  String get homeTipPalette => '快速跳转到任意标签页、文件夹或命令';
+  @override
+  String get homeTipOpenPalette => '打开命令面板';
+  @override
+  String get homeTipShowOnHome => '在主页显示键盘提示';
 }

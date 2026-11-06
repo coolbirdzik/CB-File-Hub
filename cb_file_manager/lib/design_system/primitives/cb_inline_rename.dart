@@ -206,9 +206,8 @@ class _CbInlineRenameFieldState extends State<CbInlineRenameField> {
             horizontal: CbSpacing.sm,
             vertical: widget.dense ? CbSpacing.xxs : CbSpacing.xs + 1,
           ),
-          // Flat: the field floats on its shadow; focus and error show as the
-          // shared bottom indicator plus a crisp translucent ring rather than
-          // a boxed outline.
+          // The field floats on its shadow; focus and error show as the
+          // shared field hairline plus a crisp translucent ring.
           decoration: BoxDecoration(
             color: c.surfaceOverlay,
             borderRadius: CbRadii.mdAll,

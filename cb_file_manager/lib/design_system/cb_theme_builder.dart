@@ -29,11 +29,17 @@ import 'tokens/cb_type_tokens.dart';
 ///  3. **The `fromSeed` tonal palette.** The [ColorScheme] below is assembled
 ///     field by field from tokens, so no Material algorithm decides colour.
 ///
-/// And one CoolBird rule is enforced on top: **flat, borderless chrome.**
-/// Buttons, cards, chips, inputs, menus, dialogs and tooltips draw no
-/// outline. Resting things separate from the page by a step on the fill
-/// ramp, floating things by their shadow. The only lines left are dividers
-/// (content structure) and focus/error indicators (state).
+/// And the CoolBird (Raycast-style) rules are enforced on top:
+///
+///  * **Resting chrome is borderless.** Buttons, cards and chips separate
+///    from the page by a step on the fill ramp.
+///  * **Floating layers get a hairline.** Menus, dialogs, tooltips and
+///    snackbars draw a 1px [CbDecorations.floatingEdge] plus a soft, wide
+///    shadow, so they read on the acrylic backdrop.
+///  * **Selection is neutral.** Selected rows, chips, segments and tabs use a
+///    grey wash and primary text; the accent is reserved for the primary
+///    action and for state (focus, toggles, progress).
+///  * **Inputs are hairline fields** that brighten on hover and focus.
 class CbThemeBuilder {
   const CbThemeBuilder._();
 
@@ -134,9 +140,10 @@ class CbThemeBuilder {
       outlinedButtonTheme: OutlinedButtonThemeData(style: _tonalStyle(c)),
       textButtonTheme: TextButtonThemeData(
         style: _baseButtonStyle(c).copyWith(
+          // Neutral: a text button is a quiet secondary action, not a link.
           foregroundColor: WidgetStateProperty.resolveWith((states) {
             if (states.contains(WidgetState.disabled)) return c.textDisabled;
-            return c.accent.text;
+            return c.textPrimary;
           }),
           backgroundColor: WidgetStateProperty.resolveWith((states) {
             if (states.contains(WidgetState.pressed)) return c.surfacePressed;
@@ -199,7 +206,7 @@ class CbThemeBuilder {
         barrierColor: c.scrim,
         titleTextStyle: CbTypography.headingLg.copyWith(color: c.textPrimary),
         contentTextStyle: CbTypography.body.copyWith(color: c.textSecondary),
-        shape: const RoundedRectangleBorder(borderRadius: CbRadii.xlAll),
+        shape: CbDecorations.floatingShape(c, radius: CbRadii.xl),
       ),
 
       bottomSheetTheme: BottomSheetThemeData(
@@ -216,7 +223,7 @@ class CbThemeBuilder {
       ),
 
       // ─── Menus and popovers ──────────────────────────────────────────────
-      // Floating layers: no outline, so the shadow carries the separation.
+      // Floating layers: a hairline edge plus a soft, wide shadow.
       popupMenuTheme: PopupMenuThemeData(
         color: c.surfaceOverlay,
         surfaceTintColor: Colors.transparent,
@@ -225,7 +232,7 @@ class CbThemeBuilder {
         labelTextStyle: WidgetStatePropertyAll(
           CbTypography.body.copyWith(color: c.textPrimary),
         ),
-        shape: const RoundedRectangleBorder(borderRadius: CbRadii.lgAll),
+        shape: CbDecorations.floatingShape(c),
       ),
 
       menuTheme: MenuThemeData(style: _menuStyle(c)),
@@ -246,7 +253,7 @@ class CbThemeBuilder {
           }),
           overlayColor: const WidgetStatePropertyAll(Colors.transparent),
           shape: const WidgetStatePropertyAll(
-            RoundedRectangleBorder(borderRadius: CbRadii.buttonAll),
+            RoundedRectangleBorder(borderRadius: CbRadii.smAll),
           ),
         ),
       ),
@@ -261,15 +268,15 @@ class CbThemeBuilder {
         decoration: BoxDecoration(
           color: c.surfaceOverlay,
           borderRadius: CbRadii.smAll,
+          border: Border.all(color: CbDecorations.floatingEdge(c)),
           boxShadow: tokens.shadowLevel3,
         ),
       ),
 
       // ─── Inputs ──────────────────────────────────────────────────────────
       // Kept in step with CbTextField (CbDecorations.field): a tonal fill
-      // with no outline, and a bottom indicator that turns accent on focus
-      // and danger on error. Underline borders — not outline ones — so a
-      // floating label sits inside the fill instead of cutting its edge.
+      // with a hairline edge that brightens on focus and turns danger on
+      // error.
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: WidgetStateColor.resolveWith((states) {
@@ -286,10 +293,10 @@ class CbThemeBuilder {
         floatingLabelStyle: CbTypography.labelSm.copyWith(color: c.textPrimary),
         helperStyle: CbTypography.caption.copyWith(color: c.textTertiary),
         errorStyle: CbTypography.caption.copyWith(color: c.status.danger),
-        border: _inputBorder(null),
-        enabledBorder: _inputBorder(null),
-        disabledBorder: _inputBorder(null),
-        focusedBorder: _inputBorder(c.accent.base),
+        border: _inputBorder(c.stroke),
+        enabledBorder: _inputBorder(c.stroke),
+        disabledBorder: _inputBorder(Colors.transparent),
+        focusedBorder: _inputBorder(c.textTertiary),
         errorBorder: _inputBorder(c.status.danger),
         focusedErrorBorder: _inputBorder(c.status.danger),
       ),
@@ -379,7 +386,7 @@ class CbThemeBuilder {
         dense: true,
         iconColor: c.icon,
         textColor: c.textPrimary,
-        selectedColor: c.accent.text,
+        selectedColor: c.textPrimary,
         selectedTileColor: c.surfaceSelected,
         titleTextStyle: CbTypography.body.copyWith(color: c.textPrimary),
         subtitleTextStyle: CbTypography.bodySm.copyWith(color: c.textSecondary),
@@ -392,12 +399,12 @@ class CbThemeBuilder {
 
       chipTheme: ChipThemeData(
         backgroundColor: c.fill,
-        selectedColor: c.accent.tintStrong,
+        selectedColor: c.surfaceSelected,
         disabledColor: c.fillSubtle,
         surfaceTintColor: Colors.transparent,
         labelStyle: CbTypography.labelSm.copyWith(color: c.textPrimary),
         secondaryLabelStyle: CbTypography.labelSm.copyWith(
-          color: c.accent.text,
+          color: c.textPrimary,
         ),
         padding: const EdgeInsets.symmetric(
           horizontal: CbSpacing.sm,
@@ -415,7 +422,7 @@ class CbThemeBuilder {
             if (states.contains(WidgetState.disabled)) return c.fillSubtle;
             if (states.contains(WidgetState.selected)) {
               return states.contains(WidgetState.hovered)
-                  ? c.accent.tintStrong
+                  ? Color.alphaBlend(c.surfaceHover, c.surfaceSelected)
                   : c.surfaceSelected;
             }
             if (states.contains(WidgetState.pressed)) return c.fillPressed;
@@ -424,16 +431,16 @@ class CbThemeBuilder {
           }),
           foregroundColor: WidgetStateProperty.resolveWith((states) {
             if (states.contains(WidgetState.disabled)) return c.textDisabled;
-            if (states.contains(WidgetState.selected)) return c.accent.text;
-            return c.textPrimary;
+            if (states.contains(WidgetState.selected)) return c.textPrimary;
+            return c.textSecondary;
           }),
           fixedSize: const WidgetStatePropertyAll(null),
         ),
       ),
 
       toggleButtonsTheme: ToggleButtonsThemeData(
-        color: c.textPrimary,
-        selectedColor: c.accent.text,
+        color: c.textSecondary,
+        selectedColor: c.textPrimary,
         disabledColor: c.textDisabled,
         fillColor: c.surfaceSelected,
         hoverColor: c.surfaceHover,
@@ -475,21 +482,19 @@ class CbThemeBuilder {
         labelColor: c.textPrimary,
         unselectedLabelColor: c.textSecondary,
         labelStyle: CbTypography.label,
-        unselectedLabelStyle: CbTypography.body,
-        indicatorSize: TabBarIndicatorSize.label,
-        // Flat: the accent indicator marks the active tab; no full-width
-        // rule under the whole bar.
+        unselectedLabelStyle: CbTypography.label,
+        indicatorSize: TabBarIndicatorSize.tab,
+        // Raycast-style segmented tabs: the active tab sits on a neutral
+        // pill; no accent underline and no full-width rule under the bar.
         dividerColor: Colors.transparent,
         dividerHeight: 0,
         overlayColor: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.hovered)) return c.surfaceHover;
           return Colors.transparent;
         }),
-        indicator: UnderlineTabIndicator(
-          borderSide: BorderSide(
-            color: c.accent.base,
-            width: CbStrokes.emphasis,
-          ),
+        indicator: BoxDecoration(
+          color: c.surfaceSelected,
+          borderRadius: CbRadii.smAll,
         ),
       ),
 
@@ -497,7 +502,7 @@ class CbThemeBuilder {
         backgroundColor: c.canvas,
         indicatorColor: c.surfaceSelected,
         selectedIconTheme: IconThemeData(
-          color: c.accent.text,
+          color: c.textPrimary,
           size: CbSizes.iconLg,
         ),
         unselectedIconTheme: IconThemeData(color: c.icon, size: CbSizes.iconLg),
@@ -522,23 +527,23 @@ class CbThemeBuilder {
         actionTextColor: c.accent.text,
         behavior: SnackBarBehavior.floating,
         elevation: _floatingElevation,
-        shape: const RoundedRectangleBorder(borderRadius: CbRadii.lgAll),
+        shape: CbDecorations.floatingShape(c),
       ),
 
       // ─── Scrollbar ───────────────────────────────────────────────────────
-      // A neutral thumb that only picks up the accent while dragging; an
-      // always-accent scrollbar competes with the content for attention.
+      // A neutral thumb in every state; an accent scrollbar competes with
+      // the content for attention.
       scrollbarTheme: ScrollbarThemeData(
         thickness: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.hovered) ||
               states.contains(WidgetState.dragged)) {
-            return 11.0;
+            return 9.0;
           }
-          return 7.0;
+          return 6.0;
         }),
         radius: const Radius.circular(CbRadii.full),
         thumbColor: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.dragged)) return c.accent.base;
+          if (states.contains(WidgetState.dragged)) return c.textSecondary;
           if (states.contains(WidgetState.hovered)) return c.textTertiary;
           return isDark
               ? Colors.white.withValues(alpha: 0.20)
@@ -658,14 +663,17 @@ class CbThemeBuilder {
       padding: const WidgetStatePropertyAll(
         EdgeInsets.symmetric(vertical: CbSpacing.xs),
       ),
+      side: WidgetStatePropertyAll(
+        BorderSide(color: CbDecorations.floatingEdge(c)),
+      ),
       shape: const WidgetStatePropertyAll(
         RoundedRectangleBorder(borderRadius: CbRadii.lgAll),
       ),
     );
   }
 
-  static UnderlineInputBorder _inputBorder(Color? indicator) =>
-      CbDecorations.inputBorder(indicator);
+  static OutlineInputBorder _inputBorder(Color edge) =>
+      CbDecorations.inputBorder(edge);
 
   /// Body of a checkbox or radio. Off is a solid neutral step — one heavier
   /// than the switch's off track, since the glyph is small and has nothing
@@ -761,8 +769,10 @@ class CbThemeBuilder {
       brightness: brightness,
       primary: c.accent.base,
       onPrimary: c.accent.onBase,
-      primaryContainer: c.accent.tint,
-      onPrimaryContainer: c.accent.text,
+      // Neutral: un-migrated widgets paint selected/active states with
+      // `primaryContainer`, and selection in this system is a grey wash.
+      primaryContainer: Color.alphaBlend(c.surfaceSelected, c.surface),
+      onPrimaryContainer: c.textPrimary,
       secondary: c.textSecondary,
       onSecondary: c.textInverse,
       secondaryContainer: Color.alphaBlend(c.fillHover, c.surface),

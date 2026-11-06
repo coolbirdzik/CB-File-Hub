@@ -33,6 +33,7 @@ export 'primitives/cb_decorations.dart';
 export 'primitives/cb_dialog.dart';
 export 'primitives/cb_expander.dart';
 export 'primitives/cb_inline_rename.dart';
+export 'primitives/cb_kbd.dart';
 export 'primitives/cb_pressable.dart';
 export 'primitives/cb_panel_reveal.dart';
 export 'primitives/cb_select.dart';

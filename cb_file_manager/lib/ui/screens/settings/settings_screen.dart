@@ -44,6 +44,7 @@ import 'package:cb_file_manager/services/tab_activity/tab_activity_manager.dart'
 import 'package:cb_file_manager/services/app_update/app_update_models.dart';
 import 'package:cb_file_manager/services/app_update/app_update_service.dart';
 import 'package:cb_file_manager/ui/components/app_update/app_update_dialog.dart';
+import 'package:cb_file_manager/ui/components/keyboard_shortcuts/keyboard_shortcuts_view.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -772,6 +773,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
             );
           },
         ),
+        if (isDesktopPlatform)
+          _buildCompactSettingTile(
+            title: AppLocalizations.of(context)!.shortcutsTitle,
+            subtitle: AppLocalizations.of(context)!.shortcutsSubtitle,
+            icon: PhosphorIconsLight.keyboard,
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const KeyboardShortcutsScreen(),
+                ),
+              );
+            },
+          ),
         _buildTabInactiveThresholdTile(),
         if (_updatesSupported) _buildAppUpdateTile(),
         _buildCompactSettingTile(
@@ -1041,16 +1055,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.primary.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(16),
+                        color: context.cbColors.fill,
+                        borderRadius: CbRadii.mdAll,
                       ),
                       child: Text(
                         '$_videoThumbnailPercentage%',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.primary,
+                          color: context.cbColors.icon,
                           fontSize: 12,
                         ),
                       ),
@@ -1105,16 +1117,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.primary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(16),
+                      color: context.cbColors.fill,
+                      borderRadius: CbRadii.mdAll,
                     ),
                     child: Text(
                       '$_maxConcurrency',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        color: Theme.of(context).colorScheme.primary,
+                        color: context.cbColors.icon,
                         fontSize: 12,
                       ),
                     ),
@@ -1249,14 +1259,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: theme.colorScheme.primary.withValues(
-                          alpha: 0.12,
-                        ),
-                        borderRadius: BorderRadius.circular(16),
+                        color: context.cbColors.fill,
+                        borderRadius: CbRadii.mdAll,
                       ),
                       child: Icon(
                         PhosphorIconsLight.hardDrives,
-                        color: theme.colorScheme.primary,
+                        color: context.cbColors.icon,
                         size: 20,
                       ),
                     ),
@@ -1395,7 +1403,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _buildDatabaseSection() {
     return Card(
       elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(borderRadius: CbRadii.lgAll),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1407,15 +1415,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(16),
+                    color: context.cbColors.fill,
+                    borderRadius: CbRadii.mdAll,
                   ),
                   child: Icon(
                     PhosphorIconsLight.database,
                     size: 20,
-                    color: Theme.of(context).colorScheme.primary,
+                    color: context.cbColors.icon,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -1539,10 +1545,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.primary.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(20),
+                              color: context.cbColors.fill,
+                              borderRadius: CbRadii.mdAll,
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
@@ -1733,7 +1737,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }) {
     return Card(
       elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(borderRadius: CbRadii.lgAll),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1744,16 +1748,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(16),
+                    color: context.cbColors.fill,
+                    borderRadius: CbRadii.mdAll,
                   ),
-                  child: Icon(
-                    icon,
-                    size: 20,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
+                  child: Icon(icon, size: 20, color: context.cbColors.icon),
                 ),
                 const SizedBox(width: 12),
                 Text(
@@ -1905,7 +1903,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         color: theme.colorScheme.surfaceContainerHighest.withValues(
           alpha: 0.24,
         ),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: CbRadii.lgAll,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

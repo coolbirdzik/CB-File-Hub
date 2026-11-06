@@ -3,6 +3,10 @@ import 'cleaner_models.dart';
 
 abstract final class MacosCleanerPlatform {
   static const channel = MethodChannel('cb_file_manager/macos_window');
+  static const volumeEvents = EventChannel('cb_file_manager/cleaner_volumes');
+  static final Stream<void> volumeChanges = volumeEvents
+      .receiveBroadcastStream()
+      .map<void>((_) {});
   static Future<void> openTrash() =>
       channel.invokeMethod<void>('openCleanerTrash');
   static Future<List<DriveSpace>> volumes() async {

@@ -50,7 +50,7 @@ void main() {
       expect(isExpanded(), isFalse);
       expect(
         tester.getCenter(find.byIcon(fluent.FluentIcons.folder)).dx,
-        33,
+        32,
         reason: 'section icons must share the top-level drawer icon centerline',
       );
 

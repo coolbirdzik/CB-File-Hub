@@ -2158,6 +2158,7 @@ abstract class AppLocalizations {
   String get cleanerAppsSortSize;
   String get cleanerAppsSortName;
   String get cleanerAppsSortLastOpened;
+  String get cleanerAppsSortInstalledNewest;
   String get cleanerAppsLargeThresholdLabel;
   String get cleanerAppsStaleThresholdLabel;
   String cleanerAppsDays(int days);
@@ -2900,4 +2901,58 @@ abstract class AppLocalizations {
   String get aiSystemPromptHint;
   String get vlNameHint;
   String get vlDescriptionHint;
+
+  // Command palette (Ctrl+K)
+  String get commandPaletteTitle;
+  String get commandPaletteHint;
+  String get commandPaletteGoTo;
+  String get commandPalettePlaces;
+  String get commandPaletteCommands;
+  String get commandPaletteNavigate;
+  String get commandPaletteTabLabel;
+  String get commandPaletteFolderLabel;
+  String get commandPaletteToggleTheme;
+  String get commandPaletteToggleSplit;
+  String get commandPaletteOpenPath;
+
+  // Keyboard shortcuts reference and the Home keyboard tip
+  String get shortcutsTitle;
+  String get shortcutsSubtitle;
+  String get shortcutsSearchHint;
+  String get shortcutsGroupTabs;
+  String get shortcutsGroupFiles;
+  String get shortcutsGroupImageViewer;
+  String get shortcutsGroupVideoPlayer;
+  String get shortcutsGroupImageEditor;
+  String get shortcutNextTab;
+  String get shortcutPreviousTab;
+  String get shortcutSwitchToTab;
+  String get shortcutPaste;
+  String get shortcutRedo;
+  String get shortcutDeletePermanently;
+  String get shortcutOpenSelected;
+  String get shortcutOpenInNewWindow;
+  String get shortcutMoveSelection;
+  String get shortcutTypeToFind;
+  String get shortcutPreviousNext;
+  String get shortcutFirstLast;
+  String get shortcutZoomIn;
+  String get shortcutZoomOut;
+  String get shortcutZoomReset;
+  String get shortcutRotate;
+  String get shortcutInfo;
+  String get shortcutFullscreen;
+  String get shortcutExitFullscreen;
+  String get shortcutSlideshow;
+  String get shortcutPrint;
+  String get shortcutPlayPause;
+  String get shortcutSeek;
+  String get shortcutSeekFar;
+  String get shortcutVolume;
+  String get shortcutMute;
+  String get shortcutRunSelected;
+  String get homeTipTitle;
+  String get homeTipPalette;
+  String get homeTipOpenPalette;
+  String get homeTipShowOnHome;
 }

@@ -45,30 +45,34 @@ class CbElevation {
   ];
 
   /// Menus, popovers, dropdowns, toasts.
+  ///
+  /// Floating layers also draw a hairline edge (see `CbDecorations.floating`),
+  /// so the shadow can be soft and wide — a Raycast-style lift rather than a
+  /// hard drop shadow.
   static List<BoxShadow> level3(Color shadow, {bool isDark = false}) => [
     BoxShadow(
-      color: shadow.withValues(alpha: isDark ? 0.52 : 0.08),
-      blurRadius: 4,
-      offset: const Offset(0, 2),
+      color: shadow.withValues(alpha: isDark ? 0.40 : 0.06),
+      blurRadius: 3,
+      offset: const Offset(0, 1),
     ),
     BoxShadow(
-      color: shadow.withValues(alpha: isDark ? 0.38 : 0.07),
-      blurRadius: 24,
-      offset: const Offset(0, 8),
+      color: shadow.withValues(alpha: isDark ? 0.44 : 0.12),
+      blurRadius: 32,
+      offset: const Offset(0, 12),
     ),
   ];
 
-  /// Dialogs and modal sheets — the top of the stack.
+  /// Dialogs, modal sheets and the command palette — the top of the stack.
   static List<BoxShadow> level4(Color shadow, {bool isDark = false}) => [
     BoxShadow(
-      color: shadow.withValues(alpha: isDark ? 0.60 : 0.10),
+      color: shadow.withValues(alpha: isDark ? 0.48 : 0.08),
       blurRadius: 6,
-      offset: const Offset(0, 4),
+      offset: const Offset(0, 2),
     ),
     BoxShadow(
-      color: shadow.withValues(alpha: isDark ? 0.46 : 0.09),
-      blurRadius: 48,
-      offset: const Offset(0, 16),
+      color: shadow.withValues(alpha: isDark ? 0.56 : 0.18),
+      blurRadius: 64,
+      offset: const Offset(0, 24),
     ),
   ];
 }

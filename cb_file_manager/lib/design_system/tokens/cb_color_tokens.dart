@@ -19,30 +19,32 @@ import 'dart:ui' show Brightness;
 
 import 'package:flutter/painting.dart';
 
-/// Cool-tinted neutral ramp.
+/// Neutral ramp.
 ///
-/// A pure grey ramp reads as flat and slightly dirty against the accent
-/// colours; every step here carries a small amount of blue (hue ≈ 220) so the
-/// greys stay coherent with the accents and with the Windows desktop backdrop.
+/// Near-pure greys — only a trace of blue (hue ≈ 240, ~3% saturation) so the
+/// dark steps do not read as brown on calibrated displays. The previous ramp
+/// carried a visible cool tint; that tint competed with the accent and made
+/// every panel feel "themed". Neutral greys let content and the one accent
+/// carry the colour, which is the Raycast-style calm the app aims for.
 class CbNeutral {
   const CbNeutral._();
 
   static const Color n0 = Color(0xFFFFFFFF);
-  static const Color n25 = Color(0xFFFCFCFD);
-  static const Color n50 = Color(0xFFF8F9FB);
-  static const Color n100 = Color(0xFFF1F3F7);
-  static const Color n150 = Color(0xFFE8EBF1);
-  static const Color n200 = Color(0xFFDDE1EA);
-  static const Color n300 = Color(0xFFC6CCD9);
-  static const Color n400 = Color(0xFF9BA3B4);
-  static const Color n500 = Color(0xFF737B8C);
-  static const Color n600 = Color(0xFF565D6D);
-  static const Color n700 = Color(0xFF3E4450);
-  static const Color n800 = Color(0xFF2A2E38);
-  static const Color n850 = Color(0xFF20242C);
-  static const Color n900 = Color(0xFF191C22);
-  static const Color n950 = Color(0xFF121419);
-  static const Color n1000 = Color(0xFF0B0D10);
+  static const Color n25 = Color(0xFFFCFCFC);
+  static const Color n50 = Color(0xFFF7F7F8);
+  static const Color n100 = Color(0xFFF0F0F1);
+  static const Color n150 = Color(0xFFE7E7E9);
+  static const Color n200 = Color(0xFFDCDCDF);
+  static const Color n300 = Color(0xFFC4C4C8);
+  static const Color n400 = Color(0xFF9C9CA2);
+  static const Color n500 = Color(0xFF737379);
+  static const Color n600 = Color(0xFF56565C);
+  static const Color n700 = Color(0xFF3F3F44);
+  static const Color n800 = Color(0xFF2C2C30);
+  static const Color n850 = Color(0xFF242427);
+  static const Color n900 = Color(0xFF1C1C1E);
+  static const Color n950 = Color(0xFF151517);
+  static const Color n1000 = Color(0xFF0E0E10);
 }
 
 /// A generated ramp of tints and shades around one accent colour.
@@ -357,31 +359,35 @@ class CbColorTokens {
 
     if (brightness == Brightness.dark) {
       return CbColorTokens(
-        canvas: CbNeutral.n1000,
-        surface: CbNeutral.n950,
-        surfaceRaised: CbNeutral.n900,
+        canvas: CbNeutral.n950,
+        surface: CbNeutral.n900,
+        surfaceRaised: CbNeutral.n850,
         surfaceOverlay: CbNeutral.n850,
         surfaceSunken: CbNeutral.n1000,
-        surfaceHover: const Color(0x0FFFFFFF),
-        surfacePressed: const Color(0x1AFFFFFF),
-        surfaceSelected: ramp.tint,
-        fillSubtle: const Color(0x0DFFFFFF),
-        fill: const Color(0x14FFFFFF),
-        fillHover: const Color(0x1CFFFFFF),
-        fillPressed: const Color(0x26FFFFFF),
-        textPrimary: const Color(0xFFF2F4F8),
-        textSecondary: const Color(0xFFAAB2C0),
-        textTertiary: const Color(0xFF7C8494),
-        textDisabled: const Color(0xFF565D6D),
+        surfaceHover: const Color(0x0DFFFFFF),
+        surfacePressed: const Color(0x17FFFFFF),
+        // Selection is a neutral wash, not an accent tint: the accent is
+        // reserved for the one primary action and for state (focus, toggles).
+        surfaceSelected: const Color(0x1FFFFFFF),
+        fillSubtle: const Color(0x0AFFFFFF),
+        fill: const Color(0x12FFFFFF),
+        fillHover: const Color(0x14FFFFFF),
+        fillPressed: const Color(0x24FFFFFF),
+        textPrimary: const Color(0xFFEDEDEF),
+        textSecondary: const Color(0xFF9F9FA6),
+        textTertiary: const Color(0xFF75757C),
+        textDisabled: const Color(0xFF4E4E54),
         textInverse: CbNeutral.n1000,
-        icon: const Color(0xFFC8CEDA),
-        iconSubtle: const Color(0xFF8C94A3),
-        stroke: const Color(0x1FFFFFFF),
-        strokeSubtle: const Color(0x14FFFFFF),
-        strokeStrong: const Color(0x38FFFFFF),
+        icon: const Color(0xFFB4B4BA),
+        iconSubtle: const Color(0xFF808087),
+        // Hairlines carry the edges of floating layers (menus, popovers,
+        // dialogs) and of the palette window, Raycast-style.
+        stroke: const Color(0x1AFFFFFF),
+        strokeSubtle: const Color(0x0FFFFFFF),
+        strokeStrong: const Color(0x33FFFFFF),
         focusRing: ramp.text,
         shadow: const Color(0xFF000000),
-        scrim: const Color(0x99000000),
+        scrim: const Color(0x73000000),
         accent: ramp,
         status: status,
       );
@@ -393,26 +399,26 @@ class CbColorTokens {
       surfaceRaised: CbNeutral.n0,
       surfaceOverlay: CbNeutral.n0,
       surfaceSunken: CbNeutral.n100,
-      surfaceHover: const Color(0x0A0B0D10),
-      surfacePressed: const Color(0x140B0D10),
-      surfaceSelected: ramp.tint,
-      fillSubtle: const Color(0x0A0B0D10),
-      fill: const Color(0x0F0B0D10),
-      fillHover: const Color(0x170B0D10),
-      fillPressed: const Color(0x210B0D10),
+      surfaceHover: const Color(0x0A0E0E10),
+      surfacePressed: const Color(0x120E0E10),
+      surfaceSelected: const Color(0x170E0E10),
+      fillSubtle: const Color(0x080E0E10),
+      fill: const Color(0x0D0E0E10),
+      fillHover: const Color(0x0F0E0E10),
+      fillPressed: const Color(0x1F0E0E10),
       textPrimary: CbNeutral.n900,
-      textSecondary: CbNeutral.n600,
-      textTertiary: CbNeutral.n500,
-      textDisabled: CbNeutral.n400,
+      textSecondary: const Color(0xFF6A6A70),
+      textTertiary: const Color(0xFF8A8A90),
+      textDisabled: CbNeutral.n300,
       textInverse: CbNeutral.n0,
       icon: CbNeutral.n600,
-      iconSubtle: CbNeutral.n500,
-      stroke: const Color(0x1F0B0D10),
-      strokeSubtle: const Color(0x120B0D10),
-      strokeStrong: const Color(0x330B0D10),
+      iconSubtle: const Color(0xFF8A8A90),
+      stroke: const Color(0x170E0E10),
+      strokeSubtle: const Color(0x0F0E0E10),
+      strokeStrong: const Color(0x2E0E0E10),
       focusRing: ramp.base,
-      shadow: const Color(0xFF0B0D10),
-      scrim: const Color(0x66000000),
+      shadow: const Color(0xFF0E0E10),
+      scrim: const Color(0x4D000000),
       accent: ramp,
       status: status,
     );

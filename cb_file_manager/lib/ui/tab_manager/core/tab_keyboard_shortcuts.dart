@@ -10,6 +10,11 @@ class CloseTabIntent extends Intent {
   const CloseTabIntent();
 }
 
+/// Opens (or closes) the Raycast-style command palette — Ctrl/⌘+K.
+class OpenCommandPaletteIntent extends Intent {
+  const OpenCommandPaletteIntent();
+}
+
 class CreateNewWindowIntent extends Intent {
   const CreateNewWindowIntent();
 }
@@ -37,6 +42,7 @@ Map<ShortcutActivator, Intent> tabKeyboardShortcuts() {
     }
   }
 
+  bind(LogicalKeyboardKey.keyK, const OpenCommandPaletteIntent());
   bind(LogicalKeyboardKey.keyT, const CreateNewTabIntent());
   bind(LogicalKeyboardKey.keyW, const CloseTabIntent());
   bind(LogicalKeyboardKey.backslash, const ToggleSplitViewIntent());

@@ -255,6 +255,8 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
 
   // Setup
   List<DriveSpace> _drives = [];
+  StreamSubscription<void>? _driveChangesSub;
+  int _driveRefreshGeneration = 0;
   String? _selectedDrive;
   String? _appInsightsDrive;
   bool _aiAvailable = false;
@@ -524,6 +526,10 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       _publishCleanerScanContext();
     });
     _loadSetup();
+    _driveChangesSub = _service.driveChanges.listen(
+      (_) => unawaited(_refreshDrives()),
+      onError: (Object error) => debugPrint('Cleaner volume events: $error'),
+    );
     // Read ahead so Smart Clean's scan never waits on the registry.
     if (_hasSmartClean) unawaited(_smartCleanInstalledApps());
     _agentActivitySub = _service.agentActivityStream.listen(_onAgentActivity);
@@ -531,6 +537,8 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
 
   @override
   void dispose() {
+    _driveRefreshGeneration++;
+    _driveChangesSub?.cancel();
     if (_isScanningFullDisk) {
       _service.cancelFullDiskScan();
     }
@@ -658,9 +666,8 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       return;
     }
 
-    _drives = await _service.getDriveSpace();
-    _selectedDrive = _mostPressuredDrivePath(_drives);
-    _appInsightsDrive = _defaultDrivePath(_drives);
+    await _refreshDrives();
+    if (!mounted) return;
     await _loadLastScanSummaries();
     _aiAvailable = await _hasUsableAi();
     if (mounted) setState(() {});
@@ -671,6 +678,30 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     if (_activeSubFeature == _CleanerSubFeature.appLeftovers &&
         _appLeftoversCubit.state.status == CleanerAppLeftoversStatus.idle) {
       unawaited(_startLeftoverScan());
+    }
+  }
+
+  Future<void> _refreshDrives() async {
+    final generation = ++_driveRefreshGeneration;
+    try {
+      final drives = await _service.getDriveSpace();
+      if (!mounted || generation != _driveRefreshGeneration) return;
+      setState(() {
+        _drives = drives;
+        // A mount event must not switch the target of an active scan/results.
+        if (_phase == _Phase.setup &&
+            !_isScanningFullDisk &&
+            !drives.any((drive) => drive.path == _selectedDrive)) {
+          _selectedDrive = _mostPressuredDrivePath(drives);
+        }
+        if (_appInsightsDrive == null ||
+            (!_showsAppInsightsData &&
+                !drives.any((drive) => drive.path == _appInsightsDrive))) {
+          _appInsightsDrive = _defaultDrivePath(drives);
+        }
+      });
+    } catch (error) {
+      debugPrint('Unable to refresh Cleaner drives: $error');
     }
   }
 
@@ -1193,6 +1224,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       _cachedFlatRoot = null;
       _flatRowsValid = false;
     });
+    unawaited(_refreshDrives());
   }
 
   /// Persists a one-line summary of this scan so the setup screen can show
