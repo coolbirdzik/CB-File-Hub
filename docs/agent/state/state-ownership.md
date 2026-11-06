@@ -8,6 +8,8 @@ stale async results, lost provider context, or expensive pane rebuilds.
 
 | State or capability | Owner | Lifetime | Primary source |
 | --- | --- | --- | --- |
+| Default folder application | Operating system; Settings queries it, platform backup stores only restoration data | Per OS user | `cb_file_manager/lib/services/desktop_integration/default_file_manager_service.dart` |
+| macOS incoming folder requests | Native pending queue until the Dart bridge attaches; then current `TabManagerBloc` | App startup / main shell | `cb_file_manager/lib/services/desktop_integration/folder_open_bridge.dart` |
 | Theme | `ThemeProvider` via Provider/GetIt | Application | `cb_file_manager/lib/providers/theme_provider.dart` |
 | Language | `LanguageController` via GetIt | Application | `cb_file_manager/lib/config/language_controller.dart` |
 | Structured persistence | `DatabaseManager` via GetIt | Application | `cb_file_manager/lib/models/database/database_manager.dart` |

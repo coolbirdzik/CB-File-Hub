@@ -432,6 +432,70 @@ class TurkishLocalizations implements AppLocalizations {
       'Klasörleriniz, fotoğraflarınız ve videolarınız hep elinizin altında.';
   @override
   String get homeRecentFolders => 'Kaldığınız yerden devam edin';
+
+  @override
+  String get showRecentFoldersOnHome => 'Ana sayfada son klasörleri göster';
+
+  @override
+  String get defaultFileManagerOnboardingTitle =>
+      'Klasörleri CB File Hub ile açın';
+
+  @override
+  String get defaultFileManagerOnboardingDescription =>
+      'Klasörleri doğrudan CB File Hub içinde açın. Bu seçimi daha sonra Ayarlar bölümünden değiştirebilirsiniz.';
+
+  @override
+  String get defaultFileManagerOnboardingLater => 'Şimdi değil';
+
+  @override
+  String get defaultFileManager => 'Varsayılan dosya yöneticisi';
+  @override
+  String get defaultFileManagerUnavailable =>
+      'Explorer yönlendirmesi EXE/MSI sürümünde kullanılabilir. Bu Windows paketi desteklemiyor.';
+
+  @override
+  String get defaultFileManagerDescription =>
+      'Sistem klasörlerini CB File Hub ile açın. Sistem dosya seçme pencereleri ve başka bir dosya yöneticisini doğrudan açan işlemler değişmeyebilir.';
+
+  @override
+  String get defaultFileManagerWindowsDescription =>
+      'Klasörleri, sürücüleri ve Win+E komutunu CB File Hub ile açın. Önceki yapılandırmayı geri yükleyebilirsiniz. Sistem dosya seçme pencereleri değişmez.';
+
+  @override
+  String get defaultFileManagerSet => 'Klasörler için varsayılan yap';
+
+  @override
+  String get defaultFileManagerRestore => 'Önceki varsayılanı geri yükle';
+
+  @override
+  String get defaultFileManagerActive =>
+      'CB File Hub varsayılan klasör uygulamasıdır.';
+
+  @override
+  String get defaultFileManagerInactive =>
+      'CB File Hub varsayılan klasör uygulaması değildir.';
+
+  @override
+  String get defaultFileManagerPartial =>
+      'Yapılandırmanın yalnızca bir kısmı etkin. Yeniden etkinleştirmeden önce geri yükleyin.';
+
+  @override
+  String get defaultFileManagerFailed =>
+      'Varsayılan klasör uygulaması okunamadı veya değiştirilemedi.';
+
+  @override
+  String get defaultFileManagerRefresh => 'Durumu yenile';
+
+  @override
+  String get folderOpenFailed => 'Şu klasörler açılamadı:';
+
+  @override
+  String get showRecentFoldersOnHomeDescription =>
+      '“Kaldığınız yerden devam edin” bölümünü gösterir. Son klasör adlarını ve yollarını gizlemek için kapatın. Geçmiş korunur.';
+
+  @override
+  String get homePrivacySaveFailed =>
+      'Ana sayfa gizlilik ayarı kaydedilemedi. Lütfen tekrar deneyin.';
   @override
   String get homeRecentEmpty =>
       'Ziyaret ettiğiniz klasörler burada görünür. Başlamak için bir klasör açın.';

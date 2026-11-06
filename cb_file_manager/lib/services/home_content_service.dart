@@ -15,6 +15,9 @@ class HomeMediaPreviews {
 /// Home reads a small snapshot of existing history and media metadata. It never
 /// enumerates directories or starts thumbnail generation/background scanning.
 class HomeContentService {
+  Future<bool> loadRecentFoldersVisibility() =>
+      UserPreferences.instance.getShowRecentFoldersOnHome();
+
   Future<List<String>> loadRecentPaths() => UserPreferences.instance
       .getRecentPaths(limit: 6, validateDirectories: false);
 

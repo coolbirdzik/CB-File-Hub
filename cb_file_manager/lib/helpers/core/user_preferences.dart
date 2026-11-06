@@ -48,6 +48,7 @@ class UserPreferences {
       ValueNotifier<TagThumbnailFitMode>(TagThumbnailFitMode.contain);
   final ValueNotifier<FileThumbnailFitMode> fileThumbnailFitMode =
       ValueNotifier<FileThumbnailFitMode>(FileThumbnailFitMode.cover);
+  final ValueNotifier<bool> showRecentFoldersOnHome = ValueNotifier<bool>(true);
 
   // Stream that can be listened to for theme changes
   Stream<ThemeMode> get themeChangeStream => _themeChangeController.stream;
@@ -91,6 +92,8 @@ class UserPreferences {
       'preferred_video_player_app';
   static const String _openVideoInNewWindowKey = 'open_video_in_new_window';
   static const String _recentPathsKey = 'recent_paths';
+  static const String _showRecentFoldersOnHomeKey =
+      'show_recent_folders_on_home';
   static const String _rememberTabWorkspaceKey = 'remember_tab_workspace';
   static const String _lastOpenedTabPathKey = 'last_opened_tab_path';
   static const String _lastOpenedTabsListKey = 'last_opened_tabs_list';
@@ -410,6 +413,27 @@ class UserPreferences {
 
   bool _isVirtualPath(String value) {
     return value.startsWith('#');
+  }
+
+  /// Controls Home visibility only; browsing history is retained.
+  Future<bool> getShowRecentFoldersOnHome() async {
+    final enabled =
+        await _getPreference<bool>(
+          _showRecentFoldersOnHomeKey,
+          defaultValue: true,
+        ) ??
+        true;
+    showRecentFoldersOnHome.value = enabled;
+    return enabled;
+  }
+
+  Future<bool> setShowRecentFoldersOnHome(bool enabled) async {
+    final saved = await _savePreference<bool>(
+      _showRecentFoldersOnHomeKey,
+      enabled,
+    );
+    if (saved) showRecentFoldersOnHome.value = enabled;
+    return saved;
   }
 
   /// Get recently visited filesystem paths.

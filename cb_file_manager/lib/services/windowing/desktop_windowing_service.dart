@@ -16,6 +16,7 @@ import 'desktop_window_process_launcher.dart';
 import 'window_startup_payload.dart';
 import 'windows_native_tab_drag_drop_service.dart';
 import '../torrent/torrent_launch_request.dart';
+import '../desktop_integration/folder_launch_request.dart';
 import '../torrent/torrent_service.dart';
 import '../torrent/torrent_background_receiver.dart';
 import '../../core/service_locator.dart';
@@ -257,6 +258,29 @@ class DesktopWindowingService {
     return windows
         .where((w) => w.windowId != _windowId && w.role == 'normal')
         .toList(growable: false);
+  }
+
+  /// Uses existing window discovery, but accepts folder requests only from the
+  /// same executable so installed and development copies cannot target each other.
+  Future<bool> openFoldersInExistingWindow(List<WindowTabPayload> tabs) async {
+    for (final window in await listWindows()) {
+      if (window.role != 'normal' || window.processId == pid) continue;
+      if (Platform.isWindows) {
+        await WindowsNativeTabDragDropService.allowForegroundWindow(
+          pid: window.processId,
+        );
+      }
+      final response = await _sendPeerMessage(
+        port: window.port,
+        message: {
+          'type': 'open_folders',
+          'executable': Platform.resolvedExecutable,
+          'paths': tabs.map((tab) => tab.path).toList(),
+        },
+      );
+      if (response?['type'] == 'ok') return true;
+    }
+    return false;
   }
 
   /// Loads [tabs] into the pre-warmed spare window behind the scenes (shown,
@@ -899,6 +923,35 @@ class DesktopWindowingService {
             .map((t) => TabWindowTransfer.capture(t).toJson())
             .toList(growable: false),
       });
+      return;
+    }
+
+    if (type == 'open_folders') {
+      final paths = message['paths'];
+      if (_tabBloc == null ||
+          _windowRole != 'normal' ||
+          message['executable'] != Platform.resolvedExecutable ||
+          paths is! List ||
+          paths.length > 100 ||
+          paths.any((value) => value is! String)) {
+        _writeJsonLine(socket, {'type': 'error'});
+        return;
+      }
+      final raw = paths.cast<String>();
+      final home = raw.length == 1 && raw.single == '#home';
+      final request = await FolderLaunchRequest.takeArguments([
+        '--open-folder',
+        if (!home) ...raw,
+      ]);
+      if (request.rejected.isNotEmpty) {
+        _writeJsonLine(socket, {'type': 'error'});
+        return;
+      }
+      for (final tab in request.tabs) {
+        _tabBloc!.add(AddTab(path: tab.path, name: tab.name));
+      }
+      _writeJsonLine(socket, {'type': 'ok'});
+      unawaited(focusTorrentWindow());
       return;
     }
 

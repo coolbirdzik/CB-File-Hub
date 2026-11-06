@@ -23,6 +23,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class _EmptyHomeContent extends HomeContentService {
   @override
+  Future<bool> loadRecentFoldersVisibility() async => true;
+
+  @override
   Future<List<String>> loadRecentPaths() async => [];
 
   @override

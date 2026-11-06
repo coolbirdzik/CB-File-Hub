@@ -112,11 +112,13 @@ channels:
 
   cb_file_manager/app_icon:
     dart:
+      - cb_file_manager/lib/services/desktop_integration/default_file_manager_service.dart
       - cb_file_manager/lib/helpers/files/windows_app_icon.dart
       - cb_file_manager/lib/services/progress/desktop_app_icon_progress_service.dart
     windows:
       - cb_file_manager/windows/runner/app_icon_plugin.cpp
       - cb_file_manager/windows/runner/app_icon_plugin.h
+      - cb_file_manager/windows/runner/folder_defaults.cpp
     methods:
       - extractIconFromFile
       - getAssociatedAppPath
@@ -127,6 +129,40 @@ channels:
       - extractIconsForExtensions
       - setTaskbarProgress
       - clearTaskbarProgress
+      - folderDefaultStatus
+      - setFolderDefault
+      - restoreFolderDefault
+    invariants:
+      - "Folder defaults are queried from the OS, never inferred from a preferences boolean."
+      - "Windows overrides are HKCU-only, journal exact original bytes/types, and restore only values still owned by CB File Hub."
+      - "Packaged Windows builds cannot enable Explorer redirection."
+
+  cb_file_manager/folder_open:
+    dart:
+      - cb_file_manager/lib/services/desktop_integration/folder_open_bridge.dart
+    macos:
+      - cb_file_manager/macos/Runner/AppDelegate.swift
+      - cb_file_manager/macos/Runner/MainFlutterWindow.swift
+    methods:
+      - ready
+    callbacks:
+      - openFolders
+    invariants:
+      - "Native macOS folder-open events queue until TabMainScreen attaches its tab manager."
+      - "Non-folder open URLs continue to Flutter's existing lifecycle delegates."
+
+  cb_file_manager/macos_window:
+    dart:
+      - cb_file_manager/lib/services/desktop_integration/default_file_manager_service.dart
+    macos:
+      - cb_file_manager/macos/Runner/MainFlutterWindow.swift
+      - cb_file_manager/macos/Runner/AppDelegate.swift
+    folder_default_methods:
+      - folderDefaultStatus
+      - setFolderDefault
+      - restoreFolderDefault
+    invariants:
+      - "Launch Services changes only public.folder; Finder reveal APIs and document pickers remain system-owned."
 
   cb_file_manager/window_utils:
     dart:

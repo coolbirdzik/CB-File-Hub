@@ -12,6 +12,23 @@ ci_order:
   - "flutter build windows"
 
 features:
+  default_file_manager:
+    paths:
+      - cb_file_manager/lib/services/desktop_integration/
+      - cb_file_manager/lib/ui/screens/settings/default_file_manager_settings.dart
+      - cb_file_manager/lib/ui/screens/onboarding/default_file_manager_onboarding_screen.dart
+      - cb_file_manager/windows/runner/folder_defaults.cpp
+      - cb_file_manager/macos/Runner/AppDelegate.swift
+    focused_tests:
+      - "flutter test test/services/desktop_integration test/ui/screens/settings/default_file_manager_settings_test.dart test/ui/screens/onboarding/default_file_manager_onboarding_test.dart"
+    native_tests:
+      - cb_file_manager/windows/runner/tests/folder_defaults_test.cpp
+    windows_build_required_for_native_changes: true
+    manual_checks:
+      - "Windows Shell folder and drive opens, Explorer Win+E entry, same-executable peer handoff, exact restoration."
+      - "macOS open-folder events and Launch Services consent/restore require a real Mac."
+      - "Linux xdg-open/default association requires a logged-in GNOME/KDE desktop."
+
   tabbed_file_browser:
     paths:
       - cb_file_manager/lib/ui/tab_manager/

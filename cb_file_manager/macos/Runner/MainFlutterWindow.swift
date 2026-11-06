@@ -17,6 +17,7 @@ class MainFlutterWindow: NSWindow {
 
     RegisterGeneratedPlugins(registry: flutterViewController)
     LocalAiRuntimeChannel.register(with: flutterViewController.engine.binaryMessenger)
+    FolderOpenChannel.register(with: flutterViewController.engine.binaryMessenger)
 
     let channel = FlutterMethodChannel(
       name: "cb_file_manager/macos_window",
@@ -27,6 +28,12 @@ class MainFlutterWindow: NSWindow {
         return
       }
       switch call.method {
+      case "folderDefaultStatus":
+        result(FolderDefaults.status())
+      case "setFolderDefault":
+        FolderDefaults.change(restore: false, result: result)
+      case "restoreFolderDefault":
+        FolderDefaults.change(restore: true, result: result)
       case "openCleanerTrash":
         let url = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".Trash", isDirectory: true)
         result(NSWorkspace.shared.open(url))

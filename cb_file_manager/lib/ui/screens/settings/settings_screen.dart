@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'desktop_backdrop_strength_control.dart';
+import 'default_file_manager_settings.dart';
 
 import 'package:cb_native/cb_native.dart';
 import 'package:flutter/material.dart';
@@ -68,6 +69,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   // Show file tags setting
   bool _showFileTags = true;
+  bool _showRecentFoldersOnHome = true;
+  bool _savingHomePrivacy = false;
   // Fallback view mode for folders without their own saved view mode.
   ViewMode _defaultViewMode = ViewMode.list;
   FileThumbnailFitMode _fileThumbnailFitMode = FileThumbnailFitMode.cover;
@@ -183,6 +186,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final thumbnailMode = await _preferences.getThumbnailMode();
       final maxConcurrency = await _preferences.getMaxThumbnailConcurrency();
       final showFileTags = await _preferences.getShowFileTags();
+      final showRecentFoldersOnHome = await _preferences
+          .getShowRecentFoldersOnHome();
       final defaultViewMode = _supportedDefaultViewMode(
         await _preferences.getViewMode(),
       );
@@ -209,6 +214,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _thumbnailMode = thumbnailMode;
           _maxConcurrency = maxConcurrency;
           _showFileTags = showFileTags;
+          _showRecentFoldersOnHome = showRecentFoldersOnHome;
           _defaultViewMode = defaultViewMode;
           _fileThumbnailFitMode = fileThumbnailFitMode;
           _tagThumbnailFitMode = tagThumbnailFitMode;
@@ -337,6 +343,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
       setState(() {
         _fileThumbnailFitMode = mode;
       });
+    }
+  }
+
+  Future<void> _updateShowRecentFoldersOnHome(bool enabled) async {
+    setState(() => _savingHomePrivacy = true);
+    try {
+      final saved = await _preferences.setShowRecentFoldersOnHome(enabled);
+      if (!mounted) return;
+      if (saved) {
+        setState(() => _showRecentFoldersOnHome = enabled);
+      } else {
+        AppToast.error(context, context.tr.homePrivacySaveFailed);
+      }
+    } catch (_) {
+      if (mounted) AppToast.error(context, context.tr.homePrivacySaveFailed);
+    } finally {
+      if (mounted) setState(() => _savingHomePrivacy = false);
     }
   }
 
@@ -538,6 +561,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       children: [
                         _buildQuickSettingsSection(),
                         const SizedBox(height: 24),
+                        if (Platform.isWindows ||
+                            Platform.isLinux ||
+                            Platform.isMacOS) ...[
+                          _buildSectionCard(
+                            title: context.tr.defaultFileManager,
+                            icon: PhosphorIconsLight.folderOpen,
+                            children: const [DefaultFileManagerSettings()],
+                          ),
+                          const SizedBox(height: 24),
+                        ],
                         _buildMediaSettingsSection(),
                         const SizedBox(height: 24),
                         _buildCacheManagementSection(),
@@ -645,6 +678,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
           trailing: Switch(
             value: _showFileTags,
             onChanged: _updateShowFileTags,
+          ),
+        ),
+        _buildCompactSettingTile(
+          title: context.tr.showRecentFoldersOnHome,
+          subtitle: context.tr.showRecentFoldersOnHomeDescription,
+          icon: PhosphorIconsLight.clockCounterClockwise,
+          trailing: Switch(
+            value: _showRecentFoldersOnHome,
+            onChanged: _savingHomePrivacy
+                ? null
+                : _updateShowRecentFoldersOnHome,
           ),
         ),
         _buildDefaultViewModeTile(),

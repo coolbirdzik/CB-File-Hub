@@ -24,6 +24,13 @@ Secondary windows can defer selected initializers until after their first
 frame. Read `main.dart` before changing startup order; helpers under
 `lib/config/` are not a substitute for verifying the active call path.
 
+OS folder arguments pass through `FolderLaunchRequest` before desktop startup.
+An existing normal window from the same executable can accept validated paths
+through the window registry/peer sockets; otherwise startup creates folder tabs.
+macOS open events queue natively until `FolderOpenBridge` attaches to the tab
+manager. Default-handler registration is separate from opening folders and is
+performed only by the Settings action.
+
 ## Tab and folder navigation
 
 ```mermaid

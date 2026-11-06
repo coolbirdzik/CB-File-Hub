@@ -426,6 +426,70 @@ class EnglishLocalizations implements AppLocalizations {
   String get homeSubtitle => 'Your folders, photos and videos, close at hand.';
   @override
   String get homeRecentFolders => 'Pick up where you left off';
+
+  @override
+  String get showRecentFoldersOnHome => 'Show recent folders on Home';
+
+  @override
+  String get defaultFileManagerOnboardingTitle =>
+      'Make CB File Hub your folder opener';
+
+  @override
+  String get defaultFileManagerOnboardingDescription =>
+      'Open folders directly in CB File Hub. You can change this later in Settings.';
+
+  @override
+  String get defaultFileManagerOnboardingLater => 'Not now';
+
+  @override
+  String get defaultFileManager => 'Default file manager';
+  @override
+  String get defaultFileManagerUnavailable =>
+      'Explorer redirection is available in the EXE/MSI edition. This Windows package does not support it.';
+
+  @override
+  String get defaultFileManagerDescription =>
+      'Use CB File Hub when the system opens folders. System file selection dialogs and actions that explicitly open another file manager may stay unchanged.';
+
+  @override
+  String get defaultFileManagerWindowsDescription =>
+      'Open folders, drives and Win+E in CB File Hub. You can restore the previous configuration. System file selection dialogs stay unchanged.';
+
+  @override
+  String get defaultFileManagerSet => 'Set as default for folders';
+
+  @override
+  String get defaultFileManagerRestore => 'Restore previous default';
+
+  @override
+  String get defaultFileManagerActive =>
+      'CB File Hub is the default folder opener.';
+
+  @override
+  String get defaultFileManagerInactive =>
+      'CB File Hub is not the default folder opener.';
+
+  @override
+  String get defaultFileManagerPartial =>
+      'Only part of the registration is active. Restore before enabling again.';
+
+  @override
+  String get defaultFileManagerFailed =>
+      'Could not update or read the default folder application.';
+
+  @override
+  String get defaultFileManagerRefresh => 'Refresh status';
+
+  @override
+  String get folderOpenFailed => 'Could not open these folders:';
+
+  @override
+  String get showRecentFoldersOnHomeDescription =>
+      'Show the “Pick up where you left off” section. Turn off to hide recent folder names and paths. History is retained.';
+
+  @override
+  String get homePrivacySaveFailed =>
+      'Could not save the Home privacy setting. Please try again.';
   @override
   String get homeRecentEmpty =>
       'Folders you visit will appear here. Open a folder to get started.';

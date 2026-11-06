@@ -375,6 +375,69 @@ class VietnameseLocalizations implements AppLocalizations {
       'Thư mục, ảnh và video của bạn, luôn trong tầm tay.';
   @override
   String get homeRecentFolders => 'Tiếp tục từ lần trước';
+
+  @override
+  String get showRecentFoldersOnHome => 'Hiện thư mục gần đây trên trang chủ';
+
+  @override
+  String get defaultFileManagerOnboardingTitle => 'Mở thư mục bằng CB File Hub';
+
+  @override
+  String get defaultFileManagerOnboardingDescription =>
+      'Mở thư mục trực tiếp trong CB File Hub. Bạn có thể thay đổi lựa chọn này bất cứ lúc nào trong Cài đặt.';
+
+  @override
+  String get defaultFileManagerOnboardingLater => 'Để sau';
+
+  @override
+  String get defaultFileManager => 'Trình quản lý file mặc định';
+  @override
+  String get defaultFileManagerUnavailable =>
+      'Chuyển hướng Explorer dùng được ở bản EXE/MSI. Gói Windows này không hỗ trợ tính năng đó.';
+
+  @override
+  String get defaultFileManagerDescription =>
+      'Dùng CB File Hub khi hệ thống mở thư mục. Hộp thoại chọn file và thao tác gọi trực tiếp trình quản lý khác có thể vẫn giữ nguyên.';
+
+  @override
+  String get defaultFileManagerWindowsDescription =>
+      'Mở thư mục, ổ đĩa và Win+E bằng CB File Hub. Bạn có thể khôi phục cấu hình trước đó. Hộp thoại chọn file hệ thống vẫn giữ nguyên.';
+
+  @override
+  String get defaultFileManagerSet => 'Đặt làm mặc định cho thư mục';
+
+  @override
+  String get defaultFileManagerRestore => 'Khôi phục mặc định trước đó';
+
+  @override
+  String get defaultFileManagerActive =>
+      'CB File Hub đang là ứng dụng mở thư mục mặc định.';
+
+  @override
+  String get defaultFileManagerInactive =>
+      'CB File Hub chưa là ứng dụng mở thư mục mặc định.';
+
+  @override
+  String get defaultFileManagerPartial =>
+      'Chỉ một phần cấu hình còn hiệu lực. Hãy khôi phục trước khi bật lại.';
+
+  @override
+  String get defaultFileManagerFailed =>
+      'Không đọc hoặc thay đổi được ứng dụng mở thư mục mặc định.';
+
+  @override
+  String get defaultFileManagerRefresh => 'Kiểm tra lại';
+
+  @override
+  String get folderOpenFailed => 'Không mở được các thư mục sau:';
+
+  @override
+  String get showRecentFoldersOnHomeDescription =>
+      'Hiện mục “Tiếp tục từ lần trước”. Tắt để ẩn tên và đường dẫn thư mục gần đây. Lịch sử vẫn được giữ lại.';
+
+  @override
+  String get homePrivacySaveFailed =>
+      'Không lưu được cài đặt riêng tư trang chủ. Vui lòng thử lại.';
   @override
   String get homeRecentEmpty =>
       'Thư mục bạn truy cập sẽ xuất hiện ở đây. Mở một thư mục để bắt đầu.';

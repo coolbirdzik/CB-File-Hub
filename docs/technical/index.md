@@ -16,6 +16,8 @@ return here for narrative background.
 10. [10-macos-code-signing.md](10-macos-code-signing.md) — macOS signing certificate and why it keeps permissions across updates.
 11. [11-android-local-llama.md](11-android-local-llama.md) — Android GGUF runtime build, APK packaging, and startup diagnostics.
 12. [12-macos-local-llama.md](12-macos-local-llama.md) — macOS GGUF runtime, architecture selection, and helper signing.
+13. [13-windows-default-file-manager.md](13-windows-default-file-manager.md) — Windows folder defaults, Registry ownership/restoration and runtime verification.
+14. [14-desktop-default-file-manager.md](14-desktop-default-file-manager.md) — Windows, macOS and Linux default-folder integration, opening requests and verification limits.
 
 The implementation is authoritative. When a technical page conflicts with the
 Agent Graph or source, update the page as part of the same change.

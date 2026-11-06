@@ -27,6 +27,8 @@ add_executable(${BINARY_NAME} WIN32
   "smb_native_thumbnail_plugin.h"
   "app_icon_plugin.cpp"
   "app_icon_plugin.h"
+  "folder_defaults.cpp"
+  "folder_defaults.h"
   "app_insights_plugin.cpp"
   "app_insights_plugin.h"
   "shell_context_menu_plugin.cpp"

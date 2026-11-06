@@ -232,6 +232,24 @@ abstract class AppLocalizations {
   // Home
   String get homeSubtitle;
   String get homeRecentFolders;
+  String get defaultFileManager;
+  String get defaultFileManagerOnboardingTitle;
+  String get defaultFileManagerOnboardingDescription;
+  String get defaultFileManagerOnboardingLater;
+  String get defaultFileManagerUnavailable;
+  String get defaultFileManagerDescription;
+  String get defaultFileManagerWindowsDescription;
+  String get defaultFileManagerSet;
+  String get defaultFileManagerRestore;
+  String get defaultFileManagerActive;
+  String get defaultFileManagerInactive;
+  String get defaultFileManagerPartial;
+  String get defaultFileManagerFailed;
+  String get defaultFileManagerRefresh;
+  String get folderOpenFailed;
+  String get showRecentFoldersOnHome;
+  String get showRecentFoldersOnHomeDescription;
+  String get homePrivacySaveFailed;
   String get homeRecentEmpty;
   String get homeRecentUnavailable;
   String get homePhotosSubtitle;

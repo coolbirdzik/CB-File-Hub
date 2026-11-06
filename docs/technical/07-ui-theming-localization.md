@@ -43,6 +43,12 @@
 - `SidebarPinsRepository` seeds these paths once, merging existing pins without duplicates. The paths and `macos_sidebar_defaults_v1` marker commit in one SQLite transaction, shared with manual pin mutations. The JSON path-list format remains compatible with context menus, other windows and backups. An unavailable folder is never deleted merely by validating the list.
 - The first seed opens Favorites for existing accounts; later collapse state and removals persist. Both sidebar renderers use `SidebarPinnedEntry` for localized labels and folder-specific icons, and keep navigation on the existing tab path flow.
 
+## Home Privacy
+
+- Settings > Interface > Show recent folders on Home controls the "Pick up where you left off" section. The SQLite preference `show_recent_folders_on_home` defaults to true for existing behavior and is retained across launches.
+- Home hides recent folders until the preference is loaded. Turning it off clears displayed paths and previews immediately, skips reading recent paths and prevents in-flight requests from restoring them. Media cards remain available with library metadata; recent directories are no longer passed as preview inputs.
+- This setting hides Home history only. It does not delete browsing history, disable history collection, or change the separate tab workspace restore setting.
+
 ## Localization (Mandatory)
 
 - **Rule**: All user-facing strings must go through i18n keys.

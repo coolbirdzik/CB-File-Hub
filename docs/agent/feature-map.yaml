@@ -5,6 +5,23 @@ path_base: workspace_root
 # Feature ids here are the canonical keys for verification/test-impact-map.yaml.
 
 features:
+  default_file_manager:
+    entrypoints:
+      - cb_file_manager/lib/ui/screens/settings/default_file_manager_settings.dart
+      - cb_file_manager/lib/ui/screens/onboarding/default_file_manager_onboarding_screen.dart
+      - cb_file_manager/lib/services/desktop_integration/default_file_manager_service.dart
+    related:
+      - cb_file_manager/lib/services/desktop_integration/folder_launch_request.dart
+      - cb_file_manager/lib/services/desktop_integration/folder_open_bridge.dart
+      - cb_file_manager/windows/runner/folder_defaults.cpp
+      - cb_file_manager/macos/Runner/AppDelegate.swift
+      - scripts/package_linux_deb.sh
+    invariants:
+      - "Register capabilities without taking defaults during installation."
+      - "An explicit user action changes defaults; restoration respects later third-party choices."
+      - "Validate folder paths/URIs before startup tabs or peer delivery."
+      - "Primary desktop onboarding offers setup once after theme selection; skipping never changes OS defaults."
+
   application_bootstrap:
     entrypoints:
       - cb_file_manager/lib/main.dart

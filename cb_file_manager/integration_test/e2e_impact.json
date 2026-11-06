@@ -236,6 +236,8 @@
       "paths": [
         "cb_file_manager/lib/ui/screens/folder_list/**",
         "cb_file_manager/lib/ui/tab_manager/**",
+        "cb_file_manager/lib/services/desktop_integration/**",
+        "cb_file_manager/lib/ui/screens/onboarding/**",
         "cb_file_manager/lib/services/windowing/**"
       ],
       "suites": ["app", "video_thumbnails", "file_drag_drop", "torrent_library"]

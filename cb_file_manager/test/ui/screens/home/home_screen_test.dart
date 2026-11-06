@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:cb_file_manager/config/languages/app_localizations_delegate.dart';
 import 'package:cb_file_manager/design_system/cb_design_system.dart';
+import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/services/home_content_service.dart';
 import 'package:cb_file_manager/services/media_library_updates.dart';
 import 'package:cb_file_manager/ui/screens/home/home_media_card.dart';
@@ -15,6 +16,10 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class _Content extends HomeContentService {
+  Future<bool> Function() visibility = () async =>
+      UserPreferences.instance.showRecentFoldersOnHome.value;
+  int recentLoads = 0;
+  final List<List<String>> previewInputs = [];
   Future<List<String>> Function() recent = () async => [
     r'C:\Photos',
     r'D:\Projects',
@@ -23,11 +28,19 @@ class _Content extends HomeContentService {
   Future<HomeMediaPreviews> Function()? mediaLoader;
 
   @override
-  Future<List<String>> loadRecentPaths() => recent();
+  Future<bool> loadRecentFoldersVisibility() => visibility();
 
   @override
-  Future<HomeMediaPreviews> loadMediaPreviews(List<String> recentPaths) =>
-      mediaLoader?.call() ?? previews.future;
+  Future<List<String>> loadRecentPaths() {
+    recentLoads++;
+    return recent();
+  }
+
+  @override
+  Future<HomeMediaPreviews> loadMediaPreviews(List<String> recentPaths) {
+    previewInputs.add(List.of(recentPaths));
+    return mediaLoader?.call() ?? previews.future;
+  }
 }
 
 void main() {
@@ -36,6 +49,7 @@ void main() {
   late _Content content;
 
   setUp(() {
+    UserPreferences.instance.showRecentFoldersOnHome.value = true;
     tabs = TabManagerBloc();
     drawer = DrawerCubit();
     content = _Content();
@@ -105,6 +119,84 @@ void main() {
     await tester.pumpAndSettle();
     expect(tabs.state.activeTab!.path, r'D:\Projects');
     expect(tabs.state.activeTab!.name, 'Projects');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('saved hidden preference skips history and its preview inputs', (
+    tester,
+  ) async {
+    UserPreferences.instance.showRecentFoldersOnHome.value = false;
+    await mount(tester);
+    expect(find.text('Pick up where you left off'), findsNothing);
+    expect(find.text('Projects'), findsNothing);
+    expect(content.recentLoads, 0);
+    expect(content.previewInputs, [isEmpty]);
+    expect(find.byType(HomeMediaCard), findsNWidgets(2));
+  });
+
+  testWidgets('history stays hidden until the visibility preference resolves', (
+    tester,
+  ) async {
+    final visibility = Completer<bool>();
+    content.visibility = () => visibility.future;
+    await mount(tester);
+    expect(find.text('Pick up where you left off'), findsNothing);
+    expect(content.recentLoads, 0);
+    visibility.complete(false);
+    await tester.pumpAndSettle();
+    expect(find.text('Projects'), findsNothing);
+    expect(content.recentLoads, 0);
+  });
+
+  testWidgets('turning visibility off clears Home and rejects old previews', (
+    tester,
+  ) async {
+    await mount(tester);
+    expect(find.text('Projects'), findsOneWidget);
+    content.mediaLoader = () async => const HomeMediaPreviews();
+    UserPreferences.instance.showRecentFoldersOnHome.value = false;
+    await tester.pumpAndSettle();
+    content.previews.complete(
+      const HomeMediaPreviews(images: ['stale-private.jpg']),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Pick up where you left off'), findsNothing);
+    expect(find.text('Projects'), findsNothing);
+    expect(content.previewInputs.last, isEmpty);
+    expect(
+      tester
+          .widget<HomeMediaCard>(find.byKey(const ValueKey('home-photos')))
+          .previews,
+      isEmpty,
+    );
+    UserPreferences.instance.showRecentFoldersOnHome.value = true;
+    await tester.pumpAndSettle();
+    expect(find.text('Projects'), findsOneWidget);
+  });
+
+  testWidgets('turning visibility off rejects an in-flight history load', (
+    tester,
+  ) async {
+    final recent = Completer<List<String>>();
+    content.recent = () => recent.future;
+    await mount(tester);
+    UserPreferences.instance.showRecentFoldersOnHome.value = false;
+    await tester.pumpAndSettle();
+    recent.complete([r'C:\Private']);
+    await tester.pumpAndSettle();
+    expect(find.text('Private'), findsNothing);
+    expect(find.text('Pick up where you left off'), findsNothing);
+    expect(content.previewInputs, [isEmpty]);
+  });
+
+  testWidgets('unreadable privacy setting keeps recent folders hidden', (
+    tester,
+  ) async {
+    content.visibility = () async => throw StateError('storage unavailable');
+    await mount(tester);
+    expect(find.text('Pick up where you left off'), findsNothing);
+    expect(content.recentLoads, 0);
+    expect(content.previewInputs, [isEmpty]);
     expect(tester.takeException(), isNull);
   });
 

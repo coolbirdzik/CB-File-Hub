@@ -1,4 +1,5 @@
 #include "app_icon_plugin.h"
+#include "folder_defaults.h"
 #include <flutter/method_channel.h>
 #include <flutter/plugin_registrar_windows.h>
 #include <flutter/standard_method_codec.h>
@@ -228,6 +229,25 @@ AppIconPlugin::~AppIconPlugin() {
 void AppIconPlugin::HandleMethodCall(
     const flutter::MethodCall<flutter::EncodableValue>& method_call,
     std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
+  const auto& method = method_call.method_name();
+  if (method == "folderDefaultStatus" || method == "setFolderDefault" ||
+      method == "restoreFolderDefault") {
+    try {
+      folder_defaults::Registration registration;
+      const auto executable = folder_defaults::ExecutablePath();
+      if (method == "setFolderDefault") registration.Enable(executable);
+      if (method == "restoreFolderDefault") registration.Restore();
+      const auto status = registration.Query(executable);
+      result->Success(flutter::EncodableValue(flutter::EncodableMap{
+          {flutter::EncodableValue("available"), flutter::EncodableValue(status.available)},
+          {flutter::EncodableValue("enabled"), flutter::EncodableValue(status.enabled)},
+          {flutter::EncodableValue("canRestore"), flutter::EncodableValue(status.can_restore)},
+          {flutter::EncodableValue("partial"), flutter::EncodableValue(status.partial)}}));
+    } catch (const std::exception& error) {
+      result->Error("FOLDER_DEFAULT_FAILED", error.what());
+    }
+    return;
+  }
   
   if (method_call.method_name().compare("extractIconFromFile") == 0) {
     const auto* arguments = std::get_if<flutter::EncodableMap>(method_call.arguments());

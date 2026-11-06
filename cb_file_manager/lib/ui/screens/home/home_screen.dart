@@ -14,6 +14,7 @@ import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/config/translation_helper.dart';
 import 'package:cb_file_manager/ui/widgets/drawer/cubit/drawer_cubit.dart';
 import 'package:cb_file_manager/services/home_content_service.dart';
+import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 
 import 'home_media_card.dart';
 
@@ -36,6 +37,8 @@ class _HomeScreenState extends State<HomeScreen>
   bool _loadingRecent = true;
   bool _recentFailed = false;
   int _loadGeneration = 0;
+  bool _showRecentFolders = false;
+  bool _listeningToPreferences = false;
 
   @override
   void initState() {
@@ -61,16 +64,40 @@ class _HomeScreenState extends State<HomeScreen>
     if (mounted) unawaited(_loadContent());
   }
 
+  void _onRecentVisibilityChanged() {
+    setState(() {
+      _showRecentFolders =
+          UserPreferences.instance.showRecentFoldersOnHome.value;
+    });
+    unawaited(_loadContent());
+  }
+
   Future<void> _loadContent() async {
     final generation = ++_loadGeneration;
     setState(() {
       _previews = const HomeMediaPreviews();
+      _recentPaths = const [];
       _loadingRecent = true;
       _recentFailed = false;
     });
+    try {
+      final enabled = await _content.loadRecentFoldersVisibility();
+      if (!mounted || generation != _loadGeneration) return;
+      setState(() => _showRecentFolders = enabled);
+      if (!_listeningToPreferences) {
+        UserPreferences.instance.showRecentFoldersOnHome.addListener(
+          _onRecentVisibilityChanged,
+        );
+        _listeningToPreferences = true;
+      }
+    } catch (_) {
+      if (!mounted || generation != _loadGeneration) return;
+      // Keep history hidden when its visibility preference cannot be read.
+      setState(() => _showRecentFolders = false);
+    }
     var paths = <String>[];
     try {
-      paths = await _content.loadRecentPaths();
+      if (_showRecentFolders) paths = await _content.loadRecentPaths();
       if (!mounted || generation != _loadGeneration) return;
       setState(() {
         _recentPaths = paths;
@@ -94,6 +121,11 @@ class _HomeScreenState extends State<HomeScreen>
 
   @override
   void dispose() {
+    if (_listeningToPreferences) {
+      UserPreferences.instance.showRecentFoldersOnHome.removeListener(
+        _onRecentVisibilityChanged,
+      );
+    }
     MediaLibraryUpdates.revision.removeListener(_onLibraryChanged);
     _entryController.dispose();
     super.dispose();
@@ -155,8 +187,10 @@ class _HomeScreenState extends State<HomeScreen>
                       children: [
                         _enter(0, _buildWelcomeSection(theme)),
                         const SizedBox(height: 28),
-                        _enter(1, _buildRecentSection(theme)),
-                        const SizedBox(height: 28),
+                        if (_showRecentFolders) ...[
+                          _enter(1, _buildRecentSection(theme)),
+                          const SizedBox(height: 28),
+                        ],
                         _enter(
                           2,
                           LayoutBuilder(

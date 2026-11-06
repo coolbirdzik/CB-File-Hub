@@ -20,6 +20,15 @@
     <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed."
       AllowSameVersionUpgrades="yes" />
     <MediaTemplate EmbedCab="yes" />
+    <!-- Run while the executable still exists, in the invoking user's context.
+         Upgrades retain the association and its original backup. -->
+    <CustomAction Id="RestoreFolderDefaults" Directory="INSTALLFOLDER"
+      ExeCommand="&quot;[INSTALLFOLDER]cb_file_hub.exe&quot; --restore-folder-default"
+      Execute="immediate" Return="check" />
+    <InstallExecuteSequence>
+      <Custom Action="RestoreFolderDefaults" Before="RemoveFiles"
+        Condition="REMOVE = &quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
+    </InstallExecuteSequence>
 
     <Feature Id="ProductFeature" Title="CB File Hub" Level="1">
       <ComponentGroupRef Id="ProductComponents" />

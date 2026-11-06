@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import '../../../providers/theme_provider.dart';
 import '../../../services/permission_state_service.dart';
 import '../../screens/onboarding/theme_onboarding_screen.dart';
+import '../../screens/onboarding/default_file_manager_onboarding_screen.dart';
 import '../../screens/permissions/permission_explainer_screen.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:path_provider/path_provider.dart';
@@ -19,6 +20,7 @@ import '../../../services/windowing/desktop_windowing_service.dart';
 import '../../../services/progress/desktop_app_icon_progress_service.dart';
 import '../../controllers/operation_progress_controller.dart';
 import '../../../services/windowing/window_startup_payload.dart';
+import '../../../services/desktop_integration/folder_open_bridge.dart';
 import '../../../services/windowing/windows_native_tab_drag_drop_service.dart';
 import '../../../services/windowing/windows_engine_host.dart';
 import 'tab_manager.dart';
@@ -86,6 +88,17 @@ class _TabMainScreenState extends State<TabMainScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
 
+      unawaited(
+        FolderOpenBridge.attach(_tabManagerBloc, (paths) {
+          if (mounted) {
+            AppToast.error(
+              context,
+              '${AppLocalizations.of(context)!.folderOpenFailed}\n${paths.join('\n')}',
+            );
+          }
+        }),
+      );
+
       final payload = widget.startupPayload;
       if (payload != null && payload.tabs.isNotEmpty) {
         final active = (payload.activeIndex ?? 0).clamp(
@@ -142,6 +155,11 @@ class _TabMainScreenState extends State<TabMainScreen> {
   Future<void> _runStartupOnboardingAndPermissionFlow() async {
     await _showThemeOnboardingIfNeeded();
     if (!mounted) return;
+
+    if (_isDesktopPlatform() && !_isSecondaryDesktopWindow() && !kCbE2E) {
+      await DefaultFileManagerOnboardingScreen.showIfNeeded(context);
+      if (!mounted) return;
+    }
 
     // Desktop skips the permission screen, except macOS, where browsing needs
     // Full Disk Access. Secondary windows leave that to the primary one.
@@ -254,6 +272,7 @@ class _TabMainScreenState extends State<TabMainScreen> {
 
   @override
   void dispose() {
+    FolderOpenBridge.detach(_tabManagerBloc);
     if (Platform.isWindows) {
       WindowsNativeTabDragDropService.isDragHoveringWindow.removeListener(
         _handleNativeDropHoverChanged,

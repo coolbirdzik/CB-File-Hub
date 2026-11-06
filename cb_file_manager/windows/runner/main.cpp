@@ -5,6 +5,7 @@
 #include "flutter_window.h"
 #include "utils.h"
 #include "torrent_launch.h"
+#include "folder_defaults.h"
 #include "fc_native_video_thumbnail_plugin.h"
 
 // Function to get the primary monitor work area dimensions
@@ -144,6 +145,15 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   ::SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOOPENFILEERRORBOX);
 
   auto command_line_arguments = GetCommandLineArguments();
+  if (command_line_arguments.size() == 1 &&
+      command_line_arguments[0] == "--restore-folder-default") {
+    try {
+      folder_defaults::Registration().Restore(folder_defaults::ExecutablePath());
+      return EXIT_SUCCESS;
+    } catch (const std::exception&) {
+      return EXIT_FAILURE;
+    }
+  }
   if (TryForwardTorrentLaunch(command_line_arguments)) return EXIT_SUCCESS;
 
   // Initialize COM, so that it is available for use in the library and/or

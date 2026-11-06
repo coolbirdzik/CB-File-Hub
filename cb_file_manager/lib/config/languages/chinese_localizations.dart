@@ -389,6 +389,64 @@ class ChineseLocalizations implements AppLocalizations {
   String get homeSubtitle => '您的文件夹、照片和视频，触手可及。';
   @override
   String get homeRecentFolders => '从上次离开的地方继续';
+
+  @override
+  String get showRecentFoldersOnHome => '在主页显示最近文件夹';
+
+  @override
+  String get defaultFileManagerOnboardingTitle => '使用 CB File Hub 打开文件夹';
+
+  @override
+  String get defaultFileManagerOnboardingDescription =>
+      '直接在 CB File Hub 中打开文件夹。您可以随时在设置中更改此选择。';
+
+  @override
+  String get defaultFileManagerOnboardingLater => '暂不设置';
+
+  @override
+  String get defaultFileManager => '默认文件管理器';
+  @override
+  String get defaultFileManagerUnavailable =>
+      'Explorer 重定向适用于 EXE/MSI 版本。此 Windows 软件包不支持该功能。';
+
+  @override
+  String get defaultFileManagerDescription =>
+      '使用 CB File Hub 打开系统文件夹。系统文件选择对话框以及直接调用其他文件管理器的操作可能保持不变。';
+
+  @override
+  String get defaultFileManagerWindowsDescription =>
+      '使用 CB File Hub 打开文件夹、驱动器和 Win+E。可恢复之前的配置。系统文件选择对话框保持不变。';
+
+  @override
+  String get defaultFileManagerSet => '设为文件夹默认应用';
+
+  @override
+  String get defaultFileManagerRestore => '恢复之前的默认应用';
+
+  @override
+  String get defaultFileManagerActive => 'CB File Hub 是默认的文件夹打开应用。';
+
+  @override
+  String get defaultFileManagerInactive => 'CB File Hub 不是默认的文件夹打开应用。';
+
+  @override
+  String get defaultFileManagerPartial => '只有部分配置生效。请先恢复再启用。';
+
+  @override
+  String get defaultFileManagerFailed => '无法读取或更改默认文件夹应用。';
+
+  @override
+  String get defaultFileManagerRefresh => '刷新状态';
+
+  @override
+  String get folderOpenFailed => '无法打开以下文件夹：';
+
+  @override
+  String get showRecentFoldersOnHomeDescription =>
+      '显示“从上次离开的地方继续”区域。关闭以隐藏最近文件夹的名称和路径。历史记录仍会保留。';
+
+  @override
+  String get homePrivacySaveFailed => '无法保存主页隐私设置。请重试。';
   @override
   String get homeRecentEmpty => '您访问过的文件夹会显示在这里。打开一个文件夹即可开始。';
   @override

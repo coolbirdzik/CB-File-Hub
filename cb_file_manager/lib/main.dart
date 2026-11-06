@@ -58,6 +58,8 @@ import 'package:cb_file_manager/ui/controllers/archive_navigation.dart';
 import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
 import 'package:cb_file_manager/helpers/files/external_app_helper.dart';
 import 'services/windowing/window_startup_payload.dart';
+import 'services/desktop_integration/folder_launch_request.dart';
+import 'services/desktop_integration/folder_open_bridge.dart';
 import 'services/windowing/windows_engine_host.dart';
 import 'services/windowing/engine_window_lifetime.dart';
 import 'services/local_ai/local_model_downloads.dart';
@@ -260,6 +262,23 @@ Future<void> runCbFileApp() async {
   final torrentSources = Platform.isWindows
       ? TorrentLaunchRequest.takeArguments(_launchPaths)
       : <String>[];
+  final folderLaunch =
+      (Platform.isWindows || Platform.isMacOS || Platform.isLinux)
+      ? await FolderLaunchRequest.takeArguments(_launchPaths)
+      : const FolderLaunchRequest([], [], false);
+  FolderOpenBridge.pendingRejections.addAll(folderLaunch.rejected);
+  if (!kCbE2E &&
+      folderLaunch.tabs.isNotEmpty &&
+      folderLaunch.rejected.isEmpty &&
+      await DesktopWindowingService().openFoldersInExistingWindow(
+        folderLaunch.tabs,
+      )) {
+    try {
+      await windowManager.ensureInitialized();
+      await windowManager.destroy();
+    } catch (_) {}
+    exit(0);
+  }
   if (!kCbE2E &&
       torrentSources.isNotEmpty &&
       await DesktopWindowingService().openTorrentSourcesInExistingWindow(
@@ -281,7 +300,8 @@ Future<void> runCbFileApp() async {
           ) ==
           true;
   final environmentVideoPath = VideoWindowService.startupVideoPath();
-  final commandLineVideoPath = environmentVideoPath == null
+  final commandLineVideoPath =
+      environmentVideoPath == null && folderLaunch.tabs.isEmpty
       ? _takeDesktopLaunchVideoPath()
       : null;
 
@@ -774,10 +794,13 @@ Future<void> runCbFileApp() async {
   }
 
   final WindowStartupPayload? startupPayload =
-      torrentSources.isNotEmpty && !backgroundTorrentLaunch
+      (torrentSources.isNotEmpty && !backgroundTorrentLaunch) ||
+          folderLaunch.tabs.isNotEmpty
       ? WindowStartupPayload(
           tabs: [
-            for (final source in torrentSources)
+            ...folderLaunch.tabs,
+            for (final source
+                in backgroundTorrentLaunch ? <String>[] : torrentSources)
               WindowTabPayload(
                 path: TorrentLaunchRequest.pathFor(source),
                 name: 'Torrent',
