@@ -192,6 +192,10 @@ unchanged files are removed after the chosen archive and durable index are
 verified. Files are temporarily staged and restored if validation fails.
 Downloaded content, unrelated files and source directories remain in place.
 
+Windows inventory uses asynchronous `tasklist /FO CSV /NH`, with a bounded wait
+and explicit failures for unreadable results. It does not read thread-local
+`GetLastError` across Dart FFI calls. An inventory failure blocks source cleanup.
+
 Resume-only entries first reuse existing metainfo, including alternate indexed
 source paths when the canonical archive is missing. Otherwise the importer reads
 the resume's v1 info hash, name, tracker tiers, category, saved payload directory

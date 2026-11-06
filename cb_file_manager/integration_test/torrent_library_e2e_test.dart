@@ -603,7 +603,7 @@ void main() {
             reason: 'Re-import should preview the same test-owned backup',
           );
           await tap(tester, 'qbittorrent-remove-sources');
-          final clientRunning = WindowsQbittorrentProcess.isRunning();
+          final clientRunning = await WindowsQbittorrentProcess.isRunning();
           await tap(tester, 'qbittorrent-import-confirm');
           if (clientRunning) {
             final l = AppLocalizations.of(

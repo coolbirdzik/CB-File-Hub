@@ -93,8 +93,7 @@ class QbittorrentBackupImporter {
     required this.logPath,
     this.verifyResumeCopies,
     Future<bool> Function()? isRunning,
-  }) : isRunning =
-           isRunning ?? (() async => WindowsQbittorrentProcess.isRunning());
+  }) : isRunning = isRunning ?? WindowsQbittorrentProcess.isRunning;
 
   static Future<List<String>> discoverWindowsRoots({
     Map<String, String>? environment,

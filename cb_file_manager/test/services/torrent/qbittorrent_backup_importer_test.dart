@@ -476,6 +476,55 @@ void main() {
     },
   );
 
+  test('process inventory failure blocks cleanup before importing', () async {
+    final item = await create('First.mp4');
+    final failing = service.qbittorrentImporter(
+      isRunning: () async => throw StateError('Process inventory unavailable'),
+    );
+    await expectLater(
+      failing.run(
+        await preview(),
+        destination,
+        removeSources: true,
+        confirmedRemoval: true,
+      ),
+      throwsStateError,
+    );
+    expect(await item.torrent.exists(), isTrue);
+    expect(await item.resume.exists(), isTrue);
+    expect((await repository.page()).total, 0);
+  });
+
+  test(
+    'process inventory failure after staging restores source files',
+    () async {
+      final item = await create('First.mp4');
+      var checks = 0;
+      final failing = service.qbittorrentImporter(
+        isRunning: () async {
+          if (++checks >= 4) throw StateError('Process inventory unavailable');
+          return false;
+        },
+      );
+      final result = await failing.run(
+        await preview(),
+        destination,
+        removeSources: true,
+        confirmedRemoval: true,
+      );
+      expect(result.cleaned, 0);
+      expect(result.failed, 1);
+      expect(await item.torrent.exists(), isTrue);
+      expect(await item.resume.exists(), isTrue);
+      expect(
+        (await backup.list().toList()).where(
+          (file) => file.path.endsWith('.cleanup'),
+        ),
+        isEmpty,
+      );
+    },
+  );
+
   test(
     'verification failure after staging restores both source files',
     () async {
@@ -626,9 +675,12 @@ void main() {
     },
   );
 
-  test('native process inventory is read-only and returns a boolean', () {
-    if (Platform.isWindows) {
-      expect(WindowsQbittorrentProcess.isRunning(), isA<bool>());
-    }
-  });
+  test(
+    'Windows process inventory is read-only and returns a boolean',
+    () async {
+      if (Platform.isWindows) {
+        expect(await WindowsQbittorrentProcess.isRunning(), isA<bool>());
+      }
+    },
+  );
 }
