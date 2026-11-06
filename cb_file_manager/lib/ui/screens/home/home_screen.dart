@@ -187,6 +187,8 @@ class _HomeScreenState extends State<HomeScreen>
                       children: [
                         _enter(0, _buildWelcomeSection(theme)),
                         const SizedBox(height: 28),
+                        _enter(1, _buildQuickAccessSection(theme, l10n)),
+                        const SizedBox(height: 28),
                         if (_showRecentFolders) ...[
                           _enter(1, _buildRecentSection(theme)),
                           const SizedBox(height: 28),
@@ -290,6 +292,90 @@ class _HomeScreenState extends State<HomeScreen>
               icon: PhosphorIconsLight.tag,
               onPressed: _openTagsTab,
               size: CbButtonSize.lg,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildQuickAccessSection(ThemeData theme, AppLocalizations l10n) {
+    Widget shortcut(
+      String id,
+      String path,
+      String label,
+      IconData icon, {
+      String? tabName,
+    }) {
+      return CbButton(
+        key: ValueKey('home-shortcut-$id'),
+        label: label,
+        tooltip: label,
+        icon: icon,
+        size: CbButtonSize.lg,
+        onPressed: () => _openDestination(path, tabName ?? label),
+      );
+    }
+
+    return Column(
+      key: const ValueKey('home-quick-access'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          l10n.quickAccess,
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            shortcut(
+              'network',
+              '#network',
+              l10n.networksMenu,
+              PhosphorIconsLight.wifiHigh,
+              tabName: l10n.networkTab,
+            ),
+            shortcut(
+              'ssh',
+              '#ssh',
+              l10n.sshWorkspace,
+              PhosphorIconsLight.terminalWindow,
+            ),
+            shortcut(
+              'torrents',
+              '#torrents',
+              l10n.torrents,
+              PhosphorIconsLight.downloadSimple,
+            ),
+            shortcut(
+              'agent',
+              kAiChatPath,
+              l10n.cbAgent,
+              PhosphorIconsLight.sparkle,
+              tabName: l10n.aiChatTab,
+            ),
+            if (Platform.isWindows || Platform.isMacOS || Platform.isLinux)
+              shortcut(
+                'cleaner',
+                kCbAgentCleanerPath,
+                l10n.cbAgentCleanerTitle,
+                PhosphorIconsLight.broom,
+              ),
+            shortcut(
+              'trash',
+              '#trash',
+              l10n.trashBin,
+              PhosphorIconsLight.trash,
+            ),
+            shortcut(
+              'settings',
+              kSettingsPath,
+              l10n.settings,
+              PhosphorIconsLight.gear,
             ),
           ],
         ),
@@ -636,6 +722,19 @@ class _HomeScreenState extends State<HomeScreen>
     return parts.where((part) => part.isNotEmpty).isNotEmpty
         ? parts.where((part) => part.isNotEmpty).last
         : normalized;
+  }
+
+  void _openDestination(String path, String name) {
+    final tabs = context.read<TabManagerBloc>();
+    final homeTab = tabs.state.tabs
+        .where((tab) => tab.id == widget.tabId)
+        .firstOrNull;
+    if (homeTab != null) {
+      TabNavigator.updateTabPath(context, homeTab.id, path);
+      tabs.add(UpdateTabName(homeTab.id, name));
+    } else {
+      tabs.add(AddTab(path: path, name: name, switchToTab: true));
+    }
   }
 
   void _openImageGallery() {

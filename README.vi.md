@@ -18,12 +18,21 @@ CB File Hub là ứng dụng quản lý tập tin đa nền tảng dành cho th�
 - **Duyệt tập tin linh hoạt:** nhiều tab, chia đôi, ghim vị trí, khôi phục phiên và các chế độ xem quen thuộc.
 - **Thư viện torrent:** index chung, nơi lưu tùy chọn, nhập từ ứng dụng khác, hợp nhất mục trùng và quản lý tải xuống.
 - **Ảnh, video và âm thanh:** thư viện trực quan, hình thu nhỏ, trình xem, chỉnh sửa ảnh và trình phát tích hợp.
+- **[Tự chọn thời điểm lấy thumbnail video](#tự-chọn-thời-điểm-lấy-thumbnail-video):** chọn ảnh đại diện từ mốc 10%, 20%, 50% hoặc vị trí khác trong video.
 - **Tag và album:** tag cha/con, tìm theo nhiều tag, album thủ công và album thông minh theo quy tắc.
 - **Tập tin mạng và SSH:** SMB, FTP, SFTP, WebDAV, hồ sơ SSH, khóa và terminal.
 - **CB Agent:** tìm tập tin bằng ngôn ngữ tự nhiên, đề xuất tổ chức và hỗ trợ đánh giá trước khi dọn dẹp.
 - **Disk Cleaner (Windows, macOS, Android):** xem thư mục lớn, file tạm, bộ nhớ đệm và chọn chính xác mục cần xử lý.
 - **Tăng tốc bằng Rust:** quét ổ đĩa, tìm kiếm, tạo ảnh thu nhỏ, tính hash và xử lý file nén trên luồng native. Xem [số đo hiệu năng](#hiệu-năng-với-rust).
 - **Sao lưu và cá nhân hóa:** sao lưu cài đặt/tag, các tích hợp đám mây khả dụng, giao diện sáng/tối và màu nhấn.
+
+## Tự chọn thời điểm lấy thumbnail video
+
+**Bạn quyết định thumbnail hiển thị khung hình ở thời điểm nào trong video:** 10%, 20%, 50% hoặc một tỷ lệ khác của tổng thời lượng. Ví dụ, chọn 20% cho video dài 10 phút thì ảnh đại diện được lấy ở khoảng phút thứ 2.
+
+Vào **Cài đặt → Hình thu nhỏ video → Tùy chỉnh**, rồi chỉnh **Vị trí hình thu nhỏ** để chọn đoạn xuất hiện trên ảnh đại diện. Chế độ **Nhanh** dùng phương thức tạo thumbnail có sẵn của hệ điều hành. Bạn cũng có thể điều chỉnh số tác vụ tạo thumbnail song song.
+
+Mặc định, ứng dụng chỉ tạo thumbnail cho video đang thấy và một ít mục lân cận, giúp giảm việc dùng CPU và đọc ổ đĩa ở thư viện lớn. Khi cuộn ra xa hoặc ẩn tab, các yêu cầu ngoài vùng này còn chờ sẽ được hủy; lượt đang giải mã được chạy nốt. Thumbnail đã có cache được dùng lại khi quay về. Tắt **Chỉ tải thumbnail gần vùng đang xem** nếu muốn tạo trước cho toàn bộ danh sách. [Chi tiết cơ chế tạo thumbnail](docs/technical/06-filesystem-media.md#hybrid-thumbnail-generation).
 
 ## Hiệu năng với Rust
 

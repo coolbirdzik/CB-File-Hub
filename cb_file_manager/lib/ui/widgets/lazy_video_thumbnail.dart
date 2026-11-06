@@ -4,9 +4,12 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import '../../helpers/media/video_thumbnail_helper.dart';
+import '../../helpers/core/user_preferences.dart';
 import 'package:visibility_detector/visibility_detector.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/ui/utils/scroll_velocity_notifier.dart';
+import 'thumbnail_image.dart';
+import 'thumbnail_placeholder.dart';
+import 'thumbnail_listing_gate.dart';
 
 /// A widget that efficiently displays a video thumbnail with lazy loading
 /// and background processing to avoid UI thread blocking during scrolling
@@ -23,7 +26,7 @@ class LazyVideoThumbnail extends StatefulWidget {
   /// How the generated frame is inscribed into the available thumbnail area.
   final BoxFit fit;
 
-  /// Builder function that returns a widget to show when thumbnail is loading or on error
+  /// Builder for a thumbnail that failed to load.
   final Widget Function() fallbackBuilder;
 
   /// Whether to keep the thumbnail in memory when it's scrolled out of view
@@ -31,6 +34,7 @@ class LazyVideoThumbnail extends StatefulWidget {
 
   /// If true, only shows the placeholder and doesn't attempt to load thumbnails
   final bool placeholderOnly;
+  final bool showLoadingIndicator;
 
   /// Callback when thumbnail is successfully generated
   final Function(String path)? onThumbnailGenerated;
@@ -47,6 +51,7 @@ class LazyVideoThumbnail extends StatefulWidget {
     required this.fallbackBuilder,
     this.keepAlive = true,
     this.placeholderOnly = false,
+    this.showLoadingIndicator = true,
     this.onThumbnailGenerated,
     this.onError,
   });
@@ -60,19 +65,19 @@ class _LazyVideoThumbnailState extends State<LazyVideoThumbnail>
   // Notifiers to maintain widget state
   final _visibilityNotifier = ValueNotifier<bool>(false);
   final _thumbnailPathNotifier = ValueNotifier<String?>(null);
-  final _progressNotifier = ValueNotifier<double>(0.0);
-  final _isGeneratingNotifier = ValueNotifier<bool>(false);
-  final _generationStatusNotifier = ValueNotifier<ThumbnailGenerationStatus?>(
-    null,
-  );
 
   // State tracking
   bool _isLoading = false;
-  bool _isThumbnailGenerated = false;
+  final _hasError = ValueNotifier<bool>(false);
   bool _shouldRegenerateThumbnail = true;
+  final Object _viewportOwner = Object();
+  final _preferences = UserPreferences.instance;
+  bool get _canGenerate =>
+      !widget.placeholderOnly &&
+      (!_preferences.videoThumbnailViewportOnly.value ||
+          (_visibilityNotifier.value && !_isScrollingFast));
 
   // Progress simulation timer
-  Timer? _progressTimer;
 
   // Lightweight cache polling to recover missed repaints
   Timer? _cachePollTimer;
@@ -87,8 +92,6 @@ class _LazyVideoThumbnailState extends State<LazyVideoThumbnail>
   StreamSubscription? _cacheChangedSubscription;
   // Subscription to per-file thumbnail ready notifications
   StreamSubscription<String>? _thumbReadySubscription;
-  // Subscription for generation status updates
-  StreamSubscription<ThumbnailGenerationStatus>? _generationStatusSubscription;
 
   // AutomaticKeepAliveClientMixin implementation
   // PERFORMANCE: Changed to false to reduce memory pressure during scrolling
@@ -101,6 +104,7 @@ class _LazyVideoThumbnailState extends State<LazyVideoThumbnail>
 
     // Listen to scroll velocity changes
     ScrollVelocityNotifier.instance.addListener(_onScrollVelocityChanged);
+    _preferences.videoThumbnailViewportOnly.addListener(_onViewportModeChanged);
 
     _scheduleInitialLoad();
 
@@ -128,55 +132,35 @@ class _LazyVideoThumbnailState extends State<LazyVideoThumbnail>
       // If we don't yet show a thumbnail, update from cache and repaint
       if (_thumbnailPathNotifier.value == null) {
         try {
-          final cached = await VideoThumbnailHelper.getFromCache(
-            widget.videoPath,
-          );
-          if (!mounted) return;
+          final videoPath = widget.videoPath;
+          final cached = await VideoThumbnailHelper.getFromCache(videoPath);
+          if (!mounted || widget.videoPath != videoPath) return;
           if (cached != null) {
             // IMPORTANT: Use setState to ensure widget rebuilds
             setState(() {
               _thumbnailPathNotifier.value = cached;
-              _isThumbnailGenerated = true;
               _shouldRegenerateThumbnail = false;
             });
-            _onThumbnailGenerated(cached);
             _cachePollTimer?.cancel();
           }
         } catch (_) {}
       }
     });
-
-    // Listen for generation status updates
-    _generationStatusSubscription = VideoThumbnailHelper.onGenerationStatus
-        .listen((status) {
-          if (!mounted) return;
-
-          // Check if this status is for our video
-          final normalizedWidgetPath = VideoThumbnailHelper.getNormalizedPath(
-            widget.videoPath,
-          );
-          if (status.videoPath != normalizedWidgetPath &&
-              status.videoPath != widget.videoPath) {
-            return;
-          }
-
-          _generationStatusNotifier.value = status;
-        });
   }
 
   @override
   void dispose() {
     ScrollVelocityNotifier.instance.removeListener(_onScrollVelocityChanged);
+    _preferences.videoThumbnailViewportOnly.removeListener(
+      _onViewportModeChanged,
+    );
+    VideoThumbnailHelper.setViewportVisible(_viewportOwner, null);
     _visibilityNotifier.dispose();
     _thumbnailPathNotifier.dispose();
-    _progressNotifier.dispose();
-    _isGeneratingNotifier.dispose();
-    _generationStatusNotifier.dispose();
-    _progressTimer?.cancel();
+    _hasError.dispose();
     _cachePollTimer?.cancel();
     _cacheChangedSubscription?.cancel();
     _thumbReadySubscription?.cancel();
-    _generationStatusSubscription?.cancel();
     super.dispose();
   }
 
@@ -186,10 +170,28 @@ class _LazyVideoThumbnailState extends State<LazyVideoThumbnail>
       _isScrollingFast = isFast;
       if (isFast) {
         // Cancel pending operations when scrolling fast
-        _progressTimer?.cancel();
         _cachePollTimer?.cancel();
+        VideoThumbnailHelper.setViewportVisible(_viewportOwner, null);
+      } else {
+        _updateViewportInterest();
+        _scheduleInitialLoad();
       }
     }
+  }
+
+  void _updateViewportInterest() {
+    VideoThumbnailHelper.setViewportVisible(
+      _viewportOwner,
+      _visibilityNotifier.value && !widget.placeholderOnly && !_isScrollingFast
+          ? widget.videoPath
+          : null,
+    );
+  }
+
+  void _onViewportModeChanged() {
+    if (!mounted) return;
+    _updateViewportInterest();
+    if (_canGenerate) _scheduleInitialLoad();
   }
 
   @override
@@ -198,7 +200,17 @@ class _LazyVideoThumbnailState extends State<LazyVideoThumbnail>
 
     // Only set regeneration flag if the path actually changed
     if (widget.videoPath != oldWidget.videoPath) {
+      _cachePollTimer?.cancel();
+      _thumbnailVersion++;
+      _thumbnailPathNotifier.value = null;
+      _isLoading = false;
+      _hasError.value = false;
       _shouldRegenerateThumbnail = true;
+      _updateViewportInterest();
+      _scheduleInitialLoad();
+    }
+    if (widget.placeholderOnly != oldWidget.placeholderOnly) {
+      _updateViewportInterest();
       _scheduleInitialLoad();
     }
   }
@@ -227,47 +239,32 @@ class _LazyVideoThumbnailState extends State<LazyVideoThumbnail>
     }
 
     _thumbnailPathNotifier.value = null;
-    _isThumbnailGenerated = false;
+    _hasError.value = false;
     _shouldRegenerateThumbnail = true;
     _thumbnailVersion++; // Increment version to force Image widget rebuild
     _isLoading =
         false; // BUGFIX: Reset loading state so _loadThumbnail doesn't early-return
 
-    // Reload thumbnail after cache clear.
-    // Use a slightly longer delay to allow clearCache() to fully complete
-    // (including its finally block resetting _isProcessingQueue).
-    // Also reset _visibilityNotifier since the VisibilityDetector was not
-    // in the tree while the image was displayed, so the old value is stale.
-    final wasVisible = _visibilityNotifier.value;
-    _visibilityNotifier.value = false;
-
-    // Use the helper's throttled log method
-    VideoThumbnailHelper.logWithThrottle(
-      '[Thumbnail] Reloading thumbnail after cache clear (wasVisible=$wasVisible)',
-      widget.videoPath,
-    );
-
-    // Use a longer delay to ensure clearCache's finally block has completed
-    // and _isProcessingQueue is properly reset to false.
+    // Let clearCache finish before loading again. Keep the real visibility:
+    // mounted widgets can belong to hidden tabs or the scroll cache.
+    final source = widget.videoPath;
+    final version = _thumbnailVersion;
     Future.delayed(const Duration(milliseconds: 300), () {
-      if (!mounted) return;
+      if (!mounted ||
+          widget.videoPath != source ||
+          version != _thumbnailVersion) {
+        return;
+      }
 
-      // Mark as visible again and start loading regardless of VisibilityDetector
-      // since we know this widget was in the tree when cache was cleared
-      _visibilityNotifier.value = true;
-
-      // Request with high priority and force regeneration
+      if (!_canGenerate) return;
       _loadThumbnail(forceRegenerate: true, isPriority: true);
       _startCachePolling();
     });
   }
 
   /// Schedule initial thumbnail load.
-  /// Checks cache first; if not cached, requests generation immediately.
-  /// Generation for ALL files in the directory is driven by
-  /// proactiveGenerateAll (called from the bloc), so this widget does NOT
-  /// wait for visibility — it either picks up a cached result or joins
-  /// the existing queue via the onThumbnailReady stream.
+  /// Cached frames can display immediately. New extraction follows the
+  /// viewport preference; the helper prefetches a few display-order neighbours.
   void _scheduleInitialLoad() {
     // Don't schedule if we've determined we don't need to regenerate
     if (!_shouldRegenerateThumbnail) return;
@@ -276,19 +273,14 @@ class _LazyVideoThumbnailState extends State<LazyVideoThumbnail>
     final cached = VideoThumbnailHelper.peekCachedThumbnailPath(videoPath);
     if (cached != null) {
       _thumbnailPathNotifier.value = cached;
-      _isThumbnailGenerated = true;
       _shouldRegenerateThumbnail = false;
-      // Parent callbacks can setState; never invoke them during init/build.
-      SchedulerBinding.instance.addPostFrameCallback((_) {
-        if (mounted && widget.videoPath == videoPath) {
-          widget.onThumbnailGenerated?.call(cached);
-        }
-      });
       return;
     }
 
+    if (!_canGenerate) return;
+
     SchedulerBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || widget.videoPath != videoPath) return;
+      if (!mounted || widget.videoPath != videoPath || !_canGenerate) return;
 
       VideoThumbnailHelper.getFromCache(videoPath)
           .then((cachedThumbnailPath) {
@@ -298,13 +290,9 @@ class _LazyVideoThumbnailState extends State<LazyVideoThumbnail>
             if (cachedThumbnailPath != null) {
               setState(() {
                 _thumbnailPathNotifier.value = cachedThumbnailPath;
-                _isThumbnailGenerated = true;
                 _shouldRegenerateThumbnail = false;
               });
 
-              if (widget.onThumbnailGenerated != null) {
-                widget.onThumbnailGenerated!(cachedThumbnailPath);
-              }
               return;
             }
 
@@ -312,8 +300,9 @@ class _LazyVideoThumbnailState extends State<LazyVideoThumbnail>
             // If so, wait for the onThumbnailReady stream notification, but also
             // start cache polling as a safety net in case the stream event is
             // missed (e.g. cache-hit early-return in _generateThumbnailInternal).
-            if (VideoThumbnailHelper.isPathQueued(widget.videoPath)) {
-              _isGeneratingNotifier.value = true;
+            if (!_canGenerate) return;
+            if (!_preferences.videoThumbnailViewportOnly.value &&
+                VideoThumbnailHelper.isPathQueued(widget.videoPath)) {
               _startCachePolling();
               return;
             }
@@ -322,8 +311,8 @@ class _LazyVideoThumbnailState extends State<LazyVideoThumbnail>
             // or proactive queue already finished without this file).
             // Request as a fallback with non-priority so it doesn't disrupt
             // the sorted queue order.
-            if (!widget.placeholderOnly) {
-              _loadThumbnail(isPriority: false);
+            if (_canGenerate) {
+              _loadThumbnail(isPriority: _visibilityNotifier.value);
             }
           })
           .catchError((error) {
@@ -333,6 +322,7 @@ class _LazyVideoThumbnailState extends State<LazyVideoThumbnail>
             );
           });
     });
+    SchedulerBinding.instance.ensureVisualUpdate();
   }
 
   /// Start loading the thumbnail
@@ -341,11 +331,28 @@ class _LazyVideoThumbnailState extends State<LazyVideoThumbnail>
     // if we already have a thumbnail generated and don't need to regenerate,
     // or if we've determined we don't need to regenerate
     if (_isLoading ||
-        widget.placeholderOnly ||
+        !_canGenerate ||
         (_thumbnailPathNotifier.value != null && !forceRegenerate) ||
         (!_shouldRegenerateThumbnail && !forceRegenerate)) {
       return;
     }
+
+    final videoPath = widget.videoPath;
+    final version = _thumbnailVersion;
+    if (!ThumbnailListingGate.instance.isReadyFor(videoPath)) {
+      ThumbnailListingGate.instance.whenReady(() {
+        if (mounted &&
+            widget.videoPath == videoPath &&
+            version == _thumbnailVersion) {
+          _loadThumbnail(
+            forceRegenerate: forceRegenerate,
+            isPriority: isPriority,
+          );
+        }
+      }, source: videoPath);
+      return;
+    }
+    _hasError.value = false;
 
     // Use the helper's throttled log method
     VideoThumbnailHelper.logWithThrottle(
@@ -354,11 +361,6 @@ class _LazyVideoThumbnailState extends State<LazyVideoThumbnail>
     );
 
     _isLoading = true;
-    _progressNotifier.value = 0.0;
-    _isGeneratingNotifier.value = true; // Show generating indicator
-
-    // Start progress simulation for better UX
-    _simulateProgressUpdates();
 
     final int? thumbnailSize = _resolveThumbnailSize();
 
@@ -369,15 +371,18 @@ class _LazyVideoThumbnailState extends State<LazyVideoThumbnail>
     final bool alreadyQueued = VideoThumbnailHelper.isPathQueued(
       widget.videoPath,
     );
-    if (alreadyQueued && !forceRegenerate) {
+    if (alreadyQueued &&
+        !forceRegenerate &&
+        !_preferences.videoThumbnailViewportOnly.value) {
       // Already queued with correct priority — just wait for stream notification
       _isLoading = false;
-      _isGeneratingNotifier.value = true; // Still show generating indicator
+      _startCachePolling();
       return;
     }
 
-    final bool usePriority =
-        isPriority && !(thumbnailSize != null && thumbnailSize <= 96);
+    final bool usePriority = _preferences.videoThumbnailViewportOnly.value
+        ? _visibilityNotifier.value
+        : isPriority && !(thumbnailSize != null && thumbnailSize <= 96);
 
     // Use VideoThumbnailHelper directly instead of ThumbnailIsolateManager
     VideoThumbnailHelper.generateThumbnail(
@@ -385,13 +390,17 @@ class _LazyVideoThumbnailState extends State<LazyVideoThumbnail>
           isPriority: usePriority,
           forceRegenerate: forceRegenerate,
           thumbnailSize: thumbnailSize,
+          viewportOwner: _viewportOwner,
         )
         .then((path) {
-          if (!mounted) return;
+          if (!mounted ||
+              widget.videoPath != videoPath ||
+              version != _thumbnailVersion) {
+            return;
+          }
 
-          _progressTimer?.cancel();
           _isLoading = false;
-          _isGeneratingNotifier.value = false; // Hide generating indicator
+          if (path == null && !_canGenerate) return;
 
           if (path != null) {
             // Use the helper's throttled log method
@@ -404,10 +413,8 @@ class _LazyVideoThumbnailState extends State<LazyVideoThumbnail>
             // ValueNotifier update alone may not trigger rebuild in some cases
             setState(() {
               _thumbnailPathNotifier.value = path;
-              _isThumbnailGenerated = true;
               _shouldRegenerateThumbnail = false;
             });
-            _onThumbnailGenerated(path);
             // Stop polling if running
             _cachePollTimer?.cancel();
           } else {
@@ -418,6 +425,7 @@ class _LazyVideoThumbnailState extends State<LazyVideoThumbnail>
             );
 
             _thumbnailPathNotifier.value = null;
+            _hasError.value = true;
 
             // Call onError callback if provided
             if (widget.onError != null) {
@@ -431,12 +439,14 @@ class _LazyVideoThumbnailState extends State<LazyVideoThumbnail>
           }
 
           // Update UI - no need for setState since we use ValueListenableBuilder
-          _progressNotifier.value = 1.0;
         })
         .catchError((error) {
-          if (!mounted) return;
+          if (!mounted ||
+              widget.videoPath != videoPath ||
+              version != _thumbnailVersion) {
+            return;
+          }
 
-          _progressTimer?.cancel();
           // Use the helper's throttled log method
           VideoThumbnailHelper.logWithThrottle(
             '[Thumbnail] Error generating thumbnail: $error',
@@ -444,9 +454,8 @@ class _LazyVideoThumbnailState extends State<LazyVideoThumbnail>
           );
 
           _thumbnailPathNotifier.value = null;
+          _hasError.value = true;
           _isLoading = false;
-          _isGeneratingNotifier.value = false; // Hide generating indicator
-          _progressNotifier.value = 0.0;
 
           // Call onError callback if provided
           if (widget.onError != null) {
@@ -465,50 +474,7 @@ class _LazyVideoThumbnailState extends State<LazyVideoThumbnail>
     return size.clamp(24, 320);
   }
 
-  /// Play-circle overlay size proportional to the thumbnail so it doesn't
-  /// overflow small containers (e.g. 20x20 in Miller columns view).
-  double _playIconSize() {
-    final double w = widget.width;
-    final double h = widget.height;
-    if (!w.isFinite || !h.isFinite) return 32;
-    final double minDim = w < h ? w : h;
-    return (minDim * 0.7).clamp(10.0, 32.0);
-  }
-
-  /// Simulate progress updates for better UX while thumbnail is generating
-  /// PERFORMANCE: Removed periodic timer to eliminate timer storm during scrolling
-  void _simulateProgressUpdates() {
-    _progressTimer?.cancel();
-    _progressNotifier.value = 0.0;
-
-    // Use a single delayed update instead of periodic timer
-    // This eliminates the timer storm issue while still providing visual feedback
-    _progressTimer = Timer(const Duration(milliseconds: 500), () {
-      if (mounted && _thumbnailPathNotifier.value == null) {
-        _progressNotifier.value = 0.5;
-      }
-    });
-  }
-
-  /// Handle the thumbnail generation completion
-  void _onThumbnailGenerated(String path) {
-    // Notify parent about the thumbnail being generated
-    if (widget.onThumbnailGenerated != null) {
-      // Use a post-frame callback to avoid calling during build
-      SchedulerBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          widget.onThumbnailGenerated!(path);
-        }
-      });
-    }
-
-    // No need for setState - ValueListenableBuilder will handle UI updates automatically
-  }
-
-  /// Visibility change handler — only tracks visibility state for UI indicators.
-  /// Thumbnail generation is NOT gated by visibility; it is driven by
-  /// proactiveGenerateAll (for ALL files in the directory) and by
-  /// _scheduleInitialLoad as a fallback.
+  /// Keep tracking decoded tiles too, so scrolling away releases prefetch work.
   void _onVisibilityChanged(VisibilityInfo info) {
     if (!mounted) return;
 
@@ -518,94 +484,39 @@ class _LazyVideoThumbnailState extends State<LazyVideoThumbnail>
     if (isNowVisible == wasVisible) return;
 
     _visibilityNotifier.value = isNowVisible;
+    _updateViewportInterest();
 
     if (!isNowVisible) {
       _cachePollTimer?.cancel();
+    } else {
+      _scheduleInitialLoad();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    super.build(context); // Required for AutomaticKeepAliveClientMixin
-
-    // Use a unique key for the VisibilityDetector based on video path
-    // This helps Flutter identify and reuse this widget when possible
-    // Use collision-free key to ensure VisibilityDetector delivers events reliably
-    final Key visibilityKey = ValueKey('vid-visibility:${widget.videoPath}');
-
+    super.build(context);
     return RepaintBoundary(
-      child: ValueListenableBuilder<String?>(
-        valueListenable: _thumbnailPathNotifier,
-        builder: (context, thumbnailPath, _) {
-          // If we have a thumbnail path, render it directly
-          // Skip existsSync() to avoid blocking UI thread during scroll
-          // Image.file errorBuilder will handle missing files gracefully
-          if (thumbnailPath != null) {
-            return _buildThumbnailImage(thumbnailPath);
-          }
-
-          // The main widget that detects visibility and loads thumbnails
-          return VisibilityDetector(
-            key: visibilityKey,
-            onVisibilityChanged: _onVisibilityChanged,
-            child: ValueListenableBuilder<bool>(
-              valueListenable: _isGeneratingNotifier,
-              builder: (context, isGenerating, _) {
-                return ValueListenableBuilder<ThumbnailGenerationStatus?>(
-                  valueListenable: _generationStatusNotifier,
-                  builder: (context, status, _) {
-                    return Stack(
-                      children: [
-                        widget.fallbackBuilder(),
-                        if (isGenerating)
-                          Positioned(
-                            bottom: 4,
-                            right: 4,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 3,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.black.withValues(alpha: 0.7),
-                                borderRadius: BorderRadius.circular(16.0),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const SizedBox(
-                                    width: 12,
-                                    height: 12,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 1.5,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        Colors.white,
-                                      ),
-                                    ),
-                                  ),
-                                  if (status != null) ...[
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      status.statusMessage,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 9,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ),
-                          ),
-                      ],
-                    );
-                  },
-                );
-              },
-            ),
-          );
-        },
+      child: VisibilityDetector(
+        key: ValueKey('vid-visibility:${widget.videoPath}'),
+        onVisibilityChanged: _onVisibilityChanged,
+        child: ValueListenableBuilder<String?>(
+          valueListenable: _thumbnailPathNotifier,
+          builder: (context, thumbnailPath, _) {
+            if (thumbnailPath != null) {
+              return _buildThumbnailImage(thumbnailPath);
+            }
+            return ValueListenableBuilder<bool>(
+              valueListenable: _hasError,
+              builder: (context, failed, _) => failed
+                  ? widget.fallbackBuilder()
+                  : ThumbnailPlaceholder(
+                      isVideo: true,
+                      visible: widget.showLoadingIndicator,
+                    ),
+            );
+          },
+        ),
       ),
     );
   }
@@ -617,6 +528,7 @@ class _LazyVideoThumbnailState extends State<LazyVideoThumbnail>
   int _pollAttempts = 0;
 
   void _startCachePolling() {
+    if (!_canGenerate) return;
     _cachePollTimer?.cancel();
     _pollAttempts = 0;
     _schedulePollAttempt();
@@ -631,17 +543,15 @@ class _LazyVideoThumbnailState extends State<LazyVideoThumbnail>
 
       _pollAttempts++;
 
+      final videoPath = widget.videoPath;
       try {
-        final cached = await VideoThumbnailHelper.getFromCache(
-          widget.videoPath,
-        );
-        if (cached != null && mounted) {
+        final cached = await VideoThumbnailHelper.getFromCache(videoPath);
+        if (!mounted || widget.videoPath != videoPath) return;
+        if (cached != null) {
           setState(() {
             _thumbnailPathNotifier.value = cached;
-            _isThumbnailGenerated = true;
             _shouldRegenerateThumbnail = false;
           });
-          _onThumbnailGenerated(cached);
           return; // Success — stop polling
         }
       } catch (_) {}
@@ -653,120 +563,46 @@ class _LazyVideoThumbnailState extends State<LazyVideoThumbnail>
     });
   }
 
-  /// Build the actual thumbnail image
+  /// The decoded frame, not generation/cache lookup, completes loading.
   Widget _buildThumbnailImage(String thumbnailPath) {
     final videoPath = widget.videoPath;
-    return RepaintBoundary(
-      child: SizedBox(
+    return SizedBox(
+      width: widget.width,
+      height: widget.height,
+      child: ThumbnailImage(
+        key: ValueKey('$videoPath-$thumbnailPath-$_thumbnailVersion'),
+        image: FileImage(File(thumbnailPath)),
         width: widget.width,
         height: widget.height,
-        child: Image.file(
-          File(thumbnailPath),
-          // Decorative: the file name next to it is what a screen reader
-          // announces. Image would otherwise add a semantics node that appears
-          // when the thumbnail lands and disappears as tiles recycle, and the
-          // Windows AccessibilityBridge drops any ui::AXTreeUpdate that creates
-          // and destroys nodes in one frame.
-          excludeFromSemantics: true,
-          key: ValueKey(
-            'thumbnail-${widget.videoPath}-${thumbnailPath.hashCode}-$_thumbnailVersion',
-          ),
-          width: widget.width,
-          height: widget.height,
-          fit: widget.fit,
-          filterQuality: FilterQuality.low,
-          errorBuilder: (context, error, stackTrace) {
-            // Use the helper's throttled log method
-            VideoThumbnailHelper.logWithThrottle(
-              '[Thumbnail] Error loading thumbnail image: $error',
-              widget.videoPath,
-            );
-
-            // Image calls this while building. Notify the parent only after
-            // the frame, and ignore failures from a source already replaced.
-            SchedulerBinding.instance.addPostFrameCallback((_) {
-              if (!mounted ||
-                  widget.videoPath != videoPath ||
-                  _thumbnailPathNotifier.value != thumbnailPath) {
-                return;
+        fit: widget.fit,
+        isVideo: true,
+        showLoadingIndicator: widget.showLoadingIndicator,
+        onReady: () {
+          _shouldRegenerateThumbnail = false;
+          widget.onThumbnailGenerated?.call(thumbnailPath);
+        },
+        errorBuilder: widget.fallbackBuilder,
+        onError: (error) {
+          if (!mounted ||
+              widget.videoPath != videoPath ||
+              _thumbnailPathNotifier.value != thumbnailPath) {
+            return;
+          }
+          _hasError.value = true;
+          _thumbnailPathNotifier.value = null;
+          _isLoading = false;
+          _shouldRegenerateThumbnail = true;
+          unawaited(
+            VideoThumbnailHelper.removeFromCache(videoPath).then((_) {
+              if (mounted &&
+                  widget.videoPath == videoPath &&
+                  !widget.placeholderOnly) {
+                _scheduleInitialLoad();
               }
-              _thumbnailPathNotifier.value = null;
-              _isLoading = false;
-              _isThumbnailGenerated = false;
-              _shouldRegenerateThumbnail = true;
-              unawaited(VideoThumbnailHelper.removeFromCache(videoPath));
-            });
-            return widget.fallbackBuilder();
-          },
-          frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-            if (wasSynchronouslyLoaded) {
-              // Also notify for synchronously loaded images
-              SchedulerBinding.instance.addPostFrameCallback((_) {
-                if (mounted &&
-                    widget.onThumbnailGenerated != null &&
-                    !_isThumbnailGenerated) {
-                  widget.onThumbnailGenerated!(thumbnailPath);
-                  _isThumbnailGenerated = true;
-                  _shouldRegenerateThumbnail = false;
-                }
-              });
-              // Return with play icon overlay for synchronously loaded images
-              return Stack(
-                fit: StackFit.expand,
-                children: [
-                  child,
-                  // Add video play icon overlay
-                  Center(
-                    child: Icon(
-                      PhosphorIconsLight.playCircle,
-                      color: Colors.white,
-                      size: _playIconSize(),
-                    ),
-                  ),
-                ],
-              );
-            }
-
-            if (frame != null) {
-              // Thumbnail is ready now
-              SchedulerBinding.instance.addPostFrameCallback((_) {
-                if (mounted &&
-                    widget.onThumbnailGenerated != null &&
-                    !_isThumbnailGenerated) {
-                  widget.onThumbnailGenerated!(thumbnailPath);
-                  _isThumbnailGenerated = true;
-                  _shouldRegenerateThumbnail = false;
-                }
-              });
-            }
-
-            return AnimatedSwitcher(
-              duration: const Duration(
-                milliseconds: 50,
-              ), // Reduced from 200ms to avoid flickering
-              child: frame != null
-                  ? Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        child,
-                        // Add video play icon overlay for local videos
-                        Center(
-                          child: Icon(
-                            PhosphorIconsLight.playCircle,
-                            color: Colors.white,
-                            size: _playIconSize(),
-                          ),
-                        ),
-                      ],
-                    )
-                  : SizedBox(
-                      width: widget.width,
-                      height: widget.height,
-                      child: widget.fallbackBuilder(),
-                    ),
-            );
-          },
-        ),
+            }),
+          );
+          widget.onError?.call(error);
+        },
       ),
     );
   }

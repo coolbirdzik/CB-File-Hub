@@ -938,6 +938,17 @@ class VietnameseLocalizations implements AppLocalizations {
   String get defaultViewMode => 'Chế độ xem mặc định';
 
   @override
+  String get folderViewModePreference =>
+      'Chế độ xem cho thư mục chưa tùy chỉnh';
+  @override
+  String get folderViewModePreferenceDescription =>
+      'Khi chưa lưu chế độ xem riêng: ưu tiên Lưới nếu chỉ có ảnh/video, hoặc theo thư mục cha. Nếu không phù hợp thì dùng chế độ xem mặc định.';
+  @override
+  String get folderViewModeMediaGrid => 'Lưới cho ảnh và video';
+  @override
+  String get folderViewModeInheritParent => 'Theo thư mục cha';
+
+  @override
   String get defaultViewModeDescription =>
       'Áp dụng cho thư mục chưa lưu chế độ xem riêng';
 
@@ -2018,6 +2029,12 @@ class VietnameseLocalizations implements AppLocalizations {
   String get videoThumbnails => 'Hình thu nhỏ video';
   @override
   String get thumbnailMode => 'Chế độ tạo';
+  @override
+  String get videoThumbnailViewportOnly =>
+      'Chỉ tải thumbnail gần vùng đang xem';
+  @override
+  String get videoThumbnailViewportOnlyDescription =>
+      'Chỉ tạo hình thu nhỏ video cho các mục đang thấy và một ít mục lân cận. Tắt để tải trước toàn bộ danh sách.';
   @override
   String get thumbnailModeFast => 'Nhanh';
   @override
@@ -4307,7 +4324,7 @@ class VietnameseLocalizations implements AppLocalizations {
 
   // Disk Cleaner (CB Agent skill)
   @override
-  String get cbAgentCleanerTitle => 'Dọn rác (CB Agent)';
+  String get cbAgentCleanerTitle => 'Cleaner';
   @override
   String get diskCleanerNotAvailable =>
       'Dọn rác khả dụng trên Windows và macOS';
@@ -5103,7 +5120,11 @@ class VietnameseLocalizations implements AppLocalizations {
   String cleanerAppsLoadFailed(String error) =>
       'Không thể phân tích ứng dụng đã cài: $error';
   @override
-  String get cleanerAppsPartialBanner => 'Dữ liệu vẫn đang được cập nhật.';
+  String get cleanerAppsPartialBanner =>
+      'Một số thông tin ứng dụng chưa có. Quét lại để cập nhật.';
+  @override
+  String get cleanerAppsQuickScanHint =>
+      'Tải danh sách ứng dụng mà không quét ổ đĩa. Dung lượng dùng ước tính của Windows, hoặc số đo từ lần quét Dung lượng ổ đĩa trước đó.';
   @override
   String get cleanerAppsSearchHint => 'Tìm ứng dụng';
   @override
@@ -5210,6 +5231,34 @@ class VietnameseLocalizations implements AppLocalizations {
       'Không đọc được thư mục này: $error';
   @override
   String get cleanerAppsManageInWindows => 'Quản lý trong Windows';
+  @override
+  String get cleanerUninstallApp => 'Gỡ ứng dụng';
+  @override
+  String get cleanerUninstallConfirm =>
+      'Trình gỡ cài đặt của ứng dụng sẽ mở. Sau khi gỡ xong, Cleaner sẽ quét các thư mục liên quan để bạn xem và chọn xóa.';
+  @override
+  String get cleanerUninstallReview =>
+      'Đã gỡ ứng dụng. Chọn các thư mục còn lại mà bạn muốn chuyển vào Thùng rác.';
+  @override
+  String get cleanerUninstallDataWarning =>
+      'Các thư mục này có thể chứa cài đặt, tài khoản và dữ liệu cá nhân. Hãy xem đường dẫn trước khi chọn xóa.';
+  @override
+  String get cleanerUninstallRunning =>
+      'Đang chờ trình gỡ cài đặt. Hãy hoàn tất hoặc hủy trong cửa sổ của ứng dụng.';
+  @override
+  String get cleanerUninstallScanning => 'Đang quét các thư mục liên quan…';
+  @override
+  String get cleanerUninstallNoFiles =>
+      'Không còn thư mục liên quan tại những vị trí đã quét.';
+  @override
+  String get cleanerUninstallPartial =>
+      'Không đọc được một số vị trí. Kết quả có thể chưa đầy đủ:';
+  @override
+  String get cleanerUninstallFilesChanged =>
+      'Ứng dụng hoặc thư mục đã thay đổi. Hãy đóng hộp thoại và quét lại trước khi xóa.';
+  @override
+  String get cleanerUninstallCleanupFailed =>
+      'Một số thư mục chưa chuyển được vào Thùng rác. Các đường dẫn còn lại vẫn được hiển thị.';
   @override
   String get cleanerAppsReviewCleanable => 'Xem dữ liệu có thể dọn';
   @override

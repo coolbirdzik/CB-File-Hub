@@ -153,13 +153,11 @@ class _DriveViewState extends State<DriveView> {
   }
 
   Widget _buildSkeletonDriveList(BuildContext context) {
-    final bool isGrid = _effectiveViewMode() == ViewMode.grid;
-    return SkeletonHelper.responsive(
-      isGridView: isGrid,
-      isAlbum: false,
-      crossAxisCount: isGrid ? widget.gridZoomLevel : 1,
+    return SkeletonHelper.files(
+      viewMode: _effectiveViewMode(),
+      gridZoomLevel: widget.gridZoomLevel,
       itemCount: 6,
-      wrapInCardOnDesktop: true,
+      drives: true,
     );
   }
 

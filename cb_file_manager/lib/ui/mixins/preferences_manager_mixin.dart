@@ -187,6 +187,8 @@ mixin PreferencesManagerMixin<T extends StatefulWidget> on State<T> {
   /// (list -> tiles -> grid -> details -> columns (desktop) -> tree -> list)
   void toggleViewMode() {
     setState(() {
+      // Automatic folder layouts can change the bloc after preferences load.
+      viewMode = ViewModeUtils.normalize(folderListBloc.state.viewMode);
       if (viewMode == ViewMode.list) {
         viewMode = ViewMode.tiles;
       } else if (viewMode == ViewMode.tiles) {

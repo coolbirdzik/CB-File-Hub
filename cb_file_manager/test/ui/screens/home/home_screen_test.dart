@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:cb_file_manager/config/languages/app_localizations_delegate.dart';
 import 'package:cb_file_manager/design_system/cb_design_system.dart';
@@ -121,6 +122,59 @@ void main() {
     expect(tabs.state.activeTab!.name, 'Projects');
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'drawer shortcuts open in the Home tab and retain navigation history',
+    (tester) async {
+      await mount(tester);
+      final homeId = tabs.state.activeTabId!;
+      final count = tabs.state.tabs.length;
+      final destinations = [
+        ('network', '#network'),
+        ('ssh', '#ssh'),
+        ('torrents', '#torrents'),
+        ('agent', '#ai-chat'),
+        if (Platform.isWindows || Platform.isMacOS || Platform.isLinux)
+          ('cleaner', '#cb-agent-cleaner'),
+        ('trash', '#trash'),
+        ('settings', '#settings'),
+      ];
+      for (final (id, path) in destinations) {
+        final shortcut = find.byKey(ValueKey('home-shortcut-$id'));
+        await tester.ensureVisible(shortcut);
+        await tester.tap(shortcut);
+        await tester.pumpAndSettle();
+        expect(tabs.state.activeTabId, homeId);
+        expect(tabs.state.activeTab!.path, path);
+        expect(tabs.state.tabs.length, count);
+        tabs.backNavigationToPath(homeId);
+        await tester.pumpAndSettle();
+        expect(tabs.state.activeTab!.path, '#home');
+        expect(tabs.state.activeTab!.forwardHistory, [path]);
+      }
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'quick access stays with its owning Home tab when another tab is active',
+    (tester) async {
+      await mount(tester);
+      final homeId = tabs.state.activeTabId!;
+      tabs.add(AddTab(path: r'C:\Other'));
+      await tester.pumpAndSettle();
+      final settings = find.byKey(const ValueKey('home-shortcut-settings'));
+      await tester.ensureVisible(settings);
+      await tester.tap(settings);
+      await tester.pumpAndSettle();
+      expect(
+        tabs.state.tabs.firstWhere((tab) => tab.id == homeId).path,
+        '#settings',
+      );
+      expect(tabs.state.activeTab!.path, r'C:\Other');
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('saved hidden preference skips history and its preview inputs', (
     tester,
@@ -246,6 +300,11 @@ void main() {
         textScale: 1.5,
       );
       expect(find.text('Tiếp tục từ lần trước'), findsOneWidget);
+      expect(find.text('Truy cập nhanh'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('home-shortcut-settings')),
+        findsOneWidget,
+      );
       expect(find.byType(FadeTransition), findsNothing);
       final photos = tester.getRect(find.byKey(const ValueKey('home-photos')));
       final videos = tester.getRect(find.byKey(const ValueKey('home-videos')));

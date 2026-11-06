@@ -23,6 +23,9 @@ enum TagThumbnailFitMode { contain, cover }
 
 enum FileThumbnailFitMode { cover, contain }
 
+/// How folders without a saved view mode choose their layout.
+enum FolderViewModePreference { mediaGrid, inheritParent }
+
 /// What the mouse wheel does over the video player.
 enum VideoWheelAction { volume, seek }
 
@@ -49,12 +52,17 @@ class UserPreferences {
   final ValueNotifier<FileThumbnailFitMode> fileThumbnailFitMode =
       ValueNotifier<FileThumbnailFitMode>(FileThumbnailFitMode.cover);
   final ValueNotifier<bool> showRecentFoldersOnHome = ValueNotifier<bool>(true);
+  final ValueNotifier<bool> videoThumbnailViewportOnly = ValueNotifier<bool>(
+    true,
+  );
 
   // Stream that can be listened to for theme changes
   Stream<ThemeMode> get themeChangeStream => _themeChangeController.stream;
 
   // Shared preferences keys
   static const String _viewModeKey = 'view_mode';
+  static const String _folderViewModePreferenceKey =
+      'folder_view_mode_preference';
   static const String _sortOptionKey = 'sort_option';
   static const String _gridZoomLevelKey = 'grid_zoom_level';
   static const String _lastFolderKey = 'last_accessed_folder';
@@ -82,6 +90,8 @@ class UserPreferences {
   static const String _showFileTagsKey = 'show_file_tags';
   static const String _previewPaneVisibleKey = 'preview_pane_visible';
   static const String _thumbnailModeKey = 'thumbnail_mode';
+  static const String _videoThumbnailViewportOnlyKey =
+      'video_thumbnail_viewport_only';
   static const String _maxThumbnailConcurrencyKey = 'max_thumbnail_concurrency';
   static const String _tabInactiveThresholdMinutesKey =
       'tab_inactive_threshold_minutes';
@@ -214,6 +224,12 @@ class UserPreferences {
       tagThumbnailFitMode.value = _parseTagThumbnailFitMode(stored);
     } catch (_) {
       tagThumbnailFitMode.value = TagThumbnailFitMode.contain;
+    }
+
+    try {
+      await getVideoThumbnailViewportOnly();
+    } catch (_) {
+      videoThumbnailViewportOnly.value = true;
     }
   }
 
@@ -893,6 +909,17 @@ class UserPreferences {
   Future<bool> setViewMode(ViewMode viewMode) =>
       _saveDisplayDefault(_viewModeKey, viewMode.index);
 
+  Future<FolderViewModePreference> getFolderViewModePreference() async {
+    final saved = await _getPreference<String>(_folderViewModePreferenceKey);
+    return FolderViewModePreference.values.firstWhere(
+      (mode) => mode.name == saved,
+      orElse: () => FolderViewModePreference.mediaGrid,
+    );
+  }
+
+  Future<bool> setFolderViewModePreference(FolderViewModePreference mode) =>
+      _saveDisplayDefault(_folderViewModePreferenceKey, mode.name);
+
   /// Get current sort option preference
   Future<SortOption> getSortOption() async {
     int sortOptionIndex =
@@ -1223,6 +1250,27 @@ class UserPreferences {
       _videoThumbnailPercentageKey,
       validPercentage,
     );
+  }
+
+  /// Only extract frames for the viewport and a small prefetch neighbourhood.
+  Future<bool> getVideoThumbnailViewportOnly() async {
+    final enabled =
+        await _getPreference<bool>(
+          _videoThumbnailViewportOnlyKey,
+          defaultValue: true,
+        ) ??
+        true;
+    videoThumbnailViewportOnly.value = enabled;
+    return enabled;
+  }
+
+  Future<bool> setVideoThumbnailViewportOnly(bool enabled) async {
+    final saved = await _savePreference<bool>(
+      _videoThumbnailViewportOnlyKey,
+      enabled,
+    );
+    if (saved) videoThumbnailViewportOnly.value = enabled;
+    return saved;
   }
 
   /// Get thumbnail generation mode preference

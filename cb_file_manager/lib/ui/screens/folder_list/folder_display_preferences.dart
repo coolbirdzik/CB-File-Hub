@@ -1,10 +1,13 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/helpers/files/folder_sort_manager.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:cb_file_manager/ui/utils/view_mode_utils.dart';
+import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
 import 'package:flutter/foundation.dart';
+import 'package:path/path.dart' as pathlib;
 
 /// How a folder is shown: its own saved settings over the global defaults.
 @immutable
@@ -33,6 +36,9 @@ class FolderDisplaySettings {
         columnVisibility: overrides.columnVisibility ?? columnVisibility,
         showFileTags: overrides.showFileTags ?? showFileTags,
       );
+
+  FolderDisplaySettings _withViewMode(ViewMode mode) =>
+      _over(FolderDisplayOverrides(viewMode: mode));
 }
 
 /// Resolves [FolderDisplaySettings] for a path.
@@ -49,6 +55,23 @@ class FolderDisplayPreferences {
   FolderDisplaySettings? _defaults;
   Future<FolderDisplaySettings>? _loadingDefaults;
   int _defaultsGeneration = 0;
+  FolderViewModePreference _viewModePreference =
+      FolderViewModePreference.mediaGrid;
+
+  // Only remember the classification, never the listing or an inferred override.
+  // Large folders that the listing cache skips can still restore their layout.
+  final Map<String, bool> _mediaOnlyFolders = {};
+
+  /// Until media detection has a listing, avoid a skeleton in the wrong view.
+  bool needsListingForViewMode(String path) {
+    if (path.isEmpty || path.startsWith('#') || path.contains('://')) {
+      return false;
+    }
+    if (_defaults == null) return true;
+    return _viewModePreference == FolderViewModePreference.mediaGrid &&
+        FolderSortManager().cachedOverrides(path)?.viewMode == null &&
+        !_mediaOnlyFolders.containsKey(_pathKey(path));
+  }
 
   /// Loads the defaults and every saved folder. Safe to call more than once.
   Future<void> warmUp() async {
@@ -66,13 +89,75 @@ class FolderDisplayPreferences {
     final defaults = _defaults;
     if (defaults == null) return null;
     final overrides = FolderSortManager().cachedOverrides(path);
-    return overrides == null ? null : defaults._over(overrides);
+    if (overrides == null) return null;
+    final settings = defaults._over(overrides);
+    if (overrides.viewMode != null) return settings;
+    if (_viewModePreference == FolderViewModePreference.mediaGrid) {
+      return _mediaOnlyFolders[_pathKey(path)] == true
+          ? settings._withViewMode(ViewMode.grid)
+          : settings;
+    }
+    for (final parent in _parents(path)) {
+      final inherited = FolderSortManager().cachedOverrides(parent);
+      if (inherited == null) return null;
+      if (inherited.viewMode != null) {
+        return settings._withViewMode(inherited.viewMode!);
+      }
+    }
+    return settings;
   }
 
-  Future<FolderDisplaySettings> resolve(String path) async {
+  Future<FolderDisplaySettings> resolve(
+    String path, {
+    List<File>? files,
+    List<Directory>? folders,
+  }) async {
+    if (files != null && folders != null) {
+      final key = _pathKey(path);
+      _mediaOnlyFolders.remove(key);
+      _mediaOnlyFolders[key] =
+          folders.isEmpty &&
+          files.isNotEmpty &&
+          files.every((file) => FileTypeUtils.isMediaFile(file.path));
+      if (_mediaOnlyFolders.length > 128) {
+        _mediaOnlyFolders.remove(_mediaOnlyFolders.keys.first);
+      }
+    }
     final defaults = await _loadDefaults();
     final overrides = await FolderSortManager().getOverrides(path);
-    return defaults._over(overrides);
+    final settings = defaults._over(overrides);
+    if (overrides.viewMode != null) return settings;
+    if (_viewModePreference == FolderViewModePreference.mediaGrid) {
+      return _mediaOnlyFolders[_pathKey(path)] == true
+          ? settings._withViewMode(ViewMode.grid)
+          : settings;
+    }
+    for (final parent in _parents(path)) {
+      final inherited =
+          FolderSortManager().cachedOverrides(parent) ??
+          await FolderSortManager().getOverrides(parent);
+      if (inherited.viewMode != null) {
+        return settings._withViewMode(inherited.viewMode!);
+      }
+    }
+    return settings;
+  }
+
+  String _pathKey(String path) {
+    final normalized = pathlib.normalize(path);
+    return Platform.isWindows ? normalized.toLowerCase() : normalized;
+  }
+
+  Iterable<String> _parents(String path) sync* {
+    // Virtual screens and remote URL schemes have their own view preferences.
+    if (path.isEmpty || path.startsWith('#') || path.contains('://')) return;
+    var current = pathlib.normalize(path);
+    while (true) {
+      final parent = pathlib.dirname(current);
+      if (parent == current || parent == '.') return;
+      yield parent;
+      current = parent;
+    }
   }
 
   /// Drops the cached defaults after a global display preference changed.
@@ -90,6 +175,7 @@ class FolderDisplayPreferences {
       try {
         final prefs = UserPreferences.instance;
         await prefs.init();
+        final viewModePreference = await prefs.getFolderViewModePreference();
         final loaded = FolderDisplaySettings(
           viewMode: ViewModeUtils.normalize(await prefs.getViewMode()),
           sortOption: await prefs.getSortOption(),
@@ -99,7 +185,10 @@ class FolderDisplayPreferences {
         );
         // A default saved meanwhile invalidated this read; the next call
         // reads again.
-        if (generation == _defaultsGeneration) _defaults = loaded;
+        if (generation == _defaultsGeneration) {
+          _defaults = loaded;
+          _viewModePreference = viewModePreference;
+        }
         return loaded;
       } catch (_) {
         if (generation == _defaultsGeneration) _loadingDefaults = null;

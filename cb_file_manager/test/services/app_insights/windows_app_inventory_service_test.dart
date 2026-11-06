@@ -11,6 +11,61 @@ import 'package:cb_file_manager/services/app_insights/windows_app_usage_parser.d
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test(
+    'inventory finishes with a partial result when a source never answers',
+    () async {
+      final source = _ControlledInventoryDataSource();
+      final service = WindowsAppInventoryService(
+        dataSource: source,
+        readTimeout: const Duration(milliseconds: 20),
+      );
+      final snapshots = <InstalledAppInventoryResult>[];
+      final pending = service.loadInventory(onSnapshot: snapshots.add);
+      source.win32.complete(
+        const WindowsRawAppInsightsResult(
+          records: [
+            {
+              'registryKeyName': 'alpha',
+              'displayName': 'Alpha Editor',
+              'uninstallString': 'uninstall.exe',
+            },
+          ],
+        ),
+      );
+      final inventory = await pending.timeout(const Duration(seconds: 2));
+      expect(inventory.apps.single.displayName, 'Alpha Editor');
+      expect(inventory.apps.single.uninstallCommand, 'uninstall.exe');
+      expect(inventory.isPartial, isTrue);
+      expect(inventory.warnings.join(), contains('TimeoutException'));
+      final count = snapshots.length;
+      source.msix.complete(const WindowsRawAppInsightsResult());
+      await Future<void>.delayed(Duration.zero);
+      expect(
+        snapshots.length,
+        count,
+        reason: 'a timed-out source cannot publish late snapshots',
+      );
+    },
+  );
+
+  test('concurrent requests share pending platform inventory reads', () async {
+    final source = _ControlledInventoryDataSource();
+    final service = WindowsAppInventoryService(dataSource: source);
+    final first = service.loadInventory();
+    final second = service.loadInventory();
+    expect(source.win32Reads, 1);
+    expect(source.msixReads, 1);
+    source.win32.complete(const WindowsRawAppInsightsResult());
+    source.msix.complete(const WindowsRawAppInsightsResult());
+    await Future.wait([first, second]);
+    await service.loadInventory();
+    expect(
+      source.win32Reads,
+      2,
+      reason: 'refresh must read fresh metadata after completion',
+    );
+    expect(source.msixReads, 2);
+  });
   group('WindowsAppInventoryParser', () {
     const parser = WindowsAppInventoryParser();
 
@@ -385,20 +440,28 @@ class _FakeDataSource implements WindowsAppInsightsDataSource {
 }
 
 class _ControlledInventoryDataSource implements WindowsAppInsightsDataSource {
+  int win32Reads = 0;
+  int msixReads = 0;
   final Completer<WindowsRawAppInsightsResult> win32 =
       Completer<WindowsRawAppInsightsResult>();
   final Completer<WindowsRawAppInsightsResult> msix =
       Completer<WindowsRawAppInsightsResult>();
 
   @override
-  Future<WindowsRawAppInsightsResult> readMsixInventory() => msix.future;
+  Future<WindowsRawAppInsightsResult> readMsixInventory() {
+    msixReads++;
+    return msix.future;
+  }
 
   @override
   Future<WindowsRawAppInsightsResult> readUserAssist() async =>
       const WindowsRawAppInsightsResult();
 
   @override
-  Future<WindowsRawAppInsightsResult> readWin32Inventory() => win32.future;
+  Future<WindowsRawAppInsightsResult> readWin32Inventory() {
+    win32Reads++;
+    return win32.future;
+  }
 
   @override
   Future<Map<String, String>> resolveUserAssistTargets(

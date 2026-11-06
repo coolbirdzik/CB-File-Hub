@@ -92,8 +92,23 @@ extension _TabbedFolderListMobileActions on _TabbedFolderListScreenState {
     }
   }
 
-  /// Show the shared create-folder dialog.
+  /// Create and edit a desktop folder inline; prompt on mobile.
   void _showCreateFolderDialog() async {
+    if (isDesktopPlatform) {
+      if (!path.isAbsolute(_currentPath) ||
+          ArchivePathUtils.isArchiveBrowsePath(_currentPath)) {
+        return;
+      }
+      await tab_components.FolderContextMenu.createNewFolder(
+        context: context,
+        currentPath: _currentPath,
+        onCreateFolder: _createNewFolder,
+        folderListBloc: _folderListBloc,
+        inlineRenameController: _inlineRenameController,
+        onAfterFileCreated: _handleCreatedFile,
+      );
+      return;
+    }
     await RouteUtils.showAcrylicDialog(
       context: context,
       builder: (dialogContext) => _MobileCreateFolderDialog(

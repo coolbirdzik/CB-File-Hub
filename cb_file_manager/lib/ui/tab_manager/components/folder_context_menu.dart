@@ -380,8 +380,14 @@ class FolderContextMenu {
               id: 'new_folder',
               label: l10n.newFolder,
               icon: PhosphorIconsLight.folderPlus,
-              onSelected: (_) =>
-                  _showCreateFolderDialog(context, currentPath, onCreateFolder),
+              onSelected: (_) => createNewFolder(
+                context: context,
+                currentPath: currentPath,
+                onCreateFolder: onCreateFolder,
+                folderListBloc: folderListBloc,
+                inlineRenameController: inlineRenameController,
+                onAfterFileCreated: onAfterFileCreated,
+              ),
             ),
             ContextMenuAction(
               id: 'new_file',
@@ -411,8 +417,14 @@ class FolderContextMenu {
         id: 'new_folder',
         label: l10n.newFolder,
         icon: PhosphorIconsLight.folderPlus,
-        onSelected: (_) =>
-            _showCreateFolderDialog(context, currentPath, onCreateFolder),
+        onSelected: (_) => createNewFolder(
+          context: context,
+          currentPath: currentPath,
+          onCreateFolder: onCreateFolder,
+          folderListBloc: folderListBloc,
+          inlineRenameController: inlineRenameController,
+          onAfterFileCreated: onAfterFileCreated,
+        ),
       ),
     ];
 
@@ -522,20 +534,12 @@ class FolderContextMenu {
       return;
     }
 
-    folderListBloc?.add(FolderListRefresh(currentPath));
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (onAfterFileCreated != null) {
-        onAfterFileCreated(createdPath);
-        return;
-      }
-
-      if (inlineRenameController != null && !_isMobilePlatform()) {
-        Future<void>.delayed(const Duration(milliseconds: 100), () {
-          inlineRenameController.startRename(createdPath);
-        });
-      }
-    });
+    if (onAfterFileCreated != null) {
+      onAfterFileCreated(createdPath);
+    } else {
+      folderListBloc?.add(FolderListRefresh(currentPath));
+      inlineRenameController?.startRename(createdPath, commitOnBlur: true);
+    }
   }
 
   static Future<void> _showDesktopNewMenuCustomizationDialog({
@@ -794,14 +798,37 @@ class FolderContextMenu {
 
   static bool _isMobilePlatform() => Platform.isAndroid || Platform.isIOS;
 
-  static Future<void> _showCreateFolderDialog(
-    BuildContext context,
-    String currentPath,
-    Future<void> Function(String) onCreateFolder,
-  ) async {
+  static Future<void> createNewFolder({
+    required BuildContext context,
+    required String currentPath,
+    required Future<void> Function(String) onCreateFolder,
+    FolderListBloc? folderListBloc,
+    InlineRenameController? inlineRenameController,
+    ValueChanged<String>? onAfterFileCreated,
+  }) async {
     if (!context.mounted) return;
 
     final l10n = AppLocalizations.of(context)!;
+    if (!_isMobilePlatform()) {
+      final toast = AppToast.capture(context);
+      try {
+        DirectoryWatcherService.instance.suppressRefreshForPath(currentPath);
+        final createdPath = await DesktopNewFileService.instance.createFolder(
+          currentPath,
+          l10n.newFolder,
+        );
+        if (!context.mounted) return;
+        if (onAfterFileCreated != null) {
+          onAfterFileCreated(createdPath);
+        } else {
+          folderListBloc?.add(FolderListRefresh(currentPath));
+          inlineRenameController?.startRename(createdPath, commitOnBlur: true);
+        }
+      } catch (error) {
+        toast.error(l10n.errorCreatingFolder('$error'));
+      }
+      return;
+    }
     return RouteUtils.showAcrylicDialog(
       context: context,
       builder: (dialogContext) => _CreateFolderDialog(

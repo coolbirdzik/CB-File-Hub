@@ -949,6 +949,16 @@ class EnglishLocalizations implements AppLocalizations {
   String get defaultViewMode => 'Default view mode';
 
   @override
+  String get folderViewModePreference => 'View mode for uncustomized folders';
+  @override
+  String get folderViewModePreferenceDescription =>
+      'For folders without a saved view mode: use Grid for photo/video-only folders, or inherit the parent. Falls back to the default view mode.';
+  @override
+  String get folderViewModeMediaGrid => 'Grid for photos and videos';
+  @override
+  String get folderViewModeInheritParent => 'Follow parent folder';
+
+  @override
   String get defaultViewModeDescription =>
       'Used for folders without their own saved view mode';
 
@@ -2009,6 +2019,11 @@ class EnglishLocalizations implements AppLocalizations {
   String get videoThumbnails => 'Video Thumbnails';
   @override
   String get thumbnailMode => 'Generation Mode';
+  @override
+  String get videoThumbnailViewportOnly => 'Load thumbnails near the viewport';
+  @override
+  String get videoThumbnailViewportOnlyDescription =>
+      'Only generate video thumbnails for visible items and a few nearby items. Turn off to preload the entire list.';
   @override
   String get thumbnailModeFast => 'Fast';
   @override
@@ -4322,7 +4337,7 @@ class EnglishLocalizations implements AppLocalizations {
 
   // Disk Cleaner (CB Agent skill)
   @override
-  String get cbAgentCleanerTitle => 'Disk Cleaner (CB Agent)';
+  String get cbAgentCleanerTitle => 'Cleaner';
   @override
   String get diskCleanerNotAvailable =>
       'Disk Cleaner is available on Windows and macOS';
@@ -5121,7 +5136,11 @@ class EnglishLocalizations implements AppLocalizations {
   String cleanerAppsLoadFailed(String error) =>
       'Could not analyze installed apps: $error';
   @override
-  String get cleanerAppsPartialBanner => 'Results are still updating.';
+  String get cleanerAppsPartialBanner =>
+      'Some app information is unavailable. Refresh to try again.';
+  @override
+  String get cleanerAppsQuickScanHint =>
+      'Loads installed apps without scanning the drive. Sizes use Windows estimates unless Disk usage has already measured them.';
   @override
   String get cleanerAppsSearchHint => 'Search apps';
   @override
@@ -5226,6 +5245,34 @@ class EnglishLocalizations implements AppLocalizations {
       'Could not read this folder: $error';
   @override
   String get cleanerAppsManageInWindows => 'Manage in Windows';
+  @override
+  String get cleanerUninstallApp => 'Uninstall app';
+  @override
+  String get cleanerUninstallConfirm =>
+      'The app’s uninstaller will open. After removal, Cleaner will scan for related folders for you to review.';
+  @override
+  String get cleanerUninstallReview =>
+      'App removed. Select any remaining folders you want to move to the Recycle Bin.';
+  @override
+  String get cleanerUninstallDataWarning =>
+      'These folders can contain settings, accounts and personal data. Review the paths before choosing what to delete.';
+  @override
+  String get cleanerUninstallRunning =>
+      'Waiting for the app’s uninstaller. Complete or cancel it in its window.';
+  @override
+  String get cleanerUninstallScanning => 'Scanning related folders…';
+  @override
+  String get cleanerUninstallNoFiles =>
+      'No related folders remain in the locations scanned.';
+  @override
+  String get cleanerUninstallPartial =>
+      'Some locations could not be read. Results may be incomplete:';
+  @override
+  String get cleanerUninstallFilesChanged =>
+      'The app or its folders have changed. Close this dialog and scan again before deleting.';
+  @override
+  String get cleanerUninstallCleanupFailed =>
+      'Some folders could not be moved to the Recycle Bin. The remaining paths are still listed.';
   @override
   String get cleanerAppsReviewCleanable => 'Review cleanable data';
   @override

@@ -5,9 +5,9 @@ import 'package:flutter/services.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:path/path.dart' as pathlib;
 
-import 'package:cb_file_manager/helpers/media/video_thumbnail_helper.dart';
 import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
 import 'package:cb_file_manager/ui/widgets/thumbnail_loader.dart';
+import 'package:cb_file_manager/ui/widgets/thumbnail_image.dart';
 
 class AlbumImageTile extends StatefulWidget {
   final File file;
@@ -36,46 +36,8 @@ class AlbumImageTile extends StatefulWidget {
 class _AlbumImageTileState extends State<AlbumImageTile> {
   bool _hovering = false;
 
-  // Video thumbnail state — lazy loaded once per tile lifecycle.
-  String? _videoThumbPath;
-  bool _videoThumbRequested = false;
-
   bool get _isImage => FileTypeUtils.isImageFile(widget.file.path);
   bool get _isVideo => FileTypeUtils.isVideoFile(widget.file.path);
-
-  @override
-  void initState() {
-    super.initState();
-    if (_isVideo) _loadVideoThumbnail();
-  }
-
-  Future<void> _loadVideoThumbnail() async {
-    if (_videoThumbRequested) return;
-    _videoThumbRequested = true;
-
-    // Wait until the listing gate is open so we don't compete with file
-    // list loading for I/O / CPU.
-    if (!ThumbnailLoader.isListingReady) {
-      ThumbnailLoader.runAfterReady(() {
-        if (mounted) {
-          _videoThumbRequested = false; // allow retry
-          _loadVideoThumbnail();
-        }
-      });
-      return;
-    }
-
-    try {
-      final path = await VideoThumbnailHelper.getThumbnail(
-        widget.file.path,
-        isPriority: false,
-        forceRegenerate: false,
-      );
-      if (mounted && path != null) {
-        setState(() => _videoThumbPath = path);
-      }
-    } catch (_) {}
-  }
 
   void _handleTap() {
     final keyboard = HardwareKeyboard.instance;
@@ -168,58 +130,31 @@ class _AlbumImageTileState extends State<AlbumImageTile> {
   }
 
   Widget _buildMediaContent(ThemeData theme) {
+    if (!_isImage && !_isVideo) return _fallbackIcon(theme);
     if (_isImage) {
       return LayoutBuilder(
         builder: (context, constraints) {
-          final dpr = MediaQuery.of(context).devicePixelRatio;
-          final cacheWidth = (constraints.maxWidth * dpr)
-              .clamp(96.0, 320.0)
-              .round();
-          return Image.file(
-            widget.file,
-            fit: BoxFit.cover,
-            cacheWidth: cacheWidth,
-            filterQuality: FilterQuality.low,
-            gaplessPlayback: false,
-            errorBuilder: (_, _, _) => _fallbackIcon(theme),
+          final cacheWidth =
+              (constraints.maxWidth * MediaQuery.devicePixelRatioOf(context))
+                  .clamp(96.0, 320.0)
+                  .round();
+          return ThumbnailImage(
+            image: ResizeImage(FileImage(widget.file), width: cacheWidth),
+            width: double.infinity,
+            height: double.infinity,
           );
         },
       );
     }
-    if (_isVideo) {
-      if (_videoThumbPath != null) {
-        return Stack(
-          fit: StackFit.expand,
-          children: [
-            Image.file(
-              File(_videoThumbPath!),
-              fit: BoxFit.cover,
-              filterQuality: FilterQuality.low,
-              errorBuilder: (_, _, _) =>
-                  _fallbackIcon(theme, icon: PhosphorIconsLight.filmSlate),
-            ),
-            // Play icon overlay
-            Center(
-              child: Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: Colors.black54,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Icon(
-                  PhosphorIconsLight.play,
-                  color: Colors.white,
-                  size: 22,
-                ),
-              ),
-            ),
-          ],
-        );
-      }
-      // Thumbnail not yet ready — show video icon placeholder.
-      return _fallbackIcon(theme, icon: PhosphorIconsLight.filmSlate);
-    }
-    return _fallbackIcon(theme);
+    return ThumbnailLoader(
+      key: ValueKey(widget.file.path),
+      filePath: widget.file.path,
+      isImage: _isImage,
+      isVideo: _isVideo,
+      width: double.infinity,
+      height: double.infinity,
+      fit: BoxFit.cover,
+    );
   }
 
   Widget _fallbackIcon(ThemeData theme, {IconData? icon}) {

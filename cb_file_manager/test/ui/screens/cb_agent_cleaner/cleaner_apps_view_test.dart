@@ -26,6 +26,7 @@ void main() {
             version: '4.2',
             source: InstalledAppSource.win32,
             canManage: true,
+            uninstallCommand: 'uninstall.exe',
           ),
           usage: AppUsageEvidence(
             lastOpenedAt: now.subtract(const Duration(days: 220)),
@@ -79,6 +80,7 @@ void main() {
     Locale locale = const Locale('en'),
     void Function(AppStorageEntry)? onOpenFolder,
     void Function(InstalledAppInfo)? onManageApp,
+    void Function(AppStorageProfile)? onUninstallApp,
     void Function(AppStorageProfile)? onReviewCleanable,
     void Function(AppStorageProfile)? onAskAgent,
   }) async {
@@ -97,6 +99,7 @@ void main() {
             cubit: cubit,
             onOpenFolder: onOpenFolder,
             onManageApp: onManageApp,
+            onUninstallApp: onUninstallApp,
             onReviewCleanable: onReviewCleanable,
             onAskAgent: onAskAgent,
           ),
@@ -122,6 +125,7 @@ void main() {
       ..setReport(fixtureReport());
     addTearDown(cubit.close);
     AppStorageProfile? reviewed;
+    AppStorageProfile? uninstalled;
     InstalledAppInfo? managed;
     AppStorageProfile? asked;
     AppStorageEntry? opened;
@@ -132,6 +136,7 @@ void main() {
       onOpenFolder: (entry) => opened = entry,
       onManageApp: (app) => managed = app,
       onReviewCleanable: (profile) => reviewed = profile,
+      onUninstallApp: (profile) => uninstalled = profile,
       onAskAgent: (profile) => asked = profile,
     );
 
@@ -202,6 +207,13 @@ void main() {
       ),
     );
 
+    await tester.ensureVisible(
+      find.byKey(const ValueKey<String>('cleaner-app-uninstall-alpha')),
+    );
+    await tester.tap(
+      find.byKey(const ValueKey<String>('cleaner-app-uninstall-alpha')),
+    );
+    expect(uninstalled?.app.id, 'alpha');
     expect(managed?.id, 'alpha');
     expect(reviewed?.app.id, 'alpha');
     expect(asked?.app.id, 'alpha');

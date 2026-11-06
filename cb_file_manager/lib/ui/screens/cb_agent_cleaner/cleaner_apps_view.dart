@@ -23,6 +23,7 @@ class CleanerAppsView extends StatefulWidget {
   final CleanerAppInsightsCubit cubit;
   final AppStorageEntryAction? onOpenFolder;
   final InstalledAppAction? onManageApp;
+  final AppStorageProfileAction? onUninstallApp;
   final AppStorageProfileAction? onReviewCleanable;
   final AppStorageProfileAction? onAskAgent;
 
@@ -31,6 +32,7 @@ class CleanerAppsView extends StatefulWidget {
     required this.cubit,
     this.onOpenFolder,
     this.onManageApp,
+    this.onUninstallApp,
     this.onReviewCleanable,
     this.onAskAgent,
   });
@@ -166,6 +168,13 @@ class _CleanerAppsViewState extends State<CleanerAppsView> {
         if (report.isPartial || report.warnings.isNotEmpty)
           _PartialReportBanner(message: l10n.cleanerAppsPartialBanner),
         Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+          child: Text(
+            l10n.cleanerAppsQuickScanHint,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ),
+        Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
           child: _SummaryCards(cubit: widget.cubit, state: state),
         ),
@@ -219,6 +228,7 @@ class _CleanerAppsViewState extends State<CleanerAppsView> {
             onViewFiles: _viewAppFiles,
             onOpenFolder: widget.onOpenFolder,
             onManageApp: widget.onManageApp,
+            onUninstallApp: widget.onUninstallApp,
             onReviewCleanable: widget.onReviewCleanable,
             onAskAgent: widget.onAskAgent,
             evaluatedAt: state.evaluatedAt,
@@ -288,6 +298,7 @@ class _CleanerAppsViewState extends State<CleanerAppsView> {
                     onViewFiles: _viewAppFiles,
                     onOpenFolder: widget.onOpenFolder,
                     onManageApp: widget.onManageApp,
+                    onUninstallApp: widget.onUninstallApp,
                     onReviewCleanable: widget.onReviewCleanable,
                     onAskAgent: widget.onAskAgent,
                     evaluatedAt: state.evaluatedAt,
@@ -387,6 +398,15 @@ class _SummaryCards extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final report = state.report!;
+    final footprint = report.apps.fold<int>(
+      0,
+      (sum, profile) => sum + profile.bestKnownSizeBytes,
+    );
+    final includesEstimates = report.apps.any(
+      (profile) =>
+          profile.confirmedSizeBytes == 0 &&
+          (profile.app.estimatedSizeBytes ?? 0) > 0,
+    );
     return Container(
       decoration: CbDecorations.card(context, radius: 12),
       child: Row(
@@ -396,7 +416,8 @@ class _SummaryCards extends StatelessWidget {
               key: const ValueKey<String>('cleaner-apps-summary-footprint'),
               icon: Icons.apps_rounded,
               title: l10n.cleanerAppsTitle,
-              value: FormatUtils.formatFileSize(report.confirmedSizeBytes),
+              value:
+                  '${includesEstimates ? '≈ ' : ''}${FormatUtils.formatFileSize(footprint)}',
             ),
           ),
           const _SummaryDivider(),
@@ -1011,6 +1032,7 @@ class _AppDetailsPanel extends StatelessWidget {
   final _AppFilesAction onViewFiles;
   final AppStorageEntryAction? onOpenFolder;
   final InstalledAppAction? onManageApp;
+  final AppStorageProfileAction? onUninstallApp;
   final AppStorageProfileAction? onReviewCleanable;
   final AppStorageProfileAction? onAskAgent;
   final DateTime evaluatedAt;
@@ -1022,6 +1044,7 @@ class _AppDetailsPanel extends StatelessWidget {
     required this.onViewFiles,
     required this.onOpenFolder,
     required this.onManageApp,
+    required this.onUninstallApp,
     required this.onReviewCleanable,
     required this.onAskAgent,
     required this.evaluatedAt,
@@ -1059,6 +1082,7 @@ class _AppDetailsPanel extends StatelessWidget {
             profile: current,
             onViewFiles: () => onViewFiles(current, null),
             onManageApp: onManageApp,
+            onUninstallApp: onUninstallApp,
             onReviewCleanable: onReviewCleanable,
             onAskAgent: onAskAgent,
           ),
@@ -1248,6 +1272,7 @@ class _DetailsActions extends StatelessWidget {
   final AppStorageProfile profile;
   final VoidCallback onViewFiles;
   final InstalledAppAction? onManageApp;
+  final AppStorageProfileAction? onUninstallApp;
   final AppStorageProfileAction? onReviewCleanable;
   final AppStorageProfileAction? onAskAgent;
 
@@ -1255,6 +1280,7 @@ class _DetailsActions extends StatelessWidget {
     required this.profile,
     required this.onViewFiles,
     required this.onManageApp,
+    required this.onUninstallApp,
     required this.onReviewCleanable,
     required this.onAskAgent,
   });
@@ -1267,6 +1293,14 @@ class _DetailsActions extends StatelessWidget {
       spacing: 8,
       runSpacing: 8,
       children: [
+        if (onUninstallApp != null && profile.app.canManage)
+          FilledButton.icon(
+            style: FilledButton.styleFrom(shape: buttonShape),
+            key: ValueKey<String>('cleaner-app-uninstall-${profile.app.id}'),
+            onPressed: () => onUninstallApp!(profile),
+            icon: const Icon(Icons.delete_outline, size: 17),
+            label: Text(l10n.cleanerUninstallApp),
+          ),
         if (profile.entries.isNotEmpty)
           OutlinedButton.icon(
             style: OutlinedButton.styleFrom(shape: buttonShape),

@@ -137,12 +137,9 @@ class FolderContentRouter {
             context: context,
             enableBlur: isDesktopPlatform,
             child: shouldShowSkeleton
-                ? SkeletonHelper.responsive(
-                    isGridView: state.viewMode == ViewMode.grid,
-                    isAlbum: false,
-                    crossAxisCount: state.gridZoomLevel,
-                    itemCount: 12,
-                    wrapInCardOnDesktop: true,
+                ? SkeletonHelper.files(
+                    viewMode: state.viewMode,
+                    gridZoomLevel: state.gridZoomLevel,
                   )
                 : mainContentBuilder(
                     context,

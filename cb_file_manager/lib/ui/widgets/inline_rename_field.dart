@@ -7,9 +7,8 @@ import '../controllers/inline_rename_controller.dart';
 /// The in-place rename field for a file or folder row.
 ///
 /// Thin adapter over [CbInlineRenameField]: it binds the controller and focus
-/// node owned by [InlineRenameController], and keeps the "blur cancels the
-/// rename" policy that the list and grid views rely on — clicking away is how
-/// users back out, and committing on blur would rename files by accident.
+/// node owned by [InlineRenameController]. New items commit on blur, while
+/// ordinary renames retain the existing cancel-on-blur behavior.
 class InlineRenameField extends StatelessWidget {
   final InlineRenameController controller;
   final Future<void> Function() onCommit;
@@ -38,6 +37,15 @@ class InlineRenameField extends StatelessWidget {
     if (textController == null || focusNode == null) {
       return const SizedBox.shrink();
     }
+    // The previous item's focus can leave while the next editor is mounting.
+    // Its callbacks must never commit or cancel the new session.
+    void commit() {
+      if (identical(controller.textController, textController)) onCommit();
+    }
+
+    void cancel() {
+      if (identical(controller.textController, textController)) onCancel();
+    }
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -56,9 +64,9 @@ class InlineRenameField extends StatelessWidget {
           child: CbInlineRenameField(
             controller: textController,
             focusNode: focusNode,
-            onCommit: onCommit,
-            onCancel: onCancel,
-            onBlur: onCancel,
+            onCommit: commit,
+            onCancel: cancel,
+            onBlur: controller.commitOnBlur ? commit : cancel,
             lockedSuffix: controller.lockedSuffix,
             textStyle: textStyle,
             textAlign: textAlign,

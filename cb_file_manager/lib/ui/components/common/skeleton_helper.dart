@@ -1,12 +1,29 @@
 import 'package:flutter/material.dart';
 import 'skeleton.dart';
+import 'file_loading_skeleton.dart';
+import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 
 /// Unified helper class for skeleton loading across all platforms
 /// Provides consistent skeleton UI for files, albums, videos, and thumbnails
 /// Automatically adapts to mobile/desktop environments
 class SkeletonHelper {
-  /// Create a file list skeleton with album design
-  /// Automatically wraps in Card on desktop for elevated appearance
+  static Widget files({
+    required ViewMode viewMode,
+    int gridZoomLevel = 4,
+    int itemCount = 12,
+    bool layoutKnown = true,
+    bool singleColumn = false,
+    bool drives = false,
+  }) => FileLoadingSkeleton(
+    viewMode: viewMode,
+    gridZoomLevel: gridZoomLevel,
+    itemCount: itemCount,
+    layoutKnown: layoutKnown,
+    singleColumn: singleColumn,
+    drives: drives,
+  );
+
+  /// File rows follow the platform's List layout and stay flat.
   ///
   /// Parameters:
   /// - [itemCount]: Number of skeleton items to show (default: 12)
@@ -15,26 +32,19 @@ class SkeletonHelper {
     int itemCount = 12,
     bool wrapInCardOnDesktop = true,
   }) {
-    return Skeleton(
-      type: SkeletonType.albumList,
-      itemCount: itemCount,
-      isAlbum: true,
-      wrapInCardOnDesktop: wrapInCardOnDesktop,
-    );
+    return files(viewMode: ViewMode.list, itemCount: itemCount);
   }
 
-  /// Create a file grid skeleton with album design
-  /// Consistent across mobile and desktop platforms
+  /// File tiles use the same zoom geometry as the loaded grid.
   ///
   /// Parameters:
   /// - [crossAxisCount]: Number of columns in grid (default: 3)
   /// - [itemCount]: Number of skeleton items to show (default: 12)
   static Widget fileGrid({int crossAxisCount = 3, int itemCount = 12}) {
-    return Skeleton(
-      type: SkeletonType.albumGrid,
-      crossAxisCount: crossAxisCount,
+    return files(
+      viewMode: ViewMode.grid,
+      gridZoomLevel: crossAxisCount,
       itemCount: itemCount,
-      isAlbum: true,
     );
   }
 

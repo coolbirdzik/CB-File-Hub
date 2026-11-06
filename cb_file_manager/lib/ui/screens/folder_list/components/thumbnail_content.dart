@@ -38,7 +38,7 @@ class ThumbnailContent extends StatelessWidget {
                 fit: BoxFit.contain,
                 isPriority: true,
                 borderRadius: BorderRadius.circular(16.0),
-                showLoadingIndicator: true, // Re-enable skeleton loading
+                showLoadingIndicator: true,
                 fallbackBuilder: () => Icon(
                   icon,
                   size: iconSize,

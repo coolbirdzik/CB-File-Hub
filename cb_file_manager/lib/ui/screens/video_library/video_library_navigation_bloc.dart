@@ -376,6 +376,7 @@ class VideoLibraryNavigationBloc
         .map((f) => f.path)
         .toList();
     if (videoPaths.isEmpty) return;
+    VideoThumbnailHelper.updateDisplayIndexMap(videoPaths);
     VideoThumbnailHelper.setCurrentDirectory(dirPath);
     // Prefer a smaller, UI-friendly preload strategy on first load.
     // Generating thumbnails for every item immediately can stall the event loop

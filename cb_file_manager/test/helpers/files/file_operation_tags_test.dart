@@ -7,6 +7,7 @@ import 'package:cb_file_manager/helpers/tags/tag_manager.dart';
 import 'package:cb_file_manager/models/database/database_manager.dart';
 import 'package:cb_file_manager/models/database/sqlite_database_provider.dart';
 import 'package:cb_file_manager/services/file_drag_drop/file_drag_drop_move_service.dart';
+import 'package:cb_file_manager/services/windowing/windows_file_clipboard.dart';
 import 'package:cb_file_manager/ui/controllers/operation_progress_controller.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/bloc/file_navigation_bloc.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/bloc/file_navigation_event.dart';
@@ -21,6 +22,32 @@ class _RecordingNavigationBloc extends FileNavigationBloc {
   // Transfers are real; suppress unrelated directory scans in this unit test.
   @override
   void add(FileNavigationEvent event) {}
+}
+
+class _ExplorerClipboard extends WindowsFileClipboard {
+  WindowsFileClipboardSnapshot snapshot = const WindowsFileClipboardSnapshot(
+    sequence: 1,
+    paths: [],
+  );
+  Future<WindowsFileClipboardSnapshot?> Function()? onRead;
+  int reads = 0;
+
+  @override
+  int get sequenceNumber => snapshot.sequence;
+
+  @override
+  Future<WindowsFileClipboardSnapshot?> read() async {
+    reads++;
+    return onRead == null ? snapshot : onRead!();
+  }
+
+  void copy(List<String> paths, {bool cut = false}) {
+    snapshot = WindowsFileClipboardSnapshot(
+      sequence: snapshot.sequence + 1,
+      paths: paths,
+      isCut: cut,
+    );
+  }
 }
 
 void main() {
@@ -60,6 +87,183 @@ void main() {
     expect(await TagManager.setTags(path, tags), isTrue);
     return file;
   }
+
+  test(
+    'Explorer copy pastes Unicode files and folders with an empty app clipboard',
+    () async {
+      final source = await taggedFile(p.join(fixture.path, 'ảnh Việt.txt'), [
+        'photo',
+      ]);
+      final folder = await Directory(p.join(fixture.path, 'Thư mục')).create();
+      await File(
+        p.join(folder.path, 'child.txt'),
+      ).writeAsString('folder content');
+      final clipboard = _ExplorerClipboard()..copy([source.path, folder.path]);
+      final ops = FileOperations.forTesting(clipboard);
+      expect(ops.hasClipboardItem, isFalse);
+      final destination = await Directory(
+        p.join(fixture.path, 'target'),
+      ).create();
+
+      await ops.pasteFromClipboard(destination.path);
+
+      expect(
+        await File(p.join(destination.path, 'ảnh Việt.txt')).readAsString(),
+        'tagged content',
+      );
+      expect(
+        await File(
+          p.join(destination.path, 'Thư mục', 'child.txt'),
+        ).readAsString(),
+        'folder content',
+      );
+      expect(await source.exists(), isTrue);
+      expect(await folder.exists(), isTrue);
+      expect(ops.clipboardItems.last, isA<Directory>());
+      expect(
+        await TagManager.getTags(p.join(destination.path, 'ảnh Việt.txt')),
+        ['photo'],
+      );
+      final another = await Directory(p.join(fixture.path, 'another')).create();
+      await ops.pasteFromClipboard(another.path);
+      expect(await File(p.join(another.path, 'ảnh Việt.txt')).exists(), isTrue);
+      expect(clipboard.reads, 1);
+    },
+  );
+
+  test('a newer Explorer copy replaces a stale app selection', () async {
+    final clipboard = _ExplorerClipboard();
+    final ops = FileOperations.forTesting(clipboard);
+    ops.cutToClipboard(File('old.txt'));
+    clipboard.copy([p.join(fixture.path, 'new.txt')]);
+
+    await ops.syncSystemClipboard();
+
+    expect(ops.clipboardItems.single.path, p.join(fixture.path, 'new.txt'));
+    expect(ops.isCutOperation, isFalse);
+  });
+
+  test('an app copy wins over an unchanged Explorer clipboard', () async {
+    final clipboard = _ExplorerClipboard()..copy(['explorer.txt']);
+    final ops = FileOperations.forTesting(clipboard);
+    ops.copyToClipboard(File('app.txt'));
+
+    await ops.syncSystemClipboard();
+
+    expect(ops.clipboardItems.single.path, 'app.txt');
+    expect(clipboard.reads, 0);
+  });
+
+  test(
+    'replacing Explorer files with text clears the stale file selection',
+    () async {
+      final clipboard = _ExplorerClipboard()..copy(['explorer.txt']);
+      final ops = FileOperations.forTesting(clipboard);
+      await ops.syncSystemClipboard();
+      clipboard.copy([]);
+
+      await ops.syncSystemClipboard();
+
+      expect(ops.hasClipboardItem, isFalse);
+    },
+  );
+
+  test('an app copy during the Windows read is preserved', () async {
+    final clipboard = _ExplorerClipboard()..copy(['explorer.txt']);
+    final ops = FileOperations.forTesting(clipboard);
+    clipboard.onRead = () async {
+      ops.copyToClipboard(File('new-app.txt'));
+      return clipboard.snapshot;
+    };
+
+    await ops.syncSystemClipboard();
+
+    expect(ops.clipboardItems.single.path, 'new-app.txt');
+  });
+
+  test(
+    'a Windows clipboard change during the read retries the newer selection',
+    () async {
+      final clipboard = _ExplorerClipboard()..copy(['old.txt']);
+      final ops = FileOperations.forTesting(clipboard);
+      clipboard.onRead = () async {
+        final old = clipboard.snapshot;
+        clipboard.copy(['new.txt']);
+        clipboard.onRead = null;
+        return old;
+      };
+
+      await ops.syncSystemClipboard();
+
+      expect(ops.clipboardItems.single.path, 'new.txt');
+      expect(clipboard.reads, 2);
+    },
+  );
+
+  test(
+    'a failed Windows clipboard read does not paste the stale app selection',
+    () async {
+      final clipboard = _ExplorerClipboard();
+      final ops = FileOperations.forTesting(clipboard);
+      ops.copyToClipboard(File('old.txt'));
+      clipboard.copy(['new.txt']);
+      clipboard.onRead = () async => throw const OSError('Clipboard busy', 5);
+
+      await expectLater(
+        ops.pasteFromClipboard(fixture.path),
+        throwsA(isA<OSError>()),
+      );
+    },
+  );
+
+  test('Explorer cut moves once and accepts a later copy', () async {
+    final source = await taggedFile(p.join(fixture.path, 'cut.txt'), ['move']);
+    final next = await taggedFile(p.join(fixture.path, 'next.txt'), ['next']);
+    final destination = await Directory(
+      p.join(fixture.path, 'target'),
+    ).create();
+    final clipboard = _ExplorerClipboard()..copy([source.path], cut: true);
+    final ops = FileOperations.forTesting(clipboard);
+
+    await ops.pasteFromClipboard(destination.path);
+    expect(await source.exists(), isFalse);
+    expect(await File(p.join(destination.path, 'cut.txt')).exists(), isTrue);
+    await ops.syncSystemClipboard();
+    expect(ops.hasClipboardItem, isFalse);
+    expect(clipboard.reads, 1);
+
+    clipboard.copy([next.path]);
+    await ops.syncSystemClipboard();
+    expect(ops.clipboardItems.single.path, next.path);
+    expect(ops.isCutOperation, isFalse);
+  });
+
+  test(
+    'Explorer copy during a cut transfer is available on the next paste',
+    () async {
+      final source = await taggedFile(p.join(fixture.path, 'cut.txt'), [
+        'move',
+      ]);
+      final next = await taggedFile(p.join(fixture.path, 'next.txt'), ['next']);
+      final destination = await Directory(
+        p.join(fixture.path, 'target'),
+      ).create();
+      final clipboard = _ExplorerClipboard()..copy([source.path], cut: true);
+      final ops = FileOperations.forTesting(clipboard);
+
+      await ops.pasteFromClipboard(
+        destination.path,
+        onProgress: (completed, _) {
+          if (completed == 0) clipboard.copy([next.path]);
+        },
+      );
+      await ops.syncSystemClipboard();
+
+      expect(await source.exists(), isFalse);
+      expect(ops.clipboardItems.single.path, next.path);
+      expect(ops.isCutOperation, isFalse);
+    },
+  );
 
   for (final move in [false, true]) {
     test(

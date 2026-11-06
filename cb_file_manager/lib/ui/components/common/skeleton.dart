@@ -4,6 +4,8 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'file_loading_skeleton.dart';
+import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 
 /// Unified skeleton component for file, album, and media loading across all platforms
 /// Automatically adapts to mobile/desktop with consistent design
@@ -139,6 +141,12 @@ class _SkeletonState extends State<Skeleton>
   }
 
   Widget _buildListSkeleton(BuildContext context) {
+    if (!widget.isAlbum) {
+      return FileLoadingSkeleton(
+        viewMode: ViewMode.list,
+        itemCount: widget.itemCount ?? 12,
+      );
+    }
     return ListView.builder(
       physics: const ClampingScrollPhysics(),
       padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -153,6 +161,13 @@ class _SkeletonState extends State<Skeleton>
   }
 
   Widget _buildGridSkeleton(BuildContext context) {
+    if (!widget.isAlbum) {
+      return FileLoadingSkeleton(
+        viewMode: ViewMode.grid,
+        gridZoomLevel: widget.crossAxisCount ?? 3,
+        itemCount: widget.itemCount ?? 12,
+      );
+    }
     final int requestedCrossAxisCount = widget.crossAxisCount ?? 3;
     const double gridPadding = 8.0;
     const double spacing = 8.0;

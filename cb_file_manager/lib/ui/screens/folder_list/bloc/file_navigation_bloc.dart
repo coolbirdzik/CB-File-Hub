@@ -204,9 +204,11 @@ class FileNavigationBloc
       return;
     }
     _inFlightScans.add(event.path);
+    final releaseListing = ThumbnailLoader.pauseListing(folder: event.path);
     try {
-      await _performLoad(event, emit, totalSw);
+      await _performLoad(event, emit, totalSw, releaseListing);
     } finally {
+      releaseListing();
       _inFlightScans.remove(event.path);
     }
   }
@@ -215,6 +217,7 @@ class FileNavigationBloc
     FileNavigationLoad event,
     Emitter<FileNavigationState> emit,
     Stopwatch totalSw,
+    void Function() releaseListing,
   ) async {
     final display = applyFolderDisplay
         ? FolderDisplayPreferences.instance.cached(event.path) ??
@@ -246,20 +249,16 @@ class FileNavigationBloc
       ),
     );
 
-    // Gate: pause thumbnail generation while we scan/sort the file list.
-    // Thumbnails will start AFTER the listing is emitted to the UI.
-    ThumbnailLoader.setListingReady(false);
-
     if (event.path.isEmpty && Platform.isWindows) {
       emit(state.copyWith(isLoading: false, folders: [], files: []));
-      ThumbnailLoader.setListingReady(true);
+      releaseListing();
       AppLogger.perf('Empty path total=${totalSw.elapsedMilliseconds}ms');
       return;
     }
 
     if (_isDrivesPath(event.path)) {
       emit(state.copyWith(isLoading: false, folders: [], files: []));
-      ThumbnailLoader.setListingReady(true);
+      releaseListing();
       AppLogger.perf('Drives path total=${totalSw.elapsedMilliseconds}ms');
       return;
     }
@@ -328,9 +327,18 @@ class FileNavigationBloc
             fileStatsCache: cacheResult.stats,
           );
           if (isClosed || state.currentPath.path != event.path) return;
+          final listingDisplay = applyFolderDisplay
+              ? await FolderDisplayPreferences.instance.resolve(
+                  event.path,
+                  files: sortedFiles,
+                  folders: sortedFolders,
+                )
+              : null;
+          if (isClosed || state.currentPath.path != event.path) return;
           emit(
             state.copyWith(
               isLoading: false,
+              viewMode: listingDisplay?.viewMode,
               folders: sortedFolders,
               files: sortedFiles,
               fileStatsCache: Map.from(cacheResult.stats),
@@ -343,8 +351,7 @@ class FileNavigationBloc
           ThumbnailLoader.updateDisplayIndexMap(
             sortedFiles.map((f) => f.path).toList(),
           );
-          ThumbnailLoader.clearFileExistsCache();
-          ThumbnailLoader.setListingReady(true);
+          releaseListing();
           await _directoryWatcher.startWatching(event.path);
           AppLogger.perf(
             'Complete (cached) total=${totalSw.elapsedMilliseconds}ms',
@@ -369,9 +376,19 @@ class FileNavigationBloc
       final sortedFolders = folders; // already sorted in isolate
       final sortedFiles = files; // already sorted in isolate
 
+      final listingDisplay = applyFolderDisplay
+          ? await FolderDisplayPreferences.instance.resolve(
+              event.path,
+              files: sortedFiles,
+              folders: sortedFolders,
+            )
+          : null;
+      if (isClosed || state.currentPath.path != event.path) return;
+
       emit(
         state.copyWith(
           isLoading: false,
+          viewMode: listingDisplay?.viewMode,
           folders: sortedFolders,
           files: sortedFiles,
           sortOption: sortOption,
@@ -384,11 +401,8 @@ class FileNavigationBloc
       ThumbnailLoader.updateDisplayIndexMap(
         sortedFiles.map((f) => f.path).toList(),
       );
-      // Clear file-exists cache so stale entries from previous folders don't
-      // persist to the new directory.
-      ThumbnailLoader.clearFileExistsCache();
       // Open the gate: file list is ready, thumbnails can start generating.
-      ThumbnailLoader.setListingReady(true);
+      releaseListing();
 
       AppLogger.perf('UI ready total=${totalSw.elapsedMilliseconds}ms');
 
@@ -430,7 +444,7 @@ class FileNavigationBloc
 
       AppLogger.perf('Complete total=${totalSw.elapsedMilliseconds}ms');
     } catch (e) {
-      ThumbnailLoader.setListingReady(true);
+      releaseListing();
       _emitPermissionError(emit, e, event.path);
     }
   }
@@ -501,9 +515,19 @@ class FileNavigationBloc
       final sortedFolders = scanResult.folderPaths.map(Directory.new).toList();
       final sortedFiles = scanResult.filePaths.map(File.new).toList();
 
+      final listingDisplay = applyFolderDisplay
+          ? await FolderDisplayPreferences.instance.resolve(
+              event.path,
+              files: sortedFiles,
+              folders: sortedFolders,
+            )
+          : null;
+      if (isClosed || state.currentPath.path != event.path) return;
+
       emit(
         state.copyWith(
           isRefreshing: false,
+          viewMode: listingDisplay?.viewMode,
           folders: sortedFolders,
           files: sortedFiles,
           currentPath: Directory(event.path),

@@ -13,6 +13,7 @@ import 'package:cb_file_manager/ui/screens/folder_list/folder_list_event.dart';
 /// and provides methods for starting, committing, and cancelling renames.
 class InlineRenameController extends ChangeNotifier {
   bool allowFileExtensionRename = false;
+  bool commitOnBlur = false;
 
   /// The path of the entity currently being renamed, or null if none.
   String? _renamingPath;
@@ -57,6 +58,7 @@ class InlineRenameController extends ChangeNotifier {
     String entityPath, {
     VoidCallback? onCancelled,
     VoidCallback? onCommitted,
+    bool commitOnBlur = false,
   }) {
     // Cancel any existing rename first
     if (_renamingPath != null) {
@@ -66,6 +68,7 @@ class InlineRenameController extends ChangeNotifier {
     _renamingPath = entityPath;
     _onCancelled = onCancelled;
     _onCommitted = onCommitted;
+    this.commitOnBlur = commitOnBlur;
 
     // Get basename for the text field
     final isFile =
@@ -155,30 +158,29 @@ class InlineRenameController extends ChangeNotifier {
 
   /// Cancel the current rename operation.
   void cancelRename() {
+    if (!isRenaming) return;
     final callback = _onCancelled;
-
-    // Schedule cleanup for next frame to avoid disposing FocusNode
-    // while it's notifying listeners (which causes crash)
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _cleanup();
-    });
-
-    // But clear the renaming path immediately so UI updates
-    _renamingPath = null;
-    _lockedSuffix = null;
+    _cleanup();
     notifyListeners();
     callback?.call();
   }
 
   void _cleanup() {
-    _textController?.dispose();
+    final oldTextController = _textController;
+    final oldFocusNode = _focusNode;
     _textController = null;
-    _focusNode?.dispose();
     _focusNode = null;
     _renamingPath = null;
     _lockedSuffix = null;
     _onCancelled = null;
     _onCommitted = null;
+    commitOnBlur = false;
+    // Retire this session only. A new item may enter rename before the next
+    // frame, and blur may be running inside the old focus node's listeners.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      oldTextController?.dispose();
+      oldFocusNode?.dispose();
+    });
   }
 
   @override

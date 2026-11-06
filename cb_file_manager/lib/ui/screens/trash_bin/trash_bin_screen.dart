@@ -1432,12 +1432,9 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
   }
 
   Widget _buildSkeletonLoader() {
-    return SkeletonHelper.responsive(
-      isGridView: _viewMode == ViewMode.grid,
-      isAlbum: false,
-      crossAxisCount: _gridZoomLevel,
-      itemCount: 12,
-      wrapInCardOnDesktop: true,
+    return SkeletonHelper.files(
+      viewMode: _viewMode,
+      gridZoomLevel: _gridZoomLevel,
     );
   }
 

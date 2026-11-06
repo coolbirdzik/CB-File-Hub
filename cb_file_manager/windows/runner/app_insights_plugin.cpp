@@ -535,16 +535,28 @@ AppInsightsPlugin::~AppInsightsPlugin() = default;
 void AppInsightsPlugin::HandleMethodCall(
     const flutter::MethodCall<EncodableValue>& method_call,
     std::unique_ptr<flutter::MethodResult<EncodableValue>> result) {
-  if (method_call.method_name() == "readWin32UninstallEntries") {
-    result->Success(ReadWin32UninstallEntries());
-    return;
-  }
-  if (method_call.method_name() == "readUserAssist") {
-    result->Success(ReadUserAssist());
-    return;
-  }
-  if (method_call.method_name() == "resolveUserAssistTargets") {
-    result->Success(ResolveUserAssistTargets(method_call.arguments()));
+  const auto method = method_call.method_name();
+  if (method == "readWin32UninstallEntries" || method == "readUserAssist" ||
+      method == "resolveUserAssistTargets") {
+    // Registry and shell shortcut reads may block. Never run them on the
+    // Windows platform thread, which must keep pumping the app's window.
+    const EncodableValue arguments = method_call.arguments() == nullptr
+                                        ? EncodableValue()
+                                        : *method_call.arguments();
+    std::thread([method, arguments, thread_result = std::move(result)]() {
+      try {
+        if (method == "readWin32UninstallEntries") {
+          thread_result->Success(ReadWin32UninstallEntries());
+        } else if (method == "readUserAssist") {
+          thread_result->Success(ReadUserAssist());
+        } else {
+          thread_result->Success(ResolveUserAssistTargets(&arguments));
+        }
+      } catch (...) {
+        thread_result->Error("APP_INSIGHTS_READ_FAILED",
+                             "Windows app metadata could not be read.");
+      }
+    }).detach();
     return;
   }
   if (method_call.method_name() == "readMsixPackages") {

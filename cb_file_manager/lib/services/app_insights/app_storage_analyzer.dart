@@ -16,6 +16,65 @@ class AppStorageAnalyzer {
 
   const AppStorageAnalyzer();
 
+  /// Lists registry/package metadata immediately, without walking the disk.
+  /// Locations are browseable, but no unmeasured data is marked cleanable.
+  AppStorageReport inventoryReport({
+    required String drivePath,
+    required InstalledAppInventoryResult inventory,
+    Map<String, String>? environment,
+    Map<String, AppUsageEvidence> usageByAppId = const {},
+    DateTime? generatedAt,
+  }) {
+    final env = _normalizedEnvironment(environment ?? Platform.environment);
+    final drive = normalizeWindowsPath(drivePath);
+    final profiles = <AppStorageProfile>[];
+    for (final app in inventory.apps) {
+      final install = _expandAndNormalize(app.installLocation, env);
+      if (install != null && !isSameOrDescendant(install, drive)) continue;
+      if (install == null &&
+          env['SYSTEMDRIVE'] != null &&
+          !isSameOrDescendant(drive, env['SYSTEMDRIVE']!)) {
+        continue;
+      }
+      final local = env['LOCALAPPDATA'];
+      final family = app.packageFamilyName;
+      final paths = <(String, AppStorageKind)>[
+        if (install != null) (install, AppStorageKind.install),
+        if (app.source == InstalledAppSource.msix &&
+            local != null &&
+            family != null &&
+            family.isNotEmpty &&
+            !family.contains(RegExp(r'[\\/]')) &&
+            isSameOrDescendant('$local\\Packages\\$family', drive))
+          ('$local\\Packages\\$family', AppStorageKind.packageData),
+      ];
+      profiles.add(
+        AppStorageProfile(
+          app: app,
+          usage: usageByAppId[app.id] ?? const AppUsageEvidence(),
+          entries: [
+            for (final (path, kind) in paths)
+              AppStorageEntry(
+                path: path,
+                kind: kind,
+                sizeBytes: 0,
+                measurementQuality: MeasurementQuality.unknown,
+                attributionConfidence: AttributionConfidence.confirmed,
+              ),
+          ],
+          warnings: app.warnings,
+        ),
+      );
+    }
+    return AppStorageReport(
+      drivePath: drivePath,
+      apps: profiles,
+      generatedAt: generatedAt ?? DateTime.now(),
+      warnings: inventory.warnings,
+      isPartial: inventory.isPartial,
+    );
+  }
+
   AppStorageReport analyze({
     required DiskTreeNode root,
     required FullDiskScanResult scanResult,

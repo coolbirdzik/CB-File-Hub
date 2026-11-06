@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/ui/components/common/skeleton_helper.dart';
 import 'dart:io';
 import 'file_drag_drop_item.dart';
 import 'file_tags_tooltip.dart';
@@ -321,9 +322,12 @@ class _MillerColumnsViewState extends State<MillerColumnsView> {
 
     // Loading: show skeleton rows while we list the directory.
     if (column.isLoading) {
-      return const SizedBox(
+      return SizedBox(
         width: MillerColumnsView.columnWidth,
-        child: _MillerLoadingSkeleton(),
+        child: SkeletonHelper.files(
+          viewMode: ViewMode.columns,
+          singleColumn: true,
+        ),
       );
     }
 
@@ -850,74 +854,6 @@ class _MillerFileRowState extends State<_MillerFileRow> {
           ),
         );
       },
-    );
-  }
-}
-
-/// Loading skeleton shown while a Miller column is fetching directory contents.
-///
-/// Renders a top progress bar plus shimmering placeholder rows so the column
-/// never looks like an "Empty folder" while the listing is in flight.
-class _MillerLoadingSkeleton extends StatelessWidget {
-  const _MillerLoadingSkeleton();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final Color baseColor = theme.colorScheme.onSurface.withValues(alpha: 0.06);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        SizedBox(
-          height: 2,
-          child: LinearProgressIndicator(
-            backgroundColor: theme.colorScheme.surfaceContainerHighest
-                .withValues(alpha: 0.4),
-            valueColor: AlwaysStoppedAnimation<Color>(
-              theme.colorScheme.primary,
-            ),
-          ),
-        ),
-        Expanded(
-          child: ListView.builder(
-            physics: const NeverScrollableScrollPhysics(),
-            padding: const EdgeInsets.symmetric(vertical: 4.0),
-            itemCount: 12,
-            itemBuilder: (context, index) {
-              // Vary the name-block width so the placeholder feels organic.
-              final double nameWidth = 80.0 + ((index * 23) % 100);
-              return Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10.0,
-                  vertical: 6.0,
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 20,
-                      height: 20,
-                      decoration: BoxDecoration(
-                        color: baseColor,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Container(
-                      width: nameWidth,
-                      height: 12,
-                      decoration: BoxDecoration(
-                        color: baseColor,
-                        borderRadius: BorderRadius.circular(3),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-        ),
-      ],
     );
   }
 }

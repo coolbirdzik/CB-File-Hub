@@ -369,21 +369,47 @@ class _TagManagementHelper {
 class FileBrowserHelper {
   /// Controller for starting inline rename after file creation.
   /// Set by TabbedFolderListScreen when it initializes.
-  static InlineRenameController? _inlineRenameController;
-  static ValueChanged<String>? _afterFileCreated;
+  static final _inlineRenameControllers = <String, InlineRenameController>{};
+  static final _afterFileCreated = <String, ValueChanged<String>>{};
+  static final _createFolder = <String, VoidCallback>{};
 
   /// Sets the controller to use for inline rename.
-  static void setInlineRenameController(InlineRenameController? controller) {
-    _inlineRenameController = controller;
+  static void setInlineRenameController(
+    InlineRenameController? controller, {
+    required String tabId,
+  }) {
+    if (controller == null) {
+      _inlineRenameControllers.remove(tabId);
+    } else {
+      _inlineRenameControllers[tabId] = controller;
+    }
   }
 
-  static void setAfterFileCreatedCallback(ValueChanged<String>? callback) {
-    _afterFileCreated = callback;
+  static void setAfterFileCreatedCallback(
+    ValueChanged<String>? callback, {
+    required String tabId,
+  }) {
+    if (callback == null) {
+      _afterFileCreated.remove(tabId);
+    } else {
+      _afterFileCreated[tabId] = callback;
+    }
+  }
+
+  static void setCreateFolderCallback(
+    VoidCallback? callback, {
+    required String tabId,
+  }) {
+    if (callback == null) {
+      _createFolder.remove(tabId);
+    } else {
+      _createFolder[tabId] = callback;
+    }
   }
 
   static void createNewFolder(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    AppToast.info(context, l10n.createNewFolder);
+    final tabId = context.read<TabManagerBloc>().state.activeTab?.id;
+    _createFolder[tabId]?.call();
   }
 
   static void createNewFile(BuildContext context) {
@@ -402,6 +428,7 @@ class FileBrowserHelper {
     }
 
     final currentPath = tabManager?.state.activeTab?.path ?? '';
+    final tabId = tabManager?.state.activeTab?.id;
 
     // Skip virtual/system tabs
     if (currentPath.isEmpty || currentPath.startsWith('#')) {
@@ -413,9 +440,9 @@ class FileBrowserHelper {
     await CreateFileDialog.show(
       context,
       directoryPath: currentPath,
-      onAfterFileCreated: _afterFileCreated,
-      inlineRenameController: _afterFileCreated == null
-          ? _inlineRenameController
+      onAfterFileCreated: _afterFileCreated[tabId],
+      inlineRenameController: _afterFileCreated[tabId] == null
+          ? _inlineRenameControllers[tabId]
           : null,
     );
   }

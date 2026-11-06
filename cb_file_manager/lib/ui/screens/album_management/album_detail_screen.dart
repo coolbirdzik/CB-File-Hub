@@ -477,18 +477,16 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
     });
   }
 
-  /// The gate is app-wide, so whoever closes it must reopen it on every exit,
-  /// including when this screen is disposed mid-load.
-  bool _holdsListingGate = false;
+  VoidCallback? _releaseListingGate;
+  bool get _holdsListingGate => _releaseListingGate != null;
 
   void _closeListingGate() {
-    _holdsListingGate = true;
-    ThumbnailLoader.setListingReady(false);
+    _releaseListingGate ??= ThumbnailLoader.pauseListing();
   }
 
   void _openListingGate() {
-    _holdsListingGate = false;
-    ThumbnailLoader.setListingReady(true);
+    _releaseListingGate?.call();
+    _releaseListingGate = null;
   }
 
   Future<void> _loadAlbumFiles({bool initial = false}) async {

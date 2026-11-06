@@ -35,26 +35,24 @@ import 'drag_selection_region.dart';
 
 /// Static factory class for building file list views in different modes
 class FileListViewBuilder {
-  static const double _gridSpacing = 8.0;
-  static const double _gridAspectRatio = 0.8;
-  static const double _gridReferenceWidth = 960.0;
+  static const double _gridSpacing = GridZoomConstraints.fileGridSpacing;
+  static const double _gridAspectRatio =
+      GridZoomConstraints.fileGridAspectRatio;
+  static const double _gridReferenceWidth =
+      GridZoomConstraints.fileGridReferenceWidth;
   static const double _tilesSpacing = 8.0;
   static const double _tilesMaxCrossAxisExtent = 280.0;
   static const double _tilesMainAxisExtent = 76.0;
 
   static double _gridItemWidthForZoom(int zoomLevel) {
-    final clamped = zoomLevel.clamp(
-      UserPreferences.minGridZoomLevel,
-      UserPreferences.maxGridZoomLevel,
-    );
-    final totalSpacing = _gridSpacing * (clamped - 1);
-    return math.max(56.0, (_gridReferenceWidth - totalSpacing) / clamped);
+    return GridZoomConstraints.itemWidthForZoom(zoomLevel);
   }
 
   static int _gridCrossAxisCount(double availableWidth, double itemWidth) {
-    final raw = ((availableWidth + _gridSpacing) / (itemWidth + _gridSpacing))
-        .floor();
-    return math.max(1, raw);
+    return GridZoomConstraints.columnCountForItemWidth(
+      availableWidth,
+      itemWidth,
+    );
   }
 
   static double _masonryHeightFactor(String path) {

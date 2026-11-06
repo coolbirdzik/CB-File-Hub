@@ -991,12 +991,13 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
     Widget content;
 
     if (shouldShowSkeleton) {
-      final int crossAxis = _viewMode == ViewMode.grid ? _gridZoomLevel : 2;
       content = FluentBackground.container(
         context: context,
-        child: _viewMode == ViewMode.grid
-            ? SkeletonHelper.fileGrid(crossAxisCount: crossAxis, itemCount: 12)
-            : SkeletonHelper.fileList(itemCount: 12),
+        child: SkeletonHelper.files(
+          viewMode: _viewMode,
+          gridZoomLevel: _gridZoomLevel,
+          layoutKnown: !_arePreferencesLoading,
+        ),
       );
     } else if (state.hasError) {
       content = FluentBackground.container(

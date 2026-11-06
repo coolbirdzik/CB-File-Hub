@@ -23,5 +23,6 @@ The application employs a hybrid strategy for generating video thumbnails to max
 3.  **Orchestration**:
     - **Controller**: `helpers/media/video_thumbnail_helper.dart`
     - **Logic**: Detects the operating system and routes the thumbnail generation request to either the native Windows plugin or the `video_thumbnail` package. This ensures the best possible experience on Windows while maintaining cross-platform compatibility.
+    - **Viewport loading (default)**: Settings > Video Thumbnails > Load thumbnails near the viewport stores `video_thumbnail_viewport_only` (defaults to `true`, including existing installations). Visible video tiles request extraction, with up to four display-order neighbours on either side prefetched. Hidden/recycled tiles release their interest and queued work outside that neighbourhood is canceled; already-running decodes finish normally. Turning this option off restores full-list preloading without clearing existing thumbnails. This scheduling option is independent of Fast/Custom extraction mode.
 
 _Last reviewed: 2026-03-07_

@@ -46,6 +46,7 @@ import '../../../services/local_ai/local_ai_advisor_service.dart';
 import '../../../services/app_insights/app_insights_models.dart';
 import '../../../services/app_insights/app_leftover_finder.dart';
 import '../../../services/app_insights/app_leftover_scanner.dart';
+import '../../../services/app_insights/app_uninstall_service.dart';
 import '../../../services/app_insights/posix_app_inventory.dart';
 import '../../../utils/app_logger.dart';
 import '../../../services/app_insights/app_storage_analyzer.dart';
@@ -71,6 +72,7 @@ import '../../widgets/app_progress_indicator.dart';
 import '../ai_chat/ai_panel_controller.dart';
 import 'cleaner_apps_view.dart';
 import 'cleaner_leftovers_view.dart';
+import 'cleaner_app_uninstall_dialog.dart';
 import 'cleaner_smart_clean_view.dart';
 import 'cleaner_audit_labels.dart';
 import 'cleaner_utilities_shell.dart';
@@ -143,8 +145,14 @@ class CleanerScanCoordinator {
 class CbAgentCleanerScreen extends StatefulWidget {
   final String? tabId;
   final DiskCleanerService? cleanerService;
+  final WindowsAppInventoryService? appInventoryService;
 
-  const CbAgentCleanerScreen({super.key, this.tabId, this.cleanerService});
+  const CbAgentCleanerScreen({
+    super.key,
+    this.tabId,
+    this.cleanerService,
+    this.appInventoryService,
+  });
 
   @override
   State<CbAgentCleanerScreen> createState() => _CbAgentCleanerScreenState();
@@ -188,20 +196,6 @@ class _AppInsightsEvidence {
     required this.warnings,
     required this.isPartial,
   });
-
-  factory _AppInsightsEvidence.inventoryOnly(
-    InstalledAppInventoryResult inventory,
-  ) {
-    return _AppInsightsEvidence(
-      inventory: inventory,
-      usageByAppId: const <String, AppUsageEvidence>{},
-      warnings: <String>[
-        ...inventory.warnings,
-        'App usage evidence is still loading.',
-      ],
-      isPartial: true,
-    );
-  }
 }
 
 class _AppInsightsAnalysisRequest {
@@ -250,8 +244,8 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
   late final DiskCleanerService _service =
       widget.cleanerService ?? DiskCleanerService.instance;
   late final CleanerScanCoordinator _scanCoordinator;
-  final WindowsAppInventoryService _appInventoryService =
-      WindowsAppInventoryService();
+  late final WindowsAppInventoryService _appInventoryService =
+      widget.appInventoryService ?? WindowsAppInventoryService();
   final AppStorageAnalyzer _appStorageAnalyzer = const AppStorageAnalyzer();
 
   OutlinedBorder get _cleanerButtonShape =>
@@ -537,7 +531,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
 
   @override
   void dispose() {
-    if (_isScanningFullDisk || _isScanningAppInsights) {
+    if (_isScanningFullDisk) {
       _service.cancelFullDiskScan();
     }
     _diskScanGeneration++;
@@ -1278,167 +1272,90 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     }
   }
 
-  Future<void> _startAppInsightsScan({bool forceDiskScan = false}) async {
+  Future<void> _startAppInsightsScan() async {
     if (_isScanningAppInsights || _isScanningFullDisk) return;
     final scanDrive = _appInsightsDrive ?? _defaultDrivePath(_drives);
     if (scanDrive == null) return;
-
     final generation = ++_appInsightsGeneration;
-    late final Future<InstalledAppInventoryResult> inventoryFuture;
-    late final Future<_AppInsightsEvidence> evidenceFuture;
-    var latestSnapshot = DiskTreeNode(
-      name: scanDrive,
-      fullPath: scanDrive,
-      isExpanded: true,
-    );
-    _AppInsightsEvidence? progressiveEvidence;
-    Timer? progressiveTimer;
-    var progressiveBusy = false;
-    var progressiveDirty = false;
-    var finalizing = false;
-
-    Future<void> publishProgressiveReport() async {
-      if (finalizing || progressiveBusy) return;
-      final evidence = progressiveEvidence;
-      if (evidence == null) return;
-      final snapshot = latestSnapshot;
-      progressiveBusy = true;
-      progressiveDirty = false;
-      try {
-        final report = await _analyzeAppInsightsReport(
-          result: FullDiskScanResult(root: snapshot, duration: Duration.zero),
-          evidence: evidence,
-          scanInProgress: true,
-        );
-        if (!mounted || finalizing || generation != _appInsightsGeneration) {
-          return;
-        }
-        _publishAppInsightsReport(report);
-      } finally {
-        progressiveBusy = false;
-        if (progressiveDirty && !finalizing) {
-          progressiveTimer = Timer(
-            const Duration(milliseconds: 350),
-            () => unawaited(publishProgressiveReport()),
-          );
-        }
-      }
-    }
-
-    void scheduleProgressiveReport({bool immediate = false}) {
-      if (finalizing || progressiveEvidence == null) return;
-      progressiveDirty = true;
-      if (progressiveBusy || (progressiveTimer?.isActive ?? false)) return;
-      progressiveTimer = Timer(
-        immediate ? Duration.zero : const Duration(milliseconds: 550),
-        () => unawaited(publishProgressiveReport()),
-      );
-    }
-
+    bool isCurrent() => mounted && generation == _appInsightsGeneration;
     _appInsightsSharedWithAgent = false;
-    _appInsightsProgressListenable.value = null;
-    _appInsightsCubit.setLoading();
-    setState(() {
-      _isScanningAppInsights = true;
-      _appStorageReport = null;
-    });
+    if (_appStorageReport == null) _appInsightsCubit.setLoading();
+    setState(() => _isScanningAppInsights = true);
     _publishCleanerScanContext();
-
-    inventoryFuture = _loadInstalledAppInventory(
-      onSnapshot: (inventory) {
-        if (!mounted || generation != _appInsightsGeneration) return;
-        progressiveEvidence = _AppInsightsEvidence.inventoryOnly(inventory);
-        scheduleProgressiveReport(immediate: true);
-      },
-    );
-    evidenceFuture = inventoryFuture.then(_loadAppInsightsEvidence);
-
     try {
-      var result = _lastDiskScanResult;
-      final canReuseDiskScan =
-          !forceDiskScan &&
-          result != null &&
-          _isSameDriveRoot(result.root.fullPath, scanDrive);
-
-      if (canReuseDiskScan) {
-        final inventory = await inventoryFuture;
-        if (!mounted || generation != _appInsightsGeneration) return;
-        progressiveEvidence = _AppInsightsEvidence.inventoryOnly(inventory);
-        latestSnapshot = result.root;
-        await publishProgressiveReport();
-      } else {
-        unawaited(
-          inventoryFuture.then((inventory) {
-            if (!mounted || generation != _appInsightsGeneration) return;
-            progressiveEvidence = _AppInsightsEvidence.inventoryOnly(inventory);
-            scheduleProgressiveReport(immediate: true);
-          }),
-        );
-        unawaited(
-          evidenceFuture.then((evidence) {
-            if (!mounted || generation != _appInsightsGeneration) return;
-            progressiveEvidence = evidence;
-            scheduleProgressiveReport(immediate: true);
-          }),
-        );
-
-        final handle = await _service.scanFullDisk(drivePath: scanDrive);
-        handle.progress.listen((progress) {
-          if (!mounted || generation != _appInsightsGeneration) return;
-          _appInsightsProgressListenable.value = progress;
-        });
-        handle.treeSnapshots.listen((root) {
-          if (!mounted || generation != _appInsightsGeneration) return;
-          latestSnapshot = root;
-          scheduleProgressiveReport();
-        });
-        result = await handle.future;
-        if (!mounted || generation != _appInsightsGeneration) return;
-        // Current scan workers apply junk rules and calculate aggregates
-        // before returning. Keep the fallback for older fixtures/results that
-        // predate those fields so App Insights remains safe in compatibility
-        // tests and cached sessions.
-        if (result.junkBytes == null || result.cleanableCount == null) {
-          _service.markJunkNodes(result.root);
-        }
-      }
-
-      if (!mounted || generation != _appInsightsGeneration) {
-        return;
-      }
-      finalizing = true;
-      progressiveTimer?.cancel();
-      _appInsightsScanResult = result;
-      final evidence = await evidenceFuture;
-      if (!mounted || generation != _appInsightsGeneration) return;
-      final report = await _analyzeAppInsightsReport(
-        result: result,
-        evidence: evidence,
+      // Apps must not wait for a recursive full-drive scan. Each inventory
+      // source publishes a usable list as soon as it answers.
+      final inventory = await _loadInstalledAppInventory(
+        onSnapshot: (snapshot) {
+          if (!isCurrent()) return;
+          _publishAppInsightsReport(
+            _appStorageAnalyzer.inventoryReport(
+              drivePath: scanDrive,
+              inventory: snapshot,
+              environment: _appInsightsEnvironment,
+            ),
+          );
+        },
       );
-      if (!mounted || generation != _appInsightsGeneration) return;
+      if (!isCurrent()) return;
+      _publishAppInsightsReport(
+        _appStorageAnalyzer.inventoryReport(
+          drivePath: scanDrive,
+          inventory: inventory,
+          environment: _appInsightsEnvironment,
+        ),
+      );
+      final evidence = await _loadAppInsightsEvidence(inventory).timeout(
+        const Duration(seconds: 2),
+        onTimeout: () => _AppInsightsEvidence(
+          inventory: inventory,
+          usageByAppId: const {},
+          warnings: [...inventory.warnings, 'App usage information timed out.'],
+          isPartial: true,
+        ),
+      );
+      if (!isCurrent()) return;
+      final quickReport = _appStorageAnalyzer.inventoryReport(
+        drivePath: scanDrive,
+        inventory: InstalledAppInventoryResult(
+          apps: inventory.apps,
+          warnings: evidence.warnings,
+          isPartial: evidence.isPartial,
+        ),
+        environment: _appInsightsEnvironment,
+        usageByAppId: evidence.usageByAppId,
+      );
+      // Reuse measured data only when the user already scanned Disk usage.
+      // Refreshing Apps never starts another full-disk walk.
+      final cached = _lastDiskScanResult;
+      _appInsightsScanResult =
+          cached != null && _isSameDriveRoot(cached.root.fullPath, scanDrive)
+          ? cached
+          : null;
+      final report = _appInsightsScanResult == null
+          ? quickReport
+          : await _analyzeAppInsightsReport(
+              result: _appInsightsScanResult!,
+              evidence: evidence,
+            ).timeout(const Duration(seconds: 3), onTimeout: () => quickReport);
+      if (!isCurrent()) return;
       _publishAppInsightsReport(report);
     } catch (error) {
-      finalizing = true;
-      progressiveTimer?.cancel();
-      if (!mounted || generation != _appInsightsGeneration) return;
-      _appInsightsCubit.setError('$error');
+      if (!isCurrent()) return;
+      if (_appStorageReport == null) _appInsightsCubit.setError('$error');
     } finally {
-      finalizing = true;
-      progressiveTimer?.cancel();
-      if (mounted && generation == _appInsightsGeneration) {
+      if (isCurrent()) {
         setState(() => _isScanningAppInsights = false);
-        _appInsightsProgressListenable.value = null;
       }
     }
   }
 
   void _cancelAppInsightsScan() {
     if (!_isScanningAppInsights) return;
-    _service.cancelFullDiskScan();
     _appInsightsGeneration++;
-    _appInsightsProgressListenable.value = null;
     _appInsightsSharedWithAgent = false;
-    _appInsightsCubit.clear();
+    // Keep the usable apps already loaded, including their uninstall actions.
+    if (_appStorageReport == null) _appInsightsCubit.clear();
     setState(() => _isScanningAppInsights = false);
     _publishCleanerScanContext();
   }
@@ -1476,27 +1393,11 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
   Future<AppStorageReport> _analyzeAppInsightsReport({
     required FullDiskScanResult result,
     required _AppInsightsEvidence evidence,
-    bool scanInProgress = false,
   }) {
-    final effectiveResult = scanInProgress
-        ? FullDiskScanResult(
-            root: result.root,
-            duration: result.duration,
-            inaccessible: result.inaccessible,
-            coverageIssues: <FullDiskScanCoverageIssue>[
-              ...result.coverageIssues,
-              FullDiskScanCoverageIssue(
-                path: result.root.fullPath,
-                reason: FullDiskScanCoverageIssueReason.scanInProgress,
-                detail: 'Progressive App Insights snapshot',
-              ),
-            ],
-          )
-        : result;
     return compute(
       _analyzeAppInsightsInBackground,
       _AppInsightsAnalysisRequest(
-        scanResult: effectiveResult,
+        scanResult: result,
         evidence: evidence,
         environment: Map<String, String>.from(_appInsightsEnvironment),
       ),
@@ -1620,6 +1521,69 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
 
   void _openLeftoverFolder(String path) {
     EntityOpenActions.openInNewTab(context, sourcePath: path);
+  }
+
+  Future<void> _uninstallApp(AppStorageProfile profile) async {
+    if (_isScanningAppInsights) _cancelAppInsightsScan();
+    if (!AppUninstallService.supports(profile.app)) {
+      await _manageInstalledApp(profile.app);
+      return;
+    }
+    final excludedPaths = await _ownAppPaths();
+    if (!mounted) return;
+    final uninstallService = AppUninstallService(
+      loadInventory: _loadInstalledAppInventory,
+    );
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => CleanerAppUninstallDialog(
+        profile: profile,
+        service: uninstallService,
+        excludedPaths: excludedPaths,
+        onOpenFolder: _openLeftoverFolder,
+        onClean: (items, onProgress) => _enqueueCleanup(items, (batch) async {
+          // A previous cleanup may have held this batch in the queue.
+          final fresh = await uninstallService.scan(
+            profile,
+            excludedPaths: excludedPaths,
+          );
+          if (!mounted) return null;
+          if (!batch.every((item) => fresh.folders.containsKey(item.path))) {
+            throw AppUninstallException(
+              AppLocalizations.of(context)!.cleanerUninstallFilesChanged,
+            );
+          }
+          return _runSelectedCleanup(
+            batch,
+            onProgress,
+            autoSkipFailures: false,
+          );
+        }),
+        onUninstalled: () {
+          final report = _appStorageReport;
+          if (!mounted || report == null) return;
+          _appInsightsSharedWithAgent = false;
+          _smartCleanAppsFuture = null;
+          _appLeftoversGeneration++;
+          _appLeftoversJob?.cancel();
+          _appLeftoversJob = null;
+          _publishAppInsightsReport(
+            AppStorageReport(
+              drivePath: report.drivePath,
+              generatedAt: DateTime.now(),
+              apps: report.apps
+                  .where((item) => item.app.id != profile.app.id)
+                  .toList(),
+              sharedOrUnattributed: report.sharedOrUnattributed,
+              warnings: report.warnings,
+              isPartial: report.isPartial,
+            ),
+          );
+          _appLeftoversCubit.clear();
+        },
+      ),
+    );
   }
 
   Future<void> _manageInstalledApp(InstalledAppInfo app) async {
@@ -3244,7 +3208,6 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       return;
     }
     if (_isScanningAppInsights) {
-      _service.cancelFullDiskScan();
       _appInsightsGeneration++;
     }
     _appInsightsSharedWithAgent = false;
@@ -3359,7 +3322,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
                 ? null
                 : _isScanningAppInsights
                 ? _cancelAppInsightsScan
-                : () => unawaited(_startAppInsightsScan(forceDiskScan: true)),
+                : () => unawaited(_startAppInsightsScan()),
             icon: _isScanningAppInsights
                 ? const Icon(Icons.stop_rounded, size: 16)
                 : const Icon(
@@ -3399,6 +3362,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
               cubit: _appInsightsCubit,
               onOpenFolder: _openAppStorageFolder,
               onManageApp: _manageInstalledApp,
+              onUninstallApp: _isCleaningJunk ? null : _uninstallApp,
               onReviewCleanable: _isScanningAppInsights
                   ? null
                   : _reviewAppCleanableData,

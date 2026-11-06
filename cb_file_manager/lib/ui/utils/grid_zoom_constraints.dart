@@ -54,6 +54,7 @@ class GridZoomConstraints {
   static const double fileGridSpacing = 8.0;
   static const double fileGridReferenceWidth = 960.0;
   static const double fileGridMinItemWidth = 56.0;
+  static const double fileGridAspectRatio = .8;
 
   // ── Grid item name area ──────────────────────────────────────────────────
   // Fixed height reserved for the filename label below the thumbnail.
@@ -78,25 +79,34 @@ class GridZoomConstraints {
   /// Returns the ideal item width for [zoomLevel] using the canonical
   /// file-browser formula.  Same calculation as
   /// [FileListViewBuilder._gridItemWidthForZoom].
-  static double itemWidthForZoom(int zoomLevel) {
+  static double itemWidthForZoom(
+    int zoomLevel, {
+    double spacing = fileGridSpacing,
+    double referenceWidth = fileGridReferenceWidth,
+    double minWidth = fileGridMinItemWidth,
+  }) {
     final clamped = zoomLevel.clamp(
       UserPreferences.minGridZoomLevel,
       UserPreferences.maxGridZoomLevel,
     );
-    final totalSpacing = fileGridSpacing * (clamped - 1);
-    return math.max(
-      fileGridMinItemWidth,
-      (fileGridReferenceWidth - totalSpacing) / clamped,
-    );
+    final totalSpacing = spacing * (clamped - 1);
+    return math.max(minWidth, (referenceWidth - totalSpacing) / clamped);
   }
 
   /// Returns the actual column count for [zoomLevel] at [availableWidth],
   /// matching the layout produced by [FileListViewBuilder].
   static int columnCountForZoom(int zoomLevel, double availableWidth) {
     final itemWidth = itemWidthForZoom(zoomLevel);
+    return columnCountForItemWidth(availableWidth, itemWidth);
+  }
+
+  static int columnCountForItemWidth(
+    double availableWidth,
+    double itemWidth, {
+    double spacing = fileGridSpacing,
+  }) {
     final raw =
-        ((math.max(0.0, availableWidth) + fileGridSpacing) /
-                (itemWidth + fileGridSpacing))
+        ((math.max(0.0, availableWidth) + spacing) / (itemWidth + spacing))
             .floor();
     return math.max(1, raw);
   }

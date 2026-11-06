@@ -1038,14 +1038,10 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
     // Neither a skeleton nor files in a view mode that is about to change.
     if (!_preferencesReady) return const SizedBox.shrink();
 
-    final isGridView =
-        state.viewMode == ViewMode.grid ||
-        state.viewMode == ViewMode.gridPreview;
-
     if (state.isLoading && state.files.isEmpty) {
-      return SkeletonHelper.responsive(
-        isGridView: isGridView,
-        crossAxisCount: isGridView ? state.gridZoomLevel : null,
+      return SkeletonHelper.files(
+        viewMode: state.viewMode,
+        gridZoomLevel: state.gridZoomLevel,
         itemCount: 12,
       );
     }
@@ -1066,9 +1062,9 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
     if (visibleFiles.isEmpty) {
       return Center(
         child: state.isLoading || _isSearchLoading
-            ? SkeletonHelper.responsive(
-                isGridView: isGridView,
-                crossAxisCount: isGridView ? state.gridZoomLevel : null,
+            ? SkeletonHelper.files(
+                viewMode: state.viewMode,
+                gridZoomLevel: state.gridZoomLevel,
                 itemCount: 8,
               )
             : Text(

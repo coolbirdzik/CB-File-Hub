@@ -4,6 +4,7 @@ import 'default_file_manager_settings.dart';
 
 import 'package:cb_native/cb_native.dart';
 import 'package:flutter/material.dart';
+import 'folder_view_mode_preference_control.dart';
 import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/helpers/tags/tag_manager.dart';
@@ -73,6 +74,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _savingHomePrivacy = false;
   // Fallback view mode for folders without their own saved view mode.
   ViewMode _defaultViewMode = ViewMode.list;
+  FolderViewModePreference _folderViewModePreference =
+      FolderViewModePreference.mediaGrid;
   FileThumbnailFitMode _fileThumbnailFitMode = FileThumbnailFitMode.cover;
   TagThumbnailFitMode _tagThumbnailFitMode = TagThumbnailFitMode.contain;
   bool _rememberTabWorkspace = false;
@@ -191,6 +194,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final defaultViewMode = _supportedDefaultViewMode(
         await _preferences.getViewMode(),
       );
+      final folderViewModePreference = await _preferences
+          .getFolderViewModePreference();
       final fileThumbnailFitMode = await _preferences.getFileThumbnailFitMode();
       final tagThumbnailFitMode = await _preferences.getTagThumbnailFitMode();
       final rememberTabWorkspace = await _preferences
@@ -216,6 +221,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _showFileTags = showFileTags;
           _showRecentFoldersOnHome = showRecentFoldersOnHome;
           _defaultViewMode = defaultViewMode;
+          _folderViewModePreference = folderViewModePreference;
           _fileThumbnailFitMode = fileThumbnailFitMode;
           _tagThumbnailFitMode = tagThumbnailFitMode;
           _rememberTabWorkspace = rememberTabWorkspace;
@@ -325,6 +331,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
       setState(() {
         _defaultViewMode = mode;
       });
+    }
+  }
+
+  Future<void> _updateFolderViewModePreference(
+    FolderViewModePreference mode,
+  ) async {
+    final saved = await _preferences.setFolderViewModePreference(mode);
+    if (saved && mounted) {
+      setState(() => _folderViewModePreference = mode);
     }
   }
 
@@ -692,6 +707,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ),
         _buildDefaultViewModeTile(),
+        FolderViewModePreferenceControl(
+          value: _folderViewModePreference,
+          onChanged: _updateFolderViewModePreference,
+        ),
         _buildCompactSettingTile(
           title: AppLocalizations.of(context)!.fileThumbnailFit,
           subtitle: AppLocalizations.of(context)!.fileThumbnailFitDescription,
@@ -945,6 +964,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
           trailing: Switch(
             value: _videoSeekAcceleration,
             onChanged: _updateVideoSeekAcceleration,
+          ),
+        ),
+        ValueListenableBuilder<bool>(
+          valueListenable: _preferences.videoThumbnailViewportOnly,
+          builder: (context, enabled, _) => _buildCompactSettingTile(
+            title: context.tr.videoThumbnailViewportOnly,
+            subtitle: context.tr.videoThumbnailViewportOnlyDescription,
+            icon: PhosphorIconsLight.eye,
+            trailing: Switch(
+              value: enabled,
+              onChanged: (value) async {
+                await _preferences.setVideoThumbnailViewportOnly(value);
+              },
+            ),
           ),
         ),
         // Thumbnail Mode Selection

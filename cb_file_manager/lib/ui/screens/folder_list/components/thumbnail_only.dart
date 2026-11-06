@@ -120,18 +120,6 @@ class _ThumbnailOnlyState extends State<ThumbnailOnly>
               false, // Don't mark all as priority to reduce concurrent loads
           borderRadius: BorderRadius.circular(0),
           showLoadingIndicator: true,
-          // No placeholder icon for video: the loaded thumbnail brings its
-          // own play overlay, and a second, larger one here flashed before
-          // the frame landed.
-          fallbackBuilder: () => isVideo
-              ? const SizedBox.expand()
-              : Center(
-                  child: Icon(
-                    genericIcon,
-                    size: widget.iconSize,
-                    color: Theme.of(context).colorScheme.secondary,
-                  ),
-                ),
         ),
       ),
     );

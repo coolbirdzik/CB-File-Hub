@@ -950,6 +950,17 @@ class TurkishLocalizations implements AppLocalizations {
   String get defaultViewMode => 'Varsayılan görünüm modu';
 
   @override
+  String get folderViewModePreference =>
+      'Özelleştirilmemiş klasörlerin görünümü';
+  @override
+  String get folderViewModePreferenceDescription =>
+      'Kayıtlı görünümü olmayan klasörlerde: yalnızca fotoğraf/video varsa ızgara kullan veya üst klasörü izle. Aksi halde varsayılan görünüm kullanılır.';
+  @override
+  String get folderViewModeMediaGrid => 'Fotoğraf ve videolar için ızgara';
+  @override
+  String get folderViewModeInheritParent => 'Üst klasörü izle';
+
+  @override
   String get defaultViewModeDescription =>
       'Kendi kayıtlı görünüm modu olmayan klasörler için kullanılır';
 
@@ -2025,6 +2036,12 @@ class TurkishLocalizations implements AppLocalizations {
   String get videoThumbnails => 'Video küçük resimleri';
   @override
   String get thumbnailMode => 'Oluşturma modu';
+  @override
+  String get videoThumbnailViewportOnly =>
+      'Yalnızca görünüm yakınındaki küçük resimleri yükle';
+  @override
+  String get videoThumbnailViewportOnlyDescription =>
+      'Yalnızca görünen ve yakındaki birkaç öğe için video küçük resimleri oluşturur. Tüm listeyi önceden yüklemek için kapatın.';
   @override
   String get thumbnailModeFast => 'Hızlı';
   @override
@@ -4353,7 +4370,7 @@ class TurkishLocalizations implements AppLocalizations {
 
   // Disk Cleaner (CB Agent skill)
   @override
-  String get cbAgentCleanerTitle => 'Disk Temizleyici (CB Agent)';
+  String get cbAgentCleanerTitle => 'Cleaner';
   @override
   String get diskCleanerNotAvailable =>
       'Disk Temizleyici Windows ve macOS\'ta kullanılabilir';
@@ -5162,7 +5179,11 @@ class TurkishLocalizations implements AppLocalizations {
   String cleanerAppsLoadFailed(String error) =>
       'Yüklü uygulamalar analiz edilemedi: $error';
   @override
-  String get cleanerAppsPartialBanner => 'Sonuçlar hâlâ güncelleniyor.';
+  String get cleanerAppsPartialBanner =>
+      'Bazı uygulama bilgileri alınamadı. Yenileyerek tekrar deneyin.';
+  @override
+  String get cleanerAppsQuickScanHint =>
+      'Uygulamalar diski taramadan yüklenir. Boyutlar Windows tahminlerinden veya önceki disk kullanımı taramasından alınır.';
   @override
   String get cleanerAppsSearchHint => 'Uygulama ara';
   @override
@@ -5270,6 +5291,34 @@ class TurkishLocalizations implements AppLocalizations {
       'Bu klasör okunamadı: $error';
   @override
   String get cleanerAppsManageInWindows => 'Windows\'ta yönet';
+  @override
+  String get cleanerUninstallApp => 'Uygulamayı kaldır';
+  @override
+  String get cleanerUninstallConfirm =>
+      'Uygulamanın kaldırma aracı açılacak. Kaldırdıktan sonra Cleaner, incelemeniz için ilgili klasörleri tarayacak.';
+  @override
+  String get cleanerUninstallReview =>
+      'Uygulama kaldırıldı. Geri Dönüşüm Kutusu’na taşımak istediğiniz kalan klasörleri seçin.';
+  @override
+  String get cleanerUninstallDataWarning =>
+      'Bu klasörler ayarlar, hesaplar ve kişisel veriler içerebilir. Silmeden önce yolları inceleyin.';
+  @override
+  String get cleanerUninstallRunning =>
+      'Kaldırma aracı bekleniyor. Uygulama penceresinde işlemi tamamlayın veya iptal edin.';
+  @override
+  String get cleanerUninstallScanning => 'İlgili klasörler taranıyor…';
+  @override
+  String get cleanerUninstallNoFiles =>
+      'Taranan konumlarda ilgili klasör kalmadı.';
+  @override
+  String get cleanerUninstallPartial =>
+      'Bazı konumlar okunamadı. Sonuçlar eksik olabilir:';
+  @override
+  String get cleanerUninstallFilesChanged =>
+      'Uygulama veya klasörleri değişti. Silmeden önce bu pencereyi kapatıp yeniden tarayın.';
+  @override
+  String get cleanerUninstallCleanupFailed =>
+      'Bazı klasörler Geri Dönüşüm Kutusu’na taşınamadı. Kalan yollar listede gösteriliyor.';
   @override
   String get cleanerAppsReviewCleanable => 'Temizlenebilir verileri incele';
   @override

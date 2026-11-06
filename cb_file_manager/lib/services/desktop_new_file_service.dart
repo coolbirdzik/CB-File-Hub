@@ -57,6 +57,21 @@ class DesktopNewFileService {
 
   Future<List<WindowsShellNewEntry>>? _shellNewEntriesFuture;
 
+  /// Creates a new, uniquely named folder before its name is edited inline.
+  Future<String> createFolder(String directoryPath, String defaultName) async {
+    var name = defaultName;
+    var suffix = 2;
+    while (await FileSystemEntity.type(
+          path.join(directoryPath, name),
+          followLinks: false,
+        ) !=
+        FileSystemEntityType.notFound) {
+      name = '$defaultName (${suffix++})';
+    }
+    final directory = await Directory(path.join(directoryPath, name)).create();
+    return directory.path;
+  }
+
   Future<List<DesktopNewFileItem>> getAvailableItems({
     Duration shellNewWait = defaultShellNewWait,
   }) async {

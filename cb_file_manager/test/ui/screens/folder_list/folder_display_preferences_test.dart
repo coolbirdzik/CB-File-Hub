@@ -4,6 +4,7 @@ import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/helpers/files/folder_sort_manager.dart';
 import 'package:cb_file_manager/models/database/database_manager.dart';
 import 'package:cb_file_manager/models/database/sqlite_database_provider.dart';
+import 'package:cb_file_manager/services/directory_listing_cache_service.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/bloc/file_navigation_bloc.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/bloc/file_navigation_event.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/bloc/file_navigation_state.dart';
@@ -144,4 +145,243 @@ void main() {
       ]);
     },
   );
+
+  group('view mode fallback policy', () {
+    final prefs = UserPreferences.instance;
+    final displays = FolderDisplayPreferences.instance;
+    late Directory fixture;
+
+    setUp(() async {
+      fixture = await testRoot.createTemp('view-policy-');
+      await prefs.setViewMode(ViewMode.list);
+      await prefs.setSortOption(SortOption.nameAsc);
+      await prefs.setFolderViewModePreference(
+        FolderViewModePreference.mediaGrid,
+      );
+    });
+
+    test(
+      'unknown media layouts wait for classification, saved layouts do not',
+      () async {
+        await displays.warmUp();
+        expect(displays.needsListingForViewMode(fixture.path), isTrue);
+        await displays.resolve(
+          fixture.path,
+          files: [File(path.join(fixture.path, 'photo.jpg'))],
+          folders: [],
+        );
+        expect(displays.needsListingForViewMode(fixture.path), isFalse);
+        final saved = path.join(fixture.path, 'saved');
+        await FolderSortManager().saveFolderViewMode(saved, ViewMode.details);
+        expect(displays.needsListingForViewMode(saved), isFalse);
+        await prefs.setFolderViewModePreference(
+          FolderViewModePreference.inheritParent,
+        );
+        await displays.warmUp();
+        expect(
+          displays.needsListingForViewMode(path.join(fixture.path, 'new')),
+          isFalse,
+        );
+      },
+    );
+
+    test(
+      'policy persists and invalid values fall back to media Grid',
+      () async {
+        await prefs.setFolderViewModePreference(
+          FolderViewModePreference.inheritParent,
+        );
+        expect(
+          await prefs.getFolderViewModePreference(),
+          FolderViewModePreference.inheritParent,
+        );
+        await displays.warmUp();
+        await prefs.setFolderViewModePreference(
+          FolderViewModePreference.mediaGrid,
+        );
+        expect(displays.cached(fixture.path), isNull);
+        await DatabaseManager.getInstance().saveStringPreference(
+          'folder_view_mode_preference',
+          'unknown',
+        );
+        expect(
+          await prefs.getFolderViewModePreference(),
+          FolderViewModePreference.mediaGrid,
+        );
+      },
+    );
+
+    test('only nonempty photo/video-only folders default to Grid', () async {
+      for (final (names, folders, expected)
+          in <(List<String>, List<Directory>, ViewMode)>[
+            (['photo.JPG'], [], ViewMode.grid),
+            (['clip.mp4'], [], ViewMode.grid),
+            (['photo.webp', 'clip.MKV'], [], ViewMode.grid),
+            (['photo.jpg', 'notes.txt'], [], ViewMode.list),
+            (['photo.jpg', 'song.mp3'], [], ViewMode.list),
+            ([], [], ViewMode.list),
+            (
+              ['photo.jpg'],
+              [Directory(path.join(fixture.path, 'nested'))],
+              ViewMode.list,
+            ),
+          ]) {
+        final settings = await displays.resolve(
+          fixture.path,
+          files: names
+              .map((name) => File(path.join(fixture.path, name)))
+              .toList(),
+          folders: folders,
+        );
+        expect(settings.viewMode, expected, reason: '$names / $folders');
+        expect(displays.cached(fixture.path)!.viewMode, expected);
+        expect(
+          await FolderSortManager().getFolderViewMode(fixture.path),
+          isNull,
+          reason: 'automatic layouts must not become explicit preferences',
+        );
+      }
+    });
+
+    test(
+      'saved view wins over media Grid while other overrides stay intact',
+      () async {
+        await FolderSortManager().saveFolderSortOption(
+          fixture.path,
+          SortOption.sizeDesc,
+        );
+        final automatic = await displays.resolve(
+          fixture.path,
+          files: [File(path.join(fixture.path, 'photo.jpg'))],
+          folders: [],
+        );
+        expect(automatic.viewMode, ViewMode.grid);
+        expect(automatic.sortOption, SortOption.sizeDesc);
+        await FolderSortManager().saveFolderViewMode(
+          fixture.path,
+          ViewMode.details,
+        );
+        expect(
+          (await displays.resolve(fixture.path)).viewMode,
+          ViewMode.details,
+        );
+        expect(displays.cached(fixture.path)!.viewMode, ViewMode.details);
+      },
+    );
+
+    test(
+      'inheritance uses nearest saved ancestor and only its view mode',
+      () async {
+        await prefs.setFolderViewModePreference(
+          FolderViewModePreference.inheritParent,
+        );
+        final parent = path.join(fixture.path, 'parent');
+        final child = path.join(parent, 'child');
+        await FolderSortManager().saveFolderViewMode(
+          fixture.path,
+          ViewMode.details,
+        );
+        await FolderSortManager().saveFolderSortOption(
+          fixture.path,
+          SortOption.sizeDesc,
+        );
+        await FolderSortManager().saveFolderGridZoomLevel(fixture.path, 7);
+        await FolderSortManager().saveFolderSortOption(
+          parent,
+          SortOption.dateAsc,
+        );
+        await displays.warmUp();
+
+        final inherited = await displays.resolve(child);
+        expect(inherited.viewMode, ViewMode.details);
+        expect(inherited.sortOption, SortOption.nameAsc);
+        expect(inherited.gridZoomLevel, await prefs.getGridZoomLevel());
+        expect(displays.cached(child)!.viewMode, ViewMode.details);
+
+        await FolderSortManager().saveFolderViewMode(parent, ViewMode.tiles);
+        expect(displays.cached(child)!.viewMode, ViewMode.tiles);
+        await FolderSortManager().saveFolderViewMode(child, ViewMode.tree);
+        expect((await displays.resolve(child)).viewMode, ViewMode.tree);
+        expect(displays.cached(child)!.viewMode, ViewMode.tree);
+      },
+    );
+
+    test('inheritance without a saved ancestor uses global default', () async {
+      await prefs.setFolderViewModePreference(
+        FolderViewModePreference.inheritParent,
+      );
+      await prefs.setViewMode(ViewMode.tiles);
+      expect((await displays.resolve(fixture.path)).viewMode, ViewMode.tiles);
+      expect((await displays.resolve('#drives')).viewMode, ViewMode.tiles);
+      expect(
+        (await displays.resolve('smb://server/share')).viewMode,
+        ViewMode.tiles,
+      );
+    });
+
+    for (final policy in FolderViewModePreference.values) {
+      test('$policy applies on cold load, cached load and refresh', () async {
+        await prefs.setFolderViewModePreference(policy);
+        await FolderSortManager().saveFolderViewMode(
+          fixture.path,
+          ViewMode.details,
+        );
+        final folder = await Directory(
+          path.join(fixture.path, 'photos'),
+        ).create();
+        await File(
+          path.join(folder.path, 'photo.jpg'),
+        ).writeAsString('photo fixture');
+        await displays.warmUp();
+        final bloc = FileNavigationBloc(applyFolderDisplay: true);
+        addTearDown(bloc.close);
+        final expected = policy == FolderViewModePreference.mediaGrid
+            ? ViewMode.grid
+            : ViewMode.details;
+        Future<FileNavigationState> loaded(int count) => bloc.stream
+            .firstWhere(
+              (s) =>
+                  !s.isLoading &&
+                  !s.isRefreshing &&
+                  s.currentPath.path == folder.path &&
+                  s.files.length == count,
+            )
+            .timeout(const Duration(seconds: 10));
+
+        var done = loaded(1);
+        bloc.add(FileNavigationLoad(folder.path));
+        expect((await done).viewMode, expected);
+        // Let the load finish storing its listing and starting the watcher.
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+        expect(
+          DirectoryListingCacheService.instance.getListing(folder.path),
+          isNotNull,
+        );
+        done = loaded(1);
+        bloc.add(FileNavigationLoad(folder.path));
+        expect((await done).viewMode, expected);
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+
+        // A mixed folder ceases to be media-only after refresh.
+        await File(path.join(folder.path, 'notes.txt')).writeAsString('notes');
+        done = loaded(2);
+        bloc.add(FileNavigationRefresh(folder.path));
+        expect(
+          (await done).viewMode,
+          policy == FolderViewModePreference.mediaGrid
+              ? ViewMode.list
+              : ViewMode.details,
+        );
+
+        // A later explicit choice takes precedence in either policy.
+        await FolderSortManager().saveFolderViewMode(
+          folder.path,
+          ViewMode.tiles,
+        );
+        done = loaded(2);
+        bloc.add(FileNavigationRefresh(folder.path));
+        expect((await done).viewMode, ViewMode.tiles);
+      });
+    }
+  });
 }

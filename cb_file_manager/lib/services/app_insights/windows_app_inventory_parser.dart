@@ -58,6 +58,7 @@ class WindowsAppInventoryParser {
             _firstString(records, 'installDate'),
           ),
           estimatedSizeBytes: _largestEstimatedSize(records),
+          uninstallCommand: _firstString(records, 'uninstallString'),
           canManage: records.any(
             (entry) =>
                 _string(entry['uninstallString']) != null ||

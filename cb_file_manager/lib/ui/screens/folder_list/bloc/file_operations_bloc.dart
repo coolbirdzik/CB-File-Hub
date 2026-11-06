@@ -114,6 +114,12 @@ class FileOperationsBloc
     FileOperationsPaste event,
     Emitter<FileOperationsState> emit,
   ) async {
+    try {
+      await FileOperations().syncSystemClipboard();
+    } catch (e) {
+      emit(state.copyWith(error: currentL10n.foErrorPasting(e.toString())));
+      return;
+    }
     if (!FileOperations().hasClipboardItem) {
       emit(state.copyWith(error: currentL10n.foNothingToPaste));
       return;
@@ -156,6 +162,7 @@ class FileOperationsBloc
     try {
       await FileOperations().pasteFromClipboard(
         event.destinationPath,
+        syncSystemClipboard: false,
         onProgress: (completed, total) {
           _progressController.update(
             progressId,

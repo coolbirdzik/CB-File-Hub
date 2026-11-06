@@ -22,6 +22,60 @@ DiskTreeNode _directory(
 }
 
 void main() {
+  test(
+    'inventory report uses estimates and browseable paths without measuring or allowing cleanup',
+    () {
+      final report = const AppStorageAnalyzer().inventoryReport(
+        drivePath: r'C:\',
+        inventory: const InstalledAppInventoryResult(
+          apps: [
+            InstalledAppInfo(
+              id: 'alpha',
+              displayName: 'Alpha Editor',
+              source: InstalledAppSource.win32,
+              installLocation: r'C:\Apps\Alpha',
+              estimatedSizeBytes: 12345,
+              uninstallCommand: 'uninstall.exe',
+            ),
+            InstalledAppInfo(
+              id: 'store',
+              displayName: 'Store App',
+              source: InstalledAppSource.msix,
+              packageFamilyName: 'Contoso.App_123',
+            ),
+            InstalledAppInfo(
+              id: 'other-drive',
+              displayName: 'Other App',
+              source: InstalledAppSource.win32,
+              installLocation: r'D:\Apps\Other',
+            ),
+          ],
+        ),
+        environment: const {
+          'SYSTEMDRIVE': 'C:',
+          'LOCALAPPDATA': r'C:\Users\Test\AppData\Local',
+        },
+      );
+      expect(report.apps, hasLength(2));
+      final alpha = report.findApp('alpha')!;
+      expect(alpha.bestKnownSizeBytes, 12345);
+      expect(alpha.confirmedSizeBytes, 0);
+      expect(alpha.measurementQuality, MeasurementQuality.estimated);
+      expect(alpha.entries.single.path, r'C:\APPS\ALPHA');
+      expect(
+        alpha.entries.single.measurementQuality,
+        MeasurementQuality.unknown,
+      );
+      expect(alpha.entries.single.isCleanable, isFalse);
+      expect(alpha.app.uninstallCommand, 'uninstall.exe');
+      expect(
+        report.findApp('store')!.entries.single.path,
+        r'C:\USERS\TEST\APPDATA\LOCAL\Packages\Contoso.App_123',
+      );
+      expect(report.cleanableBytes, 0);
+      expect(report.isPartial, isFalse);
+    },
+  );
   // These tests are written against the Windows rule table; without this the
   // Linux/macOS CI runners resolve a different category set.
   setUpAll(() => CleanerCategories.debugOperatingSystem = 'windows');

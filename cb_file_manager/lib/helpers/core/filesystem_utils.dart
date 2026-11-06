@@ -16,6 +16,7 @@ import 'package:ffi/ffi.dart';
 
 // local files
 import 'package:cb_file_manager/services/drive/windows_volume_probe.dart';
+import 'package:cb_file_manager/services/windowing/windows_file_clipboard.dart';
 import 'package:cb_file_manager/helpers/files/windows_file_operations.dart';
 import 'package:cb_file_manager/helpers/tags/file_operation_tags.dart';
 
@@ -689,7 +690,13 @@ class FileOperations {
   // Singleton instance
   static final FileOperations _instance = FileOperations._internal();
   factory FileOperations() => _instance;
-  FileOperations._internal();
+  FileOperations._internal() : _systemClipboard = const WindowsFileClipboard();
+
+  @visibleForTesting
+  FileOperations.forTesting(this._systemClipboard);
+
+  final WindowsFileClipboard _systemClipboard;
+  int? _systemClipboardSequence;
 
   // Store the current clipboard items (for copy/cut operations)
   List<FileSystemEntity> _clipboardItems = [];
@@ -726,6 +733,7 @@ class FileOperations {
     _clipboardItems = List.from(entities);
     _isCut = false;
     _clipboardRevision++;
+    _systemClipboardSequence = _systemClipboard.sequenceNumber;
   }
 
   // Set clipboard for cut operation
@@ -738,6 +746,7 @@ class FileOperations {
     _clipboardItems = List.from(entities);
     _isCut = true;
     _clipboardRevision++;
+    _systemClipboardSequence = _systemClipboard.sequenceNumber;
   }
 
   // Clear clipboard after operation
@@ -745,13 +754,45 @@ class FileOperations {
     _clipboardItems = [];
     _isCut = false;
     _clipboardRevision++;
+    _systemClipboardSequence = _systemClipboard.sequenceNumber;
+  }
+
+  /// Import a newer Explorer selection before checking whether Paste is empty.
+  /// An app copy/cut wins until the Windows clipboard changes again.
+  Future<void> syncSystemClipboard() async {
+    for (var attempt = 0; attempt < 3; attempt++) {
+      final sequence = _systemClipboard.sequenceNumber;
+      if (sequence == null || sequence == _systemClipboardSequence) return;
+      final revision = _clipboardRevision;
+      final snapshot = await _systemClipboard.read();
+      if (snapshot == null || revision != _clipboardRevision) return;
+      final items = <FileSystemEntity>[];
+      for (final source in snapshot.paths) {
+        final type = await FileSystemEntity.type(source);
+        items.add(
+          type == FileSystemEntityType.directory
+              ? Directory(source)
+              : File(source),
+        );
+      }
+      if (revision != _clipboardRevision) return;
+      if (_systemClipboard.sequenceNumber != snapshot.sequence) continue;
+      _clipboardItems = items;
+      _isCut = snapshot.isCut;
+      _systemClipboardSequence = snapshot.sequence;
+      _clipboardRevision++;
+      return;
+    }
+    throw StateError('The Windows clipboard changed while reading files');
   }
 
   // Paste files or folders from clipboard to destination using Windows native operations when available
   Future<List<FileSystemEntity>> pasteFromClipboard(
     String destinationPath, {
     void Function(int completed, int total)? onProgress,
+    bool syncSystemClipboard = true,
   }) async {
+    if (syncSystemClipboard) await this.syncSystemClipboard();
     if (_clipboardItems.isEmpty) return [];
 
     // Each paste owns its inputs across every await, including native fallback.
@@ -761,7 +802,13 @@ class FileOperations {
     final revision = _clipboardRevision;
 
     void clearCompletedCut() {
-      if (isCut && revision == _clipboardRevision) clearClipboard();
+      if (isCut && revision == _clipboardRevision) {
+        // Keep the consumed sequence so repeated Paste cannot reimport a cut,
+        // and a newer Explorer copy made during the transfer is still read.
+        _clipboardItems = [];
+        _isCut = false;
+        _clipboardRevision++;
+      }
     }
 
     // On Windows, try to use native file operations with progress dialog

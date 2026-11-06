@@ -43,6 +43,14 @@ Smart Clean removes only junk that apps can recreate: temporary files, browser a
 ### Photos, videos and tags
 Gallery and video library, built-in player with picture-in-picture, image editor, albums and rule-based smart albums, and hierarchical tags you can search across every folder.
 
+### Choose which moment appears in video thumbnails
+
+**You choose which point in a video becomes its thumbnail:** 10%, 20%, 50%, or another percentage of its duration. For example, choosing 20% for a ten-minute video uses a frame around the two-minute mark.
+
+Go to **Settings → Video Thumbnails → Custom** and adjust **Thumbnail position** to choose the moment shown in your previews. Fast mode uses the operating system's thumbnail method instead. You can also set the maximum number of parallel tasks.
+
+Viewport loading is on by default: only visible videos and a few nearby items get thumbnails generated, reducing background CPU and disk activity in large libraries. Scrolling away or hiding a tab cancels queued work outside that range; decodes already running finish normally. Cached thumbnails are reused when you return. Turn off **Load thumbnails near the viewport** to preload the entire list. [How thumbnail generation works](docs/technical/06-filesystem-media.md#hybrid-thumbnail-generation).
+
 ### Torrents and backup
 A searchable torrent library with qBittorrent and Transmission import and built-in downloads. Back up settings and tags to Google Drive, Dropbox or OneDrive.
 

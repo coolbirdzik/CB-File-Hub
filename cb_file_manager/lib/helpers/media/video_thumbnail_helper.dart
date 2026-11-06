@@ -13,9 +13,11 @@ import 'package:path/path.dart' as path;
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/helpers/core/app_path_helper.dart';
 import 'package:cb_file_manager/ui/utils/scroll_velocity_notifier.dart';
+import 'package:cb_file_manager/ui/widgets/thumbnail_listing_gate.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import 'fc_native_video_thumbnail.dart';
+import 'thumbnail_viewport_policy.dart';
 
 /// Enum for thumbnail generation mode
 enum ThumbnailMode {
@@ -401,6 +403,94 @@ class VideoThumbnailHelper {
   // not its position in the file system. This fixes the issue where thumbnails
   // were loaded in file-system order instead of display (sort) order.
   static final Map<String, int> _displayIndexByPath = <String, int>{};
+  static final _viewport = ThumbnailViewportPolicy();
+  static final Set<String> _viewportPrefetched = {};
+  static List<String> _preloadPaths = const [];
+  static int _preloadVersion = 0;
+  static bool _viewportSyncScheduled = false;
+  static bool _viewportListenerAttached = false;
+
+  static void _ensureViewportListener() {
+    if (_viewportListenerAttached) return;
+    _viewportListenerAttached = true;
+    _userPrefs.videoThumbnailViewportOnly.addListener(_viewportModeChanged);
+  }
+
+  static void _viewportModeChanged() {
+    _preloadVersion++;
+    _viewportPrefetched.clear();
+    if (_userPrefs.videoThumbnailViewportOnly.value) {
+      final wanted = _viewport.wantedPaths;
+      _cancelPendingWhere((request) => !wanted.contains(request.videoPath));
+      for (final request in _pendingQueue) {
+        request.viewportScoped = true;
+      }
+      _scheduleViewportSync();
+    } else if (_preloadPaths.isNotEmpty) {
+      unawaited(optimizedBatchPreload(_preloadPaths));
+    }
+  }
+
+  /// Visibility remains tracked after the thumbnail has decoded, so leaving a
+  /// viewport or hiding a tab also releases its prefetch neighbourhood.
+  static void setViewportVisible(Object owner, String? videoPath) {
+    _ensureViewportListener();
+    _viewport.setVisible(
+      owner,
+      videoPath == null ? null : _cacheKeyForPath(videoPath),
+    );
+    _scheduleViewportSync();
+  }
+
+  static void _cancelPendingWhere(bool Function(_ThumbnailRequest) predicate) {
+    final canceled = _pendingQueue.where(predicate).toList();
+    _pendingQueue.removeWhere(predicate);
+    for (final request in canceled) {
+      if (!request.completer.isCompleted) request.completer.complete(null);
+    }
+  }
+
+  static void _scheduleViewportSync() {
+    if (_viewportSyncScheduled) return;
+    _viewportSyncScheduled = true;
+    scheduleMicrotask(() {
+      _viewportSyncScheduled = false;
+      if (!_userPrefs.videoThumbnailViewportOnly.value) return;
+      final wanted = _viewport.wantedPaths;
+      _viewportPrefetched.removeWhere((path) => !wanted.contains(path));
+      _cancelPendingWhere(
+        (request) =>
+            request.viewportScoped && !wanted.contains(request.videoPath),
+      );
+      for (final path in wanted.difference(_viewport.visiblePaths)) {
+        if (!_viewportPrefetched.add(path) || !isSupportedVideoFormat(path)) {
+          continue;
+        }
+        unawaited(_prefetchViewportNeighbour(path));
+      }
+    });
+  }
+
+  static Future<void> _prefetchViewportNeighbour(String path) async {
+    await initializeCache();
+    if (!ThumbnailListingGate.instance.isReadyFor(path)) {
+      final ready = Completer<void>();
+      ThumbnailListingGate.instance.whenReady(
+        () => ready.complete(),
+        source: path,
+      );
+      await ready.future;
+    }
+    if (!_userPrefs.videoThumbnailViewportOnly.value ||
+        !_viewport.wantedPaths.contains(path)) {
+      return;
+    }
+    await _requestThumbnail(
+      path,
+      priority: _prefetchPriority,
+      viewportScoped: true,
+    );
+  }
 
   static bool _verboseLogging = false;
 
@@ -414,11 +504,18 @@ class VideoThumbnailHelper {
     for (var i = 0; i < filePaths.length; i++) {
       _displayIndexByPath[_cacheKeyForPath(filePaths[i])] = i;
     }
+    _viewport.updateDisplayPaths(filePaths.map(_cacheKeyForPath).toList());
+    _preloadPaths = filePaths.where(isSupportedVideoFormat).toList();
+    _scheduleViewportSync();
   }
 
   /// Clear the display-index map (e.g., when navigating away).
   static void clearDisplayIndexMap() {
     _displayIndexByPath.clear();
+    _preloadPaths = const [];
+    _preloadVersion++;
+    _viewport.updateDisplayPaths(const []);
+    _scheduleViewportSync();
   }
 
   static bool _cacheInitialized = false;
@@ -593,6 +690,7 @@ class VideoThumbnailHelper {
   }
 
   static Future<void> initializeCache() async {
+    _ensureViewportListener();
     if (_cacheInitialized) return;
     if (_initializing) return _initCompleter.future;
 
@@ -657,6 +755,8 @@ class VideoThumbnailHelper {
       forceShow: true,
     );
     _currentDirectory = dirPath;
+    _preloadVersion++;
+    _preloadPaths = const [];
 
     cancelThumbnailsNotInDirectory(dirPath);
   }
@@ -994,6 +1094,7 @@ class VideoThumbnailHelper {
     bool forceRegenerate = false,
     int? quality,
     int? thumbnailSize,
+    bool viewportScoped = false,
   }) {
     final cacheKey = _cacheKeyForPath(videoPath);
 
@@ -1002,7 +1103,7 @@ class VideoThumbnailHelper {
     // This ensures thumbnails load in display order even when the OS listed
     // them in a different (file-system) order.
     final displayIndex = _displayIndexByPath[cacheKey];
-    if (displayIndex != null) {
+    if (displayIndex != null && !viewportScoped) {
       if (displayIndex < 20) {
         priority = _visiblePriority - displayIndex; // 100, 99, ..., 81
       } else if (displayIndex < 60) {
@@ -1025,8 +1126,7 @@ class VideoThumbnailHelper {
         existingPending.priority >= priority) {
       return existingPending.completer.future;
     }
-    if (existingProcessing.videoPath.isNotEmpty &&
-        existingProcessing.priority >= priority) {
+    if (existingProcessing.videoPath.isNotEmpty) {
       return existingProcessing.completer.future;
     }
 
@@ -1045,6 +1145,7 @@ class VideoThumbnailHelper {
       forceRegenerate: forceRegenerate,
       quality: quality,
       thumbnailSize: thumbnailSize,
+      viewportScoped: viewportScoped,
     );
 
     _pendingQueue.add(newRequest);
@@ -1544,6 +1645,7 @@ class VideoThumbnailHelper {
     bool isPriority = false,
     int? quality,
     int? thumbnailSize,
+    Object? viewportOwner,
   }) async {
     if (!_cacheInitialized) {
       if (_initializing) {
@@ -1551,6 +1653,12 @@ class VideoThumbnailHelper {
       } else {
         await initializeCache();
       }
+    }
+
+    if (viewportOwner != null &&
+        _userPrefs.videoThumbnailViewportOnly.value &&
+        !_viewport.containsOwner(viewportOwner, _cacheKeyForPath(videoPath))) {
+      return null;
     }
 
     if (!isSupportedVideoFormat(videoPath)) {
@@ -1577,6 +1685,8 @@ class VideoThumbnailHelper {
       forceRegenerate: forceRegenerate,
       quality: effectiveQuality,
       thumbnailSize: effectiveSize,
+      viewportScoped:
+          viewportOwner != null && _userPrefs.videoThumbnailViewportOnly.value,
     );
 
     return result;
@@ -2027,6 +2137,8 @@ class VideoThumbnailHelper {
       // this finally block would overwrite it back to true.
       _isProcessingQueue = false;
       _shouldStopProcessing = false;
+      _viewportPrefetched.clear();
+      _scheduleViewportSync();
     }
   }
 
@@ -2064,6 +2176,7 @@ class VideoThumbnailHelper {
     }
 
     if (videoPaths.isEmpty) return;
+    if (_userPrefs.videoThumbnailViewportOnly.value) return;
 
     _log(
       'VideoThumbnail: Proactively generating ${videoPaths.length} thumbnails for $directoryPath',
@@ -2076,6 +2189,7 @@ class VideoThumbnailHelper {
     // Priority decreases by 1 for each position, ensuring top items are processed first
     for (var i = 0; i < videoPaths.length; i++) {
       final path = videoPaths[i];
+      if (_userPrefs.videoThumbnailViewportOnly.value) break;
 
       // Check if we're still in the same directory
       if (_currentDirectory != directoryPath) {
@@ -2127,11 +2241,21 @@ class VideoThumbnailHelper {
     int maxConcurrent = 2,
     int visibleCount = 10,
   }) async {
+    _preloadPaths = List.of(videoPaths);
+    final version = ++_preloadVersion;
     if (!_cacheInitialized) {
       await initializeCache();
     }
 
-    if (videoPaths.isEmpty) return;
+    if (videoPaths.isEmpty ||
+        version != _preloadVersion ||
+        _userPrefs.videoThumbnailViewportOnly.value) {
+      return;
+    }
+
+    bool canceled() =>
+        version != _preloadVersion ||
+        _userPrefs.videoThumbnailViewportOnly.value;
 
     // Chia thành 3 nhóm ưu tiên:
     // 1. Nhóm hiển thị - tải ngay với ưu tiên cao
@@ -2145,9 +2269,6 @@ class VideoThumbnailHelper {
         .toList();
     final otherPaths = videoPaths.skip(visibleCount * 3).toList();
 
-    // Tạm dừng các yêu cầu đang chờ để xếp các yêu cầu mới
-    _pendingQueue.clear();
-
     // Thêm vào queue với độ ưu tiên thích hợp
     for (final path in visiblePaths) {
       _requestThumbnail(
@@ -2160,6 +2281,7 @@ class VideoThumbnailHelper {
 
     // Delay trước khi thêm nhóm kế tiếp để tránh nghẽn
     await Future.delayed(const Duration(milliseconds: 100));
+    if (canceled()) return;
 
     for (final path in nearPaths) {
       _requestThumbnail(
@@ -2172,6 +2294,7 @@ class VideoThumbnailHelper {
 
     // Delay dài hơn trước khi thêm nhóm cuối
     await Future.delayed(const Duration(milliseconds: 200));
+    if (canceled()) return;
 
     for (final path in otherPaths) {
       _requestThumbnail(
@@ -2260,6 +2383,12 @@ class VideoThumbnailHelper {
 
       // Set as current directory
       setCurrentDirectory(directoryPath);
+
+      if (_userPrefs.videoThumbnailViewportOnly.value) {
+        _viewportPrefetched.clear();
+        _scheduleViewportSync();
+        return;
+      }
 
       // Get all video files in the directory
       final fileList = await directory.list().toList();
@@ -2452,6 +2581,7 @@ class _ThumbnailRequest {
   final bool forceRegenerate;
   final int? quality;
   final int? thumbnailSize;
+  bool viewportScoped;
 
   _ThumbnailRequest.empty()
     : videoPath = '',
@@ -2460,7 +2590,8 @@ class _ThumbnailRequest {
       timestamp = DateTime(0),
       forceRegenerate = false,
       quality = null,
-      thumbnailSize = null;
+      thumbnailSize = null,
+      viewportScoped = false;
 
   _ThumbnailRequest({
     required this.videoPath,
@@ -2470,5 +2601,6 @@ class _ThumbnailRequest {
     required this.forceRegenerate,
     this.quality,
     this.thumbnailSize,
+    this.viewportScoped = false,
   });
 }

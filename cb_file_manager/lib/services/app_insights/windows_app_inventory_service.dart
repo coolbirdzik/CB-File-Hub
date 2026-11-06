@@ -17,6 +17,9 @@ class WindowsAppInventoryService {
   final WindowsAppUsageMatcher _usageMatcher;
   final Directory? prefetchDirectory;
   final DateTime Function() _now;
+  final Duration readTimeout;
+  Future<WindowsRawAppInsightsResult>? _win32Read;
+  Future<WindowsRawAppInsightsResult>? _msixRead;
 
   List<String> _lastUsageWarnings = const <String>[];
 
@@ -27,6 +30,7 @@ class WindowsAppInventoryService {
     this._usageMatcher = const WindowsAppUsageMatcher(),
     this.prefetchDirectory,
     DateTime Function()? now,
+    this.readTimeout = const Duration(seconds: 8),
   }) : _dataSource =
            dataSource ?? const MethodChannelWindowsAppInsightsDataSource(),
        _now = now ?? DateTime.now;
@@ -53,19 +57,19 @@ class WindowsAppInventoryService {
     }
 
     final win32Future =
-        _safeRead(
+        (_win32Read ??= _safeRead(
           _dataSource.readWin32Inventory,
           'Win32 app inventory failed',
-        ).then((result) {
+        ).whenComplete(() => _win32Read = null)).then((result) {
           win32 = result;
           publishSnapshot();
           return result;
         });
     final msixFuture =
-        _safeRead(
+        (_msixRead ??= _safeRead(
           _dataSource.readMsixInventory,
           'MSIX app inventory failed',
-        ).then((result) {
+        ).whenComplete(() => _msixRead = null)).then((result) {
           msix = result;
           publishSnapshot();
           return result;
@@ -190,7 +194,7 @@ class WindowsAppInventoryService {
     String label,
   ) async {
     try {
-      return await read();
+      return await read().timeout(readTimeout);
     } on Object catch (error) {
       return WindowsRawAppInsightsResult(
         warnings: <String>['$label: $error'],

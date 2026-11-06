@@ -169,6 +169,14 @@ The interactive walkthrough uses `inspect_cleaner_scan_item` to expand, scroll t
 
 In **Apps**, **View files** opens the storage locations linked to the selected
 application; the same action beside a storage location opens it directly.
+Opening or refreshing Apps reads the installed-app inventory without starting a
+full-drive scan. Registry and Store sources load concurrently, share in-flight
+reads and time out after eight seconds per source; a completed source is shown
+immediately. Optional usage evidence has a two-second UI budget. Sizes use
+Windows estimates unless an existing Disk usage scan provides measurements;
+known install/package paths remain browseable with unknown sizes. Uninstall
+stays available while optional details load. Cancelling keeps apps already
+listed, and late responses cannot replace a cancelled or newer report.
 The preview lists real filenames, paths and file sizes, with folder navigation,
 Back, refresh and visible read errors with Retry. It lists one directory at a
 time on Rust threads or a Dart isolate, including hidden/config files and
@@ -177,6 +185,19 @@ retain their confirmed/possible/shared attribution; application data is not
 automatically junk. Only a confirmed cleanable location offers **Review cleanable
 data**, which passes that exact rule-backed root to the existing cleanup preview
 and confirmation flow. Browsing does not select deletion targets.
+
+On Windows, **Uninstall app** opens the registered interactive Win32 uninstaller
+or removes the selected Store package for the current user. Cleaner refreshes
+the installed-app inventory and confirms removal before scanning related
+folders in AppData, ProgramData and program locations, plus the known install
+directory. The review includes small and recently modified folders, with every
+checkbox initially empty. It excludes shared vendor roots, remaining apps,
+links, system locations and Cleaner itself. Users review exact paths and
+separately confirm moving selected folders to the Recycle Bin; application data
+can contain personal files and settings. Inventory and paths are rechecked when
+the cleanup leaves the shared queue. Cancelled/failed uninstalls and incomplete
+inventories never permit this cleanup. Read failures and failed deletion paths
+remain visible. **Manage in Windows** remains available for other uninstallers.
 
 Cleaner deletion runs in a background isolate. Permanent deletion uses the
 optional `cb_native` `deletion.rs` job with up to eight Rust workers and one

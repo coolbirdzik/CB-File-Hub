@@ -53,6 +53,9 @@ class InstalledAppInfo {
   final DateTime? installedOrUpdatedAt;
   final int? estimatedSizeBytes;
   final bool canManage;
+
+  /// Interactive command registered by a Win32 app. Never a quiet uninstall.
+  final String? uninstallCommand;
   final List<String> executablePaths;
   final List<String> warnings;
 
@@ -68,6 +71,7 @@ class InstalledAppInfo {
     this.installedOrUpdatedAt,
     this.estimatedSizeBytes,
     this.canManage = true,
+    this.uninstallCommand,
     this.executablePaths = const <String>[],
     this.warnings = const <String>[],
   });
@@ -84,6 +88,7 @@ class InstalledAppInfo {
     DateTime? installedOrUpdatedAt,
     int? estimatedSizeBytes,
     bool? canManage,
+    String? uninstallCommand,
     List<String>? executablePaths,
     List<String>? warnings,
   }) {
@@ -99,6 +104,7 @@ class InstalledAppInfo {
       installedOrUpdatedAt: installedOrUpdatedAt ?? this.installedOrUpdatedAt,
       estimatedSizeBytes: estimatedSizeBytes ?? this.estimatedSizeBytes,
       canManage: canManage ?? this.canManage,
+      uninstallCommand: uninstallCommand ?? this.uninstallCommand,
       executablePaths: executablePaths ?? this.executablePaths,
       warnings: warnings ?? this.warnings,
     );

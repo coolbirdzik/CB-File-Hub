@@ -358,6 +358,10 @@ abstract class AppLocalizations {
   String get viewModeTiles;
   String get defaultViewMode;
   String get defaultViewModeDescription;
+  String get folderViewModePreference;
+  String get folderViewModePreferenceDescription;
+  String get folderViewModeMediaGrid;
+  String get folderViewModeInheritParent;
 
   // Preview pane
   String get propertiesAndTags;
@@ -927,6 +931,8 @@ abstract class AppLocalizations {
   // Video thumbnails
   String get videoThumbnails;
   String get thumbnailMode;
+  String get videoThumbnailViewportOnly;
+  String get videoThumbnailViewportOnlyDescription;
   String get thumbnailModeFast;
   String get thumbnailModeCustom;
   String get thumbnailModeFastDescription;
@@ -2141,6 +2147,7 @@ abstract class AppLocalizations {
   String get cleanerAppsUnavailable;
   String cleanerAppsLoadFailed(String error);
   String get cleanerAppsPartialBanner;
+  String get cleanerAppsQuickScanHint;
   String get cleanerAppsSearchHint;
   String get cleanerAppsFilterAll;
   String get cleanerAppsFilterAttention;
@@ -2189,6 +2196,16 @@ abstract class AppLocalizations {
   String get cleanerAppsDataFilesHint;
   String cleanerAppsFilesLoadFailed(String error);
   String get cleanerAppsManageInWindows;
+  String get cleanerUninstallApp;
+  String get cleanerUninstallConfirm;
+  String get cleanerUninstallReview;
+  String get cleanerUninstallDataWarning;
+  String get cleanerUninstallRunning;
+  String get cleanerUninstallScanning;
+  String get cleanerUninstallNoFiles;
+  String get cleanerUninstallPartial;
+  String get cleanerUninstallFilesChanged;
+  String get cleanerUninstallCleanupFailed;
   String get cleanerAppsReviewCleanable;
   String get cleanerAppsAskAgent;
   String cleanerAppsVersion(String version);

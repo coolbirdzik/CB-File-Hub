@@ -11,15 +11,15 @@ import 'package:cb_file_manager/services/file_template_service.dart';
 import 'package:cb_file_manager/services/directory_watcher_service.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/ui/components/common/app_toast.dart';
+import 'package:cb_file_manager/ui/components/common/shared_file_context_menu.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_bloc.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_event.dart';
 import 'package:cb_file_manager/ui/controllers/inline_rename_controller.dart';
 import 'package:cb_file_manager/helpers/core/text_utils.dart';
 import 'package:cb_file_manager/config/translation_helper.dart';
 
-/// Dialog for creating a new file from a template.
-/// Shows a grid (desktop) or list (mobile) of file types, filtered by detected
-/// installed apps. On selection, creates the file and refreshes the folder list.
+/// Template picker for new files. Desktop uses a popup menu and names the
+/// created item inline; mobile uses the dialog below.
 class CreateFileDialog extends StatefulWidget {
   final String directoryPath;
   final ValueChanged<String>? onAfterFileCreated;
@@ -34,7 +34,7 @@ class CreateFileDialog extends StatefulWidget {
     this.folderListBloc,
   });
 
-  /// Opens the dialog as a modal.
+  /// Opens the platform's file-type picker.
   static Future<void> show(
     BuildContext context, {
     required String directoryPath,
@@ -51,6 +51,66 @@ class CreateFileDialog extends StatefulWidget {
       } catch (_) {
         resolvedFolderListBloc = null;
       }
+    }
+
+    if (!Platform.isAndroid && !Platform.isIOS) {
+      final anchor = context.findRenderObject();
+      final position = anchor is RenderBox && anchor.hasSize
+          ? anchor.localToGlobal(const Offset(24, 56))
+          : const Offset(24, 56);
+      await showContextMenuPopup(
+        context: context,
+        globalPosition: position,
+        sections: [
+          ContextMenuSection(
+            title: AppLocalizations.of(context)!.createNewFile,
+            actions: [
+              for (final template
+                  in FileTemplateService.instance.getAvailableTemplates())
+                ContextMenuAction(
+                  id: 'new_template:${template.extension}',
+                  label:
+                      '${_templateDisplayName(context, template)} (${template.extension})',
+                  icon: template.icon,
+                  onSelected: (_) async {
+                    final toast = AppToast.capture(context);
+                    final l10n = AppLocalizations.of(context)!;
+                    DirectoryWatcherService.instance.suppressRefreshForPath(
+                      directoryPath,
+                    );
+                    final createdPath = await FileTemplateService.instance
+                        .createFile(
+                          directoryPath,
+                          template,
+                          _sanitizeFileName(
+                            _templateDisplayName(context, template),
+                          ),
+                        );
+                    if (createdPath == null) {
+                      toast.error(
+                        l10n.errorCreatingFile(l10n.fileCreateFailedDetail),
+                      );
+                      return;
+                    }
+                    if (!context.mounted) return;
+                    if (onAfterFileCreated != null) {
+                      onAfterFileCreated(createdPath);
+                    } else {
+                      resolvedFolderListBloc?.add(
+                        FolderListRefresh(directoryPath),
+                      );
+                      inlineRenameController?.startRename(
+                        createdPath,
+                        commitOnBlur: true,
+                      );
+                    }
+                  },
+                ),
+            ],
+          ),
+        ],
+      );
+      return;
     }
 
     await RouteUtils.showAcrylicDialog(
@@ -134,50 +194,7 @@ class _CreateFileDialogState extends State<CreateFileDialog> {
     }
   }
 
-  String _displayName(FileTemplate t) {
-    // Use known localization keys when available; fall back to hardcoded strings.
-    switch (t.displayNameKey) {
-      case 'fileTypeWord':
-        return AppLocalizations.of(context)?.fileTypeWord ?? 'Word Document';
-      case 'fileTypeExcel':
-        return AppLocalizations.of(context)?.fileTypeExcel ?? 'Spreadsheet';
-      case 'fileTypePowerPoint':
-        return AppLocalizations.of(context)?.fileTypePowerPoint ??
-            'Presentation';
-      case 'fileTypeTxt':
-        return AppLocalizations.of(context)?.fileTypeTxt ?? 'Text File';
-      case 'fileTypePdf':
-        return AppLocalizations.of(context)?.fileTypePdf ?? 'PDF Document';
-      case 'fileTypeZip':
-        return AppLocalizations.of(context)?.fileTypeZip ?? 'ZIP Archive';
-      case 'fileTypeRar':
-        return AppLocalizations.of(context)?.fileTypeRar ?? 'RAR Archive';
-      case 'fileType7z':
-        return AppLocalizations.of(context)?.fileType7z ?? '7Z Archive';
-      case 'fileTypeCsv':
-        return AppLocalizations.of(context)?.cfCsvSpreadsheet ??
-            'CSV Spreadsheet';
-      case 'fileTypePng':
-        return AppLocalizations.of(context)?.fileTypePng ?? 'PNG Image';
-      case 'fileTypeJpeg':
-        return AppLocalizations.of(context)?.fileTypeJpeg ?? 'JPEG Image';
-      case 'fileTypeGif':
-        return AppLocalizations.of(context)?.fileTypeGif ?? 'GIF Image';
-      case 'fileTypeSvg':
-        return AppLocalizations.of(context)?.fileTypeSvg ?? 'SVG Image';
-      case 'fileTypeMp4':
-        return AppLocalizations.of(context)?.fileTypeMp4 ?? 'MP4 Video';
-      case 'fileTypeMp3':
-        return AppLocalizations.of(context)?.fileTypeMp3 ?? 'MP3 Audio';
-      case 'fileTypeWav':
-        return AppLocalizations.of(context)?.fileTypeWav ?? 'WAV Audio';
-      case 'fileTypeOgg':
-        return AppLocalizations.of(context)?.fileTypeOgg ?? 'OGG Audio';
-      default:
-        // Brand-specific templates (Libre/WPS/Google) — use extension as display name
-        return t.extension.toUpperCase().replaceFirst('.', '');
-    }
-  }
+  String _displayName(FileTemplate t) => _templateDisplayName(context, t);
 
   @override
   void dispose() {
@@ -240,14 +257,6 @@ class _CreateFileDialogState extends State<CreateFileDialog> {
       );
       Navigator.of(context).pop();
     }
-  }
-
-  String _sanitizeFileName(String name) {
-    // Remove characters that are invalid in file names
-    return name
-        .replaceAll(RegExp(r'[<>:"/\\|?*]'), '_')
-        .replaceAll(RegExp(r'\s+'), '_')
-        .trim();
   }
 
   Future<String?> _promptForFileName({
@@ -752,4 +761,56 @@ class _TemplateTile extends StatelessWidget {
         return Colors.grey;
     }
   }
+}
+
+String _templateDisplayName(BuildContext context, FileTemplate t) {
+  // Use known localization keys when available; fall back to hardcoded strings.
+  switch (t.displayNameKey) {
+    case 'fileTypeWord':
+      return AppLocalizations.of(context)?.fileTypeWord ?? 'Word Document';
+    case 'fileTypeExcel':
+      return AppLocalizations.of(context)?.fileTypeExcel ?? 'Spreadsheet';
+    case 'fileTypePowerPoint':
+      return AppLocalizations.of(context)?.fileTypePowerPoint ?? 'Presentation';
+    case 'fileTypeTxt':
+      return AppLocalizations.of(context)?.fileTypeTxt ?? 'Text File';
+    case 'fileTypePdf':
+      return AppLocalizations.of(context)?.fileTypePdf ?? 'PDF Document';
+    case 'fileTypeZip':
+      return AppLocalizations.of(context)?.fileTypeZip ?? 'ZIP Archive';
+    case 'fileTypeRar':
+      return AppLocalizations.of(context)?.fileTypeRar ?? 'RAR Archive';
+    case 'fileType7z':
+      return AppLocalizations.of(context)?.fileType7z ?? '7Z Archive';
+    case 'fileTypeCsv':
+      return AppLocalizations.of(context)?.cfCsvSpreadsheet ??
+          'CSV Spreadsheet';
+    case 'fileTypePng':
+      return AppLocalizations.of(context)?.fileTypePng ?? 'PNG Image';
+    case 'fileTypeJpeg':
+      return AppLocalizations.of(context)?.fileTypeJpeg ?? 'JPEG Image';
+    case 'fileTypeGif':
+      return AppLocalizations.of(context)?.fileTypeGif ?? 'GIF Image';
+    case 'fileTypeSvg':
+      return AppLocalizations.of(context)?.fileTypeSvg ?? 'SVG Image';
+    case 'fileTypeMp4':
+      return AppLocalizations.of(context)?.fileTypeMp4 ?? 'MP4 Video';
+    case 'fileTypeMp3':
+      return AppLocalizations.of(context)?.fileTypeMp3 ?? 'MP3 Audio';
+    case 'fileTypeWav':
+      return AppLocalizations.of(context)?.fileTypeWav ?? 'WAV Audio';
+    case 'fileTypeOgg':
+      return AppLocalizations.of(context)?.fileTypeOgg ?? 'OGG Audio';
+    default:
+      // Brand-specific templates (Libre/WPS/Google) — use extension as display name
+      return t.extension.toUpperCase().replaceFirst('.', '');
+  }
+}
+
+String _sanitizeFileName(String name) {
+  // Remove characters that are invalid in file names
+  return name
+      .replaceAll(RegExp(r'[<>:"/\\|?*]'), '_')
+      .replaceAll(RegExp(r'\s+'), '_')
+      .trim();
 }

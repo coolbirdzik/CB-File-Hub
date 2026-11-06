@@ -872,6 +872,16 @@ class ChineseLocalizations implements AppLocalizations {
   String get defaultViewMode => '默认视图模式';
 
   @override
+  String get folderViewModePreference => '未自定义文件夹的视图模式';
+  @override
+  String get folderViewModePreferenceDescription =>
+      '未保存单独视图模式时：仅含照片或视频的文件夹使用网格，或继承父文件夹。否则使用默认视图模式。';
+  @override
+  String get folderViewModeMediaGrid => '照片和视频使用网格';
+  @override
+  String get folderViewModeInheritParent => '跟随父文件夹';
+
+  @override
   String get defaultViewModeDescription => '用于没有单独保存视图模式的文件夹';
 
   @override
@@ -1888,6 +1898,11 @@ class ChineseLocalizations implements AppLocalizations {
   String get videoThumbnails => '视频缩略图';
   @override
   String get thumbnailMode => '生成模式';
+  @override
+  String get videoThumbnailViewportOnly => '仅加载可视区域附近的缩略图';
+  @override
+  String get videoThumbnailViewportOnlyDescription =>
+      '仅为可见项目及附近少量项目生成视频缩略图。关闭后预加载整个列表。';
   @override
   String get thumbnailModeFast => '快速';
   @override
@@ -4085,7 +4100,7 @@ class ChineseLocalizations implements AppLocalizations {
 
   // Disk Cleaner (CB Agent skill)
   @override
-  String get cbAgentCleanerTitle => '磁盘清理 (CB Agent)';
+  String get cbAgentCleanerTitle => 'Cleaner';
   @override
   String get diskCleanerNotAvailable => '磁盘清理可在 Windows 和 macOS 上使用';
   @override
@@ -4794,7 +4809,10 @@ class ChineseLocalizations implements AppLocalizations {
   @override
   String cleanerAppsLoadFailed(String error) => '无法分析已安装的应用：$error';
   @override
-  String get cleanerAppsPartialBanner => '结果仍在更新。';
+  String get cleanerAppsPartialBanner => '部分应用信息不可用，请刷新后重试。';
+  @override
+  String get cleanerAppsQuickScanHint =>
+      '无需扫描磁盘即可加载应用列表。大小使用 Windows 估计值，或先前磁盘用量扫描的测量值。';
   @override
   String get cleanerAppsSearchHint => '搜索应用';
   @override
@@ -4894,6 +4912,26 @@ class ChineseLocalizations implements AppLocalizations {
   String cleanerAppsFilesLoadFailed(String error) => '无法读取此文件夹：$error';
   @override
   String get cleanerAppsManageInWindows => '在 Windows 中管理';
+  @override
+  String get cleanerUninstallApp => '卸载应用';
+  @override
+  String get cleanerUninstallConfirm => '将打开应用的卸载程序。卸载后，Cleaner 将扫描相关文件夹供您检查。';
+  @override
+  String get cleanerUninstallReview => '应用已卸载。选择要移入回收站的残留文件夹。';
+  @override
+  String get cleanerUninstallDataWarning => '这些文件夹可能包含设置、账户及个人数据。请先检查路径再选择删除。';
+  @override
+  String get cleanerUninstallRunning => '正在等待卸载程序。请在应用窗口中完成或取消卸载。';
+  @override
+  String get cleanerUninstallScanning => '正在扫描相关文件夹…';
+  @override
+  String get cleanerUninstallNoFiles => '扫描位置中没有残留的相关文件夹。';
+  @override
+  String get cleanerUninstallPartial => '部分位置无法读取，结果可能不完整：';
+  @override
+  String get cleanerUninstallFilesChanged => '应用或文件夹已发生变化。请关闭对话框并重新扫描后再删除。';
+  @override
+  String get cleanerUninstallCleanupFailed => '部分文件夹未能移入回收站，剩余路径仍显示在列表中。';
   @override
   String get cleanerAppsReviewCleanable => '查看可清理的数据';
   @override

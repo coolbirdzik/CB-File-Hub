@@ -218,6 +218,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
   // Controller for inline rename on desktop
   late final InlineRenameController _inlineRenameController;
   String? _pendingCreatedFilePath;
+  int _createdItemRenameGeneration = 0;
   Set<String> _pendingDeletedFocusPaths = const {};
   String? _pendingNextFocusPathAfterDelete;
   bool _allowFileExtensionRename = false;
@@ -425,8 +426,18 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
     _propertiesPaneVisible =
         TabPaneState.propertiesVisible(widget.tabId) ?? _propertiesPaneVisible;
     _inlineRenameController = InlineRenameController();
-    FileBrowserHelper.setInlineRenameController(_inlineRenameController);
-    FileBrowserHelper.setAfterFileCreatedCallback(_handleCreatedFile);
+    FileBrowserHelper.setInlineRenameController(
+      _inlineRenameController,
+      tabId: widget.tabId,
+    );
+    FileBrowserHelper.setAfterFileCreatedCallback(
+      _handleCreatedFile,
+      tabId: widget.tabId,
+    );
+    FileBrowserHelper.setCreateFolderCallback(
+      _showCreateFolderDialog,
+      tabId: widget.tabId,
+    );
 
     // If this is a new tab with empty path (drive view), enable lazy loading
     if (_isDrivesPathValue(_currentPath)) {
@@ -582,8 +593,9 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
     _previewPaneWidthNotifier.dispose();
     _propertiesPaneFocusNode.dispose();
     _inlineRenameController.dispose();
-    FileBrowserHelper.setInlineRenameController(null);
-    FileBrowserHelper.setAfterFileCreatedCallback(null);
+    FileBrowserHelper.setInlineRenameController(null, tabId: widget.tabId);
+    FileBrowserHelper.setAfterFileCreatedCallback(null, tabId: widget.tabId);
+    FileBrowserHelper.setCreateFolderCallback(null, tabId: widget.tabId);
     _pendingTasksSubscription?.cancel();
     _fileDropSubscription?.cancel();
 
@@ -941,12 +953,23 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
   }
 
   void _handleCreatedFile(String createdPath) {
-    if (!mounted || !isDesktopPlatform) {
+    if (!mounted ||
+        !isDesktopPlatform ||
+        _normalizePath(path.dirname(createdPath)) !=
+            _normalizePath(_currentPath)) {
       return;
     }
 
+    _createdItemRenameGeneration++;
     _pendingCreatedFilePath = createdPath;
-    _maybeStartPendingCreatedFileRename(_folderListBloc.state);
+    final state = _folderListBloc.state;
+    if (state.currentFilter != null ||
+        state.currentSearchQuery != null ||
+        state.currentSearchTag != null) {
+      _searchController.clear();
+      _folderListBloc.add(const ClearSearchAndFilters());
+    }
+    _folderListBloc.add(FolderListRefresh(_currentPath));
   }
 
   void _maybeStartPendingCreatedFileRename(FolderListState folderState) {
@@ -956,43 +979,59 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
     }
 
     if (folderState.isLoading ||
+        folderState.isRefreshing ||
         _normalizePath(folderState.currentPath.path) !=
             _normalizePath(_currentPath)) {
       return;
     }
 
     final normalizedPendingPath = _normalizePath(pendingPath);
-    final matchedFilePath = folderState.files
-        .map((entity) => entity.path)
-        .cast<String?>()
-        .firstWhere(
-          (entityPath) =>
-              entityPath != null &&
-              _normalizePath(entityPath) == normalizedPendingPath,
-          orElse: () => null,
-        );
-    if (matchedFilePath == null) {
-      return;
-    }
+    final items = <FileSystemEntity>[
+      ...folderState.folders,
+      ...folderState.files,
+    ];
+    final targetIndex = items.indexWhere(
+      (entity) => _normalizePath(entity.path) == normalizedPendingPath,
+    );
+    if (targetIndex == -1) return;
 
+    final entity = items[targetIndex];
+    final generation = _createdItemRenameGeneration;
     _pendingCreatedFilePath = null;
-    _toggleFileSelection(matchedFilePath);
-    _keyboardController.focusedPath = matchedFilePath;
+    if (entity is Directory) {
+      _toggleFolderSelection(entity.path);
+    } else {
+      _toggleFileSelection(entity.path);
+    }
+    _keyboardController.focusedPath = entity.path;
 
+    final crossAxisCount = (_gridCrossAxisCount ?? 1).clamp(1, 999).toInt();
+    _keyboardController.ensurePathVisible(
+      entity.path,
+      index: targetIndex,
+      crossAxisCount: crossAxisCount,
+      itemMainAxisExtent: _resolvedItemMainAxisExtent(
+        folderState,
+        crossAxisCount,
+      ),
+    );
+    // Let the refresh and scroll build the item before focusing its editor.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) {
-        return;
-      }
-
-      _inlineRenameController.startRename(
-        matchedFilePath,
-        onCancelled: () {
-          _keyboardController.focusNode.requestFocus();
-        },
-        onCommitted: () {
-          _keyboardController.focusNode.requestFocus();
-        },
-      );
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted ||
+            generation != _createdItemRenameGeneration ||
+            _normalizePath(path.dirname(entity.path)) !=
+                _normalizePath(_currentPath)) {
+          return;
+        }
+        _inlineRenameController.startRename(
+          entity.path,
+          commitOnBlur: true,
+          onCancelled: () => _keyboardController.focusNode.requestFocus(),
+          onCommitted: () => _keyboardController.focusNode.requestFocus(),
+        );
+      });
+      WidgetsBinding.instance.ensureVisualUpdate();
     });
   }
 
@@ -1309,6 +1348,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
     if (_isHandlingPathUpdate) return;
     _isHandlingPathUpdate = true;
     _pendingCreatedFilePath = null;
+    _createdItemRenameGeneration++;
     // Defer the actual update to avoid setState-during-build when this is
     // triggered synchronously from didUpdateWidget (e.g. split-pane path change).
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1995,13 +2035,12 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
   /// Build skeleton loader while initial content loads
   /// Uses unified skeleton system with automatic mobile/desktop adaptation
   Widget _buildSkeletonLoader(FolderListState state) {
-    final isGridView = state.viewMode == ViewMode.grid;
-    return SkeletonHelper.responsive(
-      isGridView: isGridView,
-      isAlbum: false,
-      crossAxisCount: state.gridZoomLevel,
-      itemCount: 12,
-      wrapInCardOnDesktop: true,
+    return SkeletonHelper.files(
+      viewMode: state.viewMode,
+      gridZoomLevel: state.gridZoomLevel,
+      layoutKnown: !FolderDisplayPreferences.instance.needsListingForViewMode(
+        _currentPath,
+      ),
     );
   }
 

@@ -371,8 +371,7 @@ class _TagManagementHelper {
 /// Helper class cho File Browser menu
 class _FileBrowserHelper {
   static void createNewFolder(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    AppToast.info(context, l10n.createNewFolder);
+    shared_registry.FileBrowserHelper.createNewFolder(context);
   }
 
   static Future<void> createNewFile(BuildContext context) async {
