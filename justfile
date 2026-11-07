@@ -110,6 +110,18 @@ verify-format:
 test:
     cd {{project_dir}} && {{flutter}} test --reporter {{test_reporter}}
 
+# Inspect an existing report without rerunning tests or native build hooks.
+test-times report="build/unit_test_report.jsonl":
+    cd {{project_dir}} && dart tool/test_timing_report.dart "{{report}}"
+
+# Complete desktop coverage with one build/launch (same runner as CI/release).
+e2e-desktop suite="": deps fetch-llama fetch-aria2
+    node scripts/ci/e2e_run.mjs {{ if suite == "" { "--all" } else { "--suites " + suite } }}
+
+# Rerun failed desktop suites; an empty failure list performs no build.
+e2e-desktop-failed:
+    node scripts/ci/e2e_run.mjs --failed
+
 # Kill all CB File Hub app processes
 kill-cb:
     @echo "Killing CB File Hub processes..."
@@ -128,14 +140,12 @@ kill-cb:
 #
 # Options: just e2e "rename" true true               (full_startup, full_screenshots)
 e2e suite="" full_startup="false" full_screenshots="false" no_open="false": kill-cb
-    cd {{project_dir}} && {{flutter}} test integration_test/app_e2e_test.dart --no-pub -d {{e2e_device}} --dart-define=CB_E2E=true --dart-define=CB_E2E_FAST={{ if full_startup == "true" { "false" } else { "true" } }} --dart-define=CB_E2E_FULL_SCREENSHOTS={{full_screenshots}} --reporter {{test_reporter}} --file-reporter json:build/e2e_report.jsonl {{ if suite != "" { '--plain-name "' + suite + '"' } else { "" } }} || true
-    cd {{project_dir}} && dart run tool/e2e_dashboard.dart --build-dir build
-    @echo ""
-    @echo "Dashboard: file://$(pwd)/{{project_dir}}/build/e2e_dashboard/index.html"
-    {{ if no_open != "true" { "just _open-dashboard" } else { "true" } }}
+    cd {{project_dir}} && dart tool/e2e_allure.dart {{ if suite != "" { '--plain-name "' + suite + '"' } else { "" } }} {{ if full_startup == "true" { "--full-startup" } else { "" } }} {{ if full_screenshots == "true" { "--full-screenshots" } else { "" } }} {{ if no_open == "true" { "--no-open" } else { "" } }}
 
 # Open the dashboard in default browser (cross-platform)
-dashboard: _open-dashboard
+dashboard:
+    cd {{project_dir}} && dart tool/e2e_dashboard.dart --build-dir build
+    just _open-dashboard
     @echo "Dashboard: file://$(pwd)/{{project_dir}}/build/e2e_dashboard/index.html"
 
 # List all available E2E test cases (group + test name).
@@ -163,19 +173,19 @@ _open-dashboard:
 #   - env:  CB_E2E_MAX_PARALLEL=4 just e2e-parallel
 # Options: just e2e-parallel Navigation  |  just e2e-parallel "" 4 true true true
 e2e-parallel suite="" max_parallel="" rerun="false" no_open="false" full_startup="false" full_screenshots="false": kill-cb
-    cd {{project_dir}} && dart run tool/e2e_parallel.dart {{ if suite != "" { '--plain-name "' + suite + '"' } else { "" } }} {{ if max_parallel != "" { "--max-parallel " + max_parallel } else { "" } }} {{ if rerun == "true" { "--rerun-failed" } else { "" } }} {{ if no_open == "true" { "--no-open" } else { "" } }} {{ if full_startup == "true" { "--full-startup" } else { "" } }} {{ if full_screenshots == "true" { "--full-screenshots" } else { "" } }}
+    cd {{project_dir}} && dart tool/e2e_parallel.dart {{ if suite != "" { '--plain-name "' + suite + '"' } else { "" } }} {{ if max_parallel != "" { "--max-parallel " + max_parallel } else { "" } }} {{ if rerun == "true" { "--rerun-failed" } else { "" } }} {{ if no_open == "true" { "--no-open" } else { "" } }} {{ if full_startup == "true" { "--full-startup" } else { "" } }} {{ if full_screenshots == "true" { "--full-screenshots" } else { "" } }}
 
 # E2E serial runner (debug exact order)
 e2e-serial suite="" rerun="false" no_open="false" full_startup="false" full_screenshots="false": kill-cb
-    cd {{project_dir}} && dart run tool/e2e_allure.dart {{ if suite != "" { '--plain-name "' + suite + '"' } else { "" } }} {{ if rerun == "true" { "--rerun-failed" } else { "" } }} {{ if no_open == "true" { "--no-open" } else { "" } }} {{ if full_startup == "true" { "--full-startup" } else { "" } }} {{ if full_screenshots == "true" { "--full-screenshots" } else { "" } }}
+    cd {{project_dir}} && dart tool/e2e_allure.dart {{ if suite != "" { '--plain-name "' + suite + '"' } else { "" } }} {{ if rerun == "true" { "--rerun-failed" } else { "" } }} {{ if no_open == "true" { "--no-open" } else { "" } }} {{ if full_startup == "true" { "--full-startup" } else { "" } }} {{ if full_screenshots == "true" { "--full-screenshots" } else { "" } }}
 
 # E2E plain output (no dashboard, useful for debugging)
 e2e-plain full_startup="false" full_screenshots="false": kill-cb
-    cd {{project_dir}} && dart run tool/run_e2e_with_log.dart {{ if full_startup == "true" { "--full-startup" } else { "" } }} {{ if full_screenshots == "true" { "--full-screenshots" } else { "" } }}
+    cd {{project_dir}} && dart tool/run_e2e_with_log.dart {{ if full_startup == "true" { "--full-startup" } else { "" } }} {{ if full_screenshots == "true" { "--full-screenshots" } else { "" } }}
 
 # Rerun only previously-failed E2E tests
 e2e-failed no_open="false" full_startup="false" full_screenshots="false": kill-cb
-    cd {{project_dir}} && dart run tool/e2e_allure.dart --rerun-failed {{ if no_open == "true" { "--no-open" } else { "" } }} {{ if full_startup == "true" { "--full-startup" } else { "" } }} {{ if full_screenshots == "true" { "--full-screenshots" } else { "" } }}
+    cd {{project_dir}} && dart tool/e2e_allure.dart --rerun-failed {{ if no_open == "true" { "--no-open" } else { "" } }} {{ if full_startup == "true" { "--full-startup" } else { "" } }} {{ if full_screenshots == "true" { "--full-screenshots" } else { "" } }}
 
 # flutter clean + pub get + E2E (fix MSB3073 / bad build)
 e2e-clean full_startup="false" full_screenshots="false": kill-cb
@@ -185,7 +195,7 @@ e2e-clean full_startup="false" full_screenshots="false": kill-cb
 
 # Run E2E by test file name
 e2e-file file suite="": kill-cb
-    cd {{project_dir}} && dart run tool/e2e_parallel.dart --file {{file}} {{ if suite != "" { '--plain-name "' + suite + '"' } else { "" } }}
+    cd {{project_dir}} && dart tool/e2e_parallel.dart --file {{file}} {{ if suite != "" { '--plain-name "' + suite + '"' } else { "" } }}
 
 # Run the app on a device with the local .env applied (default: windows)
 run device="windows": deps

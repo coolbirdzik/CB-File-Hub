@@ -33,9 +33,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:path/path.dart' as p;
+import 'package:test_api/hooks.dart' show TestHandle;
 
 import 'e2e_keys.dart' as keys;
 import 'e2e_sandbox_paths.dart';
+import 'e2e_wait.dart';
 
 // ---------------------------------------------------------------------------
 // Internal state
@@ -53,15 +55,6 @@ class _Entry {
     required this.ts,
   });
 }
-
-/// Upper bound for every settle performed by this reporter.
-///
-/// `pumpAndSettle` defaults to a ten minute timeout. A screen that never stops
-/// animating — a video thumbnail placeholder still waiting on its decoder, for
-/// example — therefore blocks a capture run for ten minutes per frame before
-/// the surrounding try/catch can fall back to a plain pump. Capturing a
-/// still-loading frame is always preferable to losing the run.
-const Duration kE2ESettleTimeout = Duration(seconds: 12);
 
 final List<_Entry> _log = [];
 Directory? _reportDir;
@@ -126,24 +119,8 @@ Future<void> captureE2EScreenshot(
   try {
     await _ensureReportDir();
 
-    // Let the UI fully settle before grabbing a frame.
-    // The action that triggered this screenshot already called pumpAndSettle,
-    // so this is mostly free (returns immediately when already settled).
-    try {
-      await tester.pumpAndSettle(
-        kCbE2EFast
-            ? const Duration(milliseconds: 100)
-            : const Duration(seconds: 1),
-        EnginePhase.sendSemanticsUpdate,
-        kE2ESettleTimeout,
-      );
-    } catch (_) {
-      await tester.pump(
-        kCbE2EFast
-            ? const Duration(milliseconds: 50)
-            : const Duration(milliseconds: 200),
-      );
-    }
+    // Capture the asserted state, including loading/error states. A screenshot
+    // must not wait for a video/spinner to become globally idle.
     await tester.pump(
       kCbE2EFast
           ? const Duration(milliseconds: 16)
@@ -152,7 +129,7 @@ Future<void> captureE2EScreenshot(
 
     final index = ++_counter;
     final slug =
-        '${index.toString().padLeft(3, '0')}_${_slugify(testName)}_${_slugify(step)}';
+        '${index.toString().padLeft(3, '0')}_${_filenameSlug(testName, 84)}_${_filenameSlug(step, 44)}';
 
     final Uint8List? bytes = await _capturePngBytes(tester, slug);
 
@@ -220,7 +197,7 @@ Future<void> captureE2EScreenshot(
 /// ```
 ///
 /// Methods return `Future<void>` to match [WidgetTester] signatures.
-/// Finder errors (zero elements) are logged and skip without failing the test.
+/// Missing targets and interaction failures propagate to the test runner.
 class E2ETester {
   /// The wrapped tester. Exposed for helpers that still need the raw
   /// [WidgetTester] (e.g. some `page.go()` extensions).
@@ -236,12 +213,14 @@ class E2ETester {
   /// Call once at the top of each test, before any interactions:
   ///   await et.init('my test');
   Future<void> init(String label) async {
-    _label = label;
+    // Exact JSON-reporter identity also works under the combined suite prefix.
+    final testName = TestHandle.current.name;
+    _label = testName.isEmpty ? label : testName;
     await _ensureReportDir();
     // Drop any stale screenshots from a previous run of this same test so
     // reruns of a subset of tests don't show a mixed history. Other tests'
     // entries stay intact.
-    await _clearTestEntries(label);
+    await _clearTestEntries(_label);
     await captureE2EScreenshot(tester, _label, '00_initial');
   }
 
@@ -256,14 +235,9 @@ class E2ETester {
     await _saveManifest(); // always flush at explicit checkpoints
   }
 
-  /// Wait for animations to settle, then capture a screenshot.
+  /// Wait for finite animations to settle, then capture a screenshot.
   Future<void> screenshotSettled(String step) async {
-    try {
-      await tester.pumpAndSettle(const Duration(seconds: 2));
-    } catch (_) {
-      await tester.pump(const Duration(milliseconds: 500));
-    }
-    await tester.pump(const Duration(milliseconds: 200));
+    await settleE2EUi(tester);
     await captureE2EScreenshot(tester, _label, step);
   }
 
@@ -312,7 +286,7 @@ class E2ETester {
     return detail != null ? '${action}_${c}_$detail' : '${action}_$c';
   }
 
-  /// Runs [fn] then captures a screenshot.  Never throws.
+  /// Runs [fn], propagating interaction errors, then optionally captures it.
   Future<void> _act(
     String action,
     Future<void> Function() fn, [
@@ -327,15 +301,9 @@ class E2ETester {
   }
 
   Future<void> _settleAfterAction() async {
-    try {
-      await tester.pumpAndSettle(
-        const Duration(milliseconds: 100),
-        EnginePhase.sendSemanticsUpdate,
-        kE2ESettleTimeout,
-      );
-    } catch (_) {
-      await tester.pump(const Duration(milliseconds: 50));
-    }
+    // File I/O and persistent animations do not define action completion.
+    // Callers wait for the relevant result with the shared condition helpers.
+    await tester.pump(const Duration(milliseconds: 50));
   }
 
   // -------------------------------------------------------------------------
@@ -394,17 +362,7 @@ class E2ETester {
   /// Pump until animations are done.
   /// [pumpAndSettle] does NOT auto-screenshot — it is a timing wait, not a
   /// user-visible action. Use [screenshotSettled] when you also need a frame.
-  Future<void> pumpAndSettle([Duration? duration]) async {
-    try {
-      await tester.pumpAndSettle(
-        duration ?? const Duration(milliseconds: 100),
-        EnginePhase.sendSemanticsUpdate,
-        kE2ESettleTimeout,
-      );
-    } catch (_) {
-      await tester.pump(const Duration(milliseconds: 100));
-    }
-  }
+  Future<void> pumpAndSettle() => settleE2EUi(tester);
 
   // -------------------------------------------------------------------------
   // Keyboard helpers — sendKeyDownEvent / sendKeyUpEvent / sendKeyEvent
@@ -813,6 +771,11 @@ String _slugify(String s) => s
     .toLowerCase()
     .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
     .replaceAll(RegExp(r'^_+|_+$'), '');
+
+String _filenameSlug(String value, int limit) {
+  final slug = _slugify(value);
+  return slug.length > limit ? slug.substring(0, limit) : slug;
+}
 
 String _esc(String s) => s
     .replaceAll('&', '&amp;')

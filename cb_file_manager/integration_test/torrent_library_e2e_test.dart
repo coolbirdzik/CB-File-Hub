@@ -118,11 +118,19 @@ void main() {
     String action,
   ) async {
     await waitForFileRowVisible(tester, path);
-    await rightClickFileRow(tester, path);
     // Torrent actions use the shared renderer, whose desktop rows are custom
-    // PopupMenuEntry widgets. Address actions by the renderer's stable keys.
+    // PopupMenuEntry widgets. A menu snapshots its entry when opened: waiting
+    // on a stale open menu cannot observe the asynchronously refreshed row.
+    // Reopen until the requested action is offered, bounded by the same deadline.
     final item = keyed('context-menu-action-torrent_$action');
-    await waitForTorrentWidget(tester, item);
+    final deadline = DateTime.now().add(const Duration(seconds: 20));
+    do {
+      await rightClickFileRow(tester, path);
+      await tester.pump(const Duration(milliseconds: 50));
+      if (item.evaluate().isNotEmpty) break;
+      await dismissDialog(tester);
+    } while (DateTime.now().isBefore(deadline));
+    expect(item, findsOneWidget, reason: 'Torrent $path never offered $action');
     await tester.ensureVisible(item);
     await tester.tap(item);
     await tester.pump(const Duration(milliseconds: 200));
@@ -709,12 +717,14 @@ void main() {
             await tester.pump(const Duration(milliseconds: 100));
           }
           expect(status['status'], 'active');
-          await tester.pump(const Duration(milliseconds: 800));
+          expect(
+            int.parse(status['completedLength'] as String),
+            greaterThan(0),
+          );
           await contextAction(tester, entry.torrentPath, 'pause');
-          await f.service.sync();
-          status = await f.engine.call('tellStatus', [entry.gid]) as Map;
+          status = await f.waitForTask(tester, hash, 'paused');
           expect(status['status'], 'paused');
-          await tester.pump(const Duration(milliseconds: 800));
+          entry = await f.waitForStatus(tester, hash, 'paused');
           await contextAction(tester, entry.torrentPath, 'resume');
           final deadline = DateTime.now().add(const Duration(seconds: 40));
           while (DateTime.now().isBefore(deadline)) {

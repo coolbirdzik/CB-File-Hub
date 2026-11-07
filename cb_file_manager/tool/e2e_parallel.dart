@@ -28,6 +28,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'test_run_summary.dart';
 
 const _kAllGroups = [
   '01 Navigation',
@@ -47,6 +48,9 @@ const _kAllGroups = [
   'File Drag Drop',
   'Breadcrumb Overflow',
   'Torrent Library',
+  'AX Semantics',
+  'Tooltip Semantics',
+  'Video Chrome Semantics',
 ];
 
 const _kWorkersDir = 'build/e2e_workers';
@@ -124,9 +128,8 @@ Future<void> main(List<String> args) async {
       testFile = resolved;
       fileMode = true;
     } else {
-      print(
-        '[Parallel E2E] WARNING: file not found "$resolved" — using default.',
-      );
+      stderr.writeln('[Parallel E2E] Test file not found: $resolved');
+      exit(64);
     }
   }
 
@@ -134,12 +137,6 @@ Future<void> main(List<String> args) async {
     _printDryRun();
     return;
   }
-
-  // ---- Kill stray Windows instances ----
-  await _killCbFileHubOnWindows();
-
-  // Avoid each worker running pub get concurrently against .dart_tool.
-  await _runPubGetOnce();
 
   // ---- Determine groups to run ----
   List<String> groups;
@@ -158,8 +155,8 @@ Future<void> main(List<String> args) async {
   } else if (rerunFailed) {
     groups = await _loadFailedGroups();
     if (groups.isEmpty) {
-      print('[Parallel E2E] No previous failures found — running all groups.');
-      groups = _kAllGroups;
+      print('[Parallel E2E] No previous failures found; nothing to rerun.');
+      return;
     } else {
       print(
         '[Parallel E2E] Rerunning ${groups.length} failed group(s): '
@@ -169,6 +166,10 @@ Future<void> main(List<String> args) async {
   } else {
     groups = _kAllGroups;
   }
+
+  // Only prepare/close app processes when there is actual work to execute.
+  await _killCbFileHubOnWindows();
+  await _runPubGetOnce();
 
   // ---- File mode: run single test file directly, skip parallel workers ----
   if (fileMode) {
@@ -184,6 +185,7 @@ Future<void> main(List<String> args) async {
       fullStartup: fullStartup,
       fullScreenshots: fullScreenshots,
       doNotOpenBrowser: noOpen,
+      generateReport: !noGenerate,
     );
     return;
   }
@@ -326,7 +328,6 @@ Future<void> main(List<String> args) async {
     print('[Parallel E2E] Generating dashboard...');
 
     final adapter = await Process.run(Platform.resolvedExecutable, [
-      'run',
       'tool/e2e_allure_adapter.dart',
       _kMergedJsonl,
       '--build-dir',
@@ -336,7 +337,6 @@ Future<void> main(List<String> args) async {
     if (adapter.stderr.isNotEmpty) stderr.write(adapter.stderr);
 
     final dash = await Process.run(Platform.resolvedExecutable, [
-      'run',
       'tool/e2e_dashboard.dart',
       '--build-dir',
       'build',
@@ -375,12 +375,14 @@ Future<void> _runSingleFile({
   required bool fullStartup,
   required bool fullScreenshots,
   required bool doNotOpenBrowser,
+  required bool generateReport,
 }) async {
   final device = Platform.environment['E2E_DEVICE'] ?? 'windows';
 
   final args = <String>[
     'test',
     testFile,
+    '--no-pub',
     '-d',
     device,
     '--dart-define=CB_E2E=true',
@@ -419,10 +421,12 @@ Future<void> _runSingleFile({
   await logSink.close();
   stopwatch.stop();
 
-  final stats = _statsInJsonl(await jsonlFile.readAsString());
+  final content = await jsonlFile.readAsString();
+  final stats = _statsInJsonl(content);
+  final successful = exitCode == 0 && TestRunSummary.parse(content).successful;
   final reason = exitCode == 0 ? null : await _failureReason(logFile);
 
-  final status = exitCode == 0 ? 'PASS' : 'FAIL';
+  final status = successful ? 'PASS' : 'FAIL';
   final elapsed = _formatDuration(stopwatch.elapsed);
   final filename = testFile.split('/').last;
   print(
@@ -433,19 +437,23 @@ Future<void> _runSingleFile({
     print('[File:$filename] Reason: $reason');
   }
 
-  // Generate the dashboard for the single-file results
-  await _runPubGetOnce();
+  if (!generateReport) {
+    await _killAllTestProcesses();
+    exit(successful ? 0 : (exitCode == 0 ? 1 : exitCode));
+  }
+
+  // Convert the report that was just produced. Calling e2e_allure here would
+  // launch the app suite a second time and replace the requested file's report.
   final adapter = await Process.run(Platform.resolvedExecutable, [
-    'run',
-    'tool/e2e_allure.dart',
-    '--no-open',
-    '--skip-generate',
+    'tool/e2e_allure_adapter.dart',
+    jsonlOut,
+    '--build-dir',
+    'build',
   ], workingDirectory: Directory.current.path);
   if (adapter.stdout.isNotEmpty) stdout.write(adapter.stdout);
   if (adapter.stderr.isNotEmpty) stderr.write(adapter.stderr);
 
   final dash = await Process.run(Platform.resolvedExecutable, [
-    'run',
     'tool/e2e_dashboard.dart',
     '--build-dir',
     'build',
@@ -460,7 +468,7 @@ Future<void> _runSingleFile({
   }
 
   await _killAllTestProcesses();
-  exit(exitCode);
+  exit(successful ? 0 : (exitCode == 0 ? 1 : exitCode));
 }
 
 // ---------------------------------------------------------------------------
@@ -527,9 +535,10 @@ Future<_WorkerResult> _runWorker(
 
   final content = await jsonlFile.readAsString();
   final stats = _statsInJsonl(content);
+  final successful = exitCode == 0 && TestRunSummary.parse(content).successful;
   final reason = exitCode == 0 ? null : await _failureReason(logFile);
 
-  final status = exitCode == 0 ? 'PASS' : 'FAIL';
+  final status = successful ? 'PASS' : 'FAIL';
   final elapsed = _formatDuration(stopwatch.elapsed);
   print(
     '[Worker:$group] $status ($elapsed) — '
@@ -541,7 +550,7 @@ Future<_WorkerResult> _runWorker(
 
   return _WorkerResult(
     group: group,
-    success: exitCode == 0,
+    success: successful,
     exitCode: exitCode,
     passed: stats.passed,
     failed: stats.failed,
@@ -567,6 +576,12 @@ String _testFileForGroup(String group) {
       return _kBreadcrumbOverflowE2ETestFile;
     case _kTorrentLibraryGroup:
       return _kTorrentLibraryE2ETestFile;
+    case 'AX Semantics':
+      return 'integration_test/semantics_stability_e2e_test.dart';
+    case 'Tooltip Semantics':
+      return 'integration_test/tooltip_semantics_e2e_test.dart';
+    case 'Video Chrome Semantics':
+      return 'integration_test/video_player_chrome_semantics_e2e_test.dart';
     default:
       return _kAppE2ETestFile;
   }

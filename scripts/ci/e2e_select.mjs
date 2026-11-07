@@ -29,6 +29,8 @@ export const configPath = path.join(repoRoot, 'cb_file_manager/integration_test/
 export const fingerprintPaths = [
   'cb_file_manager',
   'mobile_smb_native',
+  'cb_native',
+  'build.config',
   '.github/workflows/build-test.yml',
   'scripts/ci',
   'scripts/fetch_llama_runtime.sh',

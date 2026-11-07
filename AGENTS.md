@@ -37,6 +37,9 @@ Run from repo root via `just` (requires Git Bash on Windows):
 | Run macOS dev build      | `just macos-dev` (own permissions + hot reload)     |
 | Unit/widget tests        | `just test`                                         |
 | E2E tests (parallel)     | `just e2e-parallel`                                 |
+| Full desktop E2E (one build/launch) | `just e2e-desktop`                        |
+| Rerun failed desktop suites | `just e2e-desktop-failed`                         |
+| Inspect existing test timings | `just test-times`                              |
 | E2E single suite         | `just e2e Navigation`                               |
 | E2E single test by name  | `just e2e "navigate back to parent with Backspace"` |
 | E2E single file          | `just e2e-file video_thumbnails_e2e_test`           |

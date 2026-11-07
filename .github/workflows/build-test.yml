@@ -134,10 +134,9 @@ jobs:
           bash scripts/fetch_llama_runtime.sh
           bash scripts/fetch_aria2_runtime.sh
 
-      # Flutter desktop integration_test does NOT support multiple test files
-      # in one `flutter test integration_test` invocation, so e2e_run.mjs runs
-      # one process per suite and kills stray cb_file_hub.exe between them.
-      # It keeps going after a failure so every regression shows up in one run.
+      # The combined desktop entrypoint builds/launches once, with scoped hooks
+      # and a filter for the selected suites. Assertions keep running after a
+      # failure and the runner records each suite separately.
       # showcase_screenshots_e2e_test (marketing screenshots) and the other
       # files under "notInCi" in e2e_impact.json are intentionally not run here.
       # See: cb_file_manager/integration_test/app_e2e_test.dart header.

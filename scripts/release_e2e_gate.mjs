@@ -4,11 +4,11 @@
 // version, so a failing suite stops the release before any commit or tag.
 //
 // It runs the same suites, the same way, as the `e2e-windows` CI job on main
-// (scripts/ci/e2e_run.mjs, one `flutter test` process per suite).
+// (scripts/ci/e2e_run.mjs, one shared desktop entrypoint for pending suites).
 //
 // A pass is recorded per suite under cb_file_manager/build/release-e2e/<fingerprint>/,
-// where <fingerprint> is the CI source fingerprint of HEAD (e2e_select.mjs) plus
-// cb_native. Rerunning
+// where <fingerprint> is the CI source fingerprint of HEAD (e2e_select.mjs),
+// including both native packages and the pinned build configuration. Rerunning
 // the gate on the same source only runs the suites that have not passed yet. Any
 // change to the fingerprinted sources starts over, and `flutter clean` clears them.
 //
@@ -19,11 +19,11 @@
 //   node scripts/release_e2e_gate.mjs           # run missing suites, exit 1 on failure
 //   node scripts/release_e2e_gate.mjs --status  # show recorded passes, run nothing
 
-import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { loadConfig, repoRoot, sourceFingerprint } from './ci/e2e_select.mjs';
+import { coveredSuites } from './ci/e2e_plan.mjs';
 
 const projectDir = path.join(repoRoot, 'cb_file_manager');
 const statusOnly = process.argv.includes('--status');
@@ -70,16 +70,7 @@ if (dirty) {
   fail(`Working tree is not clean. Commit or stash these changes first, so the E2E run tests exactly what gets released:\n${dirty}`);
 }
 
-// The CI fingerprint does not cover cb_native, yet its Rust code is built into
-// every E2E run through the build hook, so it is added here.
-function releaseFingerprint() {
-  const result = spawnSync('git', ['rev-parse', 'HEAD:cb_native'], { cwd: repoRoot, encoding: 'utf8' });
-  if (result.status !== 0) fail(`git rev-parse HEAD:cb_native failed: ${result.stderr.trim()}`);
-  return crypto.createHash('sha256')
-    .update(`${sourceFingerprint()}\ncb_native=${result.stdout.trim()}`)
-    .digest('hex')
-    .slice(0, 20);
-}
+const releaseFingerprint = sourceFingerprint;
 
 const suites = Object.keys(loadConfig().suites);
 const fingerprint = releaseFingerprint();
@@ -114,19 +105,27 @@ if (dirtyAfterPrep) {
   fail(`Preparing the E2E run changed tracked files (e.g. pubspec.lock). Commit them first:\n${dirtyAfterPrep}`);
 }
 
-const failed = [];
-for (const suite of pending) {
-  console.log(`\n[release-e2e] Running ${suite}...`);
-  const result = spawnSync(process.execPath, ['scripts/ci/e2e_run.mjs', '--suites', suite], { cwd: repoRoot, stdio: 'inherit' });
-  if (result.status === 0) {
-    fs.mkdirSync(markerDir, { recursive: true });
-    fs.writeFileSync(markerFile(suite), `${new Date().toISOString()}\n`);
-  } else {
-    failed.push(suite);
-  }
+// Batch pending suites through one desktop build/launch. Preserve individual
+// passes after an ordinary assertion failure, but never cache a crashed run.
+const summaryPath = path.join(projectDir, 'build/e2e-logs/summary.json');
+fs.rmSync(summaryPath, { force: true });
+const result = spawnSync(process.execPath,
+  ['scripts/ci/e2e_run.mjs', '--suites', pending.join(',')],
+  { cwd: repoRoot, stdio: 'inherit' });
+if (gitStatus() || releaseFingerprint() !== fingerprint) {
+  fail('Sources changed during E2E. No passes were recorded; commit the final sources and rerun.');
 }
+const summary = fs.existsSync(summaryPath)
+  ? JSON.parse(fs.readFileSync(summaryPath, 'utf8')) : null;
+const passed = coveredSuites(summary && result.status !== null
+  ? summary.results.filter(item => item.ok).map(item => item.id) : []);
+fs.mkdirSync(markerDir, { recursive: true });
+for (const suite of pending.filter(id => passed.includes(id))) {
+  fs.writeFileSync(markerFile(suite), `${new Date().toISOString()}\n`);
+}
+const failed = pending.filter(suite => !passed.includes(suite));
 
-if (failed.length > 0) {
+if (failed.length > 0 || result.status !== 0) {
   fail(
     `E2E failed: ${failed.join(', ')}. Release blocked.\n` +
     'Logs: cb_file_manager/build/e2e-logs/<suite>.log. Fix and commit, then rerun the release ' +

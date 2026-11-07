@@ -1,4 +1,5 @@
 import 'package:cb_file_manager/design_system/cb_theme_builder.dart';
+import 'e2e_wait.dart';
 import 'package:cb_file_manager/ui/components/common/breadcrumb_address_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -54,7 +55,7 @@ void main() {
               ),
             ),
           );
-          await tester.pumpAndSettle();
+          await settleE2EUi(tester);
           expect(tester.takeException(), isNull, reason: 'width $width');
         }
       },

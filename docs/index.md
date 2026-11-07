@@ -12,7 +12,8 @@
   - `contributing/03-release-guide.md`
   - [Development setup](contributing/04-development-setup.md) — Toolchains, builds, tests, and screenshot automation
   - `quality/01-testing-strategy.md`
-  - `quality/02-e2e-desktop-integration.md` — Desktop E2E (`integration_test`, Makefile, logs, CI)
+  - `quality/02-e2e-desktop-integration.md` — Desktop E2E (one build/launch, affected suites, reports, CI/release)
+  - [Test performance](quality/04-test-performance.md) — Measured Windows Navigation timings before/after the harness update
   - [Rust benchmarks](quality/03-rust-benchmarks.md) — Measured acceleration, raw samples, and reproduction commands
 - **Technical**
   - `technical/index.md`

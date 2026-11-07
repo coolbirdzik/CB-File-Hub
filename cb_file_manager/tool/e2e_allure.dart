@@ -22,6 +22,7 @@
 
 import 'dart:convert';
 import 'dart:io';
+import 'test_run_summary.dart';
 
 Future<void> main(List<String> args) async {
   final rerunFailed = args.contains('--rerun-failed');
@@ -41,9 +42,8 @@ Future<void> main(List<String> args) async {
     if (File(resolved).existsSync()) {
       testFile = resolved;
     } else {
-      print(
-        '[Allure E2E] WARNING: file not found "$resolved" — using default.',
-      );
+      stderr.writeln('[Allure E2E] Test file not found: $resolved');
+      exit(64);
     }
   }
 
@@ -67,7 +67,8 @@ Future<void> main(List<String> args) async {
   final plainNameFilter = rerunFailed ? await _loadFailedTests() : null;
 
   if (rerunFailed && plainNameFilter == null) {
-    print('[Allure E2E] No previous failures found — running all tests.');
+    print('[Allure E2E] No previous failures found; nothing to rerun.');
+    return;
   } else if (rerunFailed) {
     final count = plainNameFilter!.split('|').length;
     print('[Allure E2E] Rerunning $count failed test(s) only...');
@@ -86,12 +87,18 @@ Future<void> main(List<String> args) async {
   final logSink = logFile.openWrite();
 
   final List<String> extraArgs = effectivePlainName != null
-      ? ['--plain-name', effectivePlainName]
+      ? [
+          plainNameFilter == null ? '--plain-name' : '--name',
+          plainNameFilter == null
+              ? effectivePlainName
+              : plainNameFilter.split('|').map(RegExp.escape).join('|'),
+        ]
       : <String>[];
 
   final flutterArgs = <String>[
     'test',
     testFile,
+    '--no-pub',
     '-d',
     device,
     '--dart-define=CB_E2E=true',
@@ -116,14 +123,17 @@ Future<void> main(List<String> args) async {
     _drain(proc.stderr, stderr, stderr),
   ]);
 
-  final testExitCode = await proc.exitCode;
+  final processExitCode = await proc.exitCode;
   await logSink.close();
+  final summary = TestRunSummary.parse(await logFile.readAsString());
+  final testExitCode = processExitCode == 0 && !summary.successful
+      ? 1
+      : processExitCode;
 
   // Step 4: Run Allure adapter (write Allure JSON results)
   print('[Allure E2E] Parsing results and generating Allure JSON...');
 
   final adapterResult = await Process.run(Platform.resolvedExecutable, [
-    'run',
     'tool/e2e_allure_adapter.dart',
     'build/e2e_report.jsonl',
     '--build-dir',
@@ -145,7 +155,6 @@ Future<void> main(List<String> args) async {
     print('[Allure E2E] Generating HTML dashboard...');
 
     final dashResult = await Process.run(Platform.resolvedExecutable, [
-      'run',
       'tool/e2e_dashboard.dart',
       '--build-dir',
       'build',
@@ -262,7 +271,8 @@ const _kFailedTestsFile = 'build/e2e_failed_tests.txt';
 Future<String?> _loadFailedTests() async {
   final file = File(_kFailedTestsFile);
   if (!await file.exists()) return null;
-  return (await file.readAsString()).trim();
+  final content = (await file.readAsString()).trim();
+  return content.isEmpty ? null : content;
 }
 
 Future<void> _saveFailedTestsFromJson(String logPath) async {

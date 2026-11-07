@@ -10,9 +10,17 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'e2e_sandbox_paths.dart';
 
+bool _sandboxRegistered = false;
+
 /// Install before any app singleton opens its database or preference files.
 /// Real filesystem operations still run, but app data belongs to this suite.
 void registerE2EAppSandbox() {
+  // The combined desktop entrypoint owns one process-wide sandbox. Individual
+  // suites still work alone, without duplicating scoped uninstall hooks.
+  if (_sandboxRegistered) {
+    return;
+  }
+  _sandboxRegistered = true;
   setUpAll(() async {
     await E2ESandboxPaths.install();
     SharedPreferences.setMockInitialValues({

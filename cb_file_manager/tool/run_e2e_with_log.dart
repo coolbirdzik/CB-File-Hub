@@ -51,6 +51,7 @@ Future<void> main(List<String> args) async {
   final flutterArgs = <String>[
     'test',
     'integration_test/app_e2e_test.dart',
+    '--no-pub',
     '-d',
     device,
     '--dart-define=CB_E2E=true',
@@ -85,7 +86,6 @@ Future<void> main(List<String> args) async {
 
   if (code != 0) {
     final sum = await Process.run(Platform.resolvedExecutable, <String>[
-      'run',
       'tool/e2e_summarize_failures.dart',
       logRelative,
     ], workingDirectory: Directory.current.path);

@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'e2e_wait.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -64,12 +65,11 @@ Future<bool> pumpUntilFound(
   Finder finder, {
   Duration timeout = const Duration(seconds: 10),
 }) async {
-  final deadline = DateTime.now().add(timeout);
-  while (DateTime.now().isBefore(deadline)) {
-    if (finder.evaluate().isNotEmpty) return true;
-    await tester.pump(const Duration(milliseconds: 100));
-  }
-  return finder.evaluate().isNotEmpty;
+  return waitForE2ECondition(
+    tester,
+    () => finder.evaluate().isNotEmpty,
+    timeout: timeout,
+  );
 }
 
 /// Waits (polling) for a file row to appear after an async operation
@@ -125,17 +125,16 @@ Future<void> waitForFileRowAbsent(
   String absolutePath, {
   Duration timeout = const Duration(seconds: 10),
 }) async {
-  final deadline = DateTime.now().add(timeout);
-  while (DateTime.now().isBefore(deadline)) {
-    final gone =
+  await waitForE2ECondition(
+    tester,
+    () =>
         find
             .byKey(ValueKey('file-grid-item-$absolutePath'))
             .evaluate()
             .isEmpty &&
-        find.byKey(ValueKey('file-item-$absolutePath')).evaluate().isEmpty;
-    if (gone) break;
-    await tester.pump(const Duration(milliseconds: 100));
-  }
+        find.byKey(ValueKey('file-item-$absolutePath')).evaluate().isEmpty,
+    timeout: timeout,
+  );
   expectFileRowAbsent(absolutePath);
 }
 
@@ -187,7 +186,7 @@ Future<void> tapFolderRow(WidgetTester tester, String absolutePath) async {
     debugPrint('[E2E] tapFolderRow: double-tapping $absolutePath');
   }
   await tester.ensureVisible(finder);
-  await tester.pumpAndSettle(const Duration(milliseconds: 300));
+  await settleE2EUi(tester);
 
   // Grid folder keys wrap the entire card, including the filename area. The
   // card's center can land outside the actual interaction layer at some zoom
@@ -281,7 +280,7 @@ Future<void> selectFileWithCtrl(
   await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
   await tester.tapAt(center);
   await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
-  await tester.pumpAndSettle(const Duration(milliseconds: 300));
+  await settleE2EUi(tester);
 }
 
 /// Opens the context menu for a file by right-clicking it.
@@ -332,12 +331,15 @@ Future<void> tapContextMenuItem(WidgetTester tester, String actionId) async {
     debugPrint('[E2E] tapContextMenuItem: tapping id="$actionId"');
   }
 
-  // Give the overlay time to render the menu items.
-  // `pumpAndSettle` from the caller may return before `showMenu`'s internal
-  // layout is complete. Extra pumps ensure PopupMenuItem widgets exist in the tree.
-  await tester.pump(const Duration(milliseconds: 200));
-  await tester.pump(const Duration(milliseconds: 200));
-  await tester.pump(const Duration(milliseconds: 200));
+  // Wait for the menu instead of always paying three 200 ms pumps.
+  await pumpUntilFound(
+    tester,
+    find.byWidgetPredicate(
+      (widget) =>
+          widget is PopupMenuItem ||
+          widget.key.toString().contains('context-menu-action-'),
+    ),
+  );
 
   final actionIds = _actionIdAliases(actionId);
   final labels = _actionIdLabels(actionId);
@@ -352,7 +354,7 @@ Future<void> tapContextMenuItem(WidgetTester tester, String actionId) async {
   }
   if (keyedFinder != null && keyedCount > 0) {
     await tester.tap(keyedFinder.first, warnIfMissed: false);
-    await tester.pumpAndSettle(const Duration(seconds: 3));
+    await settleE2EUi(tester);
     return;
   }
 
@@ -377,7 +379,7 @@ Future<void> tapContextMenuItem(WidgetTester tester, String actionId) async {
         (w) => w is PopupMenuItem<String> && actionIds.contains(w.value),
       ),
     );
-    await tester.pumpAndSettle(const Duration(seconds: 3));
+    await settleE2EUi(tester);
     return;
   }
 
@@ -392,7 +394,7 @@ Future<void> tapContextMenuItem(WidgetTester tester, String actionId) async {
   }
   if (textFinder != null && textCount > 0) {
     await tester.tap(textFinder.first, warnIfMissed: false);
-    await tester.pumpAndSettle(const Duration(seconds: 3));
+    await settleE2EUi(tester);
     return;
   }
 
@@ -440,7 +442,7 @@ Future<void> tapContextMenuItem(WidgetTester tester, String actionId) async {
         );
       }
       await tester.tap(retryKeyedFinder.first, warnIfMissed: false);
-      await tester.pumpAndSettle(const Duration(seconds: 3));
+      await settleE2EUi(tester);
       return;
     }
 
@@ -452,7 +454,7 @@ Future<void> tapContextMenuItem(WidgetTester tester, String actionId) async {
         );
       }
       await tester.tap(retryFinder.first, warnIfMissed: false);
-      await tester.pumpAndSettle(const Duration(seconds: 3));
+      await settleE2EUi(tester);
       return;
     }
   }
@@ -599,7 +601,7 @@ Future<void> openBackgroundContextMenu(
     position = Offset(r.center.dx, r.center.dy);
   }
   await tester.tapAt(position, buttons: kSecondaryMouseButton);
-  await tester.pumpAndSettle(const Duration(seconds: 3));
+  await settleE2EUi(tester);
 }
 
 /// Dismisses any open dialog or popup by pressing Escape.
@@ -608,7 +610,7 @@ Future<void> dismissDialog(WidgetTester tester) async {
     debugPrint('[E2E] dismissDialog: pressing Escape');
   }
   await tester.sendKeyEvent(LogicalKeyboardKey.escape);
-  await tester.pumpAndSettle(const Duration(seconds: 2));
+  await settleE2EUi(tester);
 }
 
 /// Dismisses any open dialog or popup by tapping the Cancel button.
@@ -624,7 +626,7 @@ Future<void> tapDialogCancel(WidgetTester tester) async {
     reason: 'Cancel button not found in dialog',
   );
   await tester.tap(cancelFinder);
-  await tester.pumpAndSettle(const Duration(seconds: 2));
+  await settleE2EUi(tester);
 }
 
 /// Confirms a dialog by tapping the primary action button (Create, Delete, etc.).
@@ -668,7 +670,7 @@ Future<void> tapDialogConfirm(WidgetTester tester, {String? buttonText}) async {
   expect(confirmFinder, findsWidgets, reason: 'No button found in dialog');
   // Tap the last matching button (primary action is conventionally last)
   await tester.tap(confirmFinder.last);
-  await tester.pumpAndSettle(const Duration(seconds: 3));
+  await settleE2EUi(tester);
 }
 
 /// Types text into the currently focused TextField (e.g., rename field, create dialog).
@@ -696,7 +698,7 @@ Future<void> selectFolderRow(WidgetTester tester, String absolutePath) async {
     debugPrint('[E2E] selectFolderRow: single-tapping $absolutePath');
   }
   await tester.tap(finder, warnIfMissed: false);
-  await tester.pumpAndSettle(const Duration(milliseconds: 300));
+  await settleE2EUi(tester);
 }
 
 /// Right-click a folder row to open its context menu.
@@ -749,17 +751,17 @@ Future<void> createFolderViaContextMenu(
     );
   }
   await openBackgroundContextMenu(tester);
-  await tester.pumpAndSettle(const Duration(seconds: 2));
+  await settleE2EUi(tester);
 
   // Tap "New folder" in the context menu
   await tapContextMenuItem(tester, 'new_folder');
-  await tester.pumpAndSettle(const Duration(seconds: 2));
+  await settleE2EUi(tester);
 
   // Type folder name in the dialog
   await typeIntoFocusedField(tester, folderName);
-  await tester.pumpAndSettle(const Duration(milliseconds: 500));
+  await settleE2EUi(tester);
 
   // Confirm
   await tapDialogConfirm(tester, buttonText: 'Create');
-  await tester.pumpAndSettle(const Duration(seconds: 3));
+  await settleE2EUi(tester);
 }

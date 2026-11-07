@@ -25,6 +25,7 @@
 
 import 'dart:convert';
 import 'dart:io';
+import 'test_report_names.dart';
 
 const _kDefaultBuildDir = 'build';
 const _kReportFile = 'e2e_report.jsonl';
@@ -162,6 +163,7 @@ TestReport parseJsonLog(
   final idToPrints = <int, List<String>>{};
   final hiddenIds = <int>{};
   final hiddenErrors = <_ErrorInfo>[];
+  var finished = false;
 
   for (final rawLine in content.split('\n')) {
     final line = rawLine.trim();
@@ -176,6 +178,7 @@ TestReport parseJsonLog(
     if (decoded == null) continue;
 
     final type = decoded['type'] as String?;
+    if (type == 'done') finished = true;
 
     if (type == 'testStart') {
       final test = decoded['test'] as Map<String, dynamic>?;
@@ -216,7 +219,11 @@ TestReport parseJsonLog(
       if (testID == null) continue;
 
       final result = decoded['result'] as String?;
-      if (result != null) idToStatus[testID] = result;
+      if (decoded['skipped'] == true) {
+        idToStatus[testID] = 'skipped';
+      } else if (result != null) {
+        idToStatus[testID] = result;
+      }
 
       if (decoded['hidden'] == true) {
         hiddenIds.add(testID);
@@ -285,7 +292,10 @@ TestReport parseJsonLog(
     if (name.startsWith('(') && name.endsWith(')')) continue;
 
     final errorInfo = idToError[testID];
-    final rawResult = idToStatus[testID] ?? 'success';
+    final reported = idToStatus[testID];
+    final rawResult = !finished && reported == 'success'
+        ? 'incomplete'
+        : reported ?? 'incomplete';
     final shots = _shotsForTest(name, manifestShots, buildDir);
 
     String status;
@@ -296,6 +306,8 @@ TestReport parseJsonLog(
       status = 'failed';
       errMessage = errorInfo.message;
       errTrace = errorInfo.trace;
+    } else if (rawResult == 'skipped') {
+      status = 'skipped';
     } else if (rawResult != 'success') {
       // Test was reported as error/failure but has no individual error —
       // this happens when the suite loader crashed and every subsequent
@@ -726,7 +738,7 @@ Future<void> _savePersistedState(
 /// Drops legacy framework pseudo-tests like `"(tearDownAll)"` /
 /// `"(setUpAll)"` and `"loading <file>.dart"` that older runs may have
 /// persisted before we started filtering them at parse time.
-Map<String, TestResult> _mergeResults(
+Map<String, TestResult> mergeReportResults(
   Map<String, TestResult> persisted,
   List<TestResult> fresh,
 ) {
@@ -738,11 +750,11 @@ Map<String, TestResult> _mergeResults(
 
   final out = <String, TestResult>{};
   persisted.forEach((name, t) {
-    if (!isPseudo(name)) out[name] = t;
+    if (!isPseudo(name)) out[withoutDesktopSuitePrefix(name)] = t;
   });
   for (final t in fresh) {
     if (isPseudo(t.name)) continue;
-    out[t.name] = t;
+    out[withoutDesktopSuitePrefix(t.name)] = t;
   }
   return out;
 }
@@ -751,9 +763,13 @@ String generateHtml(TestReport report) {
   final passed = report.passed;
   final failed = report.failed;
   final blocked = report.blocked;
+  final skipped = report.skipped;
   final total = report.total;
   final passRate = report.passRate;
-  final passColor = (failed == 0 && blocked == 0) ? '#22c55e' : '#eab308';
+  final passColor =
+      (passed > 0 && failed == 0 && blocked == 0 && report.suiteError == null)
+      ? '#22c55e'
+      : '#eab308';
 
   // Group tests by suite
   final Map<String, List<TestResult>> suiteGroups = {};
@@ -808,12 +824,16 @@ String generateHtml(TestReport report) {
   String statusKey(TestResult t) {
     if (t.isPassed) return 'passed';
     if (t.isBlocked) return 'blocked';
+    if (t.status == 'skipped') return 'skipped';
     return 'failed';
   }
 
   String statusBadge(TestResult t) {
     if (t.isPassed) return '<span class="badge pass">PASSED</span>';
     if (t.isBlocked) return '<span class="badge blocked">BLOCKED</span>';
+    if (t.status == 'skipped') {
+      return '<span class="badge blocked">SKIPPED</span>';
+    }
     return '<span class="badge fail">FAILED</span>';
   }
 
@@ -1338,6 +1358,7 @@ String generateHtml(TestReport report) {
       <button class="filter-btn" data-filter="passed" onclick="setFilter('passed')">Passed ($passed)</button>
       <button class="filter-btn" data-filter="failed" onclick="setFilter('failed')">Failed ($failed)</button>
       ${blocked > 0 ? '<button class="filter-btn" data-filter="blocked" onclick="setFilter(\'blocked\')">Blocked ($blocked)</button>' : ''}
+      ${skipped > 0 ? '<button class="filter-btn" data-filter="skipped" onclick="setFilter(\'skipped\')">Skipped ($skipped)</button>' : ''}
     </div>
     <div class="collapse-controls">
       <button class="collapse-btn" onclick="expandAll()">Expand All</button>
@@ -1446,7 +1467,8 @@ $suiteSections
         _currentFilter === 'all' ||
         (_currentFilter === 'passed'  && status === 'passed') ||
         (_currentFilter === 'failed'  && status === 'failed') ||
-        (_currentFilter === 'blocked' && status === 'blocked');
+        (_currentFilter === 'blocked' && status === 'blocked') ||
+        (_currentFilter === 'skipped' && status === 'skipped');
       const matchSearch = q === '' || search.indexOf(q) !== -1;
       item.classList.toggle('hidden', !(matchFilter && matchSearch));
     });
@@ -1476,11 +1498,20 @@ String _escapeHtml(String s) {
 }
 
 String _inferSuite(String name) {
+  name = withoutDesktopSuitePrefix(name);
   // 1. Explicit group() prefix (present in JSON reporter output).
   // New numbered prefixes are listed first; legacy names follow for
   // backward-compat with persisted dashboard state.
   const groupPrefixes = [
     '01 Navigation',
+    'Media Kit Playback',
+    'FFmpeg Thumbnails',
+    'File Drag Drop',
+    'Breadcrumb Overflow',
+    'Torrent Library',
+    'AX Semantics',
+    'Tooltip Semantics',
+    'Video Chrome Semantics',
     '02 File Operations',
     '03 Cut & Move',
     '04 Folder Operations',
@@ -1648,7 +1679,7 @@ Future<void> main(List<String> args) async {
 
   // Merge with persisted state so reruns of a subset don't drop other tests.
   final persisted = await _loadPersistedState(dashboardDir);
-  final merged = _mergeResults(persisted, freshReport.tests);
+  final merged = mergeReportResults(persisted, freshReport.tests);
 
   if (merged.isEmpty) {
     print('[Dashboard] WARNING: No test results parsed from log.');

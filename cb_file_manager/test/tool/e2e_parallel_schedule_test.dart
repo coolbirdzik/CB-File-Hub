@@ -24,6 +24,9 @@ void main() {
       'FFmpeg Thumbnails',
       'File Drag Drop',
       'Breadcrumb Overflow',
+      'AX Semantics',
+      'Tooltip Semantics',
+      'Video Chrome Semantics',
     ]) {
       expect(
         runner.requiresExclusiveDesktopRun(group, isWindows: true),

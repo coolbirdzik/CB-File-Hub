@@ -1,6 +1,7 @@
 // TEMPORARY diagnostic: how long does it take for a grid card to show as
 // selected after a click / arrow key? Delete after the investigation.
 import 'dart:io';
+import 'e2e_wait.dart';
 
 import 'package:cb_file_manager/e2e/cb_e2e_config.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
@@ -83,7 +84,7 @@ void main() {
 
       try {
         await runCbFileApp();
-        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await settleE2EUi(tester);
         await tester.pump(const Duration(seconds: 6)); // thumbnails settle
         SchedulerBinding.instance.addTimingsCallback(onTimings);
 

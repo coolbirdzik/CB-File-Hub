@@ -13,49 +13,62 @@
     "app": {
       "description": "Core file manager flows (app_e2e_test, all groups)",
       "file": "integration_test/app_e2e_test.dart",
-      "command": ["dart", "run", "tool/run_e2e_with_log.dart", "--json-report"]
+      "command": ["flutter", "test", "integration_test/desktop_e2e_test.dart", "--no-pub", "-d", "windows", "--dart-define=CB_E2E=true", "--name", "^app "]
     },
     "smoke": {
       "description": "App boots and navigates (app_e2e_test, group 01 Navigation only)",
       "file": "integration_test/app_e2e_test.dart",
-      "command": ["dart", "run", "tool/run_e2e_with_log.dart", "--json-report", "--plain-name", "01 Navigation"]
+      "command": ["flutter", "test", "integration_test/desktop_e2e_test.dart", "--no-pub", "-d", "windows", "--dart-define=CB_E2E=true", "--name", "^app 01 Navigation "]
     },
     "video_thumbnails": {
       "description": "Video grid thumbnails and context menu",
       "file": "integration_test/video_thumbnails_e2e_test.dart",
-      "command": ["flutter", "test", "integration_test/video_thumbnails_e2e_test.dart", "-d", "windows", "--dart-define=CB_E2E=true"]
+      "command": ["flutter", "test", "integration_test/desktop_e2e_test.dart", "--no-pub", "-d", "windows", "--dart-define=CB_E2E=true", "--name", "^video_thumbnails "]
     },
     "media_kit_playback": {
       "description": "media_kit video playback and player chrome",
       "file": "integration_test/media_kit_playback_e2e_test.dart",
-      "command": ["flutter", "test", "integration_test/media_kit_playback_e2e_test.dart", "-d", "windows", "--dart-define=CB_E2E=true", "--reporter", "expanded", "--file-reporter", "json:build/e2e-media-kit-ci.jsonl"]
+      "command": ["flutter", "test", "integration_test/desktop_e2e_test.dart", "--no-pub", "-d", "windows", "--dart-define=CB_E2E=true", "--name", "^media_kit_playback "]
     },
     "ffmpeg_thumbnail": {
       "description": "Native FFmpeg thumbnail plugin",
       "file": "integration_test/ffmpeg_thumbnail_e2e_test.dart",
-      "command": ["flutter", "test", "integration_test/ffmpeg_thumbnail_e2e_test.dart", "-d", "windows", "--dart-define=CB_E2E=true"]
+      "command": ["flutter", "test", "integration_test/desktop_e2e_test.dart", "--no-pub", "-d", "windows", "--dart-define=CB_E2E=true", "--name", "^ffmpeg_thumbnail "]
     },
     "file_drag_drop": {
       "description": "Explorer and in-app file drag and drop",
       "file": "integration_test/file_drag_drop_e2e_test.dart",
-      "command": ["flutter", "test", "integration_test/file_drag_drop_e2e_test.dart", "-d", "windows", "--dart-define=CB_E2E=true"]
+      "command": ["flutter", "test", "integration_test/desktop_e2e_test.dart", "--no-pub", "-d", "windows", "--dart-define=CB_E2E=true", "--name", "^file_drag_drop "]
     },
     "breadcrumb_address_bar_overflow": {
       "description": "Breadcrumb address bar overflow layout",
       "file": "integration_test/breadcrumb_address_bar_overflow_e2e_test.dart",
-      "command": ["flutter", "test", "integration_test/breadcrumb_address_bar_overflow_e2e_test.dart", "-d", "windows", "--dart-define=CB_E2E=true"]
+      "command": ["flutter", "test", "integration_test/desktop_e2e_test.dart", "--no-pub", "-d", "windows", "--dart-define=CB_E2E=true", "--name", "^breadcrumb_address_bar_overflow "]
     },
     "torrent_library": {
       "description": "Torrent library, aria2 engine and qBittorrent import",
       "file": "integration_test/torrent_library_e2e_test.dart",
-      "command": ["flutter", "test", "integration_test/torrent_library_e2e_test.dart", "--no-pub", "-d", "windows", "--dart-define=CB_E2E=true", "--reporter", "expanded", "--file-reporter", "json:build/e2e-torrent-ci.jsonl"]
+      "command": ["flutter", "test", "integration_test/desktop_e2e_test.dart", "--no-pub", "-d", "windows", "--dart-define=CB_E2E=true", "--name", "^torrent_library "]
+    },
+    "semantics_stability": {
+      "description": "Windows accessibility stability across file manager actions",
+      "file": "integration_test/semantics_stability_e2e_test.dart",
+      "command": ["flutter", "test", "integration_test/desktop_e2e_test.dart", "--no-pub", "-d", "windows", "--dart-define=CB_E2E=true", "--name", "^semantics_stability "]
+    },
+    "tooltip_semantics": {
+      "description": "Windows accessibility tooltip traversal ownership",
+      "file": "integration_test/tooltip_semantics_e2e_test.dart",
+      "command": ["flutter", "test", "integration_test/desktop_e2e_test.dart", "--no-pub", "-d", "windows", "--dart-define=CB_E2E=true", "--name", "^tooltip_semantics "]
+    },
+    "video_player_chrome_semantics": {
+      "description": "Windows video controls and real playback accessibility",
+      "file": "integration_test/video_player_chrome_semantics_e2e_test.dart",
+      "command": ["flutter", "test", "integration_test/desktop_e2e_test.dart", "--no-pub", "-d", "windows", "--dart-define=CB_E2E=true", "--name", "^video_player_chrome_semantics "]
     }
   },
   "notInCi": {
+    "integration_test/desktop_e2e_test.dart": "Shared entrypoint for selected CI/release suites; original files define suite impact",
     "integration_test/showcase_screenshots_e2e_test.dart": "Marketing screenshot generator, run locally when refreshing screenshots",
-    "integration_test/semantics_stability_e2e_test.dart": "Not wired into CI yet",
-    "integration_test/tooltip_semantics_e2e_test.dart": "Not wired into CI yet",
-    "integration_test/video_player_chrome_semantics_e2e_test.dart": "Not wired into CI yet",
     "integration_test/zz_tmp_focus_latency_e2e_test.dart": "Temporary latency probe"
   },
   "rules": [
@@ -69,13 +82,17 @@
     },
     {
       "why": "Release version bump only",
-      "paths": ["cb_file_manager/pubspec.yaml"],
+      "paths": [
+        "cb_file_manager/pubspec.yaml"
+      ],
       "onlyIf": "version-line",
       "suites": []
     },
     {
       "why": "Only new translation keys: strings the tests match on are unchanged (analyze catches missing overrides)",
-      "paths": ["cb_file_manager/lib/config/languages/**"],
+      "paths": [
+        "cb_file_manager/lib/config/languages/**"
+      ],
       "onlyIf": "additions",
       "suites": ["smoke"]
     },
@@ -145,27 +162,39 @@
     },
     {
       "why": "Suite sources select themselves",
-      "paths": ["cb_file_manager/integration_test/app_e2e_test.dart"],
+      "paths": [
+        "cb_file_manager/integration_test/app_e2e_test.dart"
+      ],
       "suites": ["app"]
     },
     {
-      "paths": ["cb_file_manager/integration_test/video_thumbnails_e2e_test.dart"],
+      "paths": [
+        "cb_file_manager/integration_test/video_thumbnails_e2e_test.dart"
+      ],
       "suites": ["video_thumbnails"]
     },
     {
-      "paths": ["cb_file_manager/integration_test/media_kit_playback_e2e_test.dart"],
+      "paths": [
+        "cb_file_manager/integration_test/media_kit_playback_e2e_test.dart"
+      ],
       "suites": ["media_kit_playback"]
     },
     {
-      "paths": ["cb_file_manager/integration_test/ffmpeg_thumbnail_e2e_test.dart"],
+      "paths": [
+        "cb_file_manager/integration_test/ffmpeg_thumbnail_e2e_test.dart"
+      ],
       "suites": ["ffmpeg_thumbnail"]
     },
     {
-      "paths": ["cb_file_manager/integration_test/file_drag_drop_e2e_test.dart"],
+      "paths": [
+        "cb_file_manager/integration_test/file_drag_drop_e2e_test.dart"
+      ],
       "suites": ["file_drag_drop"]
     },
     {
-      "paths": ["cb_file_manager/integration_test/breadcrumb_address_bar_overflow_e2e_test.dart"],
+      "paths": [
+        "cb_file_manager/integration_test/breadcrumb_address_bar_overflow_e2e_test.dart"
+      ],
       "suites": ["breadcrumb_address_bar_overflow"]
     },
     {
@@ -177,7 +206,9 @@
     },
     {
       "why": "Breadcrumb bar lives inside the folder list, so the core flows cover it too",
-      "paths": ["cb_file_manager/lib/ui/components/common/breadcrumb_address_bar*.dart"],
+      "paths": [
+        "cb_file_manager/lib/ui/components/common/breadcrumb_address_bar*.dart"
+      ],
       "suites": ["breadcrumb_address_bar_overflow", "app"]
     },
     {
@@ -191,7 +222,9 @@
       "suites": ["torrent_library"]
     },
     {
-      "paths": ["cb_file_manager/lib/models/database/**"],
+      "paths": [
+        "cb_file_manager/lib/models/database/**"
+      ],
       "suites": ["app", "torrent_library", "video_thumbnails"]
     },
     {
@@ -215,12 +248,14 @@
         "cb_file_manager/lib/services/pip_window_service.dart",
         "cb_file_manager/lib/services/windowing/video_window_service.dart"
       ],
-      "suites": ["media_kit_playback"]
+      "suites": ["media_kit_playback", "video_player_chrome_semantics"]
     },
     {
       "why": "Full-screen gallery player is opened from the thumbnail suite too",
-      "paths": ["cb_file_manager/lib/ui/screens/media_gallery/**"],
-      "suites": ["media_kit_playback", "video_thumbnails"]
+      "paths": [
+        "cb_file_manager/lib/ui/screens/media_gallery/**"
+      ],
+      "suites": ["media_kit_playback", "video_thumbnails", "video_player_chrome_semantics"]
     },
     {
       "why": "Thumbnail generation and the video library cache",
@@ -241,7 +276,7 @@
         "cb_file_manager/lib/ui/screens/onboarding/**",
         "cb_file_manager/lib/services/windowing/**"
       ],
-      "suites": ["app", "video_thumbnails", "file_drag_drop", "torrent_library"]
+      "suites": ["app", "video_thumbnails", "file_drag_drop", "torrent_library", "semantics_stability"]
     },
     {
       "why": "Shared file-manager UI and helpers used by the core flows",

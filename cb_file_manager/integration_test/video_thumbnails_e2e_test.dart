@@ -23,6 +23,7 @@
 // fails instead of silently replacing decodable media with a header-only stub.
 
 import 'dart:io';
+import 'e2e_wait.dart';
 
 import 'package:cb_file_manager/e2e/cb_e2e_config.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
@@ -115,7 +116,7 @@ void main() {
       try {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
-        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await settleE2EUi(tester);
         await et.init('video file row is visible and has correct file type');
 
         // Video file row should be visible alongside the text file
@@ -146,7 +147,7 @@ void main() {
       try {
         await UserPreferences.instance.setViewMode(ViewMode.grid);
         await runCbFileApp();
-        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await settleE2EUi(tester);
         await et.init('video context menu shows Play video action');
 
         await waitForFileRowVisible(tester, videoFile.path);
@@ -197,7 +198,7 @@ void main() {
         // list. An explicit folder preference keeps this a list-view test.
         await FolderSortManager().saveFolderViewMode(dir.path, ViewMode.list);
         await runCbFileApp();
-        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await settleE2EUi(tester);
         await et.init('video context menu in list view');
 
         await waitForFileRowVisible(tester, videoFile.path);
@@ -248,7 +249,7 @@ void main() {
 
       try {
         await runCbFileApp();
-        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await settleE2EUi(tester);
         await et.init('multiple video formats display correctly');
 
         // All video formats should appear as rows
@@ -288,7 +289,7 @@ void main() {
 
       try {
         await runCbFileApp();
-        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await settleE2EUi(tester);
         await et.init('video files persist after folder refresh');
 
         await waitForFileRowVisible(tester, videoFile.path);
@@ -296,7 +297,7 @@ void main() {
 
         // Refresh the folder with F5
         await et.keyPress(LogicalKeyboardKey.f5);
-        await et.pumpAndSettle(const Duration(seconds: 3));
+        await et.pumpAndSettle();
 
         // Video file should still be visible after refresh
         await waitForFileRowVisible(tester, videoFile.path);
@@ -324,7 +325,7 @@ void main() {
 
       try {
         await runCbFileApp();
-        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await settleE2EUi(tester);
         await et.init('deleting a video file removes it from the list');
 
         await waitForFileRowVisible(tester, videoFile.path);
@@ -337,11 +338,11 @@ void main() {
 
         // Tap "Delete"
         await tapContextMenuItem(tester, 'delete');
-        await tester.pumpAndSettle(const Duration(seconds: 3));
+        await settleE2EUi(tester);
 
         // Confirm deletion
         await tapDialogConfirm(tester, buttonText: 'Delete');
-        await et.pumpAndSettle(const Duration(seconds: 3));
+        await et.pumpAndSettle();
 
         // Video file row should be gone; keep.txt should remain
         await waitForFileRowAbsent(tester, videoFile.path);
@@ -375,7 +376,7 @@ void main() {
 
       try {
         await runCbFileApp();
-        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await settleE2EUi(tester);
         await et.init('video file can be renamed via context menu');
 
         await waitForFileRowVisible(tester, originalVideo.path);
@@ -387,7 +388,7 @@ void main() {
 
         // Tap "Rename"
         await tapContextMenuItem(tester, 'rename');
-        await tester.pumpAndSettle(const Duration(milliseconds: 500));
+        await settleE2EUi(tester);
 
         // Type the new name (overwrite the extension)
         final textFields = find.descendant(
@@ -408,9 +409,9 @@ void main() {
           newVideoName,
           detail: 'type_new_name',
         );
-        await tester.pumpAndSettle(const Duration(milliseconds: 300));
+        await settleE2EUi(tester);
         await tester.testTextInput.receiveAction(TextInputAction.done);
-        await et.pumpAndSettle(const Duration(seconds: 3));
+        await et.pumpAndSettle();
 
         final renamedPath = '${dir.path}${Platform.pathSeparator}$newVideoName';
         await waitForFileRowVisible(tester, renamedPath);
@@ -438,7 +439,7 @@ void main() {
 
       try {
         await runCbFileApp();
-        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await settleE2EUi(tester);
         await et.init('opening a video via context menu does not crash app');
 
         await waitForFileRowVisible(tester, videoFile.path);
@@ -446,7 +447,7 @@ void main() {
 
         // Single-tap the video row to select it
         await tapFileRow(tester, videoFile.path);
-        await et.pumpAndSettle(const Duration(milliseconds: 500));
+        await et.pumpAndSettle();
 
         // Right-click to open context menu
         await rightClickFileRow(tester, videoFile.path);
@@ -455,7 +456,7 @@ void main() {
 
         // Tap "Play video" in the context menu
         await tapContextMenuItem(tester, 'play_video');
-        await et.pumpAndSettle(const Duration(seconds: 5));
+        await et.pumpAndSettle();
 
         // This suite pins in-window playback and has no preferred external app.
         // Merely retaining WidgetsApp would also pass if the action did nothing.
@@ -495,7 +496,7 @@ void main() {
 
       try {
         await runCbFileApp();
-        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await settleE2EUi(tester);
         await et.init('video file row is FileItem not FolderItem');
 
         // Both rows should be visible
@@ -529,7 +530,7 @@ void main() {
 
       try {
         await runCbFileApp();
-        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await settleE2EUi(tester);
         await et.init('unsupported video extension shows as generic file');
 
         // The .abc file should still appear as a file row

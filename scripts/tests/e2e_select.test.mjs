@@ -46,7 +46,7 @@ test('changes map to the suites that exercise them', () => {
   assert.deepEqual(select('docs/features/10-torrent-library.md', 'store/listing.json'), []);
   assert.deepEqual(select('cb_file_manager/test/widget_test.dart'), []);
   assert.deepEqual(select('cb_file_manager/lib/ui/components/video/video_player/video_player.dart'),
-    ['media_kit_playback']);
+    ['media_kit_playback', 'video_player_chrome_semantics']);
   assert.deepEqual(select('cb_file_manager/lib/services/torrent/aria2_engine.dart'), ['torrent_library']);
   assert.deepEqual(select('cb_file_manager/lib/ui/components/common/breadcrumb_address_bar.dart'),
     ['app', 'breadcrumb_address_bar_overflow']);

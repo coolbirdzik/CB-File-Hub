@@ -1,259 +1,168 @@
-# E2E desktop (integration_test)
+# Desktop testing: fast feedback and native coverage
 
-End-to-end smoke tests for **cb_file_manager** on **Windows desktop** use Flutter's official [`integration_test`](https://docs.flutter.dev/testing/integration-tests) package. Tests run a **real** desktop build (`-d windows`), not a mocked widget tree.
+Run Flutter/Dart commands from `cb_file_manager/`. Recipes below run from the
+repository root. Use the pinned Flutter version in `build.config`. Agents must
+follow the explicit E2E authorization policy in [AGENTS.md](../../AGENTS.md).
 
-## Prerequisites
+## Choose the layer that proves the behavior
 
-- **Windows** + Flutter desktop enabled.
-- Build must succeed (`flutter` can compile `windows/`).
-- SQLite on Windows: `pubspec.yaml` configures `package:sqlite3` to use **system** `winsqlite3` via `hooks.user_defines` so `sqlite3.dll` does not need to sit next to the test executable (avoids load error 126 during Debug runs).
+| Layer | Use it for | Real dependencies |
+| --- | --- | --- |
+| Unit/service | Scheduling, cancellation, parsers, state transitions, errors | Inject dependencies; use completers/streams for async outcomes |
+| Component/widget | Menus, keyboard/pointer actions, layout, captions, progress | Production widgets with controlled services and fake time |
+| Service/native integration | SQLite cache, filesystem effects, Rust parity, worker protocol | Temporary DB/files and native implementation where available |
+| Desktop E2E | App wiring, playback/decoding, native drag/drop, foreground IPC, Windows accessibility | Compiled Windows app and real plugins |
 
-## How to run
+Keep detailed edge cases in the first three layers. Retain E2E assertions for
+the actual cross-layer result: a copied file's bytes and source/destination,
+decoded video pixels, seek position, real drag/drop effects or a valid native
+accessibility tree. An app opening without an exception is insufficient.
+UI screenshots made with authored fixtures illustrate layout; they do not
+establish native behavior or model inference accuracy.
 
-### Quick start (parallel — recommended)
-
-Runs all 11 test groups in parallel, then auto-opens the HTML dashboard:
-
-```bash
-cd cb_file_manager
-dart run tool/e2e_parallel.dart
-```
-
-**Options:**
-
-```bash
-# Limit concurrency (default = CPU cores)
-dart run tool/e2e_parallel.dart --max-parallel 2
-
-# Run only one group
-dart run tool/e2e_parallel.dart --plain-name "Navigation"
-
-# Run a specific test file directly (bypasses parallel workers, runs file only)
-dart run tool/e2e_parallel.dart --file video_thumbnails_e2e_test
-
-# Run a specific test file + group filter inside that file
-dart run tool/e2e_parallel.dart --file video_thumbnails_e2e_test --plain-name "Video Thumbnails"
-
-# Skip dashboard generation
-dart run tool/e2e_parallel.dart --no-generate
-
-# Rerun only previously failed tests
-dart run tool/e2e_parallel.dart --rerun-failed
-```
-
-### Using Makefile
-
-From repo root:
+## Daily checks
 
 ```bash
-# Run all E2E tests in parallel with HTML dashboard
-make dev-test mode=e2e
-
-# Rerun only previously failed tests
-make dev-test mode=e2e RERUN=1
-
-# Run only specific suite (by group name, e.g. Navigation, Video Thumbnails)
-make dev-test mode=e2e TEST="Video Thumbnails"
-make dev-test mode=e2e TEST=Navigation
-
-# Run a specific test file directly (runs only tests in that file)
-make dev-test mode=e2e TEST_FILE=video_thumbnails_e2e_test
-
-# Clean build if CMake/MSBuild issues
-make dev-test-e2e-clean
+just analyze                 # format, analysis, all unit/widget tests; no E2E
+just e2e-affected             # preview affected suites; does not execute E2E
+just e2e-affected main        # preview against a specific base
 ```
 
-**Environment variables:**
-
-- `E2E_DEVICE=linux` — Run on Linux desktop (default: windows)
-- `TEST_REPORTER=json` — JSON output instead of expanded
-- `RERUN=1` — Rerun failed tests only
-- `TEST=GroupName` — Run specific test group
-
-## Code layout
-
-| Piece | Role |
-|--------|------|
-| `lib/e2e/cb_e2e_config.dart` | `kCbE2E` (`bool.fromEnvironment('CB_E2E')`), `CbE2EConfig.startupPayload` for opening a temp folder tab. |
-| `lib/main.dart` → `runCbFileApp()` | Shared entry with production `main()`; when `CB_E2E` is true, skips theme onboarding noise, disables "remember workspace", skips maximize, applies startup payload. |
-| `integration_test/*.dart` | Calls `IntegrationTestWidgetsFlutterBinding.ensureInitialized()`, sets `CbE2EConfig`, `await runCbFileApp()`, then `find`/`expect`. |
-| `integration_test/e2e_keys.dart` | Helpers that match **grid or list** row keys (desktop often restores **grid** from prefs: `file-grid-item-*` / `folder-grid-item-*` vs list `file-item-*` / `folder-item-*`). |
-
-**You must pass** `--dart-define=CB_E2E=true` so startup payload and E2E-only behavior are honored.
-
-## Reading the log (pass / fail / which case)
-
-Flutter's test runner prints **one line per test** when using **`--reporter expanded`** (default in the repo Makefile via `TEST_REPORTER=expanded`).
-
-| Output | Meaning |
-|--------|---------|
-| `+N` / `-M` in the progress prefix | **N** tests passed, **M** failed so far. |
-| Test name string (from `testWidgets('…')`) | The **current** test / case name. |
-| `[E]` after a name | That test **errored** (failure). |
-| Final `All tests passed!` + exit code **0** | Full run **passed**. |
-| `Some tests failed.` / non-zero exit | At least one test **failed**. |
-
-### Which tests failed? (clear list)
-
-`make dev-test-e2e` runs `dart run tool/run_e2e_with_log.dart`, which streams `flutter test` to the console **and** to `cb_file_manager/build/e2e_last_run.log`. On failure it runs `tool/e2e_summarize_failures.dart` and prints a **boxed list** of failed test descriptions (from expanded ` [E]` lines and/or JSON events). This path works on **Windows** (PowerShell/cmd) without bash.
-
-Manual checks:
-
-- **Grep**: search the log for ` [E]` (expanded reporter marks failures).
-- **JSON artifact**: `make dev-test-e2e-json` writes `build/e2e_report.jsonl` (Flutter `--reporter json`) for `jq`, spreadsheets, or CI uploads.
-- **IDE**: open `integration_test/app_e2e_test.dart` and use **Run / Debug** on a `testWidgets` — the Testing panel shows pass/fail per case.
-
-There is **no built-in HTML dashboard** in Flutter's CLI; use JSON + your own viewer, or the IDE Testing UI.
-
-### HTML Dashboard (parallel runner)
-
-When using `dart run tool/e2e_parallel.dart`, an HTML dashboard is auto-generated at:
-
-```
-build/e2e_dashboard/index.html
-```
-
-Features:
-- **Pass/fail summary** with pass rate bar
-- **Filter buttons**: All / Passed / Failed
-- **Collapsible groups** by test suite
-- **Failure details** with screenshots
-- **Auto-opens** in browser (use `--no-open` to skip)
-
-Worker logs are saved to `build/e2e_workers/` for debugging individual group failures.
-
-Verbose engine logs:
+For a focused change, from `cb_file_manager/`:
 
 ```bash
-cd cb_file_manager
-flutter test integration_test -d windows --dart-define=CB_E2E=true --reporter expanded -v
+flutter test --no-pub test/ui/components/video
+flutter test --no-pub test/services/media
 ```
 
-## CI
+`scripts/check_quality.sh` resolves dependencies once; subsequent analysis and
+tests use `--no-pub`. Reports/converters use `dart tool/...`, avoiding the native
+build hooks that `dart run` would start for a reporting-only command.
 
-The root workflow (`.github/workflows/build-test.yml`) runs **Windows E2E** after analysis, but only the suites a change can affect:
+## Full desktop E2E: one build and launch
 
-1. **`e2e-select`** (Ubuntu, `scripts/ci/e2e_select.mjs`) maps changed paths to suites using the ordered, first-match rules in `cb_file_manager/integration_test/e2e_impact.json`.
-   - Pushes to `develop` diff against the last green push run on the branch (falling back to the push range); PRs into `develop` diff the PR merge commit against its base.
-   - Pushes and PRs to `main` select **every** suite.
-   - Docs, store copy, unit tests and other platforms select nothing; shared inputs (`pubspec.*`, `lib/main.dart`, `lib/core`, `lib/config` incl. localizations, `lib/design_system`, `windows/`, the E2E harness) select everything; feature areas without E2E coverage run the `smoke` suite (`app_e2e_test` group `01 Navigation`); a path no rule matches selects everything.
-   - Suites that already passed on the same source fingerprint (hash of the `cb_file_manager`, `mobile_smb_native`, workflow and fetch-script trees) are skipped. The record is an `e2e-pass-<fingerprint>-<suites>` cache key saved by the Windows job; only keys from branch pushes or the same PR count.
-2. **`e2e-windows`** is skipped when nothing is selected. Otherwise `scripts/ci/e2e_run.mjs` runs each selected suite in its own `flutter test` process, keeps going after a failure, and uploads all reports as one `e2e-diagnostics-*` artifact.
+```bash
+just e2e-desktop
+just e2e-desktop media_kit_playback,video_thumbnails
+just e2e-desktop-failed
+```
 
-Force a full run (selection and pass records ignored) with **Run workflow** → `full_e2e`, the `e2e:full` PR label, or `[e2e full]` in the head commit message. The job summary lists each suite's status and which rule each changed file hit.
+The same runner is used by Windows CI and the local release gate:
 
-Check locally what CI would run: `just e2e-affected` (or `node scripts/ci/e2e_select.mjs <base>`).
+```bash
+node scripts/ci/e2e_run.mjs --all
+node scripts/ci/e2e_run.mjs --suites app,torrent_library
+node scripts/ci/e2e_run.mjs --failed
+```
 
-When you add an `integration_test/*_e2e_test.dart` file, add it to `e2e_impact.json` under `suites` (plus a rule) or `notInCi`; `scripts/tests/e2e_select.test.mjs` fails otherwise, and also fails when a tracked `lib/` file matches no rule.
+The `just e2e-desktop` recipe prepares dependencies and bundled runtimes once.
+Direct Node/Flutter commands assume `just deps`, `just fetch-llama` and
+`just fetch-aria2` have already completed, as they do in CI/release preparation.
 
-## Test groups
+`integration_test/desktop_e2e_test.dart` registers the suites under scoped
+groups. Their individual setup/teardown hooks stay scoped; one process-wide
+temporary app-data sandbox is installed before services initialize. A single
+entrypoint avoids repeatedly replacing Flutter's generated Windows listener
+and rebuilding/launching a different target for every test file.
 
-Tests are organized into **12 groups** (44 total). Run individual groups with `--plain-name "Group Name"`.
+The runner selects exact group prefixes with `--name`, runs native/focus flows
+sequentially and continues reporting assertion failures. It never duplicates
+`smoke` when `app` already covers Navigation. Passes require completed,
+non-skipped assertions and a terminal report; an empty filter, skipped-only
+suite or crashed/truncated run cannot be recorded as a pass.
 
-| Group | Tests | Description |
-|-------|-------|-------------|
-| **Navigation** | 4 | Sandbox listing, subfolder navigation, empty state, Backspace navigation |
-| **File Operations** | 4 | Create folder, copy/paste, F2 rename, Delete key delete |
-| **Cut & Move** | 2 | Cut via context menu, Cut via Ctrl+X |
-| **Folder Operations** | 2 | Copy folder, Delete folder via keyboard |
-| **Multi-Select** | 2 | Batch copy with Ctrl+click, Select all + batch delete |
-| **Keyboard Shortcuts** | 3 | F5 refresh, Escape cancel, Enter key |
-| **Search & Filter** | 2 | Search box, Clear search |
-| **View Mode** | 3 | Grid/list toggle, File operations in grid view |
-| **Tab Management** | 3 | Ctrl+T new tab, Ctrl+W close tab, Ctrl+Tab switch tabs |
-| **Edge Cases & Error Handling** | 4 | Cancel delete dialog, Empty name rename, Paste nothing, Missing folder nav |
-| **Extended File Operations** | 5 | Create new file, Context menu rename, Batch move, Deep copy folder, Rename folder |
-| **Video Thumbnails** | 10 | Video file display, context menu, multi-format, refresh, rename, delete, play, row type, unsupported extension |
+The suite catalog is authoritative in
+[`e2e_impact.json`](../../cb_file_manager/integration_test/e2e_impact.json):
 
-## Test files
+- `app` / `smoke`: all core file-manager flows / Navigation only.
+- `video_thumbnails`, `media_kit_playback`, `ffmpeg_thumbnail`.
+- `file_drag_drop`, `breadcrumb_address_bar_overflow`, `torrent_library`.
+- `semantics_stability`, `tooltip_semantics`, `video_player_chrome_semantics`:
+  actual desktop accessibility coverage, including real playback.
 
-E2E tests live in `cb_file_manager/integration_test/`. Each test file is a self-contained `main()` that can be run independently with `--file`.
+Marketing screenshot generators and temporary latency probes remain explicitly
+outside the CI correctness gate. The real MP4 fixture lives in
+`integration_test/samples/`; media assertions must not silently fall back to an
+invalid stub or claim a pass when the fixture is missing.
 
-| File | Groups | Description |
-|------|--------|-------------|
-| `app_e2e_test.dart` | 11 groups | Main test file — Navigation, File Operations, Cut & Move, Folder Operations, Multi-Select, Keyboard Shortcuts, Search & Filter, View Mode, Tab Management, Edge Cases, Extended File Operations |
-| `video_thumbnails_e2e_test.dart` | 1 group | Video thumbnail tests — uses real sample at `integration_test/samples/file_example_MP4_1920_18MG.mp4` if available, falls back to stub files |
-| `e2e_helpers.dart` | — | Shared helpers: `E2ETester`, `e2eTearDown`, screenshot capture, `et.enterText()` |
-| `e2e_keys.dart` | — | Row matchers that work in **grid or list**: `expectFileRowVisible`, `tapFolderRow`, `rightClickFileRow`, `tapContextMenuItem`, `sendKeyboardShortcut`, `openBackgroundContextMenu`, etc. |
-| `e2e_report.dart` | — | HTML report generator + `e2e_summarize_failures.dart` runner script |
-| **Video Thumbnails** | 10 | Video file display, context menu, multi-format, refresh, rename, delete, play, row type, unsupported extension |
+## Focused/parallel debugging
 
-## Tests in `integration_test/app_e2e_test.dart`
+```bash
+just e2e Navigation
+just e2e "rename"
+just e2e-file media_kit_playback_e2e_test
+just e2e-parallel "" 4
+just e2e-failed
+```
 
-### Navigation
+These existing debugging runners remain available. `--file` converts the report
+it just produced; it does not invoke another test runner during dashboard
+generation. Invalid files fail immediately. Failed-test reruns use an escaped
+regex (`--name`), not a literal `--plain-name` containing pipe characters. If
+there are no previous failures, rerun commands perform no build or tests.
 
-| `testWidgets` name | What it checks |
-|--------------------|----------------|
-| `sandbox lists two files and a subfolder` | Temp dir with `a.txt`, `b.txt`, and one subfolder; asserts file/folder rows via grid **or** list keys (`expectFileRowVisible` / `expectFolderRowVisible`). |
-| `open subfolder shows file inside` | Temp dir with `root.txt`, subfolder `innerdir/`, and `innerdir/nested.txt`; **double-taps** the folder row (desktop: single tap only selects), then expects the nested file row. |
-| `empty sandbox has no file or folder rows` | Empty temp dir; expects no list **or** grid row widgets (`FileItem` / `FolderItem` / `FileGridItem` / `FolderGridItem`). |
-| `navigate back to parent with Backspace after entering subfolder` | Navigate into subfolder, then press Backspace key to return to parent. |
+Parallel defaults to half the CPU cores, clamped to 2–6. Windows builds with
+different entrypoints and foreground-dependent torrent tests remain exclusive:
+separate build directories do not isolate `generated_config.cmake`. More
+workers are not automatically faster; use measured total wall time and memory.
+The combined desktop runner is the full CI/release path.
 
-### File Operations
+## Waiting correctly
 
-| `testWidgets` name | What it checks |
-|--------------------|----------------|
-| `create new folder via right-click context menu` | Right-click background → New Folder → type name → expect folder row. |
-| `copy file via right-click context menu and paste` | Copy file, navigate to dest folder, paste, expect file there. |
-| `rename file via F2 keyboard shortcut` | Select file → F2 → type new name → expect renamed file row. |
-| `delete file via keyboard shortcut` | Select file → Delete key → confirm dialog → expect file gone. |
+Use `waitForE2ECondition` or the file-row/menu helpers for observable async
+results. They return immediately when ready and poll short frames up to a
+deadline. The helper bounds real and fake time so widget regressions terminate
+without consuming real seconds.
 
-### Cut & Move
+`settleE2EUi` is only for finite UI animations: 50 ms frame interval, bounded
+timeout, and errors propagate. `pumpAndSettle(Duration(seconds: 5))` sets a
+five-second **pump interval**, not a timeout. Do not use global settling for a
+playing video, spinner, directory I/O or model inference. Do not catch a settle
+timeout and silently treat it as success. A screenshot captures the asserted
+state without waiting for the entire app to become idle.
 
-| `testWidgets` name | What it checks |
-|--------------------|----------------|
-| `cut and move file via right-click context menu` | Cut via menu, navigate, paste, expect file moved (source deleted). |
-| `cut and move file via Ctrl+X Ctrl+V keyboard shortcuts` | Same as above but with keyboard shortcuts. |
+Observation windows that are themselves under test (playback position changes,
+tooltip delay, accessibility churn, debounce and SQLite busy timeout) remain
+intentional; do not mechanically shorten them.
 
-### Keyboard Shortcuts (extended)
+## Diagnostics and timing
 
-| `testWidgets` name | What it checks |
-|--------------------|----------------|
-| `refresh folder listing with F5 after external change` | Create file externally → F5 → expect file appears in UI. |
-| `cancel rename with Escape key after pressing F2` | F2 to start rename → Escape → expect original name unchanged. |
-| `open file with Enter key when file is selected` | Select file → Enter key → verify no crash. |
+- Full unit/widget events: `build/unit_test_report.jsonl`; failure-only console
+  summary: `dart tool/unit_test_failures.dart <report>`.
+- `just test-times` reads the existing unit report and prints the slowest ten
+  executed tests. It also writes `<report>.timings.json`, excluding loading/build.
+  Pass another report with `just test-times build/e2e-logs/desktop.jsonl`.
+- Desktop E2E: `build/e2e-logs/desktop.jsonl`, `desktop.log`, per-suite `.log`
+  and `summary.json`. The summary distinguishes per-suite executed test time
+  from total build/startup/test wall time and time until the first test.
+- Debugging runners: `build/e2e_workers/`, `build/e2e_report.jsonl` and the
+  HTML dashboard at `build/e2e_dashboard/index.html`.
 
-### Extended File Operations
+The desktop runner also updates `build/e2e_report.jsonl`; `just dashboard`
+regenerates the HTML before opening it. Dashboard history merges partial reruns
+without duplicating old unprefixed test identities. Allure consumes actual error,
+skip and terminal events, uses event timestamps, and removes only its generated
+result JSON files from the previous conversion. Skipped or incomplete cases are
+never relabeled as passed. [Measured improvement](04-test-performance.md).
 
-| `testWidgets` name | What it checks |
-|--------------------|----------------|
-| `batch move multiple files to destination folder` | Ctrl+select multiple files → Ctrl+X → navigate → Ctrl+V. |
-| `copy folder with nested contents to another location` | Copy folder with nested subfolders, verify structure preserved. |
-| `rename folder via F2 keyboard shortcut` | Select folder → F2 → rename → verify folder renamed. |
+Keep the build cache. `flutter clean` / `just deep-clean` are recovery tools,
+not routine test preparation. Enable full action screenshots or full production
+startup only when those are the subject of the investigation (`--full-screenshots`,
+`--full-startup` in debugging runners). Fast startup remains the default E2E mode.
 
-### Video Thumbnails
+## CI and release
 
-> **File:** `video_thumbnails_e2e_test.dart` — runs as a **separate test file** via `--file video_thumbnails_e2e_test`.
+CI selects suites from changed paths with ordered rules. `main` and explicit
+full-run requests select the complete gate; other branches select affected
+suites. Existing trusted pass records only apply to the same source fingerprint,
+including both native packages, the pinned build configuration, test harness and runtime fetch scripts.
 
-| `testWidgets` name | What it checks |
-|--------------------|----------------|
-| `video file row is visible and has correct file type` | `.mp4` row appears alongside text file; `assertFileRowExists`. |
-| `video context menu shows Play video action (grid view)` | Right-click `.mp4` → "Play video" appears in context menu. |
-| `video context menu shows Play video action (list view)` | Same as above, in list view mode. |
-| `multiple video formats display correctly in same folder` | `.mp4`, `.avi`, `.mkv`, `.mov` all visible as rows. |
-| `video files persist after folder refresh (F5)` | Video row stays visible after F5 refresh. |
-| `deleting a video file removes it from the list` | Delete `.mp4` → row gone from UI, file deleted from disk. |
-| `video file can be renamed via context menu` | Rename → new name visible, old name gone. |
-| `opening a video via context menu does not crash app` | Tapping "Play video" → app does not crash, rows remain accessible. |
-| `video file row is FileItem not FolderItem` | Video row is `FileItem`/`FileGridItem`, not folder type. |
-| `unsupported video extension does not show Play video action` | `.abc` extension → "Play video" absent from context menu. |
+The release gate still requires a clean working tree and every suite to pass
+before creating a version commit/tag. Pending suites run in one batch; completed
+suite passes are retained when another suite fails. It does not silently skip
+coverage to make releases faster. `just release-e2e --status` only displays the
+record for the current source. No release command is needed to verify edits.
 
-**Sample video:** `integration_test/samples/file_example_MP4_1920_18MG.mp4` (18 MB). The test copies it into a temp sandbox for real thumbnail generation tests. If the sample is missing, it falls back to a minimal MP4 stub (sufficient for UI structure tests — app detects video by extension).
-
-Between tests, `_e2eTearDown` pumps briefly, then `tearDownCbFileAppForNextE2ETest()` resets `DatabaseManager`'s singleton and `GetIt.reset(dispose: true)` (shared SQLite file stays open to avoid `database_closed` races), then deletes the temp sandbox directory after the app has dropped watchers on that path.
-
-## Troubleshooting
-
-| Symptom | What to try |
-|---------|-------------|
-| `make dev-test mode=e2e --file ...` fails | Use `TEST_FILE=filename` instead: `make dev-test mode=e2e TEST_FILE=video_thumbnails_e2e_test`. The `--file` flag is not a make argument. |
-| MSB3073 / `cmake_install` / `INSTALL.vcxproj` | `make dev-test-e2e-clean`, or delete `cb_file_manager/build/windows` and rebuild. |
-| `sqlite3.dll` / FFI load error 126 | Ensure `hooks.user_defines` for `sqlite3` (`source: system`, `name_windows: winsqlite3`) is present in `pubspec.yaml`; run `flutter pub get`. |
-| Flaky `pumpAndSettle` | Timeouts are long on purpose; heavy first build can take minutes. |
-| `Found 0 widgets` for `file-item-*` / `folder-item-*` | View may be **grid**; use `file-grid-item-*` / `folder-grid-item-*` or helpers in `integration_test/e2e_keys.dart`. |
-| `DatabaseException(error database_closed)` between cases | Avoid closing the shared SQLite handle while the next `runCbFileApp` boots; E2E teardown resets `DatabaseManager` + `GetIt` only (see `lib/e2e/cb_e2e_config.dart`). |
-
-## Related
-
-- `docs/quality/01-testing-strategy.md` — high-level testing pyramid.
-- `Makefile` — `help` lists `TEST_REPORTER`, `E2E_DEVICE`, and developer test targets.
+When adding a suite, update the combined entrypoint, suite/impact catalog,
+parallel debugger mapping and selector/planner tests. Add assertions at the
+lowest useful layer before expanding costly full-app scenarios.

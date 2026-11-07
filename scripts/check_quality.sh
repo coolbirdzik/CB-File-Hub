@@ -10,7 +10,7 @@ echo '==> Install dependencies'
 echo '==> Verify formatting'
 bash ../scripts/format_dart.sh --output=none --set-exit-if-changed
 echo '==> Analyze project'
-"$flutter" analyze
+"$flutter" analyze --no-pub
 echo '==> Run unit/widget tests (only failures are printed)'
 # Passing tests and their log output stay out of the console; the full event
 # stream remains in the JSON report for anyone who needs it.
@@ -18,7 +18,7 @@ report=build/unit_test_report.jsonl
 mkdir -p build
 rm -f "$report"
 status=0
-"$flutter" test --reporter silent --file-reporter "json:$report" || status=$?
+"$flutter" test --no-pub --reporter silent --file-reporter "json:$report" || status=$?
 # Plain `dart <file>` skips the build hooks `dart run` would rerun (~10 s).
 dart tool/unit_test_failures.dart "$report" || status=1
 exit "$status"

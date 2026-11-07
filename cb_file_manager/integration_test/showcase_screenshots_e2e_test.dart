@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'e2e_wait.dart';
 import 'dart:io';
 import 'dart:math' as math;
 
@@ -57,7 +58,7 @@ void main() {
 
       try {
         await runCbFileApp();
-        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await settleE2EUi(tester);
         await et.init('showcase file browser');
 
         expectFolderRowVisible(media.movies.path);
@@ -72,7 +73,7 @@ void main() {
         final heroTile = find.text(p.basename(media.heroImage));
         if (heroTile.evaluate().isNotEmpty) {
           await et.tap(heroTile.first, detail: 'select_hero_image');
-          await tester.pumpAndSettle(const Duration(seconds: 2));
+          await settleE2EUi(tester);
         }
 
         await et.screenshot('result');
@@ -94,9 +95,9 @@ void main() {
 
       try {
         await runCbFileApp();
-        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await settleE2EUi(tester);
         await et.init('showcase gallery hub');
-        await tester.pumpAndSettle(const Duration(seconds: 2));
+        await settleE2EUi(tester);
 
         await et.screenshot('result');
       } finally {
@@ -117,9 +118,9 @@ void main() {
 
       try {
         await runCbFileApp();
-        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await settleE2EUi(tester);
         await et.init('showcase album detail');
-        await tester.pumpAndSettle(const Duration(seconds: 2));
+        await settleE2EUi(tester);
 
         await et.screenshot('result');
       } finally {
@@ -149,14 +150,14 @@ void main() {
 
       try {
         await runCbFileApp();
-        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await settleE2EUi(tester);
         await et.init('showcase AI side panel search');
 
         // Tap the sparkle (AI) button in the top bar to open the side panel
         final sparkleButton = find.byIcon(PhosphorIconsLight.sparkle);
         if (sparkleButton.evaluate().isNotEmpty) {
           await et.tap(sparkleButton.first, detail: 'open_ai_panel');
-          await tester.pumpAndSettle(const Duration(seconds: 2));
+          await settleE2EUi(tester);
         }
 
         await et.screenshot('result');
@@ -192,13 +193,13 @@ void main() {
 
       try {
         await runCbFileApp();
-        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await settleE2EUi(tester);
         await et.init('showcase AI approval');
 
         final sparkleButton = find.byIcon(PhosphorIconsLight.sparkle);
         if (sparkleButton.evaluate().isNotEmpty) {
           await et.tap(sparkleButton.first, detail: 'open_ai_panel');
-          await tester.pumpAndSettle(const Duration(seconds: 2));
+          await settleE2EUi(tester);
         }
 
         await et.screenshot('result');
@@ -223,13 +224,13 @@ void main() {
 
       try {
         await runCbFileApp();
-        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await settleE2EUi(tester);
         await et.init('showcase AI conversation');
 
         final sparkleButton = find.byIcon(PhosphorIconsLight.sparkle);
         if (sparkleButton.evaluate().isNotEmpty) {
           await et.tap(sparkleButton.first, detail: 'open_ai_panel');
-          await tester.pumpAndSettle(const Duration(seconds: 2));
+          await settleE2EUi(tester);
         }
 
         await et.screenshot('result');
@@ -255,7 +256,7 @@ void main() {
 
       try {
         await runCbFileApp();
-        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await settleE2EUi(tester);
         await et.init('showcase tag management');
 
         await et.screenshot('result');
@@ -280,15 +281,15 @@ void main() {
 
       try {
         await runCbFileApp();
-        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await settleE2EUi(tester);
         await et.init('showcase tag tagged files');
 
         // Selecting a leaf tag loads its files into the panel on the right.
-        await tester.pumpAndSettle(const Duration(seconds: 2));
+        await settleE2EUi(tester);
         final tagRow = find.text('vacation');
         if (tagRow.evaluate().isNotEmpty) {
           await et.tap(tagRow.first, detail: 'open_tagged_files');
-          await tester.pumpAndSettle(const Duration(seconds: 3));
+          await settleE2EUi(tester);
         }
 
         await et.screenshot('result');
@@ -313,18 +314,18 @@ void main() {
 
       try {
         await runCbFileApp();
-        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await settleE2EUi(tester);
         await et.init('showcase tag tree');
 
         // Switch to tree view: open the "eye" view-mode menu, pick Tree.
         final eyeIcon = find.byIcon(PhosphorIconsLight.eye);
         if (eyeIcon.evaluate().isNotEmpty) {
           await et.tap(eyeIcon.first, detail: 'view_mode_menu');
-          await tester.pumpAndSettle(const Duration(seconds: 1));
+          await settleE2EUi(tester);
           final treeIcon = find.byIcon(PhosphorIconsLight.treeView);
           if (treeIcon.evaluate().isNotEmpty) {
             await et.tap(treeIcon.last, detail: 'tree_mode');
-            await tester.pumpAndSettle(const Duration(seconds: 1));
+            await settleE2EUi(tester);
           }
         }
 
@@ -335,7 +336,7 @@ void main() {
           final row = find.text(parent);
           if (row.evaluate().isEmpty) continue;
           await et.tap(row.first, detail: 'expand_$parent');
-          await tester.pumpAndSettle(const Duration(milliseconds: 800));
+          await settleE2EUi(tester);
         }
 
         // Land on a leaf that owns files so the row thumbnails and the tagged
@@ -343,7 +344,7 @@ void main() {
         final leaf = find.text('Beach');
         if (leaf.evaluate().isNotEmpty) {
           await et.tap(leaf.first, detail: 'select_leaf_tag');
-          await tester.pumpAndSettle(const Duration(seconds: 2));
+          await settleE2EUi(tester);
         }
 
         await et.screenshot('result');
@@ -374,11 +375,11 @@ void main() {
 
       try {
         await runCbFileApp();
-        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await settleE2EUi(tester);
         await et.init('showcase tag assignment');
         await et.rightClickFileRow(media.heroImage, detail: 'open_file_menu');
         await et.tapContextMenuItem('tags', detail: 'open_manage_tags');
-        await tester.pumpAndSettle(const Duration(seconds: 2));
+        await settleE2EUi(tester);
         await et.screenshot('result');
       } finally {
         await e2eTearDown(tester, dir);
@@ -409,9 +410,9 @@ void main() {
 
       try {
         await runCbFileApp();
-        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await settleE2EUi(tester);
         await et.init('showcase SSH workspace');
-        await tester.pumpAndSettle(const Duration(seconds: 2));
+        await settleE2EUi(tester);
         await et.screenshot('result');
       } finally {
         // The E2E path sandbox protects the tag/database workspace. Remove the
@@ -435,9 +436,9 @@ void main() {
 
       try {
         await runCbFileApp();
-        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await settleE2EUi(tester);
         await et.init('showcase network connections');
-        await tester.pumpAndSettle(const Duration(seconds: 2));
+        await settleE2EUi(tester);
         await et.screenshot('result');
       } finally {
         await e2eTearDown(tester, dir);
@@ -680,7 +681,7 @@ Future<void> switchToGridView(WidgetTester tester, E2ETester et) async {
   if (eyeIcon.evaluate().isEmpty) return;
 
   await et.tap(eyeIcon.first, detail: 'view_mode_menu');
-  await tester.pumpAndSettle(const Duration(seconds: 1));
+  await settleE2EUi(tester);
 
   final gridItem = find.descendant(
     of: find.byType(PopupMenuItem<ViewMode>),
@@ -689,12 +690,12 @@ Future<void> switchToGridView(WidgetTester tester, E2ETester et) async {
   if (gridItem.evaluate().isEmpty) {
     // Menu never opened — close whatever is on screen and keep the list view.
     await tester.tapAt(const Offset(20, 400));
-    await tester.pumpAndSettle(const Duration(milliseconds: 500));
+    await settleE2EUi(tester);
     return;
   }
 
   await et.tap(gridItem.first, detail: 'grid_view_mode');
-  await tester.pumpAndSettle(const Duration(seconds: 3));
+  await settleE2EUi(tester);
 }
 
 class ShowcaseMedia {

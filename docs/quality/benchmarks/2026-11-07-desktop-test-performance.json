@@ -1,0 +1,168 @@
+{
+  "before": {
+    "cases": [
+      {
+        "name": "01 Navigation 01.01 sandbox lists two files and a subfolder",
+        "ms": 28515
+      },
+      {
+        "name": "01 Navigation 01.02 open subfolder shows file inside",
+        "ms": 32756
+      },
+      {
+        "name": "01 Navigation 01.03 empty sandbox has no file or folder rows",
+        "ms": 26723
+      },
+      {
+        "name": "01 Navigation 01.04 navigate back to parent with Backspace after entering subfolder",
+        "ms": 38399
+      }
+    ],
+    "totalMs": 126393
+  },
+  "after": {
+    "cases": [
+      {
+        "name": "01 Navigation 01.01 sandbox lists two files and a subfolder",
+        "ms": 3327
+      },
+      {
+        "name": "01 Navigation 01.02 open subfolder shows file inside",
+        "ms": 2444
+      },
+      {
+        "name": "01 Navigation 01.03 empty sandbox has no file or folder rows",
+        "ms": 2253
+      },
+      {
+        "name": "01 Navigation 01.04 navigate back to parent with Backspace after entering subfolder",
+        "ms": 2883
+      }
+    ],
+    "totalMs": 10907
+  },
+  "speedup": 11.588246080498763,
+  "reductionPercent": 91.37056640794981,
+  "note": "Executed Navigation cases only; compile excluded. Final after-run also verifies listing readiness and a nonempty-to-empty refresh.",
+  "baselineCommit": "455062a1f0a561fb9686433369055a047002c614",
+  "host": {
+    "os": "Windows x64",
+    "cpu": "Intel Core i5-14600K",
+    "physicalCores": 14,
+    "logicalProcessors": 20,
+    "flutter": "3.47.8",
+    "dart": "3.13.7"
+  },
+  "method": {
+    "samplesPerSide": 1,
+    "compileIncluded": false,
+    "perCaseStartupAndTeardownIncluded": true,
+    "flags": {
+      "CB_E2E": true,
+      "CB_E2E_FAST": true
+    },
+    "afterIncludesAdditionalReadinessAssertions": true
+  },
+  "verification": {
+    "unitWidget": {
+      "passed": 2046,
+      "skipped": 24
+    },
+    "focusedToolTests": {
+      "passed": 20
+    },
+    "desktopFull": {
+      "seconds": 462,
+      "firstTestMs": 55068,
+      "exitCode": 0,
+      "results": [
+        {
+          "id": "app",
+          "ok": true,
+          "passed": 34,
+          "failed": 0,
+          "skipped": 0,
+          "seconds": 130
+        },
+        {
+          "id": "video_thumbnails",
+          "ok": true,
+          "passed": 10,
+          "failed": 0,
+          "skipped": 0,
+          "seconds": 27
+        },
+        {
+          "id": "media_kit_playback",
+          "ok": true,
+          "passed": 6,
+          "failed": 0,
+          "skipped": 1,
+          "seconds": 56
+        },
+        {
+          "id": "ffmpeg_thumbnail",
+          "ok": true,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0,
+          "seconds": 0
+        },
+        {
+          "id": "file_drag_drop",
+          "ok": true,
+          "passed": 7,
+          "failed": 0,
+          "skipped": 0,
+          "seconds": 23
+        },
+        {
+          "id": "breadcrumb_address_bar_overflow",
+          "ok": true,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0,
+          "seconds": 1
+        },
+        {
+          "id": "torrent_library",
+          "ok": true,
+          "passed": 8,
+          "failed": 0,
+          "skipped": 0,
+          "seconds": 77
+        },
+        {
+          "id": "semantics_stability",
+          "ok": true,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0,
+          "seconds": 37
+        },
+        {
+          "id": "tooltip_semantics",
+          "ok": true,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0,
+          "seconds": 2
+        },
+        {
+          "id": "video_player_chrome_semantics",
+          "ok": true,
+          "passed": 2,
+          "failed": 0,
+          "skipped": 0,
+          "seconds": 49
+        }
+      ]
+    },
+    "desktopAppFollowup": {
+      "passed": 34,
+      "skipped": 0,
+      "secondsTotal": 201
+    },
+    "optionalDesktopSkip": "Real SMB share requires CB_E2E_SMB_URL"
+  }
+}

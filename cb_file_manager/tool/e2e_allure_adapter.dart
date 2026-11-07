@@ -17,6 +17,7 @@
 
 import 'dart:convert';
 import 'dart:io';
+import 'test_report_names.dart';
 
 const _kAllureResultsDir = 'build/allure-results';
 const _kScreenshotsDir = 'build';
@@ -95,9 +96,37 @@ List<AllureTestResult> parseFlutterJsonLog(
 }) {
   final results = <AllureTestResult>[];
   final idToName = <int, String>{};
-  final idToStartTime = <int, DateTime>{};
-  final idToEndTime = <int, DateTime>{};
+  final idToStartTime = <int, int>{};
+  final idToEndTime = <int, int>{};
   final idToError = <int, _ErrorInfo>{};
+  final idToStatus = <int, String>{};
+  final hiddenIds = <int>{};
+  var finished = false;
+  var terminalSuccess = false;
+  _ErrorInfo? globalError;
+  final manifestShots = <String, String>{};
+  final manifest = File(
+    '${buildDir ?? _kScreenshotsDir}/e2e_report/manifest.json',
+  );
+  if (manifest.existsSync()) {
+    try {
+      final entries =
+          (jsonDecode(manifest.readAsStringSync()) as Map)['entries'] as List;
+      for (final entry in entries.whereType<Map>()) {
+        if (entry['testName'] is String &&
+            entry['filename'] is String &&
+            RegExp(
+              r'^[A-Za-z0-9_.-]+$',
+            ).hasMatch(entry['filename'] as String)) {
+          manifestShots[entry['testName'] as String] =
+              entry['filename'] as String;
+        }
+      }
+    } catch (error) {
+      // A partial screenshot manifest must not prevent parsing test failures.
+      stderr.writeln('[Allure] Ignoring invalid screenshot manifest: $error');
+    }
+  }
 
   for (final rawLine in logContent.split('\n')) {
     final line = rawLine.trim();
@@ -120,18 +149,20 @@ List<AllureTestResult> parseFlutterJsonLog(
         final name = test['name'] as String?;
         if (id != null && name != null) {
           idToName[id] = name;
-          idToStartTime[id] =
-              DateTime.now(); // flutter json doesn't expose start time
+          idToStartTime[id] = decoded['time'] as int? ?? 0;
         }
       }
     } else if (type == 'testDone') {
       final testID = decoded['testID'] as int?;
       if (testID == null || !idToName.containsKey(testID)) continue;
 
-      idToEndTime[testID] = DateTime.now();
+      idToEndTime[testID] = decoded['time'] as int? ?? 0;
+      idToStatus[testID] = decoded['skipped'] == true
+          ? 'skipped'
+          : decoded['result'] as String? ?? 'unknown';
 
       final hidden = decoded['hidden'] as bool? ?? false;
-      if (hidden) continue;
+      if (hidden) hiddenIds.add(testID);
 
       // Extract error info
       final errorLines = decoded['error'] as String?;
@@ -141,13 +172,23 @@ List<AllureTestResult> parseFlutterJsonLog(
           trace: errorLines,
         );
       }
-    } else if (type == 'sessionFinished') {
-      // End of session — compute duration for tests that have end times
-      for (final testID in idToName.keys) {
-        if (idToEndTime.containsKey(testID)) {
-          // duration will be set in final conversion below
-        }
+    } else if (type == 'error') {
+      final testID = decoded['testID'] as int?;
+      if (testID != null) {
+        final message = decoded['error'] as String? ?? 'Test failed';
+        idToError[testID] = _ErrorInfo(
+          message: message,
+          trace: decoded['stackTrace'] as String? ?? '',
+        );
+      } else {
+        globalError = _ErrorInfo(
+          message: decoded['error'] as String? ?? 'Test runner failed',
+          trace: decoded['stackTrace'] as String? ?? '',
+        );
       }
+    } else if (type == 'done') {
+      finished = true;
+      terminalSuccess = decoded['success'] == true;
     }
   }
 
@@ -156,21 +197,33 @@ List<AllureTestResult> parseFlutterJsonLog(
     final testID = entry.key;
     final name = entry.value;
     final error = idToError[testID];
+    final result = idToStatus[testID];
+    final failed = error != null || result == 'error' || result == 'failure';
+    if (!failed &&
+        (hiddenIds.contains(testID) || name.startsWith('loading '))) {
+      continue;
+    }
     final endTime = idToEndTime[testID];
     final startTime = idToStartTime[testID];
 
     // Determine status
     String status;
-    if (error != null) {
+    if (failed) {
       status = 'failed';
+    } else if (!finished || endTime == null) {
+      status = 'broken';
+    } else if (result == 'skipped') {
+      status = 'skipped';
+    } else if (result == 'success') {
+      status = 'passed';
     } else {
-      status = 'passed'; // no error in log = passed
+      status = 'broken';
     }
 
     // Duration in ms
     int? durationMs;
     if (startTime != null && endTime != null) {
-      durationMs = endTime.difference(startTime).inMilliseconds;
+      durationMs = endTime - startTime;
     }
 
     // Parse suite name from test name (e.g. "sandbox lists two files and a subfolder")
@@ -178,13 +231,21 @@ List<AllureTestResult> parseFlutterJsonLog(
 
     // Find matching screenshot if available
     final attachments = <AllureAttachment>[];
-    final screenshotName = _screenshotForTest(
-      name,
-      buildDir ?? _kScreenshotsDir,
-    );
+    final manifestName = manifestShots[name];
+    final screenshotName =
+        manifestName != null &&
+            File(
+              '${buildDir ?? _kScreenshotsDir}/e2e_report/screenshots/$manifestName',
+            ).existsSync()
+        ? manifestName
+        : _screenshotForTest(name, buildDir ?? _kScreenshotsDir);
     if (screenshotName != null) {
       attachments.add(
-        AllureAttachment('Failure screenshot', 'image/png', screenshotName),
+        AllureAttachment(
+          status == 'failed' ? 'Failure screenshot' : 'Checkpoint screenshot',
+          'image/png',
+          screenshotName,
+        ),
       );
     }
 
@@ -194,7 +255,9 @@ List<AllureTestResult> parseFlutterJsonLog(
         name: name,
         status: status,
         duration: durationMs,
-        message: error?.message,
+        message:
+            error?.message ??
+            (status == 'broken' ? 'Test report did not complete' : null),
         trace: error?.trace,
         labels: [
           const AllureLabel('package', 'cb_file_manager.e2e'),
@@ -208,6 +271,22 @@ List<AllureTestResult> parseFlutterJsonLog(
     );
   }
 
+  if (globalError != null ||
+      (finished &&
+          !terminalSuccess &&
+          !results.any((result) => result.status == 'failed'))) {
+    results.add(
+      AllureTestResult(
+        uuid: _uuidForTest('E2E runner failure', 0),
+        name: 'E2E runner failure',
+        status: 'broken',
+        message:
+            globalError?.message ??
+            'Runner reported failure without a completed failing case',
+        trace: globalError?.trace,
+      ),
+    );
+  }
   return results;
 }
 
@@ -224,11 +303,20 @@ String _firstLine(String s) {
 
 /// Infers a suite/feature label from the test name.
 String _inferSuiteLabel(String name) {
+  name = withoutDesktopSuitePrefix(name);
   // 1. Explicit group() prefix (present in JSON reporter output).
   // New numbered prefixes are listed first; legacy names follow for
   // backward-compat with persisted state.
   const groupPrefixes = [
     '01 Navigation',
+    'Media Kit Playback',
+    'FFmpeg Thumbnails',
+    'File Drag Drop',
+    'Breadcrumb Overflow',
+    'Torrent Library',
+    'AX Semantics',
+    'Tooltip Semantics',
+    'Video Chrome Semantics',
     '02 File Operations',
     '03 Cut & Move',
     '04 Folder Operations',
@@ -348,6 +436,16 @@ Future<void> writeAllureResults(
     await dir.create(recursive: true);
   }
 
+  // Allure consumes every result file in this directory. Retaining an older
+  // successful conversion can hide this run's failures. Remove only files with
+  // this converter's generated identity format, preserving unrelated metadata.
+  await for (final entry in dir.list()) {
+    if (entry is File &&
+        RegExp(r'[/\\][0-9a-f]{8}-[0-9a-f]{8}\.json$').hasMatch(entry.path)) {
+      await entry.delete();
+    }
+  }
+
   int written = 0;
   for (final result in results) {
     final file = File('$resultsDir/${result.uuid}.json');
@@ -424,7 +522,12 @@ Future<void> main(List<String> args) async {
 
   for (final result in results) {
     for (final attachment in result.attachments) {
-      final src = File('${buildDir ?? 'build'}/${attachment.source}');
+      var src = File('${buildDir ?? 'build'}/${attachment.source}');
+      if (!await src.exists()) {
+        src = File(
+          '${buildDir ?? 'build'}/e2e_report/screenshots/${attachment.source}',
+        );
+      }
       if (await src.exists()) {
         final dst = File('$resultsDir/${attachment.source}');
         await src.copy(dst.path);

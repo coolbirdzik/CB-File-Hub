@@ -19,12 +19,15 @@
 //   --plain-name "11 Extended File Operations"    # batch move, deep copy
 //   --plain-name "Video Thumbnails"           # video display, context menu, thumbnails
 import 'dart:io';
+import 'e2e_wait.dart';
 
 import 'package:cb_file_manager/e2e/cb_e2e_config.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/design_system/primitives/cb_inline_rename.dart';
 import 'package:cb_file_manager/design_system/primitives/cb_tooltip.dart';
 import 'package:cb_file_manager/ui/components/common/search_text_field.dart';
+import 'package:cb_file_manager/ui/components/common/breadcrumb_address_bar.dart';
+import 'package:cb_file_manager/ui/tab_manager/components/path_navigation_bar.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/main.dart';
 import 'package:cb_file_manager/services/windowing/window_startup_payload.dart';
@@ -81,10 +84,10 @@ Future<bool> _confirmDeleteDialog(
     final finder = _findDeleteConfirmButton();
     if (finder.evaluate().isNotEmpty) {
       await et.tap(finder.first, detail: 'confirm_delete_dialog');
-      await et.pumpAndSettle(const Duration(seconds: 3));
+      await et.pumpAndSettle();
       return true;
     }
-    await et.pumpAndSettle(const Duration(milliseconds: 200));
+    await et.pumpAndSettle();
   }
   return false;
 }
@@ -123,7 +126,7 @@ Future<void> _chooseBrowserView(WidgetTester tester, ViewMode mode) async {
     const Duration(seconds: 5),
   );
   await tester.tap(choice);
-  await tester.pumpAndSettle(const Duration(milliseconds: 300));
+  await settleE2EUi(tester);
   final deadline = DateTime.now().add(const Duration(seconds: 5));
   while (tester.widget<PopupMenuButton<ViewMode>>(menu).initialValue != mode &&
       DateTime.now().isBefore(deadline)) {
@@ -183,7 +186,7 @@ void main() {
       try {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
-        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await settleE2EUi(tester);
         await et.init('01.01 sandbox lists two files and a subfolder');
 
         await waitForFileRowVisible(tester, aFile.path);
@@ -215,7 +218,7 @@ void main() {
       try {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
-        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await settleE2EUi(tester);
         await et.init('01.02 open subfolder shows file inside');
 
         await waitForFolderRowVisible(tester, sub.path);
@@ -223,7 +226,7 @@ void main() {
           debugPrint('[E2E] Folder found, navigating into: ${sub.path}');
         }
         await et.tapFolderRow(sub.path, detail: 'navigate_into_innerdir');
-        await et.pumpAndSettle(const Duration(seconds: 5));
+        await et.pumpAndSettle();
         await waitForFileRowVisible(tester, innerFile.path);
         if (kDebugMode) debugPrint('[E2E] Navigation complete — SUCCESS');
       } finally {
@@ -245,8 +248,21 @@ void main() {
       try {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
-        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await settleE2EUi(tester);
         await et.init('01.03 empty sandbox has no file or folder rows');
+
+        // A blank/loading app must not satisfy a negative row assertion. Prove
+        // the real listing responds, then observe its transition back to empty.
+        final probe = File('${dir.path}${Platform.pathSeparator}probe.txt');
+        final refresh = find.byKey(const ValueKey('shared-refresh-action'));
+        await pumpUntilFound(tester, refresh);
+        expect(refresh, findsOneWidget);
+        await probe.writeAsString('empty-state readiness probe');
+        await et.tap(refresh);
+        await waitForFileRowVisible(tester, probe.path);
+        await probe.delete();
+        await et.tap(refresh);
+        await waitForFileRowAbsent(tester, probe.path);
 
         expect(find.byType(FileItem), findsNothing);
         expect(find.byType(FolderItem), findsNothing);
@@ -279,7 +295,7 @@ void main() {
             debugPrint('[E2E] Test started, sandbox: ${dir.path}');
           }
           await runCbFileApp();
-          await tester.pumpAndSettle(const Duration(seconds: 5));
+          await settleE2EUi(tester);
           await et.init(
             '01.04 navigate back to parent with Backspace after entering subfolder',
           );
@@ -290,7 +306,7 @@ void main() {
 
           // Navigate into subfolder
           await et.tapFolderRow(sub.path, detail: 'navigate_into_innerdir');
-          await et.pumpAndSettle(const Duration(seconds: 5));
+          await et.pumpAndSettle();
           await waitForFileRowVisible(tester, innerFile.path);
           await et.screenshot('inside subfolder');
 
@@ -299,7 +315,7 @@ void main() {
             debugPrint('[E2E] Pressing Backspace to navigate back');
           }
           await et.keyPress(LogicalKeyboardKey.backspace);
-          await et.pumpAndSettle(const Duration(seconds: 5));
+          await et.pumpAndSettle();
 
           // Verify back in parent folder
           await waitForFileRowVisible(tester, rootFile.path);
@@ -336,7 +352,7 @@ void main() {
       try {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
-        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await settleE2EUi(tester);
         await et.init('02.01 create new folder via right-click context menu');
 
         // Verify dummy file is visible (confirms FileListViewBuilder has rendered)
@@ -369,9 +385,9 @@ void main() {
           newFolderName,
           detail: 'type_folder_name',
         );
-        await tester.pumpAndSettle(const Duration(milliseconds: 300));
+        await settleE2EUi(tester);
         await tester.testTextInput.receiveAction(TextInputAction.done);
-        await et.pumpAndSettle(const Duration(seconds: 3));
+        await et.pumpAndSettle();
 
         final createdPath =
             '${dir.path}${Platform.pathSeparator}$newFolderName';
@@ -403,7 +419,7 @@ void main() {
       try {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
-        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await settleE2EUi(tester);
         await et.init('02.02 copy file via right-click context menu and paste');
 
         await waitForFileRowVisible(tester, srcFile.path);
@@ -417,7 +433,7 @@ void main() {
 
         // Navigate into dest_folder
         await et.tapFolderRow(sub.path, detail: 'navigate_to_dest');
-        await et.pumpAndSettle(const Duration(seconds: 5));
+        await et.pumpAndSettle();
 
         await et.openBackgroundContextMenu(detail: 'open_bg_menu_for_paste');
         await et.tapContextMenuItem('paste', detail: 'paste');
@@ -448,18 +464,18 @@ void main() {
       try {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
-        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await settleE2EUi(tester);
         await et.init('02.03 rename file via F2 keyboard shortcut');
 
         await waitForFileRowVisible(tester, originalFile.path);
 
         await et.tapFileRow(originalFile.path, detail: 'select_file');
-        await et.pumpAndSettle(const Duration(milliseconds: 300));
+        await et.pumpAndSettle();
 
         // Press F2 to trigger rename
         if (kDebugMode) debugPrint('[E2E] Pressing F2 for rename');
         await et.keyPress(LogicalKeyboardKey.f2);
-        await et.pumpAndSettle(const Duration(seconds: 2));
+        await et.pumpAndSettle();
 
         // Target the inline editor specifically; the address bar may also
         // contain a TextField and must not receive the new filename.
@@ -470,9 +486,9 @@ void main() {
           reason: 'Inline rename TextField not found',
         );
         await et.enterText(renameField, newName, detail: 'type_new_name');
-        await tester.pumpAndSettle(const Duration(milliseconds: 300));
+        await settleE2EUi(tester);
         await tester.testTextInput.receiveAction(TextInputAction.done);
-        await et.pumpAndSettle(const Duration(seconds: 3));
+        await et.pumpAndSettle();
 
         final renamedPath = '${dir.path}${Platform.pathSeparator}$newName';
         await waitForFileRowVisible(tester, renamedPath);
@@ -500,25 +516,25 @@ void main() {
       try {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
-        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await settleE2EUi(tester);
         await et.init('02.04 delete file via keyboard shortcut');
 
         await waitForFileRowVisible(tester, targetFile.path);
 
         await et.tapFileRow(targetFile.path, detail: 'select_file');
-        await et.pumpAndSettle(const Duration(milliseconds: 300));
+        await et.pumpAndSettle();
 
         // Press Delete key — triggers delete with confirmation dialog
         if (kDebugMode) debugPrint('[E2E] Pressing Delete key');
         await et.keyPress(LogicalKeyboardKey.delete);
-        await et.pumpAndSettle(const Duration(seconds: 2));
+        await et.pumpAndSettle();
 
         // A confirmation dialog should appear — find the confirm button.
         // The DeleteConfirmationDialog uses TextButton with the localized
         // "Xóa"/"Delete" label, so we use a shared helper that matches any
         // ButtonStyleButton with delete/confirm text in EN+VI.
         await _confirmDeleteDialog(et);
-        await et.pumpAndSettle(const Duration(seconds: 1));
+        await et.pumpAndSettle();
 
         await waitForFileRowAbsent(tester, targetFile.path);
         if (kDebugMode) debugPrint('[E2E] delete file — SUCCESS');
@@ -551,7 +567,7 @@ void main() {
       try {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
-        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await settleE2EUi(tester);
         await et.init('03.01 cut and move file via right-click context menu');
 
         await waitForFileRowVisible(tester, srcFile.path);
@@ -563,12 +579,12 @@ void main() {
 
         // Navigate into dest folder
         await et.tapFolderRow(destFolder.path, detail: 'navigate_to_dest');
-        await et.pumpAndSettle(const Duration(seconds: 5));
+        await et.pumpAndSettle();
 
         // Paste via background context menu
         await et.openBackgroundContextMenu(detail: 'open_bg_menu_for_paste');
         await et.tapContextMenuItem('paste', detail: 'paste');
-        await et.pumpAndSettle(const Duration(seconds: 3));
+        await et.pumpAndSettle();
 
         // Verify file appears in destination
         final movedPath =
@@ -608,7 +624,7 @@ void main() {
             debugPrint('[E2E] Test started, sandbox: ${dir.path}');
           }
           await runCbFileApp();
-          await tester.pumpAndSettle(const Duration(seconds: 5));
+          await settleE2EUi(tester);
           await et.init(
             '03.02 cut and move file via Ctrl+X Ctrl+V keyboard shortcuts',
           );
@@ -617,7 +633,7 @@ void main() {
 
           // Select the file
           await et.tapFileRow(srcFile.path, detail: 'select_file');
-          await et.pumpAndSettle(const Duration(milliseconds: 300));
+          await et.pumpAndSettle();
 
           // Ctrl+X to cut
           if (kDebugMode) debugPrint('[E2E] Pressing Ctrl+X');
@@ -626,11 +642,11 @@ void main() {
             ctrl: true,
             detail: 'ctrl_x_cut',
           );
-          await et.pumpAndSettle(const Duration(milliseconds: 500));
+          await et.pumpAndSettle();
 
           // Navigate into dest folder
           await et.tapFolderRow(destFolder.path, detail: 'navigate_to_dest');
-          await et.pumpAndSettle(const Duration(seconds: 5));
+          await et.pumpAndSettle();
 
           // Ctrl+V to paste
           if (kDebugMode) debugPrint('[E2E] Pressing Ctrl+V');
@@ -639,7 +655,7 @@ void main() {
             ctrl: true,
             detail: 'ctrl_v_paste',
           );
-          await et.pumpAndSettle(const Duration(seconds: 3));
+          await et.pumpAndSettle();
 
           // Verify file appears in destination
           final movedPath =
@@ -691,7 +707,7 @@ void main() {
       try {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
-        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await settleE2EUi(tester);
         await et.init('04.01 copy folder to another location via context menu');
 
         await waitForFolderRowVisible(tester, sourceFolder.path);
@@ -707,12 +723,12 @@ void main() {
 
         // Navigate into dest folder
         await et.tapFolderRow(destFolder.path, detail: 'navigate_to_dest');
-        await et.pumpAndSettle(const Duration(seconds: 5));
+        await et.pumpAndSettle();
 
         // Paste via background context menu
         await et.openBackgroundContextMenu(detail: 'open_bg_menu_for_paste');
         await et.tapContextMenuItem('paste', detail: 'paste');
-        await et.pumpAndSettle(const Duration(seconds: 5));
+        await et.pumpAndSettle();
 
         // Verify copied folder appears in dest
         final copiedPath =
@@ -756,7 +772,7 @@ void main() {
       try {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
-        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await settleE2EUi(tester);
         await et.init('04.02 delete folder via keyboard shortcut');
 
         await waitForFolderRowVisible(tester, targetFolder.path);
@@ -767,11 +783,11 @@ void main() {
         // Press Delete key
         if (kDebugMode) debugPrint('[E2E] Pressing Delete key for folder');
         await et.keyPress(LogicalKeyboardKey.delete);
-        await et.pumpAndSettle(const Duration(seconds: 2));
+        await et.pumpAndSettle();
 
         // Handle confirmation dialog (same pattern as file delete test)
         await _confirmDeleteDialog(et);
-        await et.pumpAndSettle(const Duration(seconds: 1));
+        await et.pumpAndSettle();
 
         expectFolderRowAbsent(targetFolder.path);
         if (kDebugMode) debugPrint('[E2E] delete folder — SUCCESS');
@@ -810,7 +826,7 @@ void main() {
             debugPrint('[E2E] Test started, sandbox: ${dir.path}');
           }
           await runCbFileApp();
-          await tester.pumpAndSettle(const Duration(seconds: 5));
+          await settleE2EUi(tester);
           await et.init(
             '05.01 multi-select two files and batch copy via keyboard shortcuts',
           );
@@ -829,12 +845,12 @@ void main() {
             ctrl: true,
             detail: 'ctrl_c_copy',
           );
-          await et.pumpAndSettle(const Duration(milliseconds: 500));
+          await et.pumpAndSettle();
 
           // Navigate into dest folder
           if (kDebugMode) debugPrint('[E2E] Navigating to dest folder');
           await et.tapFolderRow(destFolder.path, detail: 'navigate_to_dest');
-          await et.pumpAndSettle(const Duration(seconds: 5));
+          await et.pumpAndSettle();
 
           // Verify dest is empty before paste
           final pastedA =
@@ -848,7 +864,7 @@ void main() {
             ctrl: true,
             detail: 'ctrl_v_paste',
           );
-          await et.pumpAndSettle(const Duration(seconds: 3));
+          await et.pumpAndSettle();
 
           final pastedB = '${destFolder.path}${Platform.pathSeparator}beta.txt';
           await waitForFileRowVisible(tester, pastedA);
@@ -880,7 +896,7 @@ void main() {
       try {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
-        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await settleE2EUi(tester);
         await et.init('05.02 select all with Ctrl+A and batch delete');
 
         await waitForFileRowVisible(tester, fileA.path);
@@ -894,17 +910,17 @@ void main() {
           ctrl: true,
           detail: 'ctrl_a_select_all',
         );
-        await et.pumpAndSettle(const Duration(milliseconds: 500));
+        await et.pumpAndSettle();
         await et.screenshot('after Ctrl+A');
 
         // Press Delete key to delete all selected
         if (kDebugMode) debugPrint('[E2E] Pressing Delete key');
         await et.keyPress(LogicalKeyboardKey.delete);
-        await et.pumpAndSettle(const Duration(seconds: 2));
+        await et.pumpAndSettle();
 
         // Handle confirmation dialog
         await _confirmDeleteDialog(et);
-        await et.pumpAndSettle(const Duration(seconds: 1));
+        await et.pumpAndSettle();
 
         // Verify all files are gone
         await waitForFileRowAbsent(tester, fileA.path);
@@ -939,7 +955,7 @@ void main() {
       try {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
-        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await settleE2EUi(tester);
         await et.init(
           '06.01 refresh folder listing with F5 after external change',
         );
@@ -958,7 +974,7 @@ void main() {
         // Press F5 to force refresh the listing
         if (kDebugMode) debugPrint('[E2E] Pressing F5 to refresh');
         await et.keyPress(LogicalKeyboardKey.f5);
-        await et.pumpAndSettle(const Duration(seconds: 5));
+        await et.pumpAndSettle();
 
         // Verify the externally created file now appears
         await waitForFileRowVisible(tester, newFile.path);
@@ -987,16 +1003,16 @@ void main() {
       try {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
-        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await settleE2EUi(tester);
         await et.init('06.02 cancel rename with Escape key after pressing F2');
 
         await waitForFileRowVisible(tester, targetFile.path);
 
         // Select and press F2 to start rename
         await et.tapFileRow(targetFile.path, detail: 'select_file');
-        await et.pumpAndSettle(const Duration(milliseconds: 300));
+        await et.pumpAndSettle();
         await et.keyPress(LogicalKeyboardKey.f2);
-        await et.pumpAndSettle(const Duration(seconds: 2));
+        await et.pumpAndSettle();
 
         // Verify rename field is visible. The editor mounts asynchronously
         // after the F2 key event; poll so slow CI runners don't race it.
@@ -1010,7 +1026,7 @@ void main() {
 
         // Press Escape to cancel
         await et.keyPress(LogicalKeyboardKey.escape);
-        await et.pumpAndSettle(const Duration(seconds: 2));
+        await et.pumpAndSettle();
 
         // Original filename should still be there (rename cancelled)
         await waitForFileRowVisible(tester, targetFile.path);
@@ -1036,19 +1052,19 @@ void main() {
       try {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
-        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await settleE2EUi(tester);
         await et.init('06.03 open file with Enter key when file is selected');
 
         await waitForFileRowVisible(tester, targetFile.path);
 
         // Select the file
         await et.tapFileRow(targetFile.path, detail: 'select_file');
-        await et.pumpAndSettle(const Duration(milliseconds: 300));
+        await et.pumpAndSettle();
 
         // Press Enter key
         if (kDebugMode) debugPrint('[E2E] Pressing Enter key');
         await et.keyPress(LogicalKeyboardKey.enter);
-        await et.pumpAndSettle(const Duration(seconds: 3));
+        await et.pumpAndSettle();
 
         final viewer = find.byKey(ValueKey('viewer-text-${targetFile.path}'));
         await pumpUntilFound(tester, viewer);
@@ -1092,7 +1108,7 @@ void main() {
       try {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
-        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await settleE2EUi(tester);
         await et.init('07.01 search for file by typing in search box');
 
         await waitForFileRowVisible(tester, targetFile.path);
@@ -1127,7 +1143,7 @@ void main() {
       try {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
-        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await settleE2EUi(tester);
         await et.init('07.02 clear search to show all files again');
 
         await waitForFileRowVisible(tester, fileA.path);
@@ -1178,7 +1194,7 @@ void main() {
       try {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
-        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await settleE2EUi(tester);
         await et.init('08.01 toggle to grid view from list view');
 
         await waitForFileRowVisible(tester, fileA.path);
@@ -1215,7 +1231,7 @@ void main() {
       try {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
-        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await settleE2EUi(tester);
         await et.init('08.02 toggle back to list view from grid view');
 
         await waitForFileRowVisible(tester, fileA.path);
@@ -1255,7 +1271,7 @@ void main() {
       try {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
-        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await settleE2EUi(tester);
         await et.init('08.03 file operations work correctly in grid view');
 
         await _chooseBrowserView(tester, ViewMode.grid);
@@ -1271,16 +1287,16 @@ void main() {
           detail: 'open_context_menu_grid',
         );
         await et.tapContextMenuItem('copy', detail: 'copy_in_grid');
-        await et.pumpAndSettle(const Duration(milliseconds: 500));
+        await et.pumpAndSettle();
 
         // Navigate to dest
         await et.tapFolderRow(destFolder.path, detail: 'navigate_to_dest');
-        await et.pumpAndSettle(const Duration(seconds: 5));
+        await et.pumpAndSettle();
 
         // Paste in dest folder
         await et.openBackgroundContextMenu(detail: 'paste_in_dest');
         await et.tapContextMenuItem('paste', detail: 'paste_in_grid');
-        await et.pumpAndSettle(const Duration(seconds: 3));
+        await et.pumpAndSettle();
 
         final pastedPath =
             '${destFolder.path}${Platform.pathSeparator}grid_op_file.txt';
@@ -1312,7 +1328,7 @@ void main() {
       try {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
-        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await settleE2EUi(tester);
         await et.init('09.01 open a new tab with Ctrl+T');
 
         // Press Ctrl+T to open new tab
@@ -1322,7 +1338,7 @@ void main() {
           ctrl: true,
           detail: 'ctrl_t_new_tab',
         );
-        await et.pumpAndSettle(const Duration(seconds: 3));
+        await et.pumpAndSettle();
 
         // Verify a new tab was opened (check for tab bar or new content)
         // The app should have a tab indicator or the content should change
@@ -1348,7 +1364,7 @@ void main() {
       try {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
-        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await settleE2EUi(tester);
         await et.init('09.02 close a tab with Ctrl+W');
 
         await waitForFileRowVisible(tester, fileA.path);
@@ -1360,7 +1376,7 @@ void main() {
           ctrl: true,
           detail: 'ctrl_w_close_tab',
         );
-        await et.pumpAndSettle(const Duration(seconds: 3));
+        await et.pumpAndSettle();
 
         // If there's only one tab, app may close or show empty state
         await et.screenshot('after_close_tab');
@@ -1384,7 +1400,7 @@ void main() {
       try {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
-        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await settleE2EUi(tester);
         await et.init('09.03 switch between tabs with Ctrl+Tab');
 
         // Open a new tab first
@@ -1393,7 +1409,7 @@ void main() {
           ctrl: true,
           detail: 'open_new_tab',
         );
-        await et.pumpAndSettle(const Duration(seconds: 3));
+        await et.pumpAndSettle();
 
         await et.screenshot('second_tab_open');
 
@@ -1404,7 +1420,7 @@ void main() {
           ctrl: true,
           detail: 'ctrl_tab_switch',
         );
-        await et.pumpAndSettle(const Duration(seconds: 2));
+        await et.pumpAndSettle();
 
         await et.screenshot('after_tab_switch');
         if (kDebugMode) debugPrint('[E2E] tab switch with Ctrl+Tab — SUCCESS');
@@ -1436,38 +1452,42 @@ void main() {
       try {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
-        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await settleE2EUi(tester);
         await et.init('10.01 handle delete confirmation cancel correctly');
 
         await waitForFileRowVisible(tester, targetFile.path);
 
         // Select file and trigger delete
         await et.tapFileRow(targetFile.path, detail: 'select_file');
-        await et.pumpAndSettle(const Duration(milliseconds: 300));
+        await et.pumpAndSettle();
         await et.keyPress(LogicalKeyboardKey.delete);
-        await et.pumpAndSettle(const Duration(seconds: 2));
+        await et.pumpAndSettle();
 
-        // Look for cancel button in dialog and tap it
-        final cancelBtn = find.widgetWithText(TextButton, 'Cancel');
-        if (cancelBtn.evaluate().isNotEmpty) {
-          await et.tap(cancelBtn.first, detail: 'cancel_delete');
-          await et.pumpAndSettle(const Duration(seconds: 2));
+        // A missing dialog must fail this case, rather than silently skipping
+        // the cancellation action while the original file still exists.
+        final cancelBtn = find.widgetWithText(
+          TextButton,
+          AppLocalizations.of(
+            tester.element(find.byType(Scaffold).first),
+          )!.cancel,
+        );
+        await pumpUntilFound(tester, cancelBtn);
+        expect(
+          cancelBtn,
+          findsOneWidget,
+          reason: 'Delete must ask for confirmation',
+        );
+        await et.tap(cancelBtn.first, detail: 'cancel_delete');
+        await et.pumpAndSettle();
 
-          // File should still exist after cancel
-          await waitForFileRowVisible(tester, targetFile.path);
-          expect(
-            targetFile.existsSync(),
-            isTrue,
-            reason: 'File should still exist after cancelling delete',
-          );
-        } else {
-          // If no cancel button, dialog might auto-dismiss or use different UI
-          if (kDebugMode) {
-            debugPrint('[E2E] No cancel button found, checking file state');
-          }
-          // File should still exist
-          await waitForFileRowVisible(tester, targetFile.path);
-        }
+        // File should still exist after cancel
+        await waitForFileRowVisible(tester, targetFile.path);
+        expect(
+          targetFile.existsSync(),
+          isTrue,
+          reason: 'File should still exist after cancelling delete',
+        );
+        expect(await targetFile.readAsString(), 'should not be deleted');
         if (kDebugMode) debugPrint('[E2E] delete cancel — SUCCESS');
       } finally {
         await et.screenshot('result');
@@ -1491,16 +1511,16 @@ void main() {
       try {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
-        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await settleE2EUi(tester);
         await et.init('10.02 handle rename with empty name correctly');
 
         await waitForFileRowVisible(tester, targetFile.path);
 
         // Select and press F2 to start rename
         await et.tapFileRow(targetFile.path, detail: 'select_file');
-        await et.pumpAndSettle(const Duration(milliseconds: 300));
+        await et.pumpAndSettle();
         await et.keyPress(LogicalKeyboardKey.f2);
-        await et.pumpAndSettle(const Duration(seconds: 2));
+        await et.pumpAndSettle();
 
         // Clear the text field. Target the inline editor specifically: a
         // bare `find.byType(TextField).first` can resolve to the address
@@ -1513,12 +1533,14 @@ void main() {
           reason: 'Inline rename TextField not found',
         );
         await et.enterText(renameField, '', detail: 'clear_name');
-        await tester.pumpAndSettle(const Duration(milliseconds: 300));
+        await settleE2EUi(tester);
         await tester.testTextInput.receiveAction(TextInputAction.done);
-        await et.pumpAndSettle(const Duration(seconds: 3));
+        await et.pumpAndSettle();
 
         // Original name should still be there (invalid empty rename rejected)
         await waitForFileRowVisible(tester, targetFile.path);
+        expect(await targetFile.readAsString(), 'e2e');
+        expect(dir.listSync().whereType<File>(), hasLength(1));
         if (kDebugMode) debugPrint('[E2E] empty rename handled — SUCCESS');
       } finally {
         await et.screenshot('result');
@@ -1545,24 +1567,26 @@ void main() {
       try {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
-        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await settleE2EUi(tester);
         await et.init('10.03 handle paste when no file is copied or cut');
 
         await waitForFileRowVisible(tester, existingFile.path);
 
         // Navigate to dest folder
         await et.tapFolderRow(destFolder.path, detail: 'navigate_to_dest');
-        await et.pumpAndSettle(const Duration(seconds: 5));
+        await et.pumpAndSettle();
 
         // Try to paste without any prior copy/cut
         await et.openBackgroundContextMenu(detail: 'open_paste_menu');
         await et.tapContextMenuItem('paste', detail: 'paste_nothing');
-        await et.pumpAndSettle(const Duration(seconds: 2));
+        await et.pumpAndSettle();
 
         // Verify dest folder is still empty (no crash)
         final pastedFile =
             '${destFolder.path}${Platform.pathSeparator}existing.txt';
         expectFileRowAbsent(pastedFile);
+        expect(await destFolder.list().isEmpty, isTrue);
+        expect(await existingFile.readAsString(), 'test');
         if (kDebugMode) debugPrint('[E2E] paste nothing — SUCCESS');
       } finally {
         await et.screenshot('result');
@@ -1585,21 +1609,53 @@ void main() {
       try {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
-        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await settleE2EUi(tester);
         await et.init(
           '10.04 handle navigating to a folder that no longer exists',
         );
 
         await waitForFileRowVisible(tester, file.path);
 
-        // The folder we wanted to navigate to doesn't exist
-        // This tests error handling for invalid navigation paths
-        await et.screenshot('before_refresh');
-        await et.keyPress(LogicalKeyboardKey.f5);
-        await et.pumpAndSettle(const Duration(seconds: 5));
+        // Actually submit an unavailable path. Refreshing the current valid
+        // folder does not exercise invalid navigation handling.
+        final address = find.byWidgetPredicate(
+          (widget) =>
+              widget is BreadcrumbAddressBar &&
+                  widget.onPathSubmitted != null ||
+              widget is PathNavigationBar,
+        );
+        await pumpUntilFound(tester, address);
+        expect(address, findsAtLeastNWidgets(1));
+        final l10n = AppLocalizations.of(tester.element(address.first))!;
+        await tester.tapAt(
+          tester.getRect(address.first).centerRight - const Offset(4, 0),
+        );
+        final editor = find.descendant(
+          of: address.first,
+          matching: find.byType(EditableText),
+        );
+        await pumpUntilFound(tester, editor);
+        expect(
+          editor,
+          findsOneWidget,
+          reason: 'Address bar must enter editing mode',
+        );
+        await tester.enterText(
+          editor,
+          '${dir.path}${Platform.pathSeparator}missing-folder',
+        );
+        await tester.testTextInput.receiveAction(TextInputAction.done);
+        final error = find.text(l10n.pathNotAccessible);
+        await pumpUntilFound(tester, error);
+        expect(
+          error,
+          findsAtLeastNWidgets(1),
+          reason: 'Missing path must report its error',
+        );
 
         // File should still be visible (app handled gracefully)
         await waitForFileRowVisible(tester, file.path);
+        expect(await file.readAsString(), 'marker');
         if (kDebugMode) {
           debugPrint('[E2E] nav to missing folder handled — SUCCESS');
         }
@@ -1630,7 +1686,7 @@ void main() {
       try {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
-        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await settleE2EUi(tester);
         await et.init('11.01 create new file via context menu');
 
         await waitForFileRowVisible(tester, dummyFile.path);
@@ -1660,7 +1716,7 @@ void main() {
         await pumpUntilFound(tester, renameField);
         expect(renameField, findsOneWidget);
         await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-        await tester.pumpAndSettle(const Duration(seconds: 2));
+        await settleE2EUi(tester);
         final created = dir
             .listSync()
             .whereType<File>()
@@ -1699,7 +1755,7 @@ void main() {
       try {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
-        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await settleE2EUi(tester);
         await et.init('11.02 rename file via context menu');
 
         await waitForFileRowVisible(tester, originalFile.path);
@@ -1707,7 +1763,7 @@ void main() {
         // Right-click to open context menu
         await et.rightClickFileRow(originalFile.path, detail: 'open_ctx_menu');
         await et.tapContextMenuItem('rename', detail: 'context_rename');
-        await et.pumpAndSettle(const Duration(seconds: 2));
+        await et.pumpAndSettle();
 
         // Enter new name. In list view the context-menu rename opens a
         // CbInlineRenamePanel popover (not the in-row editor), and it only
@@ -1721,9 +1777,9 @@ void main() {
           reason: 'Rename popover TextField not found',
         );
         await et.enterText(renameField, newName, detail: 'type_new_name');
-        await tester.pumpAndSettle(const Duration(milliseconds: 300));
+        await settleE2EUi(tester);
         await tester.testTextInput.receiveAction(TextInputAction.done);
-        await et.pumpAndSettle(const Duration(seconds: 3));
+        await et.pumpAndSettle();
 
         final renamedPath = '${dir.path}${Platform.pathSeparator}$newName';
         await waitForFileRowVisible(tester, renamedPath);
@@ -1755,7 +1811,7 @@ void main() {
       try {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
-        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await settleE2EUi(tester);
         await et.init('11.03 batch move multiple files to destination folder');
 
         await waitForFileRowVisible(tester, fileA.path);
@@ -1771,11 +1827,11 @@ void main() {
           ctrl: true,
           detail: 'ctrl_x_cut',
         );
-        await et.pumpAndSettle(const Duration(milliseconds: 500));
+        await et.pumpAndSettle();
 
         // Navigate to destination
         await et.tapFolderRow(destFolder.path, detail: 'navigate_to_dest');
-        await et.pumpAndSettle(const Duration(seconds: 5));
+        await et.pumpAndSettle();
 
         // Paste
         await et.sendKeyboardShortcut(
@@ -1783,7 +1839,7 @@ void main() {
           ctrl: true,
           detail: 'ctrl_v_paste',
         );
-        await et.pumpAndSettle(const Duration(seconds: 3));
+        await et.pumpAndSettle();
 
         // Verify both files moved
         final movedA = '${destFolder.path}${Platform.pathSeparator}move_a.txt';
@@ -1830,7 +1886,7 @@ void main() {
       try {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
-        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await settleE2EUi(tester);
         await et.init(
           '11.04 copy folder with nested contents to another location',
         );
@@ -1840,16 +1896,16 @@ void main() {
         // Copy folder via context menu
         await et.rightClickFolderRow(sourceFolder.path, detail: 'open_menu');
         await et.tapContextMenuItem('copy', detail: 'copy');
-        await et.pumpAndSettle(const Duration(milliseconds: 500));
+        await et.pumpAndSettle();
 
         // Navigate to dest
         await et.tapFolderRow(destFolder.path, detail: 'navigate_to_dest');
-        await et.pumpAndSettle(const Duration(seconds: 5));
+        await et.pumpAndSettle();
 
         // Paste
         await et.openBackgroundContextMenu(detail: 'paste');
         await et.tapContextMenuItem('paste', detail: 'paste');
-        await et.pumpAndSettle(const Duration(seconds: 5));
+        await et.pumpAndSettle();
 
         // Verify folder was copied
         final copiedFolder =
@@ -1906,18 +1962,18 @@ void main() {
       try {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
-        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await settleE2EUi(tester);
         await et.init('11.05 rename folder via F2 keyboard shortcut');
 
         await waitForFolderRowVisible(tester, originalFolder.path);
 
         // Select the folder (single tap)
         await et.selectFolderRow(originalFolder.path, detail: 'select_folder');
-        await et.pumpAndSettle(const Duration(milliseconds: 300));
+        await et.pumpAndSettle();
 
         // Press F2
         await et.keyPress(LogicalKeyboardKey.f2);
-        await et.pumpAndSettle(const Duration(seconds: 2));
+        await et.pumpAndSettle();
 
         // Enter new name
         final textFields = _findInlineRenameField();
@@ -1932,9 +1988,9 @@ void main() {
           newFolderName,
           detail: 'type_new_name',
         );
-        await tester.pumpAndSettle(const Duration(milliseconds: 300));
+        await settleE2EUi(tester);
         await tester.testTextInput.receiveAction(TextInputAction.done);
-        await et.pumpAndSettle(const Duration(seconds: 3));
+        await et.pumpAndSettle();
 
         final renamedPath =
             '${dir.path}${Platform.pathSeparator}$newFolderName';
