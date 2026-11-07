@@ -6981,4 +6981,245 @@ class TurkishLocalizations implements AppLocalizations {
   String get homeTipOpenPalette => 'Komut paletini aç';
   @override
   String get homeTipShowOnHome => 'Ana sayfada klavye ipuçlarını göster';
+
+  // Cleaner - code editors
+  @override
+  @override
+  @override
+  @override
+  String get cleanerEditorsScan => 'Analiz et';
+  @override
+  @override
+  @override
+  String cleanerEditorsRunning(String editor) =>
+      '$editor çalışıyor, bu yüzden önbellekleri korunuyor. Temizlemek için kapatıp yeniden analiz edin.';
+  @override
+  String cleanerEditorsTotal(String size) => 'Diskte $size';
+  @override
+  String get cleanerEditorsCleanableSection => 'Güvenle temizlenebilir';
+  @override
+  String get cleanerEditorsExtensionsSection => 'Boyuta göre uzantılar';
+  @override
+  String get cleanerEditorsReviewSection => 'Yalnızca inceleme';
+  @override
+  String cleanerEditorsObsoleteExtensions(int count) =>
+      'Eski uzantı sürümleri ($count)';
+  @override
+  String get cleanerEditorsObsoleteExtensionsHint =>
+      'Kaldırılmış veya değiştirilmiş sürümler; düzenleyici bir sonraki açılışta siler.';
+  @override
+  String get cleanerEditorsKindCache => 'Web, betik ve GPU önbellekleri';
+  @override
+  String get cleanerEditorsKindCacheHint =>
+      'Bir sonraki açılışta yeniden oluşturulur.';
+  @override
+  String get cleanerEditorsKindDownloads =>
+      'İndirilmiş uzantı yükleyicileri (VSIX)';
+  @override
+  String get cleanerEditorsKindDownloadsHint =>
+      'Bir günden eski; gerektiğinde yeniden indirilir.';
+  @override
+  String get cleanerEditorsKindLogs => 'Eski oturum günlükleri';
+  @override
+  String get cleanerEditorsKindLogsHint =>
+      'Geçerli oturum dışındaki tüm oturumlar.';
+  @override
+  String get cleanerEditorsKindCrash => 'Çökme raporları';
+  @override
+  String get cleanerEditorsKindCrashHint =>
+      'Bir günden eski Crashpad mini dökümleri.';
+  @override
+  String cleanerEditorsMissingWorkspaces(int count) =>
+      'Silinmiş çalışma alanlarının verileri ($count)';
+  @override
+  String get cleanerEditorsMissingWorkspacesHint =>
+      'Klasör artık yok. Bu veriler o klasörün sohbet geçmişini ve düzenleyici durumunu içerebilir; temizlemeden önce kontrol edin.';
+  @override
+  String get cleanerEditorsKindWebStorage =>
+      'Uzantı görünümlerinin web depolaması';
+  @override
+  String get cleanerEditorsKindHistory =>
+      'Yerel Geçmiş (dosyalarınızın yedekleri)';
+  @override
+  String get cleanerEditorsKindSettings => 'Ayarlar ve düzenleyici durumu';
+  @override
+  String get cleanerEditorsKindOther => 'Diğer düzenleyici verileri';
+  @override
+  String cleanerEditorsOrphanData(int count) =>
+      'Yerleşik veya kaldırılmış uzantıların verileri ($count)';
+  @override
+  String cleanerEditorsActiveWorkspaces(int count) =>
+      'Mevcut çalışma alanlarının verileri ($count)';
+  @override
+  String cleanerEditorsOtherWorkspaces(int count) =>
+      'Uzak veya bağlı olmayan sürücülerdeki çalışma alanları ($count)';
+  @override
+  String get cleanerEditorsInstallColumn => 'Kurulum';
+  @override
+  String get cleanerEditorsDataColumn => 'Veri';
+  @override
+  String get cleanerEditorsObsoleteBadge => 'Eski sürüm';
+  @override
+  String get cleanerEditorsUnregisteredBadge => 'Kayıtlı değil';
+  @override
+  String cleanerEditorsShowAll(int count) => 'Tümünü göster ($count)';
+  @override
+  String cleanerEditorsSelected(String size) => '$size seçildi';
+  @override
+  String cleanerEditorsClean(String size) => '$size temizle';
+  @override
+  String cleanerEditorsConfirmTitle(String destination) =>
+      '$destination konumuna taşınsın mı?';
+  @override
+  @override
+  String get cleanerEditorsStatExtensions => 'Uzantılar';
+  @override
+  @override
+  @override
+  String get cleanerEditorsStatCleanable => 'Boşaltılabilir';
+  @override
+  String get cleanerEditorsRunningBadge => 'Çalışıyor';
+
+  // Cleaner - app storage
+  @override
+  String get cleanerAppStorageTitle => 'Uygulama depolaması';
+  @override
+  String get cleanerAppStorageUtilityDescription =>
+      'Her uygulamanın diskte tuttukları ve güvenle silinebilecekler';
+  @override
+  String get cleanerAppStorageIntro =>
+      'Yüklü her uygulamanın diskte tuttuklarını ölçer: uygulamanın kendisi, önbellekler, günlükler, çökme raporları, web depolaması ve kendi verileri. Kod düzenleyiciler her uzantıyı da listeler. Yalnızca uygulamanın yeniden oluşturabileceği şeyler temizlik için önerilir ve siz temizleyene kadar hiçbir şey değişmez.';
+  @override
+  String cleanerAppStorageMeasuring(int done, int total) =>
+      'Uygulama klasörleri ölçülüyor... $done/$total';
+  @override
+  String get cleanerAppStorageMeasuringApps =>
+      'Uygulamaların kendisi ölçülüyor; boyutları bitince görünür.';
+  @override
+  String get cleanerAppStorageStatApps => 'Uygulamalar';
+  @override
+  String get cleanerAppStorageStatTotal => 'Diskte';
+  @override
+  String cleanerAppStorageSafe(String size) => '$size güvenli';
+  @override
+  String get cleanerAppStorageKindInstall => 'Uygulamanın kendisi';
+  @override
+  String get cleanerAppStorageKindUserData => 'Belgeler ve uygulama verileri';
+  @override
+  String get cleanerAppStorageKindShared =>
+      'Aynı geliştiricinin uygulamalarıyla paylaşılan';
+  @override
+  String get cleanerAppStorageCacheOptionalHint =>
+      'Önbellek klasörünün tamamı. Uygulama yeniden oluşturur veya indirir, bu yüzden daha yavaş açılabilir.';
+  @override
+  String get cleanerAppStorageLogsOptionalHint =>
+      'Günlük klasörünün tamamı. Bu uygulamada sorun gideriyorsanız saklayın.';
+  @override
+  String get cleanerAppStorageLeftoversHint =>
+      'Yüklü hiçbir uygulamaya ait olmayan klasörler Kalan uygulama verileri bölümünde listelenir.';
+  @override
+  String get cleanerAppStorageNoneFound => 'Uygulama verisi bulunamadı.';
+  @override
+  String cleanerAppStorageUnreadable(int count) =>
+      '$count klasör okunamadı, bu yüzden bazı boyutlar eksik. Ölçmek için CB File Hub\'a Tam Disk Erişimi verin.';
+  @override
+  String cleanerAppStorageConfirmBody(
+    int count,
+    String size,
+    String destination,
+  ) =>
+      '$count öğe ($size) $destination konumuna taşınacak. Bu uygulamaların bunları tutmaması veya yeniden oluşturmaması için önce kapatın.';
+  @override
+  String cleanerAppStorageShowAll(int count) =>
+      '$count uygulamanın tümünü göster';
+  @override
+  String get cleanerAppStorageCleanableOnly =>
+      'Yalnızca temizlenebilecek uygulamalar';
+  @override
+  String get cleanerAppStorageAppsNotMeasured =>
+      'Uygulamaların kendisi ölçülmedi. Boyutlarını eklemek için yeniden tarayın.';
+  @override
+  String cleanerAppStorageUnreadableGeneric(int count) =>
+      '$count klasör okunamadı, bu yüzden bazı boyutlar eksik.';
+  @override
+  String get cleanerAppsShowInFinder => 'Finder\'da göster';
+  @override
+  String cleanerAppsMacUninstallTitle(String app) =>
+      '$app Çöp Sepeti\'ne taşınsın mı?';
+  @override
+  String get cleanerAppsMacUninstallBody =>
+      'Uygulama Çöp Sepeti\'ne gider, geri alabilirsiniz. Önbellekleri ve verileri kalır; ardından Kalan uygulama verileri bölümünde listelenir, orada inceleyip temizleyebilirsiniz.';
+  @override
+  String cleanerAppsMacUninstallRunning(String app) =>
+      '$app çalışıyor. Önce kapatın.';
+  @override
+  String get cleanerAppsMacUninstallProtected =>
+      'Bu uygulama macOS’un bir parçası ya da CB File Hub’ın kendisi, bu yüzden burada kaldırılmaz.';
+  @override
+  String cleanerAppsMacUninstallDone(String app) =>
+      '$app Çöp Sepeti\'ne taşındı. Kalan verileri Kalan uygulama verileri bölümünde.';
+  @override
+  String cleanerAppsMacUninstallFailed(String app) =>
+      '$app Çöp Sepeti\'ne taşınamadı. Yönetici izni gerekebilir: Finder\'da Çöp Sepeti\'ne sürükleyin.';
+  @override
+  String get cleanerAppsOpenLeftovers => 'Kalanları göster';
+  @override
+  String get cleanerAppsPosixScanHint =>
+      'Boyutlar Uygulama depolamasından gelir: her uygulamanın kendisi, kullanıcı klasörlerindeki önbellekleri ve verileri. Kendi uygulaması olmayan komutlar listelenmez.';
+
+  // Cleaner - Docker
+  @override
+  String get cleanerDockerTitle => 'Docker';
+  @override
+  String get cleanerDockerNotRunning =>
+      'Docker çalışmıyor. Görüntüleri, kapsayıcıları, birimleri ve derleme önbelleğini görmek için Docker Desktop’ı (veya Docker hizmetini) başlatıp yeniden tarayın.';
+  @override
+  String cleanerDockerFailed(String error) => 'Docker yanıt vermedi: $error';
+  @override
+  String get cleanerDockerImages => 'Görüntüler';
+  @override
+  String get cleanerDockerContainers => 'Kapsayıcılar';
+  @override
+  String get cleanerDockerVolumes => 'Birimler';
+  @override
+  String get cleanerDockerBuildCache => 'Derleme önbelleği';
+  @override
+  String cleanerDockerStoppedContainers(int count) =>
+      'Durdurulmuş kapsayıcılar ($count)';
+  @override
+  String get cleanerDockerStoppedContainersHint =>
+      'Çalışmayan kapsayıcılar ve içlerine yazılan dosyalar. Gerektiğinde görüntülerinden yeniden oluşturulabilir.';
+  @override
+  String cleanerDockerDanglingImages(int count) =>
+      'Etiketsiz görüntüler ($count)';
+  @override
+  String get cleanerDockerDanglingImagesHint =>
+      'Yeniden derlenen görüntülerden kalanlar. Hiçbir şey kullanmıyor.';
+  @override
+  String cleanerDockerUnusedImages(int count) =>
+      'Kullanılmayan görüntüler ($count)';
+  @override
+  String get cleanerDockerUnusedImagesHint =>
+      'Hiçbir kapsayıcının kullanmadığı görüntüler. Gerektiğinde Docker yeniden indirir veya derler.';
+  @override
+  String get cleanerDockerBuildCacheHint =>
+      'Derlemeleri hızlandırmak için tutulan katmanlar. Her projenin bir sonraki derlemesi daha uzun sürer.';
+  @override
+  String cleanerDockerUnusedVolumes(int count) =>
+      'Kullanılmayan birimler ($count)';
+  @override
+  String get cleanerDockerUnusedVolumesHint =>
+      'Hiçbir kapsayıcının kullanmadığı birimler. İçlerindeki veriler (veritabanları, yüklemeler) kalıcı olarak silinir.';
+  @override
+  String cleanerDockerClean(String size) => 'Docker\'ı temizle ($size)';
+  @override
+  String get cleanerDockerConfirmTitle => 'Docker\'dan kaldırılsın mı?';
+  @override
+  String get cleanerDockerConfirmBody =>
+      'Docker bunları kalıcı olarak siler; Çöp Sepeti\'ne gitmezler. Görüntüler ve derleme önbelleği yeniden indirilebilir veya derlenebilir, ancak birim verileri geri gelmez.';
+  @override
+  String cleanerDockerRunning(String command) => '$command çalışıyor...';
+  @override
+  String cleanerDockerFreed(String size) =>
+      'Docker $size boşalttı. Docker Desktop alanı kısa süre sonra diske geri verir.';
 }

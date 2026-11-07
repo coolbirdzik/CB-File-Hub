@@ -3,7 +3,7 @@ import 'cleaner_cache_rules.dart';
 import 'cleaner_models.dart';
 
 /// Narrow default locations verified by the Windows metadata audit, plus the
-/// same developer caches at their Linux (XDG / dot-folder) defaults.
+/// same developer caches at their Linux (XDG / dot-folder) and macOS defaults.
 ///
 /// Only files a tool recreates or downloads again are taken: build and
 /// analysis caches keyed per entry, downloaded installers and archives whose
@@ -212,6 +212,83 @@ abstract final class CleanerAuditedRules {
     ),
   ];
 
+  /// macOS defaults: editors keep their data under
+  /// `~/Library/Application Support/<editor>` and most tools cache under
+  /// `~/Library/Caches`, while dot-folder tools use the Linux layout.
+  static final macos = <CleanerCategory>[
+    CleanerCategory(
+      id: 'developer_analysis_cache',
+      displayName: 'Developer analysis and build caches',
+      description:
+          'Old Dart analysis, C/C++ precompiled headers, Go and Gradle build caches. Close editors, language servers and builds first. The next analysis/build may take longer.',
+      safety: CleanerSafety.safe,
+      defaultEnabled: true,
+      rules: [
+        _cache('HOME', '.dartServer/.analysis-driver', ['Dart']),
+        _cache('HOME', 'Library/Caches/vscode-cpptools/ipch', [
+          'Visual Studio Code',
+        ]),
+        _cache('HOME', 'Library/Caches/go-build', ['Go']),
+        _cache('HOME', '.gradle/caches/build-cache-1', _gradleHints),
+      ],
+    ),
+    CleanerCategory(
+      id: 'developer_download_cache',
+      displayName: 'Developer tool downloads',
+      description:
+          'Old cached VSIX installers, Electron downloads, Android SDK downloads, Gradle distribution archives and rustup downloads. Finish installs/updates/builds first. Later installs may need internet; installed extensions, SDKs and toolchains are kept.',
+      safety: CleanerSafety.safe,
+      defaultEnabled: true,
+      rules: [
+        for (final folder in CleanerCacheRules.editorFolders)
+          _cache(
+            'HOME',
+            'Library/Application Support/$folder/CachedExtensionVSIXs',
+            [folder],
+          ),
+        _cache('HOME', 'Library/Caches/electron', ['Electron']),
+        ..._sharedDownloads('HOME'),
+      ],
+    ),
+    CleanerCategory(
+      id: developerLogsId,
+      displayName: 'Developer tool logs',
+      description: _logsDescription,
+      safety: CleanerSafety.safe,
+      defaultEnabled: true,
+      rules: [
+        for (final folder in CleanerCacheRules.editorFolders)
+          _cache('HOME', 'Library/Application Support/$folder/logs', [folder]),
+        _cache('HOME', '.npm/_logs', ['npm'], globs: ['*.log']),
+        _cache('HOME', '.gradle/daemon', _gradleHints, globs: ['*.out.log']),
+        _cache(
+          'HOME',
+          'Library/Application Support/kotlin/daemon',
+          ['Kotlin'],
+          globs: ['*.log'],
+        ),
+      ],
+    ),
+    CleanerCategory(
+      id: 'electron_crash_reports',
+      displayName: 'Electron crash reports',
+      description:
+          'Crashpad minidumps unchanged for a week. They are diagnostic evidence, not app data. Keep reports still needed for troubleshooting; close the affected apps first.',
+      safety: CleanerSafety.safe,
+      defaultEnabled: true,
+      rules: [
+        for (final (folder, hints) in CleanerCacheRules.electronApps)
+          for (final reports in ['reports', 'pending', 'completed'])
+            _cache(
+              'HOME',
+              'Library/Application Support/$folder/Crashpad/$reports',
+              hints,
+              globs: ['*.dmp'],
+            ),
+      ],
+    ),
+  ];
+
   static const _logsDescription =
       'Editor session logs, npm debug logs and Gradle/Kotlin daemon logs unchanged for a week. Keep logs still needed for troubleshooting. Settings, extensions and projects are kept.';
 
@@ -262,7 +339,7 @@ abstract final class CleanerAuditedRules {
     final name = normalized
         .split('/')
         .lastWhere((part) => part.isNotEmpty, orElse: () => '');
-    for (final category in [...windows, ...linux]) {
+    for (final category in [...windows, ...linux, ...macos]) {
       if (category.id != categoryId || category.reviewOnly) continue;
       for (final rule in category.rules) {
         if (!normalized.contains('/${rule.source.relative.toLowerCase()}/')) {

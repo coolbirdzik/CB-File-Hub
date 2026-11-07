@@ -191,6 +191,46 @@ void main() {
     );
   });
 
+  test('quick clean takes old macOS editor and developer junk only', () {
+    const mac = '/Users/test';
+    const support = '$mac/Library/Application Support';
+    final ids = CleanerCategories.all(
+      operatingSystem: 'macos',
+    ).map((c) => c.id).toList();
+    for (final id in CleanerAuditedRules.cleanableIds) {
+      expect(ids.where((candidate) => candidate == id), hasLength(1));
+    }
+    for (final (id, path) in [
+      ('developer_download_cache', '$support/Code/CachedExtensionVSIXs/a.vsix'),
+      ('developer_download_cache', '$support/Cursor/CachedExtensionVSIXs/b'),
+      ('developer_logs', '$support/Code/logs/20261001T101010/main.log'),
+      ('electron_crash_reports', '$support/Code/Crashpad/completed/a.dmp'),
+      ('developer_analysis_cache', '$mac/Library/Caches/go-build/ab/abc-d'),
+      (
+        'developer_analysis_cache',
+        '$mac/Library/Caches/vscode-cpptools/ipch/a/b.ipch',
+      ),
+      ('developer_download_cache', '$mac/Library/Caches/electron/x.zip'),
+    ]) {
+      expect(eligible(id, path), isTrue, reason: path);
+    }
+    for (final (id, path) in [
+      ('electron_crash_reports', '$support/Code/Crashpad/settings.dat'),
+      ('developer_logs', '$support/Code/User/settings.json'),
+      ('developer_download_cache', '$mac/.vscode/extensions/a.b-1.0.0/x.js'),
+    ]) {
+      expect(eligible(id, path), isFalse, reason: path);
+    }
+    expect(
+      eligible(
+        'developer_logs',
+        '$support/Code/logs/today/main.log',
+        age: const Duration(days: 2),
+      ),
+      isFalse,
+    );
+  });
+
   test('quick clean takes the new Windows developer junk', () {
     for (final (id, path) in [
       (

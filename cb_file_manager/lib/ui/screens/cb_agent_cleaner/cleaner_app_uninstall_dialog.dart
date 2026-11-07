@@ -6,6 +6,7 @@ import '../../../services/app_insights/app_uninstall_service.dart';
 import '../../../services/disk_cleaner/cleaner_models.dart';
 import '../../utils/format_utils.dart';
 import 'cleaner_leftovers_view.dart';
+import 'cleaner_progress_widgets.dart';
 
 /// Removal and cleanup are separately confirmed. Nothing is checked by default.
 class CleanerAppUninstallDialog extends StatefulWidget {
@@ -217,7 +218,7 @@ class _CleanerAppUninstallDialogState extends State<CleanerAppUninstallDialog> {
                 ),
                 if (_busy) ...[
                   const SizedBox(height: 16),
-                  const LinearProgressIndicator(),
+                  const CleanerProgressBar(),
                   const SizedBox(height: 8),
                   Text(
                     _progress ??

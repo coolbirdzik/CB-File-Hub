@@ -102,8 +102,7 @@ class PosixAppLeftoverFinder {
       );
     }
 
-    final index = AppTokenIndex(inventory.apps);
-    final bundles = _BundleIndex(inventory.apps);
+    final owners = PosixAppOwnership(inventory.apps);
     final excluded = excludedPaths
         .where((path) => path.isNotEmpty)
         .toList(growable: false);
@@ -120,25 +119,8 @@ class PosixAppLeftoverFinder {
           return inventory.flatpakApps!.contains(name);
         case AppLeftoverLocation.linuxSnap:
           return inventory.snaps!.contains(name) || name == 'bin';
-        case AppLeftoverLocation.macContainers:
-          // Extension and system containers can have non-bundle names.
-          return !isReverseDns(name) || bundles.owns(name, index);
-        case AppLeftoverLocation.macGroupContainers:
-          final id = groupContainerBundleId(name);
-          return id == null || bundles.owns(id, index);
-        case AppLeftoverLocation.macApplicationSupport:
-        case AppLeftoverLocation.macCaches:
-          if (_isIgnoredMacName(name)) return true;
-          if (isReverseDns(name)) return bundles.owns(name, index);
-          return index.matchName(name) != null;
-        case AppLeftoverLocation.linuxConfig:
-        case AppLeftoverLocation.linuxData:
-        case AppLeftoverLocation.linuxCache:
-          if (_isIgnoredLinuxName(name)) return true;
-          if (isReverseDns(name)) return bundles.owns(name, index);
-          return index.matchName(name) != null;
         default:
-          return true;
+          return owners.of(location, name).kind != AppFolderOwnerKind.none;
       }
     }
 
@@ -248,6 +230,7 @@ class PosixAppLeftoverFinder {
     if (lower.startsWith('com.apple.') || lower.contains('apple')) {
       return true;
     }
+    if (_ignoredPrefixes.any(lower.startsWith)) return true;
     // System daemons keep folders named after themselves (`routined`).
     if (RegExp(r'^[a-z]{3,24}d$').hasMatch(name)) return true;
     return _ignoredMacNames.contains(lower);
@@ -256,11 +239,28 @@ class PosixAppLeftoverFinder {
   static bool _isIgnoredLinuxName(String name) {
     final lower = name.toLowerCase();
     if (_ignoredLinuxPrefixes.any(lower.startsWith)) return true;
+    if (_ignoredPrefixes.any(lower.startsWith)) return true;
     return _ignoredLinuxNames.contains(lower);
   }
 
+  /// Toolchain caches named after a tool and a variant
+  /// (`ms-playwright-go`, `ms-playwright-mcp`).
+  static const List<String> _ignoredPrefixes = <String>['ms-playwright'];
+
   /// macOS system and toolchain folders with plain names.
   static const Set<String> _ignoredMacNames = <String>{
+    // macOS frameworks that keep per-user folders.
+    'gamekit',
+    'temporaryitems',
+    // The Go toolchain (`go` is too short to match an installed command).
+    'go',
+    'goimports',
+    // Crash and native-access SDKs embedded in many apps, not one app.
+    'sentrycrash',
+    'io.sentry',
+    'jna',
+    // Homebrew's cask downloads.
+    'cask',
     'addressbook',
     'animoji',
     'app store',
@@ -326,6 +326,8 @@ class PosixAppLeftoverFinder {
 
   /// Desktop, session and toolchain folders shared by many apps.
   static const Set<String> _ignoredLinuxNames = <String>{
+    'go',
+    'goimports',
     'autostart',
     'applications',
     'backgrounds',
@@ -371,36 +373,151 @@ class PosixAppLeftoverFinder {
   };
 }
 
+/// Who a folder under one of the [PosixAppLeftoverFinder.bases] belongs to.
+enum AppFolderOwnerKind {
+  /// One installed app: an exact or nested bundle id, or its name.
+  app,
+
+  /// An app of the same vendor (`com.vendor.*`): shared between its apps.
+  vendor,
+
+  /// macOS or the desktop itself, a toolchain, or a folder never judged.
+  system,
+
+  /// No installed app: what the Leftovers page reports.
+  none,
+}
+
+class AppFolderOwner {
+  final AppFolderOwnerKind kind;
+
+  /// The app for [AppFolderOwnerKind.app] and [AppFolderOwnerKind.vendor].
+  final InstalledAppInfo? app;
+
+  const AppFolderOwner(this.kind, [this.app]);
+
+  static const system = AppFolderOwner(AppFolderOwnerKind.system);
+  static const none = AppFolderOwner(AppFolderOwnerKind.none);
+}
+
+/// Decides which installed app owns a folder name in a base folder. The
+/// Leftovers page keeps what has no owner; the App storage page groups the
+/// rest by owner, so both read ownership from here.
+class PosixAppOwnership {
+  final AppTokenIndex _names;
+  final _BundleIndex _bundles;
+
+  PosixAppOwnership(List<InstalledAppInfo> apps)
+    : _names = AppTokenIndex(apps),
+      _bundles = _BundleIndex(apps);
+
+  AppFolderOwner of(AppLeftoverLocation location, String name) {
+    switch (location) {
+      case AppLeftoverLocation.macContainers:
+        // Extension and system containers can have non-bundle names.
+        if (!PosixAppLeftoverFinder.isReverseDns(name)) {
+          return AppFolderOwner.system;
+        }
+        return _bundles.owner(name, _names);
+      case AppLeftoverLocation.macGroupContainers:
+        final id = PosixAppLeftoverFinder.groupContainerBundleId(name);
+        if (id == null) return AppFolderOwner.system;
+        return _bundles.owner(id, _names);
+      case AppLeftoverLocation.macApplicationSupport:
+      case AppLeftoverLocation.macCaches:
+        if (PosixAppLeftoverFinder._isIgnoredMacName(name)) {
+          return AppFolderOwner.system;
+        }
+        return _byName(name);
+      case AppLeftoverLocation.linuxConfig:
+      case AppLeftoverLocation.linuxData:
+      case AppLeftoverLocation.linuxCache:
+        if (PosixAppLeftoverFinder._isIgnoredLinuxName(name)) {
+          return AppFolderOwner.system;
+        }
+        return _byName(name);
+      default:
+        return AppFolderOwner.system;
+    }
+  }
+
+  /// Words apps add to their own name for a data folder (`ZaloData` for
+  /// Zalo, `SlackCache`).
+  static const List<String> _dataSuffixes = <String>[
+    'data',
+    'caches',
+    'cache',
+    'support',
+    'storage',
+    'files',
+    'helper',
+  ];
+
+  /// A plain name, or a bundle id where one is used.
+  AppFolderOwner _byName(String name) {
+    if (PosixAppLeftoverFinder.isReverseDns(name)) {
+      return _bundles.owner(name, _names);
+    }
+    final app = _names.matchName(name) ?? _matchWithoutSuffix(_names, name);
+    return app == null
+        ? AppFolderOwner.none
+        : AppFolderOwner(AppFolderOwnerKind.app, app);
+  }
+}
+
+/// [AppTokenIndex.matchName] of [name] without a trailing data word, so a
+/// short app name (`Zalo`, four letters, below the prefix-match length)
+/// still owns its `ZaloData` folder.
+InstalledAppInfo? _matchWithoutSuffix(AppTokenIndex names, String name) {
+  final letters = name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+  for (final suffix in PosixAppOwnership._dataSuffixes) {
+    if (letters.length - suffix.length < 3 || !letters.endsWith(suffix)) {
+      continue;
+    }
+    final app = names.matchName(
+      letters.substring(0, letters.length - suffix.length),
+    );
+    if (app != null) return app;
+  }
+  return null;
+}
+
 /// Installed bundle, desktop-file and Flatpak ids.
 class _BundleIndex {
-  final Set<String> _ids = <String>{};
-  final Set<String> _vendors = <String>{};
+  final Map<String, InstalledAppInfo> _ids = <String, InstalledAppInfo>{};
+  final Map<String, InstalledAppInfo> _vendors = <String, InstalledAppInfo>{};
 
   _BundleIndex(List<InstalledAppInfo> apps) {
     for (final app in apps) {
       final id = app.packageFamilyName?.trim().toLowerCase();
       if (id == null || id.isEmpty) continue;
-      _ids.add(id);
+      _ids.putIfAbsent(id, () => app);
       final vendor = _vendor(id);
-      if (vendor != null) _vendors.add(vendor);
+      if (vendor != null) _vendors.putIfAbsent(vendor, () => app);
     }
   }
 
-  bool owns(String rawId, AppTokenIndex names) {
+  AppFolderOwner owner(String rawId, AppTokenIndex names) {
     final id = rawId.toLowerCase();
-    if (id.startsWith('com.apple.')) return true;
-    for (final installed in _ids) {
+    if (id.startsWith('com.apple.')) return AppFolderOwner.system;
+    for (final MapEntry(key: installed, value: app) in _ids.entries) {
       if (id == installed ||
           id.startsWith('$installed.') ||
           installed.startsWith('$id.')) {
-        return true;
+        return AppFolderOwner(AppFolderOwnerKind.app, app);
       }
     }
     final vendor = _vendor(id);
-    if (vendor != null && _vendors.contains(vendor)) return true;
+    final vendorApp = vendor == null ? null : _vendors[vendor];
+    if (vendorApp != null) {
+      return AppFolderOwner(AppFolderOwnerKind.vendor, vendorApp);
+    }
     // `com.electron.dockerdesktop` for Docker.app, `org.gnome.Gedit` for gedit.
     final last = rawId.substring(rawId.lastIndexOf('.') + 1);
-    return names.matchName(last) != null;
+    final named = names.matchName(last);
+    return named == null
+        ? AppFolderOwner.none
+        : AppFolderOwner(AppFolderOwnerKind.app, named);
   }
 
   /// `com.vendor` from `com.vendor.app`.

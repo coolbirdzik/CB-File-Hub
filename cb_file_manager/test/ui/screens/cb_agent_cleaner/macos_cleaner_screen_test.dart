@@ -77,62 +77,61 @@ class _MacCleaner extends DiskCleanerService {
 }
 
 void main() {
-  testWidgets(
-    'macOS exposes disk cleanup, hides Windows Apps and selects exact case',
-    (tester) async {
-      SharedPreferences.setMockInitialValues({});
-      tester.view.physicalSize = const Size(1500, 1000);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-      final cleaner = _MacCleaner();
-      addTearDown(cleaner.changes.close);
-      await tester.pumpWidget(
-        MaterialApp(
-          locale: const Locale('en'),
-          supportedLocales: const [Locale('en')],
-          localizationsDelegates: const [
-            AppLocalizationsDelegate(),
-            GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
-          ],
-          home: Scaffold(
-            body: CbAgentCleanerScreen(
-              cleanerService: cleaner,
-              appInventoryService: _EmptyInventory(),
-            ),
+  testWidgets('macOS exposes disk cleanup and Apps, and selects exact case', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    tester.view.physicalSize = const Size(1500, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final cleaner = _MacCleaner();
+    addTearDown(cleaner.changes.close);
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('en'),
+        supportedLocales: const [Locale('en')],
+        localizationsDelegates: const [
+          AppLocalizationsDelegate(),
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        home: Scaffold(
+          body: CbAgentCleanerScreen(
+            cleanerService: cleaner,
+            appInventoryService: _EmptyInventory(),
           ),
         ),
-      );
-      await tester.pumpAndSettle();
-      expect(
-        find.byKey(const ValueKey('cleaner-utility-appInsights')),
-        findsNothing,
-      );
-      expect(
-        find.byKey(const ValueKey('cleaner-utility-appLeftovers')),
-        findsOneWidget,
-      );
-      await _openDiskUsage(tester);
-      await tester.tap(find.byKey(const ValueKey('cleaner-scan-cta')));
-      await tester.pumpAndSettle();
-      expect(cleaner.scannedPath, '/System/Volumes/Data');
-      await tester.tap(
-        find.byKey(
-          const ValueKey('cleaner-tree-row-idle-/System/Volumes/Data/file'),
-        ),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('cleaner-review-and-clean')));
-      await tester.pumpAndSettle();
-      expect(
-        cleaner.pendingCleanupItems!.single.path,
-        '/System/Volumes/Data/file',
-      );
-    },
-    variant: TargetPlatformVariant.only(TargetPlatform.macOS),
-  );
+      ),
+    );
+    await tester.pumpAndSettle();
+    // Apps is on every desktop; macOS feeds it from App storage.
+    expect(
+      find.byKey(const ValueKey('cleaner-utility-appInsights')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('cleaner-utility-appLeftovers')),
+      findsOneWidget,
+    );
+    await _openDiskUsage(tester);
+    await tester.tap(find.byKey(const ValueKey('cleaner-scan-cta')));
+    await tester.pumpAndSettle();
+    expect(cleaner.scannedPath, '/System/Volumes/Data');
+    await tester.tap(
+      find.byKey(
+        const ValueKey('cleaner-tree-row-idle-/System/Volumes/Data/file'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('cleaner-review-and-clean')));
+    await tester.pumpAndSettle();
+    expect(
+      cleaner.pendingCleanupItems!.single.path,
+      '/System/Volumes/Data/file',
+    );
+  }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
 
   testWidgets('mounted external disks appear, unmount, and can be scanned', (
     tester,

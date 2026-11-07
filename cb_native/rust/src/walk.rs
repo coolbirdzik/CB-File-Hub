@@ -34,6 +34,9 @@ pub struct Task {
     pub(crate) depth: u32,
     /// A path given as a file rather than a directory to read.
     pub(crate) file: bool,
+    /// Index of the root this task descends from, for walks that keep a
+    /// result per root ([RootSizes]); 0 elsewhere.
+    pub(crate) root: u32,
 }
 
 impl Task {
@@ -42,6 +45,7 @@ impl Task {
             path,
             depth,
             file: false,
+            root: 0,
         }
     }
 }
@@ -341,10 +345,139 @@ pub fn start_dir_size(port: i64, config: &[u8]) -> Option<Arc<Job>> {
             path,
             depth: 0,
             file: true,
+            root: 0,
         })
         .chain(dirs.into_iter().map(|path| Task::dir(path, 0)))
         .collect();
     Some(start(port, roots, Box::new(DirSize)))
+}
+
+// ---------------------------------------------------------------------------
+// Sizes per root
+// ---------------------------------------------------------------------------
+
+/// [DirSize] kept separately for each of many roots in one walk, so a page
+/// that sizes hundreds of folders (editor extensions and their storage)
+/// shares the pool instead of starting a job per folder.
+///
+/// A root that is a file counts as itself; a root that is a link counts as
+/// nothing, like a link met inside a folder. Overlapping roots are each
+/// walked in full, so callers pass disjoint ones.
+///
+/// Output per root, in order: bytes u64, files u64, unreadable u64, then
+/// i64 1 when the root existed and 0 when it did not.
+/// Counters: bytes, files, directories, unreadable paths (all roots).
+struct RootSizes {
+    totals: Vec<[AtomicU64; 3]>,
+    found: Vec<AtomicBool>,
+}
+
+impl RootSizes {
+    fn add(&self, root: u32, bytes: u64, files: u64) {
+        let totals = &self.totals[root as usize];
+        totals[0].fetch_add(bytes, Ordering::Relaxed);
+        totals[1].fetch_add(files, Ordering::Relaxed);
+    }
+
+    fn unreadable(&self, walk: &Walk, root: u32) {
+        self.totals[root as usize][2].fetch_add(1, Ordering::Relaxed);
+        walk.job.add_counter(3, 1);
+    }
+}
+
+impl Kind for RootSizes {
+    fn scan(&self, walk: &Walk, task: &Task) -> Vec<Task> {
+        let job = &walk.job;
+        if task.depth == 0 {
+            let Ok(metadata) = fs::symlink_metadata(&task.path) else {
+                return Vec::new();
+            };
+            self.found[task.root as usize].store(true, Ordering::Relaxed);
+            if metadata.file_type().is_symlink() {
+                return Vec::new();
+            }
+            if metadata.is_file() {
+                self.add(task.root, metadata.len(), 1);
+                job.add_counter(0, metadata.len());
+                job.add_counter(1, 1);
+                return Vec::new();
+            }
+            if !metadata.is_dir() {
+                return Vec::new();
+            }
+        }
+        let Some(entries) = read_dir(walk, task) else {
+            self.unreadable(walk, task.root);
+            return Vec::new();
+        };
+        job.add_counter(2, 1);
+        let mut children = Vec::new();
+        let (mut bytes, mut files) = (0, 0);
+        for entry in entries {
+            if walk.halted() {
+                break;
+            }
+            let Ok(entry) = entry else { continue };
+            let Ok(file_type) = entry.file_type() else {
+                continue;
+            };
+            if file_type.is_symlink() {
+                continue;
+            }
+            if file_type.is_dir() {
+                let name = entry.file_name();
+                children.push(Task {
+                    path: fsx::join(&task.path, &name.to_string_lossy()),
+                    depth: task.depth + 1,
+                    file: false,
+                    root: task.root,
+                });
+            } else if let Ok(metadata) = entry.metadata() {
+                bytes += metadata.len();
+                files += 1;
+            }
+        }
+        self.add(task.root, bytes, files);
+        job.add_counter(0, bytes);
+        job.add_counter(1, files);
+        children
+    }
+
+    fn finish(&self, walk: &Walk) -> Result<(), String> {
+        let mut out = Writer::default();
+        for (totals, found) in self.totals.iter().zip(&self.found) {
+            for value in totals {
+                out.u64(value.load(Ordering::Relaxed));
+            }
+            out.i64(i64::from(found.load(Ordering::Relaxed)));
+        }
+        walk.job.append(&out.into_bytes());
+        Ok(())
+    }
+}
+
+/// Config: root paths (a string list).
+pub fn start_root_sizes(port: i64, config: &[u8]) -> Option<Arc<Job>> {
+    let mut r = Reader::new(config);
+    let paths = r.strs()?;
+    if !r.is_empty() || paths.len() > u32::MAX as usize {
+        return None;
+    }
+    let kind = RootSizes {
+        totals: paths.iter().map(|_| Default::default()).collect(),
+        found: paths.iter().map(|_| AtomicBool::new(false)).collect(),
+    };
+    let roots = paths
+        .into_iter()
+        .enumerate()
+        .map(|(index, path)| Task {
+            path,
+            depth: 0,
+            file: false,
+            root: index as u32,
+        })
+        .collect();
+    Some(start(port, roots, Box::new(kind)))
 }
 
 // ---------------------------------------------------------------------------
@@ -840,6 +973,55 @@ mod tests {
         assert_eq!(u64_at(&out, 2), 2);
         assert_eq!(u64_at(&out, 3), 1);
         fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn sizes_each_root_separately() {
+        let root = temp_tree("root_sizes");
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(root.join("a"), root.join("link")).unwrap();
+        let mut config = Writer::default();
+        config.u32(5);
+        for path in [
+            root.join("a"),
+            root.join("one.jpg"),
+            root.join("missing"),
+            root.join(".hidden"),
+            root.join("link"),
+        ] {
+            config.str(&path.to_string_lossy());
+        }
+        let job = start_root_sizes(0, &config.into_bytes()).unwrap();
+        let (state, out) = wait(&job);
+        assert_eq!(state, JOB_DONE);
+        let row = |index: usize| {
+            let at = index * 4;
+            (
+                u64_at(&out, at),
+                u64_at(&out, at + 1),
+                u64_at(&out, at + 2),
+                u64_at(&out, at + 3),
+            )
+        };
+        assert_eq!(out.len(), 5 * 4 * 8);
+        assert_eq!(row(0), (5 + 7 + 11, 3, 0, 1));
+        assert_eq!(row(1), (3, 1, 0, 1));
+        assert_eq!(row(2), (0, 0, 0, 0));
+        assert_eq!(row(3), (13, 1, 0, 1));
+        // A link is never followed: present, but nothing counted.
+        #[cfg(unix)]
+        assert_eq!(row(4), (0, 0, 0, 1));
+        fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn root_sizes_without_roots_finish_empty() {
+        let mut config = Writer::default();
+        config.u32(0);
+        let job = start_root_sizes(0, &config.into_bytes()).unwrap();
+        let (state, out) = wait(&job);
+        assert_eq!(state, JOB_DONE);
+        assert!(out.is_empty());
     }
 
     fn walk_names(config: Vec<u8>) -> Vec<String> {

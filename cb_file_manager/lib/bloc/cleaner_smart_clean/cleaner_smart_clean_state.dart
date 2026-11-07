@@ -143,24 +143,35 @@ class CleanerSmartCleanGroup extends Equatable {
 
   CleanerSmartCleanGroup withoutPaths(Set<String> paths) {
     if (paths.isEmpty) return this;
-    final keys = paths.map(CleanerPaths.key).toSet();
+    return withoutKeys(paths.map(CleanerPaths.key).toSet());
+  }
+
+  /// [withoutPaths] for paths already turned into [CleanerPaths.key]s, so
+  /// callers filtering several groups build the set once.
+  CleanerSmartCleanGroup withoutKeys(Set<String> keys) {
+    if (keys.isEmpty) return this;
     final sources = <CleanerSmartCleanSource>[];
+    var changed = false;
     for (final source in this.sources) {
       final items = source.items
           .where(
             (item) => !CleanerPaths.ancestors(item.path).any(keys.contains),
           )
           .toList();
+      if (items.length != source.items.length) changed = true;
       if (items.isEmpty) continue;
       sources.add(
-        CleanerSmartCleanSource(
-          key: source.key,
-          origin: source.origin,
-          items: items,
-          mergedCount: source.mergedCount,
-        ),
+        items.length == source.items.length
+            ? source
+            : CleanerSmartCleanSource(
+                key: source.key,
+                origin: source.origin,
+                items: items,
+                mergedCount: source.mergedCount,
+              ),
       );
     }
+    if (!changed) return this;
     return CleanerSmartCleanGroup._(
       categoryId,
       List.unmodifiable(sources.expand((source) => source.items)),
@@ -273,44 +284,72 @@ class CleanerSmartCleanState extends Equatable {
     return all ? true : null;
   }
 
-  List<CleanerSmartCleanSource> selectedSources(CleanerSmartCleanGroup group) =>
-      group
-          .withoutPaths(pendingPaths)
-          .sources
-          .where((source) => isSourceSelected(group.categoryId, source.key))
-          .toList(growable: false);
+  /// The selection derived from [groups], [pendingPaths] and [excluded].
+  ///
+  /// Every clean progress tick is a new state from [copyWith] that shares
+  /// those three objects, and the footer reads several totals per build.
+  /// Filtering tens of thousands of pending paths for each read froze the UI
+  /// while cleaning, so the result is kept per [groups] list and reused while
+  /// the other two inputs are the same objects.
+  static final Expando<_SmartCleanSelection> _selectionCache = Expando();
+
+  _SmartCleanSelection get _selection {
+    final cached = _selectionCache[groups];
+    if (cached != null &&
+        identical(cached.pendingPaths, pendingPaths) &&
+        identical(cached.excluded, excluded)) {
+      return cached;
+    }
+    final pendingKeys = pendingPaths.map(CleanerPaths.key).toSet();
+    final selection = _SmartCleanSelection(
+      pendingPaths: pendingPaths,
+      excluded: excluded,
+      byGroup:
+          Map<CleanerSmartCleanGroup, List<CleanerSmartCleanSource>>.identity()
+            ..addEntries([
+              for (final group in groups)
+                MapEntry(
+                  group,
+                  group
+                      .withoutKeys(pendingKeys)
+                      .sources
+                      .where(
+                        (source) =>
+                            isSourceSelected(group.categoryId, source.key),
+                      )
+                      .toList(growable: false),
+                ),
+            ]),
+    );
+    _selectionCache[groups] = selection;
+    return selection;
+  }
+
+  List<CleanerSmartCleanSource> selectedSources(CleanerSmartCleanGroup group) {
+    final cached = _selection.byGroup[group];
+    if (cached != null) return cached;
+    // A group that is not one of [groups] (callers holding an older state).
+    final pendingKeys = pendingPaths.map(CleanerPaths.key).toSet();
+    return group
+        .withoutKeys(pendingKeys)
+        .sources
+        .where((source) => isSourceSelected(group.categoryId, source.key))
+        .toList(growable: false);
+  }
 
   List<JunkItem> get selectedItems => [
     for (final group in groups)
       for (final source in selectedSources(group)) ...source.items,
   ];
 
-  int get selectedBytes => groups.fold<int>(
-    0,
-    (sum, group) =>
-        sum + selectedSources(group).fold<int>(0, (s, src) => s + src.bytes),
-  );
+  int get selectedBytes => _selection.bytes;
 
-  int get selectedCount => groups.fold<int>(
-    0,
-    (sum, group) =>
-        sum +
-        selectedSources(group).fold<int>(0, (s, src) => s + src.items.length),
-  );
+  int get selectedCount => _selection.count;
 
   /// Bytes of selected Recycle Bin entries, which are deleted permanently.
-  int get selectedPermanentBytes => groups
-      .where((group) => group.isPermanent)
-      .fold<int>(
-        0,
-        (sum, group) =>
-            sum +
-            selectedSources(group).fold<int>(0, (s, src) => s + src.bytes),
-      );
+  int get selectedPermanentBytes => _selection.permanentBytes;
 
-  bool get selectedIncludesPermanent => groups.any(
-    (group) => group.isPermanent && selectedSources(group).isNotEmpty,
-  );
+  bool get selectedIncludesPermanent => _selection.includesPermanent;
 
   CleanerSmartCleanState copyWith({
     CleanerSmartCleanStatus? status,
@@ -376,4 +415,42 @@ class CleanerSmartCleanState extends Equatable {
     error,
     errorMessage,
   ];
+}
+
+/// What [CleanerSmartCleanState] selects, computed once per input set.
+class _SmartCleanSelection {
+  final Set<String> pendingPaths;
+  final Set<String> excluded;
+
+  /// The checked sources of each group, minus paths a clean already took.
+  final Map<CleanerSmartCleanGroup, List<CleanerSmartCleanSource>> byGroup;
+
+  late final int bytes = _sum(byGroup.keys, (source) => source.bytes);
+  late final int count = _sum(byGroup.keys, (source) => source.items.length);
+  late final int permanentBytes = _sum(
+    byGroup.keys.where((group) => group.isPermanent),
+    (source) => source.bytes,
+  );
+  late final bool includesPermanent = byGroup.entries.any(
+    (entry) => entry.key.isPermanent && entry.value.isNotEmpty,
+  );
+
+  _SmartCleanSelection({
+    required this.pendingPaths,
+    required this.excluded,
+    required this.byGroup,
+  });
+
+  int _sum(
+    Iterable<CleanerSmartCleanGroup> groups,
+    int Function(CleanerSmartCleanSource source) value,
+  ) {
+    var total = 0;
+    for (final group in groups) {
+      for (final source in byGroup[group]!) {
+        total += value(source);
+      }
+    }
+    return total;
+  }
 }

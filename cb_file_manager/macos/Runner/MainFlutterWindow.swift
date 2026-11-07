@@ -86,6 +86,17 @@ class MainFlutterWindow: NSWindow {
           }
           DispatchQueue.main.async { result(rows) }
         }
+      case "cleanerAppIcon":
+        // The Finder icon of an app bundle (or any file), as PNG bytes.
+        let args = call.arguments as? [String: Any]
+        let path = args?["path"] as? String ?? ""
+        let pixels = max(16, min((args?["size"] as? NSNumber)?.intValue ?? 64, 512))
+        DispatchQueue.global(qos: .userInitiated).async {
+          let png = Self.iconPng(path: path, pixels: pixels)
+          DispatchQueue.main.async {
+            result(png.map { FlutterStandardTypedData(bytes: $0) })
+          }
+        }
       case "getSidebarUserFolders":
         result(self.sidebarUserFolders())
       case "setGlassBackground":
@@ -129,6 +140,25 @@ class MainFlutterWindow: NSWindow {
     }
 
     super.awakeFromNib()
+  }
+
+  /// Draws the file's icon into a square bitmap. Nil when nothing exists
+  /// at [path] or the bitmap cannot be made.
+  static func iconPng(path: String, pixels: Int) -> Data? {
+    guard !path.isEmpty, FileManager.default.fileExists(atPath: path),
+      let rep = NSBitmapImageRep(
+        bitmapDataPlanes: nil, pixelsWide: pixels, pixelsHigh: pixels,
+        bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+        colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)
+    else { return nil }
+    let icon = NSWorkspace.shared.icon(forFile: path)
+    NSGraphicsContext.saveGraphicsState()
+    NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+    icon.draw(
+      in: NSRect(x: 0, y: 0, width: pixels, height: pixels),
+      from: .zero, operation: .sourceOver, fraction: 1)
+    NSGraphicsContext.restoreGraphicsState()
+    return rep.representation(using: .png, properties: [:])
   }
 
   private func sidebarUserFolders() -> [[String: String]] {

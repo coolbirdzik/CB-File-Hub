@@ -7,7 +7,6 @@ import '../../../bloc/cleaner_smart_clean/cleaner_smart_clean.dart';
 import '../../../config/languages/app_localizations.dart';
 import '../../../services/disk_cleaner/cleaner_item_origin.dart';
 import '../../utils/format_utils.dart';
-import '../../widgets/app_progress_indicator.dart';
 import 'cleaner_progress_widgets.dart';
 import 'installed_app_icon.dart';
 import 'cleaner_old_files_panel.dart';
@@ -201,7 +200,15 @@ class _CleanerSmartCleanViewState extends State<CleanerSmartCleanView> {
       case CleanerSmartCleanStatus.failure:
         return _CenteredCard(child: _buildStart(l, state));
       case CleanerSmartCleanStatus.scanning:
-        return _CenteredCard(child: _buildScanning(l, state));
+        final id = state.scanCategoryId;
+        return CleanerScanPanel(
+          key: const ValueKey<String>('cleaner-smart-clean-scanning'),
+          title: id == null
+              ? l.cleanerSmartCleanPreparing
+              : l.cleanerSmartCleanScanningCategory(widget.categoryTitle(id)),
+          path: state.scanPath,
+          value: state.scanFraction,
+        );
       case CleanerSmartCleanStatus.ready:
       case CleanerSmartCleanStatus.cleaning:
         if (state.groups.isEmpty &&
@@ -355,61 +362,6 @@ class _CleanerSmartCleanViewState extends State<CleanerSmartCleanView> {
   // Scanning
   // ---------------------------------------------------------------------------
 
-  Widget _buildScanning(AppLocalizations l, CleanerSmartCleanState state) {
-    final c = context.cbColors;
-    final id = state.scanCategoryId;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          children: [
-            _IconTile(
-              icon: id == null
-                  ? PhosphorIconsLight.magnifyingGlass
-                  : _categoryIcon(id),
-              size: 36,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    id == null
-                        ? l.cleanerSmartCleanPreparing
-                        : l.cleanerSmartCleanScanningCategory(
-                            widget.categoryTitle(id),
-                          ),
-                    style: CbTypography.headingSm.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  Text(
-                    state.scanPath,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: CbTypography.bodySm.copyWith(color: c.textSecondary),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 14),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(999),
-          child: AppProgressIndicator(
-            value: state.scanFraction,
-            height: 3,
-            backgroundColor: c.fill,
-            valueColor: c.accent.base,
-            showGlow: false,
-          ),
-        ),
-      ],
-    );
-  }
-
   // ---------------------------------------------------------------------------
   // Results
   // ---------------------------------------------------------------------------
@@ -516,7 +468,8 @@ class _CleanerSmartCleanViewState extends State<CleanerSmartCleanView> {
           AnimatedSize(
             duration: const Duration(milliseconds: 200),
             child: cleaning
-                ? _CleanProgress(
+                ? CleanerCleanStrip(
+                    key: const ValueKey<String>('cleaner-smart-clean-progress'),
                     done: state.cleanDone,
                     total: state.cleanTotal,
                     path: state.cleanPath,
@@ -1542,66 +1495,3 @@ class _ShareBar extends StatelessWidget {
 }
 
 /// Footer progress while the selection is cleaned.
-class _CleanProgress extends StatelessWidget {
-  final int done;
-  final int total;
-  final String path;
-
-  const _CleanProgress({
-    required this.done,
-    required this.total,
-    required this.path,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.cbColors;
-    final l = AppLocalizations.of(context)!;
-    return Padding(
-      key: const ValueKey<String>('cleaner-smart-clean-progress'),
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              AppWaveLoader(size: 18, color: c.accent.base),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  total > 0
-                      ? l.diskCleanerProcessedCount(done, total)
-                      : l.diskCleanerPreparingProgress(done),
-                  style: CbTypography.labelSm.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          if (path.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(
-                path,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: CbTypography.bodySm.copyWith(color: c.textSecondary),
-              ),
-            ),
-          const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: AppProgressIndicator(
-              value: total > 0 ? (done / total).clamp(0.0, 1.0) : null,
-              height: 3,
-              backgroundColor: c.fill,
-              valueColor: c.accent.base,
-              showGlow: false,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}

@@ -47,6 +47,10 @@ void main() {
       'crash_dumps_logs',
       'package_download_cache',
       'electron_cache',
+      'developer_analysis_cache',
+      'developer_download_cache',
+      'developer_logs',
+      'electron_crash_reports',
       'xcode_build_cache',
       'xcode_junk',
     ]);

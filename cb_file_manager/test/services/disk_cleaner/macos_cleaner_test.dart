@@ -27,6 +27,10 @@ void main() {
       'dev_cache',
       'package_download_cache',
       'electron_cache',
+      'developer_analysis_cache',
+      'developer_download_cache',
+      'developer_logs',
+      'electron_crash_reports',
       'xcode_build_cache',
       'xcode_junk',
       'old_downloads_review',
@@ -106,6 +110,28 @@ void main() {
       ]);
     },
   );
+
+  test('POSIX ancestors match path dirname for unnormalized input', () {
+    for (final path in [
+      '/',
+      '/a',
+      '/a/',
+      '//a//b/./c/../d/',
+      '/System/Volumes/Data',
+      '/System/Volumes/Data/Users/me/Library/Caches/x',
+      '/Users/me/Library/Caches/com.app/Cache.db-wal',
+    ]) {
+      final expected = <String>[];
+      var current = CleanerPaths.key(path);
+      while (true) {
+        expected.add(current);
+        final parent = p.posix.dirname(current);
+        if (parent == current) break;
+        current = parent;
+      }
+      expect(CleanerPaths.ancestors(path), expected, reason: path);
+    }
+  });
 
   test(
     'macOS channel preserves exact paths and per-item Trash failures',

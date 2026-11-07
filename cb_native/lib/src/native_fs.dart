@@ -21,6 +21,25 @@ class NativeSizeResult {
   final int unreadable;
 }
 
+/// One root of [NativeFs.rootSizes].
+class NativeRootSize {
+  const NativeRootSize({
+    required this.bytes,
+    required this.files,
+    required this.unreadable,
+    required this.exists,
+  });
+
+  final int bytes;
+  final int files;
+
+  /// Folders below the root that could not be read; their size is missing.
+  final int unreadable;
+
+  /// False when nothing was at the path.
+  final bool exists;
+}
+
 class NativeRecycleEntry {
   const NativeRecycleEntry(
     this.path,
@@ -228,6 +247,34 @@ abstract final class NativeFs {
       directories: r.i64(),
       unreadable: r.i64(),
     );
+  }
+
+  /// [directorySize] of each of [roots] on its own, in one walk on the
+  /// shared pool. A file root counts as itself and a link root as nothing;
+  /// links inside are never followed. Overlapping roots are each walked in
+  /// full, so pass disjoint ones.
+  static Future<List<NativeRootSize>?> rootSizes(
+    List<String> roots, {
+    bool Function()? shouldContinue,
+  }) async {
+    if (roots.isEmpty) return const [];
+    final job = NativeJob.start(
+      b.jobRootSizes,
+      (WireWriter()..strs(roots)).takeBytes(),
+    );
+    if (job == null) return null;
+    final out = await job.result(shouldContinue: shouldContinue);
+    if (out == null || out.length != roots.length * 32) return null;
+    final r = WireReader(out);
+    return [
+      for (var i = 0; i < roots.length; i++)
+        NativeRootSize(
+          bytes: r.i64(),
+          files: r.i64(),
+          unreadable: r.i64(),
+          exists: r.i64() != 0,
+        ),
+    ];
   }
 
   /// One directory, folders and files each sorted by [sort] exactly like the

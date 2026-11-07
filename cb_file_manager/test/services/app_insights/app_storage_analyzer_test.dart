@@ -132,6 +132,48 @@ void main() {
         isFalse,
       );
     });
+
+    test('matching many roots at once agrees with one root at a time', () {
+      const roots = [
+        r'c:\apps\alpha',
+        r'C:\',
+        '/',
+        '/Users/me/Library/Caches/app',
+        r'\\server\share\folder',
+      ];
+      const paths = [
+        r'C:\Apps\Alpha',
+        r'C:\Apps\Alpha\Cache',
+        r'C:\Apps\Alphabet',
+        r'D:\Apps\Alpha',
+        r'D:\',
+        '/Users/me/Library/Caches/app/x',
+        '/Users/me/Library/Caches/apple',
+        '/tmp/x',
+        r'\\server\share\folder\x',
+        r'\\server\share\folderx',
+      ];
+      for (final root in roots) {
+        final normalized = {AppStorageAnalyzer.normalizeWindowsPath(root)};
+        for (final path in paths) {
+          expect(
+            AppStorageAnalyzer.isSameOrDescendantOfAny(path, normalized),
+            AppStorageAnalyzer.isSameOrDescendant(path, root),
+            reason: '$path under $root',
+          );
+        }
+      }
+      final all = roots.map(AppStorageAnalyzer.normalizeWindowsPath).toSet();
+      for (final path in paths) {
+        expect(
+          AppStorageAnalyzer.isSameOrDescendantOfAny(path, all),
+          roots.any(
+            (root) => AppStorageAnalyzer.isSameOrDescendant(path, root),
+          ),
+          reason: path,
+        );
+      }
+    });
   });
 
   test('attributes measured roots without rescanning or double counting', () {

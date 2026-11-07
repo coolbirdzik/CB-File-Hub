@@ -103,6 +103,7 @@ class CleanerCategories {
       ],
     ),
     ...CleanerCacheRules.macos,
+    ...CleanerAuditedRules.macos,
     CleanerXcodeCache.category,
     CleanerXcodeCache.junkCategory,
     CleanerReviewCandidates.category(isMacOS: true),

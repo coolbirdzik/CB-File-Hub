@@ -135,11 +135,14 @@ class CleanerAppLeftoversCubit extends Cubit<CleanerAppLeftoversState> {
   void removePaths(Iterable<String> deletedPaths) {
     final report = state.report;
     if (report == null) return;
-    final deleted = deletedPaths.toList(growable: false);
+    // A Smart Clean can report tens of thousands of files; compare each
+    // candidate against one set instead of against every deleted path.
+    final deleted = deletedPaths
+        .map(AppStorageAnalyzer.normalizeWindowsPath)
+        .toSet();
     if (deleted.isEmpty) return;
-    bool isDeleted(String path) => deleted.any(
-      (removed) => AppStorageAnalyzer.isSameOrDescendant(path, removed),
-    );
+    bool isDeleted(String path) =>
+        AppStorageAnalyzer.isSameOrDescendantOfAny(path, deleted);
     final remaining = report.candidates
         .where((candidate) => !isDeleted(candidate.path))
         .toList(growable: false);

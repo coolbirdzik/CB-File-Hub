@@ -344,6 +344,38 @@ void main() {
     },
   );
 
+  test('progress ticks reuse the selection; POSIX folders hide children', () {
+    const dir = '/Users/me/Library/Caches/com.app';
+    final group = CleanerSmartCleanGroup(
+      categoryId: 'app_cache',
+      items: [
+        _item('app_cache', '$dir/a', 3),
+        _item('app_cache', '$dir/sub/b', 4),
+        _item('app_cache', '/Users/me/Library/Caches/com.app2/c', 5),
+      ],
+    );
+    final cleaning = CleanerSmartCleanState(
+      status: CleanerSmartCleanStatus.cleaning,
+      groups: [group],
+      pendingPaths: const {dir},
+    );
+    expect(cleaning.selectedCount, 1);
+    expect(cleaning.selectedBytes, 5);
+    final tick = cleaning.copyWith(cleanDone: 1, cleanTotal: 2);
+    expect(
+      identical(tick.selectedSources(group), cleaning.selectedSources(group)),
+      isTrue,
+    );
+    final unchecked = tick.copyWith(
+      excluded: {
+        for (final source in group.sources)
+          CleanerSmartCleanState.sourceId('app_cache', source.key),
+      },
+    );
+    expect(unchecked.selectedCount, 0);
+    expect(tick.selectedCount, 1);
+  });
+
   test(
     'failed items stay available and newer selection changes survive',
     () async {

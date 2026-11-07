@@ -7,9 +7,13 @@ import '../../services/app_insights/app_leftover_scanner.dart';
 enum CleanerAppLeftoversStatus { idle, loading, ready, failure }
 
 /// Zero shows folders regardless of activity.
-const List<int> cleanerLeftoverInactiveDayPresets = <int>[0, 90, 180, 365];
+const List<int> cleanerLeftoverInactiveDayPresets = <int>[0, 30, 90, 180, 365];
 
-const int defaultCleanerLeftoverInactiveDays = 90;
+/// A month without a change: an uninstalled app no longer writes to its
+/// folder, so this only hides data a running tool still uses (a CLI, a
+/// helper the inventory does not list). Longer hid apps removed a few weeks
+/// ago, the leftovers people look for.
+const int defaultCleanerLeftoverInactiveDays = 30;
 
 /// Measured folders smaller than this are not worth listing.
 const int cleanerLeftoverMinimumBytes = 1024 * 1024;

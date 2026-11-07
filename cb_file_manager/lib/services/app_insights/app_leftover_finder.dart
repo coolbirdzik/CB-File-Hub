@@ -718,6 +718,14 @@ class AppTokenIndex {
     return matchProduct(token) ?? matchVendor(token);
   }
 
+  /// [matchName] without the publisher fallback: a folder named after a
+  /// vendor (`Microsoft`, `Google`) holds data of many apps.
+  InstalledAppInfo? matchProductName(String folderName) {
+    final token = _token(folderName);
+    if (token.length < 3) return null;
+    return matchProduct(token);
+  }
+
   InstalledAppInfo? matchProduct(String folder) {
     final stem = _lettersOnly(folder);
     final exact = _productWords[folder] ?? _productWords[stem];

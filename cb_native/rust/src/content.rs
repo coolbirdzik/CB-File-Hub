@@ -191,6 +191,7 @@ impl ContentSearch {
                     path,
                     depth: task.depth,
                     file: true,
+                    root: task.root,
                 }),
             }
         }

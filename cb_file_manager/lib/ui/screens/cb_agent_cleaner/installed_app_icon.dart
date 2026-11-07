@@ -1,8 +1,10 @@
+import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
 import '../../../helpers/files/windows_app_icon.dart';
+import '../../../services/disk_cleaner/macos_cleaner_platform.dart';
 import '../../../services/app_insights/app_insights_models.dart';
 
 /// An installed app's own icon, or a generic app glyph while it loads or
@@ -36,9 +38,18 @@ class _InstalledAppIconState extends State<InstalledAppIcon> {
 
   void _loadIcon() {
     _iconPath = resolveInstalledAppIconPath(widget.app);
-    _iconFuture = _iconPath == null
-        ? Future<ui.Image?>.value(null)
-        : WindowsAppIcon.extractIconFromFile(_iconPath!);
+    final path = _iconPath;
+    if (path == null) {
+      _iconFuture = Future<ui.Image?>.value(null);
+    } else if (Platform.isMacOS) {
+      // Finder's icon, drawn at the tile's pixel size (2x on Retina).
+      _iconFuture = MacosCleanerPlatform.appIcon(
+        path,
+        (widget.size * 2).ceil(),
+      );
+    } else {
+      _iconFuture = WindowsAppIcon.extractIconFromFile(path);
+    }
   }
 
   @override
@@ -80,6 +91,13 @@ class _InstalledAppIconState extends State<InstalledAppIcon> {
 
 /// The file holding [app]'s icon: its DisplayIcon, else its executable.
 String? resolveInstalledAppIconPath(InstalledAppInfo app) {
+  // macOS: Finder draws the icon from the bundle itself.
+  final bundle = app.installLocation;
+  if (app.source == InstalledAppSource.macApp &&
+      bundle != null &&
+      bundle.endsWith('.app')) {
+    return bundle;
+  }
   final displayIcon = app.displayIconPath?.trim();
   if (displayIcon != null && displayIcon.isNotEmpty) return displayIcon;
   if (app.executablePaths.isNotEmpty) return app.executablePaths.first;

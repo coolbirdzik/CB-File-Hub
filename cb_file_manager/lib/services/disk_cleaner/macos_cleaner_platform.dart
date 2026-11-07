@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/services.dart';
 import 'cleaner_models.dart';
 
@@ -22,6 +24,27 @@ abstract final class MacosCleanerPlatform {
           ),
     ];
   }
+
+  static final Map<String, Future<ui.Image?>> _icons = {};
+
+  /// The Finder icon of [path] (an app bundle), [pixels] square. Kept for
+  /// the session; null when the path has none or the channel is missing.
+  static Future<ui.Image?> appIcon(String path, int pixels) =>
+      _icons.putIfAbsent('$pixels|$path', () async {
+        try {
+          final bytes = await channel.invokeMethod<Uint8List>(
+            'cleanerAppIcon',
+            {'path': path, 'size': pixels},
+          );
+          if (bytes == null || bytes.isEmpty) return null;
+          final codec = await ui.instantiateImageCodec(bytes);
+          return (await codec.getNextFrame()).image;
+        } on PlatformException {
+          return null;
+        } on MissingPluginException {
+          return null;
+        }
+      });
 
   /// Returns a result for every requested path, including permission failures.
   static Future<Map<String, String?>> trash(List<String> paths) async {

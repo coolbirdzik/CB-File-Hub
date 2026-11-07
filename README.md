@@ -25,7 +25,9 @@
 ## Features
 
 ### File manager
-Tabs and tear-off windows, split panes, grid and list views with previews, pinned locations, archive browsing (zip, 7z, tar), keyboard shortcuts and a fast recursive search.
+Tabs and tear-off windows, split panes, grid and list views with previews, pinned locations, keyboard shortcuts and a fast recursive search.
+
+Open archives like folders and extract selected items or everything. ZIP, 7z, TAR (including .tar.gz, .tar.bz2 and .tar.xz), GZip and BZip2 work on Windows, macOS, Linux and Android without extra tools. RAR needs 7-Zip installed, so it works on Windows only. Settings and tags can be exported to a ZIP backup.
 
 ### CB Agent: AI file assistant
 Ask in plain language: *"find duplicate videos"*, *"show large files from last year"*, *"tag these photos"*. The agent searches file names and document text, explains what it found and **asks before it moves, renames or deletes anything**. Use OpenAI, Anthropic, OpenRouter, Ollama or LM Studio, or run a local GGUF model on your own device with no cloud.
@@ -38,7 +40,32 @@ Ask in plain language: *"find duplicate videos"*, *"show large files from last y
 - **Network shares:** SMB/CIFS, FTP and WebDAV, with media streaming from network shares.
 
 ### Disk cleaner
-Smart Clean removes only junk that apps can recreate: temporary files, browser and app caches, crash dumps, and developer caches (npm, pip, Cargo, Gradle, Go, Xcode). Disk usage shows a full-drive tree, and you review every item before it goes to the Recycle Bin or Trash.
+Smart Clean removes only junk that apps can recreate: temporary files, browser and app caches, crash dumps, and developer caches (npm, pip, Cargo, Gradle, Go, Xcode, editor logs and VSIX downloads). Disk usage shows a full-drive tree, and you review every item before it goes to the Recycle Bin or Trash. The Apps page lists every installed app with its size on Windows, macOS and Linux. It also shows when each app was last opened (from Windows launch history or Spotlight on macOS) and can uninstall apps: on Windows through the app's own uninstaller, on macOS by moving the app to the Trash. Linux shows sizes only.
+
+### App storage: what each app keeps on disk
+
+App storage lists every installed app with what it keeps on disk: the app itself, caches, logs, crash reports, web storage and its own data. It also shows how much of that is safe to remove. It is available on Windows, macOS and Linux. Folders are matched to apps the same way the Leftover app data page matches them, so folders that belong to no installed app stay on that page.
+
+- **Safe to clean, checked for you:** caches that an app rebuilds when it starts (Chromium and Electron apps such as Slack, Teams, Discord and editors), logs from earlier sessions and old crash dumps.
+- **Opt-in:** a whole `Caches/<app>` or log folder. The app downloads or rebuilds it, but may start slower.
+- **Only shown, never cleaned:** documents, sandbox containers, data shared between apps of the same vendor, web storage and settings.
+- **Running apps:** their caches are kept. On macOS and Linux this is detected from the running processes; on Windows, from the app's executable names.
+- **Code editors:** VS Code, Cursor, VSCodium, Windsurf, Antigravity and Kiro also list each extension with its icon, install size and stored data, plus old extension versions and data of deleted workspaces.
+- **Docker:** images, containers, volumes and build cache, read through Docker's own CLI. Build cache and untagged images start checked. Unused images and stopped containers are opt-in, and unused volumes are opt-in with a warning that their data is deleted for good. Docker removes them itself after a confirmation; nothing goes to the Trash.
+
+<p align="center">
+  <img src="screenshots/features/app_storage/en/docker.png" alt="Docker in App storage: images, containers, volumes and build cache with what each prune frees" width="80%" />
+</p>
+
+Results appear as soon as the data folders are measured; the size of each app itself follows. Folder sizes come from one Rust walk, with a Dart fallback. Everything you clean goes to the Recycle Bin or Trash as a whole folder.
+
+<table>
+  <tr>
+    <td width="33%"><img src="screenshots/features/app_storage/en/windows.png" alt="App storage on Windows: apps by size with VS Code opened to its safe-to-clean groups" /><p align="center">Windows</p></td>
+    <td width="33%"><img src="screenshots/features/app_storage/en/macos.png" alt="App storage on macOS with VS Code running, so its caches are kept" /><p align="center">macOS</p></td>
+    <td width="33%"><img src="screenshots/features/app_storage/en/linux.png" alt="App storage on Linux" /><p align="center">Linux</p></td>
+  </tr>
+</table>
 
 ### Photos, videos and tags
 Gallery and video library, built-in player with picture-in-picture, image editor, albums and rule-based smart albums, and hierarchical tags you can search across every folder.
@@ -104,6 +131,12 @@ just deps
 ```
 
 See [development setup](docs/contributing/04-development-setup.md) for each platform's toolchain, builds and tests.
+
+The App storage screenshots are rendered from the app's widgets with sample data, without reading any app folder. To rebuild them for Windows, macOS and Linux in English and Vietnamese, run this from `cb_file_manager/`:
+
+```bash
+flutter test --no-pub tool/capture_app_storage_screenshots_test.dart --dart-define=CB_CAPTURE_SCREENSHOTS=true
+```
 
 ## Contributing
 

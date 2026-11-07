@@ -41,7 +41,20 @@ abstract final class CleanerPaths {
       key(parent) == key(child) || key(child).startsWith(prefix(parent));
   static Iterable<String> ancestors(String path) sync* {
     var current = key(path);
-    final context = isPosix(current) ? p.posix : p.windows;
+    if (isPosix(current)) {
+      // A POSIX key is normalized (no `.`, `..`, `//` or trailing `/`), so
+      // its parent is everything before the last `/`. This is what
+      // `p.posix.dirname` returns here, without parsing the path each level;
+      // Cleaner walks the ancestors of every file it removes.
+      while (true) {
+        yield current;
+        if (current == '/') break;
+        final slash = current.lastIndexOf('/');
+        current = slash <= 0 ? '/' : current.substring(0, slash);
+      }
+      return;
+    }
+    final context = p.windows;
     while (current.isNotEmpty) {
       yield current;
       final parent = context.dirname(current);

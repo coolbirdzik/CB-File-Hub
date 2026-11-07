@@ -6,6 +6,7 @@ import '../../../config/languages/app_localizations.dart';
 import '../../../services/app_insights/app_insights_models.dart';
 import '../../../services/app_insights/app_storage_file_browser.dart';
 import '../../utils/format_utils.dart';
+import 'cleaner_progress_widgets.dart';
 
 typedef AppStorageFilesLoader =
     Future<List<AppStorageFileEntry>> Function(String path);
@@ -235,16 +236,7 @@ class _CleanerAppFilesDialogState extends State<CleanerAppFilesDialog> {
       future: _listing,
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
-          return Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const CircularProgressIndicator(),
-                const SizedBox(height: 12),
-                Text(l10n.loading),
-              ],
-            ),
-          );
+          return CleanerScanPanel(title: l10n.loading);
         }
         if (snapshot.hasError) {
           return Center(

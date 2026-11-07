@@ -221,6 +221,17 @@ calling isolate:
   coverage lives in `test/services/native_ui_jobs_test.dart` and
   `test/models/database/tag_import_batch_test.dart`.
 
+- Per-root sizes (`NativeFs.rootSizes`, job 29) size thousands of disjoint
+  folders in one walk on the shared pool. The Cleaner's App storage page
+  (`lib/services/disk_cleaner/app_storage/`) uses it to measure what every
+  installed app keeps on disk: folders are attributed with the Leftovers
+  ownership rules (`PosixAppOwnership`, `AppTokenIndex`), classified by
+  layout (`ChromiumLayout`, containers, XDG, Flatpak) and VS Code family
+  editors add extensions and workspaces (`editor_storage/`). Data folders are
+  sized before app bundles so the list shows early. `dartEditorRootSizes` is
+  the fallback; `test/services/disk_cleaner/editor_storage_analyzer_test.dart`
+  checks parity.
+
 - **Optional by design:** if cargo, the rustup target or the build is missing,
   the hook prints `cb_native: ...` and bundles nothing; `CbNative.isAvailable`
   is then false and the Dart code runs. All crates are pure Rust, so cross

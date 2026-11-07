@@ -2955,4 +2955,101 @@ abstract class AppLocalizations {
   String get homeTipPalette;
   String get homeTipOpenPalette;
   String get homeTipShowOnHome;
+
+  // Cleaner - code editors
+  String get cleanerEditorsScan;
+  String cleanerEditorsRunning(String editor);
+  String cleanerEditorsTotal(String size);
+  String get cleanerEditorsCleanableSection;
+  String get cleanerEditorsExtensionsSection;
+  String get cleanerEditorsReviewSection;
+  String cleanerEditorsObsoleteExtensions(int count);
+  String get cleanerEditorsObsoleteExtensionsHint;
+  String get cleanerEditorsKindCache;
+  String get cleanerEditorsKindCacheHint;
+  String get cleanerEditorsKindDownloads;
+  String get cleanerEditorsKindDownloadsHint;
+  String get cleanerEditorsKindLogs;
+  String get cleanerEditorsKindLogsHint;
+  String get cleanerEditorsKindCrash;
+  String get cleanerEditorsKindCrashHint;
+  String cleanerEditorsMissingWorkspaces(int count);
+  String get cleanerEditorsMissingWorkspacesHint;
+  String get cleanerEditorsKindWebStorage;
+  String get cleanerEditorsKindHistory;
+  String get cleanerEditorsKindSettings;
+  String get cleanerEditorsKindOther;
+  String cleanerEditorsOrphanData(int count);
+  String cleanerEditorsActiveWorkspaces(int count);
+  String cleanerEditorsOtherWorkspaces(int count);
+  String get cleanerEditorsInstallColumn;
+  String get cleanerEditorsDataColumn;
+  String get cleanerEditorsObsoleteBadge;
+  String get cleanerEditorsUnregisteredBadge;
+  String cleanerEditorsShowAll(int count);
+  String cleanerEditorsSelected(String size);
+  String cleanerEditorsClean(String size);
+  String cleanerEditorsConfirmTitle(String destination);
+  String get cleanerEditorsStatExtensions;
+  String get cleanerEditorsStatCleanable;
+  String get cleanerEditorsRunningBadge;
+
+  // Cleaner - app storage
+  String get cleanerAppStorageTitle;
+  String get cleanerAppStorageUtilityDescription;
+  String get cleanerAppStorageIntro;
+  String cleanerAppStorageMeasuring(int done, int total);
+  String get cleanerAppStorageMeasuringApps;
+  String get cleanerAppStorageStatApps;
+  String get cleanerAppStorageStatTotal;
+  String cleanerAppStorageSafe(String size);
+  String get cleanerAppStorageKindInstall;
+  String get cleanerAppStorageKindUserData;
+  String get cleanerAppStorageKindShared;
+  String get cleanerAppStorageCacheOptionalHint;
+  String get cleanerAppStorageLogsOptionalHint;
+  String get cleanerAppStorageLeftoversHint;
+  String get cleanerAppStorageNoneFound;
+  String cleanerAppStorageUnreadable(int count);
+  String cleanerAppStorageConfirmBody(
+    int count,
+    String size,
+    String destination,
+  );
+  String cleanerAppStorageShowAll(int count);
+  String get cleanerAppStorageCleanableOnly;
+  String get cleanerAppStorageAppsNotMeasured;
+  String cleanerAppStorageUnreadableGeneric(int count);
+  String get cleanerAppsShowInFinder;
+  String cleanerAppsMacUninstallTitle(String app);
+  String get cleanerAppsMacUninstallBody;
+  String cleanerAppsMacUninstallRunning(String app);
+  String get cleanerAppsMacUninstallProtected;
+  String cleanerAppsMacUninstallDone(String app);
+  String cleanerAppsMacUninstallFailed(String app);
+  String get cleanerAppsOpenLeftovers;
+  String get cleanerAppsPosixScanHint;
+
+  // Cleaner - Docker
+  String get cleanerDockerTitle;
+  String get cleanerDockerNotRunning;
+  String cleanerDockerFailed(String error);
+  String get cleanerDockerImages;
+  String get cleanerDockerContainers;
+  String get cleanerDockerVolumes;
+  String get cleanerDockerBuildCache;
+  String cleanerDockerStoppedContainers(int count);
+  String get cleanerDockerStoppedContainersHint;
+  String cleanerDockerDanglingImages(int count);
+  String get cleanerDockerDanglingImagesHint;
+  String cleanerDockerUnusedImages(int count);
+  String get cleanerDockerUnusedImagesHint;
+  String get cleanerDockerBuildCacheHint;
+  String cleanerDockerUnusedVolumes(int count);
+  String get cleanerDockerUnusedVolumesHint;
+  String cleanerDockerClean(String size);
+  String get cleanerDockerConfirmTitle;
+  String get cleanerDockerConfirmBody;
+  String cleanerDockerRunning(String command);
+  String cleanerDockerFreed(String size);
 }

@@ -6909,4 +6909,239 @@ class VietnameseLocalizations implements AppLocalizations {
   String get homeTipOpenPalette => 'Mở bảng lệnh';
   @override
   String get homeTipShowOnHome => 'Hiện mẹo bàn phím trên trang chủ';
+
+  // Cleaner - code editors
+  @override
+  @override
+  @override
+  @override
+  String get cleanerEditorsScan => 'Phân tích';
+  @override
+  @override
+  @override
+  String cleanerEditorsRunning(String editor) =>
+      '$editor đang chạy nên cache được giữ lại. Thoát $editor rồi phân tích lại để dọn cache.';
+  @override
+  String cleanerEditorsTotal(String size) => '$size trên đĩa';
+  @override
+  String get cleanerEditorsCleanableSection => 'Dọn được an toàn';
+  @override
+  String get cleanerEditorsExtensionsSection => 'Extension theo dung lượng';
+  @override
+  String get cleanerEditorsReviewSection => 'Chỉ để xem';
+  @override
+  String cleanerEditorsObsoleteExtensions(int count) =>
+      'Bản extension cũ ($count)';
+  @override
+  String get cleanerEditorsObsoleteExtensionsHint =>
+      'Bản đã gỡ hoặc đã được cập nhật; editor sẽ tự xoá ở lần mở tiếp theo.';
+  @override
+  String get cleanerEditorsKindCache => 'Cache web, script và GPU';
+  @override
+  String get cleanerEditorsKindCacheHint =>
+      'Sẽ được tạo lại ở lần mở tiếp theo.';
+  @override
+  String get cleanerEditorsKindDownloads => 'File cài extension đã tải (VSIX)';
+  @override
+  String get cleanerEditorsKindDownloadsHint =>
+      'Cũ hơn một ngày; sẽ tải lại khi cần.';
+  @override
+  String get cleanerEditorsKindLogs => 'Log của các phiên cũ';
+  @override
+  String get cleanerEditorsKindLogsHint => 'Mọi phiên trừ phiên hiện tại.';
+  @override
+  String get cleanerEditorsKindCrash => 'Báo cáo lỗi (crash)';
+  @override
+  String get cleanerEditorsKindCrashHint =>
+      'File minidump của Crashpad cũ hơn một ngày.';
+  @override
+  String cleanerEditorsMissingWorkspaces(int count) =>
+      'Dữ liệu của workspace đã xoá ($count)';
+  @override
+  String get cleanerEditorsMissingWorkspacesHint =>
+      'Thư mục không còn tồn tại. Dữ liệu này có thể gồm lịch sử chat và trạng thái editor của thư mục đó, nên hãy xem trước khi dọn.';
+  @override
+  String get cleanerEditorsKindWebStorage =>
+      'Web storage của giao diện extension';
+  @override
+  String get cleanerEditorsKindHistory =>
+      'Local History (bản lưu file của bạn)';
+  @override
+  String get cleanerEditorsKindSettings => 'Cài đặt và trạng thái editor';
+  @override
+  String get cleanerEditorsKindOther => 'Dữ liệu khác của editor';
+  @override
+  String cleanerEditorsOrphanData(int count) =>
+      'Dữ liệu của extension tích hợp sẵn hoặc đã gỡ ($count)';
+  @override
+  String cleanerEditorsActiveWorkspaces(int count) =>
+      'Dữ liệu của workspace còn tồn tại ($count)';
+  @override
+  String cleanerEditorsOtherWorkspaces(int count) =>
+      'Workspace từ xa hoặc trên ổ đang rút ra ($count)';
+  @override
+  String get cleanerEditorsInstallColumn => 'Cài đặt';
+  @override
+  String get cleanerEditorsDataColumn => 'Dữ liệu';
+  @override
+  String get cleanerEditorsObsoleteBadge => 'Bản cũ';
+  @override
+  String get cleanerEditorsUnregisteredBadge => 'Chưa đăng ký';
+  @override
+  String cleanerEditorsShowAll(int count) => 'Hiện tất cả $count';
+  @override
+  String cleanerEditorsSelected(String size) => 'Đã chọn $size';
+  @override
+  String cleanerEditorsClean(String size) => 'Dọn $size';
+  @override
+  String cleanerEditorsConfirmTitle(String destination) =>
+      'Chuyển vào $destination?';
+  @override
+  @override
+  String get cleanerEditorsStatExtensions => 'Extension';
+  @override
+  @override
+  @override
+  String get cleanerEditorsStatCleanable => 'Có thể giải phóng';
+  @override
+  String get cleanerEditorsRunningBadge => 'Đang chạy';
+
+  // Cleaner - app storage
+  @override
+  String get cleanerAppStorageTitle => 'Dung lượng ứng dụng';
+  @override
+  String get cleanerAppStorageUtilityDescription =>
+      'Mỗi ứng dụng đang chiếm gì và phần nào xoá an toàn';
+  @override
+  String get cleanerAppStorageIntro =>
+      'Đo dung lượng mỗi ứng dụng đã cài đang chiếm: bản thân ứng dụng, cache, log, báo cáo lỗi, web storage và dữ liệu riêng. Trình soạn thảo code còn liệt kê từng extension. Chỉ những gì ứng dụng tự tạo lại được mới được đề xuất dọn, và không có gì thay đổi cho đến khi bạn bấm dọn.';
+  @override
+  String cleanerAppStorageMeasuring(int done, int total) =>
+      'Đang đo thư mục ứng dụng... $done/$total';
+  @override
+  String get cleanerAppStorageMeasuringApps =>
+      'Đang đo bản thân các ứng dụng; dung lượng sẽ hiện khi xong.';
+  @override
+  String get cleanerAppStorageStatApps => 'Ứng dụng';
+  @override
+  String get cleanerAppStorageStatTotal => 'Trên đĩa';
+  @override
+  String cleanerAppStorageSafe(String size) => '$size an toàn';
+  @override
+  String get cleanerAppStorageKindInstall => 'Bản thân ứng dụng';
+  @override
+  String get cleanerAppStorageKindUserData => 'Tài liệu và dữ liệu ứng dụng';
+  @override
+  String get cleanerAppStorageKindShared => 'Dùng chung với ứng dụng cùng hãng';
+  @override
+  String get cleanerAppStorageCacheOptionalHint =>
+      'Toàn bộ thư mục cache. Ứng dụng sẽ tạo lại hoặc tải lại nên có thể mở chậm hơn.';
+  @override
+  String get cleanerAppStorageLogsOptionalHint =>
+      'Toàn bộ thư mục log. Hãy giữ lại nếu đang cần tìm lỗi của ứng dụng này.';
+  @override
+  String get cleanerAppStorageLeftoversHint =>
+      'Thư mục không thuộc ứng dụng nào đã cài được liệt kê ở Dữ liệu ứng dụng còn sót.';
+  @override
+  String get cleanerAppStorageNoneFound =>
+      'Không tìm thấy dữ liệu ứng dụng nào.';
+  @override
+  String cleanerAppStorageUnreadable(int count) =>
+      'Không đọc được $count thư mục nên một số dung lượng bị thiếu. Cấp quyền Full Disk Access cho CB File Hub để đo được.';
+  @override
+  String cleanerAppStorageConfirmBody(
+    int count,
+    String size,
+    String destination,
+  ) =>
+      '$count mục ($size) sẽ được chuyển vào $destination. Hãy thoát các ứng dụng này trước để chúng không giữ hoặc tạo lại các mục đó.';
+  @override
+  String cleanerAppStorageShowAll(int count) => 'Hiện tất cả $count ứng dụng';
+  @override
+  String get cleanerAppStorageCleanableOnly => 'Chỉ ứng dụng có thể dọn';
+  @override
+  String get cleanerAppStorageAppsNotMeasured =>
+      'Chưa đo bản thân các ứng dụng. Quét lại để tính cả dung lượng này.';
+  @override
+  String cleanerAppStorageUnreadableGeneric(int count) =>
+      'Không đọc được $count thư mục nên một số dung lượng bị thiếu.';
+  @override
+  String get cleanerAppsShowInFinder => 'Hiện trong Finder';
+  @override
+  String cleanerAppsMacUninstallTitle(String app) =>
+      'Chuyển $app vào Thùng rác?';
+  @override
+  String get cleanerAppsMacUninstallBody =>
+      'Ứng dụng được chuyển vào Thùng rác nên có thể khôi phục. Cache và dữ liệu của nó vẫn còn; sau đó chúng được liệt kê ở Dữ liệu ứng dụng còn sót để bạn xem và dọn.';
+  @override
+  String cleanerAppsMacUninstallRunning(String app) =>
+      '$app đang chạy. Hãy thoát ứng dụng trước.';
+  @override
+  String get cleanerAppsMacUninstallProtected =>
+      'Ứng dụng này thuộc macOS hoặc chính là CB File Hub nên không gỡ ở đây.';
+  @override
+  String cleanerAppsMacUninstallDone(String app) =>
+      'Đã chuyển $app vào Thùng rác. Dữ liệu còn sót của nó nằm ở Dữ liệu ứng dụng còn sót.';
+  @override
+  String cleanerAppsMacUninstallFailed(String app) =>
+      'Không chuyển được $app vào Thùng rác. Có thể cần quyền quản trị: hãy kéo nó vào Thùng rác trong Finder.';
+  @override
+  String get cleanerAppsOpenLeftovers => 'Xem dữ liệu còn sót';
+  @override
+  String get cleanerAppsPosixScanHint =>
+      'Dung lượng lấy từ trang Dung lượng ứng dụng: bản thân ứng dụng, cache và dữ liệu của nó trong thư mục người dùng. Lệnh dòng lệnh không có ứng dụng riêng không được liệt kê.';
+
+  // Cleaner - Docker
+  @override
+  String get cleanerDockerTitle => 'Docker';
+  @override
+  String get cleanerDockerNotRunning =>
+      'Docker chưa chạy. Hãy mở Docker Desktop (hoặc dịch vụ Docker) rồi quét lại để xem image, container, volume và build cache.';
+  @override
+  String cleanerDockerFailed(String error) => 'Docker không phản hồi: $error';
+  @override
+  String get cleanerDockerImages => 'Image';
+  @override
+  String get cleanerDockerContainers => 'Container';
+  @override
+  String get cleanerDockerVolumes => 'Volume';
+  @override
+  String get cleanerDockerBuildCache => 'Build cache';
+  @override
+  String cleanerDockerStoppedContainers(int count) =>
+      'Container đã dừng ($count)';
+  @override
+  String get cleanerDockerStoppedContainersHint =>
+      'Container không chạy, kèm file đã ghi bên trong. Khi cần có thể tạo lại từ image.';
+  @override
+  String cleanerDockerDanglingImages(int count) =>
+      'Image không có tag ($count)';
+  @override
+  String get cleanerDockerDanglingImagesHint =>
+      'Phần còn sót của image đã build lại. Không còn gì dùng đến.';
+  @override
+  String cleanerDockerUnusedImages(int count) => 'Image không dùng ($count)';
+  @override
+  String get cleanerDockerUnusedImagesHint =>
+      'Image không container nào dùng. Docker sẽ tải hoặc build lại khi cần.';
+  @override
+  String get cleanerDockerBuildCacheHint =>
+      'Các layer giữ lại để build nhanh hơn. Lần build tiếp theo của mỗi dự án sẽ lâu hơn.';
+  @override
+  String cleanerDockerUnusedVolumes(int count) => 'Volume không dùng ($count)';
+  @override
+  String get cleanerDockerUnusedVolumesHint =>
+      'Volume không container nào dùng. Dữ liệu bên trong (database, file tải lên) sẽ bị xoá vĩnh viễn.';
+  @override
+  String cleanerDockerClean(String size) => 'Dọn Docker ($size)';
+  @override
+  String get cleanerDockerConfirmTitle => 'Xoá khỏi Docker?';
+  @override
+  String get cleanerDockerConfirmBody =>
+      'Docker xoá vĩnh viễn các mục này, không chuyển vào Thùng rác. Image và build cache có thể tải hoặc build lại, còn dữ liệu trong volume thì không.';
+  @override
+  String cleanerDockerRunning(String command) => 'Đang chạy $command...';
+  @override
+  String cleanerDockerFreed(String size) =>
+      'Docker đã giải phóng $size. Docker Desktop sẽ trả lại dung lượng cho ổ đĩa ngay sau đó.';
 }

@@ -5,6 +5,7 @@ import '../../../config/languages/app_localizations.dart';
 import '../../../services/disk_cleaner/cleaner_agent_review.dart';
 import '../../../services/disk_cleaner/cleaner_review_summary.dart';
 import '../../../services/disk_cleaner/disk_tree_node.dart';
+import 'cleaner_progress_widgets.dart';
 
 String cleanerDecisionLabel(AppLocalizations l, CleanerItemDecision decision) =>
     switch (decision) {
@@ -123,7 +124,12 @@ class CleanerAgentAnalysisPanel extends StatelessWidget {
             ),
           ),
           if (review != null && review!.total > 0)
-            LinearProgressIndicator(value: review!.reviewed / review!.total),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: CleanerProgressBar(
+                value: review!.reviewed / review!.total,
+              ),
+            ),
           Expanded(
             child: ListView.builder(
               key: const ValueKey('cleaner-agent-analysis-list'),

@@ -117,6 +117,47 @@ void main() {
     expect(report.candidates.first.location, AppLeftoverLocation.macContainers);
   });
 
+  test('data folders named after a short app, and toolchain caches', () {
+    const root = '/Users/me/Library';
+    final report = const PosixAppLeftoverFinder().find(
+      listing: [
+        (
+          const PosixLeftoverBase(
+            AppLeftoverLocation.macApplicationSupport,
+            '$root/Application Support',
+          ),
+          <String>['ZaloData', 'go', 'GameKit', 'Zed'],
+        ),
+        (
+          const PosixLeftoverBase(
+            AppLeftoverLocation.macCaches,
+            '$root/Caches',
+          ),
+          <String>[
+            'ms-playwright-mcp',
+            'ms-playwright-go',
+            'goimports',
+            'TemporaryItems',
+            'SentryCrash',
+          ],
+        ),
+      ],
+      inventory: const AppLeftoverInventory(
+        apps: [
+          ..._mac,
+          InstalledAppInfo(
+            id: 'mac:com.vng.zalo',
+            displayName: 'Zalo',
+            source: InstalledAppSource.macApp,
+            packageFamilyName: 'com.vng.zalo',
+          ),
+        ],
+      ),
+    );
+    // Zalo (four letters) owns ZaloData; Zed is not installed.
+    expect(_names(report), <String>['Zed']);
+  });
+
   test('Linux compares Flatpak and snap lists exactly', () {
     final report = const PosixAppLeftoverFinder().find(
       listing: [

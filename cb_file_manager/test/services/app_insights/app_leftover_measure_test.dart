@@ -67,8 +67,9 @@ void main() {
 
     final measurement = measureAppLeftoverSync(root.path, 1000);
 
-    // Creation time (change time off Windows) is new even though the write
-    // time is old, so the folder was touched recently.
+    // The write time is old, but the copy is new: its creation time on
+    // Windows, the folder's own modification time elsewhere (an entry was
+    // added), so the folder was touched recently.
     expect(
       DateTime.now().difference(measurement.lastModified!).inDays,
       lessThan(2),
@@ -121,4 +122,52 @@ void main() {
       expect(measurement.isComplete, isFalse);
     });
   }, skip: Platform.isWindows ? false : 'needs to set creation times');
+
+  group('on macOS and Linux', () {
+    final old = DateTime.now().subtract(const Duration(days: 400));
+
+    /// Ages every file and folder's modification time (folders through
+    /// `touch`, which dart:io cannot do).
+    void age() {
+      final stamp =
+          '${old.year}${old.month.toString().padLeft(2, '0')}'
+          '${old.day.toString().padLeft(2, '0')}1200';
+      final entries = [root, ...root.listSync(recursive: true)]
+        ..sort((a, b) => b.path.length.compareTo(a.path.length));
+      for (final entry in entries) {
+        final result = Process.runSync('touch', ['-t', stamp, entry.path]);
+        expect(result.exitCode, 0, reason: '${result.stderr}');
+      }
+    }
+
+    test('a metadata-only change does not make a folder recent', () {
+      write('settings.json');
+      write(p.join('sub', 'state.db'));
+      age();
+      // Permission and attribute sweeps (OS upgrades, migrations) move the
+      // inode change time of everything, not the modification time.
+      final chmod = Process.runSync('chmod', ['-R', 'u+rw', root.path]);
+      expect(chmod.exitCode, 0);
+
+      final measurement = measureAppLeftoverSync(root.path, 1000);
+
+      expect(
+        DateTime.now().difference(measurement.lastModified!).inDays,
+        inInclusiveRange(398, 402),
+      );
+    });
+
+    test('adding a file to an old folder makes it recent', () {
+      write('settings.json');
+      age();
+      write('new.log');
+
+      final measurement = measureAppLeftoverSync(root.path, 1000);
+
+      expect(
+        DateTime.now().difference(measurement.lastModified!).inDays,
+        lessThan(2),
+      );
+    });
+  }, skip: Platform.isWindows ? 'POSIX timestamps' : false);
 }

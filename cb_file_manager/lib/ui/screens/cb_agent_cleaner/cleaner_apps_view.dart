@@ -11,6 +11,7 @@ import '../../../services/app_insights/app_insights_models.dart';
 import '../../utils/format_utils.dart';
 import 'cleaner_app_files_dialog.dart';
 import 'installed_app_icon.dart';
+import 'cleaner_progress_widgets.dart';
 
 typedef AppStorageEntryAction = FutureOr<void> Function(AppStorageEntry entry);
 typedef InstalledAppAction = FutureOr<void> Function(InstalledAppInfo app);
@@ -27,6 +28,13 @@ class CleanerAppsView extends StatefulWidget {
   final AppStorageProfileAction? onReviewCleanable;
   final AppStorageProfileAction? onAskAgent;
 
+  /// Label of [onManageApp]: "Manage in Windows" unless the platform names
+  /// its own action (Show in Finder).
+  final String? manageLabel;
+
+  /// How sizes are measured, when not the Windows quick-scan hint.
+  final String? scanHint;
+
   const CleanerAppsView({
     super.key,
     required this.cubit,
@@ -35,6 +43,8 @@ class CleanerAppsView extends StatefulWidget {
     this.onUninstallApp,
     this.onReviewCleanable,
     this.onAskAgent,
+    this.manageLabel,
+    this.scanHint,
   });
 
   @override
@@ -114,14 +124,9 @@ class _CleanerAppsViewState extends State<CleanerAppsView> {
 
         switch (state.status) {
           case CleanerAppInsightsStatus.loading:
-            return _CenteredStatus(
+            return CleanerScanPanel(
               key: const ValueKey<String>('cleaner-apps-loading'),
-              icon: const SizedBox(
-                width: 28,
-                height: 28,
-                child: CircularProgressIndicator(strokeWidth: 3),
-              ),
-              message: l10n.cleanerAppsLoading,
+              title: l10n.cleanerAppsLoading,
             );
           case CleanerAppInsightsStatus.failure:
             return _CenteredStatus(
@@ -170,7 +175,7 @@ class _CleanerAppsViewState extends State<CleanerAppsView> {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
           child: Text(
-            l10n.cleanerAppsQuickScanHint,
+            widget.scanHint ?? l10n.cleanerAppsQuickScanHint,
             style: Theme.of(context).textTheme.bodySmall,
           ),
         ),
@@ -231,6 +236,7 @@ class _CleanerAppsViewState extends State<CleanerAppsView> {
             onUninstallApp: widget.onUninstallApp,
             onReviewCleanable: widget.onReviewCleanable,
             onAskAgent: widget.onAskAgent,
+            manageLabel: widget.manageLabel,
             evaluatedAt: state.evaluatedAt,
             isAttention:
                 state.selectedProfile != null &&
@@ -301,6 +307,7 @@ class _CleanerAppsViewState extends State<CleanerAppsView> {
                     onUninstallApp: widget.onUninstallApp,
                     onReviewCleanable: widget.onReviewCleanable,
                     onAskAgent: widget.onAskAgent,
+                    manageLabel: widget.manageLabel,
                     evaluatedAt: state.evaluatedAt,
                     isAttention: appNeedsAttention(
                       profile,
@@ -1050,6 +1057,7 @@ class _AppDetailsPanel extends StatelessWidget {
   final AppStorageProfileAction? onUninstallApp;
   final AppStorageProfileAction? onReviewCleanable;
   final AppStorageProfileAction? onAskAgent;
+  final String? manageLabel;
   final DateTime evaluatedAt;
   final bool isAttention;
   final bool scrollable;
@@ -1062,6 +1070,7 @@ class _AppDetailsPanel extends StatelessWidget {
     required this.onUninstallApp,
     required this.onReviewCleanable,
     required this.onAskAgent,
+    this.manageLabel,
     required this.evaluatedAt,
     required this.isAttention,
     required this.scrollable,
@@ -1100,6 +1109,7 @@ class _AppDetailsPanel extends StatelessWidget {
             onUninstallApp: onUninstallApp,
             onReviewCleanable: onReviewCleanable,
             onAskAgent: onAskAgent,
+            manageLabel: manageLabel,
           ),
           const SizedBox(height: 18),
           Text(
@@ -1297,6 +1307,7 @@ class _DetailsActions extends StatelessWidget {
   final AppStorageProfileAction? onUninstallApp;
   final AppStorageProfileAction? onReviewCleanable;
   final AppStorageProfileAction? onAskAgent;
+  final String? manageLabel;
 
   const _DetailsActions({
     required this.profile,
@@ -1305,6 +1316,7 @@ class _DetailsActions extends StatelessWidget {
     required this.onUninstallApp,
     required this.onReviewCleanable,
     required this.onAskAgent,
+    this.manageLabel,
   });
 
   @override
@@ -1337,7 +1349,7 @@ class _DetailsActions extends StatelessWidget {
             key: ValueKey<String>('cleaner-app-manage-${profile.app.id}'),
             onPressed: () => onManageApp!(profile.app),
             icon: const Icon(Icons.settings_outlined, size: 17),
-            label: Text(l10n.cleanerAppsManageInWindows),
+            label: Text(manageLabel ?? l10n.cleanerAppsManageInWindows),
           ),
         if (profile.cleanableBytes > 0 && onReviewCleanable != null)
           FilledButton.tonalIcon(

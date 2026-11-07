@@ -1514,22 +1514,10 @@ class DiskCleanerService {
 
           var batchSuccessCount = 0;
           var batchSuccessBytes = 0;
-          for (var i = 0; i < batchedDeletes.length; i++) {
-            final item = batchedDeletes[i];
-            if (skipAllRemainingDeletes) {
-              final remaining = batchedDeletes.sublist(i);
-              recordSkippedByUserMany(
-                remaining,
-                reason: 'Skipped after user selected Skip all',
-                actionLabel: permanent
-                    ? 'permanent delete'
-                    : 'recycle-bin move',
-                log: false,
-              );
-              done += remaining.length;
-              onProgress?.call(done, total, remaining.last.path);
-              break;
-            }
+          // The batch has already run: whatever it removed is reported as
+          // removed even after Skip all. resolveFailedItem records the
+          // failures as skipped once Skip all is active, without asking.
+          for (final item in batchedDeletes) {
             if (ok.contains(item.path)) {
               recordSuccess(item, log: false);
               batchSuccessCount++;

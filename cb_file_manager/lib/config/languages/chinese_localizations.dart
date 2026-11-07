@@ -6495,4 +6495,214 @@ class ChineseLocalizations implements AppLocalizations {
   String get homeTipOpenPalette => '打开命令面板';
   @override
   String get homeTipShowOnHome => '在主页显示键盘提示';
+
+  // Cleaner - code editors
+  @override
+  @override
+  @override
+  @override
+  String get cleanerEditorsScan => '分析';
+  @override
+  @override
+  @override
+  String cleanerEditorsRunning(String editor) =>
+      '$editor 正在运行，因此保留其缓存。退出后重新分析即可清理缓存。';
+  @override
+  String cleanerEditorsTotal(String size) => '占用 $size';
+  @override
+  String get cleanerEditorsCleanableSection => '可安全清理';
+  @override
+  String get cleanerEditorsExtensionsSection => '按大小排列的扩展';
+  @override
+  String get cleanerEditorsReviewSection => '仅供查看';
+  @override
+  String cleanerEditorsObsoleteExtensions(int count) => '旧版本扩展（$count）';
+  @override
+  String get cleanerEditorsObsoleteExtensionsHint => '已卸载或已被替换的版本，编辑器下次启动时会删除。';
+  @override
+  String get cleanerEditorsKindCache => '网页、脚本和 GPU 缓存';
+  @override
+  String get cleanerEditorsKindCacheHint => '下次启动时会重建。';
+  @override
+  String get cleanerEditorsKindDownloads => '已下载的扩展安装包（VSIX）';
+  @override
+  String get cleanerEditorsKindDownloadsHint => '超过一天；需要时会重新下载。';
+  @override
+  String get cleanerEditorsKindLogs => '旧会话日志';
+  @override
+  String get cleanerEditorsKindLogsHint => '除当前会话外的所有会话。';
+  @override
+  String get cleanerEditorsKindCrash => '崩溃报告';
+  @override
+  String get cleanerEditorsKindCrashHint => '超过一天的 Crashpad 小型转储。';
+  @override
+  String cleanerEditorsMissingWorkspaces(int count) => '已删除工作区的数据（$count）';
+  @override
+  String get cleanerEditorsMissingWorkspacesHint =>
+      '该文件夹已不存在。这些数据可能包含该文件夹的聊天记录和编辑器状态，清理前请先确认。';
+  @override
+  String get cleanerEditorsKindWebStorage => '扩展视图的网页存储';
+  @override
+  String get cleanerEditorsKindHistory => '本地历史记录（你的文件备份）';
+  @override
+  String get cleanerEditorsKindSettings => '设置和编辑器状态';
+  @override
+  String get cleanerEditorsKindOther => '其他编辑器数据';
+  @override
+  String cleanerEditorsOrphanData(int count) => '内置或已移除扩展的数据（$count）';
+  @override
+  String cleanerEditorsActiveWorkspaces(int count) => '现有工作区的数据（$count）';
+  @override
+  String cleanerEditorsOtherWorkspaces(int count) =>
+      '远程工作区或位于未连接驱动器上的工作区（$count）';
+  @override
+  String get cleanerEditorsInstallColumn => '安装';
+  @override
+  String get cleanerEditorsDataColumn => '数据';
+  @override
+  String get cleanerEditorsObsoleteBadge => '旧版本';
+  @override
+  String get cleanerEditorsUnregisteredBadge => '未登记';
+  @override
+  String cleanerEditorsShowAll(int count) => '显示全部 $count 个';
+  @override
+  String cleanerEditorsSelected(String size) => '已选择 $size';
+  @override
+  String cleanerEditorsClean(String size) => '清理 $size';
+  @override
+  String cleanerEditorsConfirmTitle(String destination) => '移到$destination？';
+  @override
+  @override
+  String get cleanerEditorsStatExtensions => '扩展';
+  @override
+  @override
+  @override
+  String get cleanerEditorsStatCleanable => '可释放';
+  @override
+  String get cleanerEditorsRunningBadge => '运行中';
+
+  // Cleaner - app storage
+  @override
+  String get cleanerAppStorageTitle => '应用存储';
+  @override
+  String get cleanerAppStorageUtilityDescription => '每个应用占用了什么，哪些可以安全删除';
+  @override
+  String get cleanerAppStorageIntro =>
+      '测量每个已安装应用在磁盘上占用的空间：应用本身、缓存、日志、崩溃报告、网页存储及其数据。代码编辑器还会列出每个扩展。只有应用能够重建的内容才会建议清理，在你清理之前不会更改任何内容。';
+  @override
+  String cleanerAppStorageMeasuring(int done, int total) =>
+      '正在测量应用文件夹... $done/$total';
+  @override
+  String get cleanerAppStorageMeasuringApps => '正在测量应用本身，完成后显示其大小。';
+  @override
+  String get cleanerAppStorageStatApps => '应用';
+  @override
+  String get cleanerAppStorageStatTotal => '磁盘占用';
+  @override
+  String cleanerAppStorageSafe(String size) => '$size 可安全清理';
+  @override
+  String get cleanerAppStorageKindInstall => '应用本身';
+  @override
+  String get cleanerAppStorageKindUserData => '文档和应用数据';
+  @override
+  String get cleanerAppStorageKindShared => '与同一开发商的应用共享';
+  @override
+  String get cleanerAppStorageCacheOptionalHint =>
+      '整个缓存文件夹。应用会重建或重新下载，因此启动可能变慢。';
+  @override
+  String get cleanerAppStorageLogsOptionalHint => '整个日志文件夹。如果正在排查此应用的问题，请保留。';
+  @override
+  String get cleanerAppStorageLeftoversHint => '不属于任何已安装应用的文件夹列在“残留应用数据”中。';
+  @override
+  String get cleanerAppStorageNoneFound => '未找到应用数据。';
+  @override
+  String cleanerAppStorageUnreadable(int count) =>
+      '有 $count 个文件夹无法读取，部分大小缺失。授予 CB File Hub 完全磁盘访问权限即可测量。';
+  @override
+  String cleanerAppStorageConfirmBody(
+    int count,
+    String size,
+    String destination,
+  ) => '$count 个项目（$size）将被移到$destination。请先退出这些应用，以免其占用或重新创建这些项目。';
+  @override
+  String cleanerAppStorageShowAll(int count) => '显示全部 $count 个应用';
+  @override
+  String get cleanerAppStorageCleanableOnly => '仅显示可清理的应用';
+  @override
+  String get cleanerAppStorageAppsNotMeasured => '尚未测量应用本身。重新扫描即可计入其大小。';
+  @override
+  String cleanerAppStorageUnreadableGeneric(int count) =>
+      '有 $count 个文件夹无法读取，部分大小缺失。';
+  @override
+  String get cleanerAppsShowInFinder => '在访达中显示';
+  @override
+  String cleanerAppsMacUninstallTitle(String app) => '将 $app 移到废纸篓？';
+  @override
+  String get cleanerAppsMacUninstallBody =>
+      '应用会移到废纸篓，可以放回原处。其缓存和数据会保留，之后列在“残留应用数据”中，你可以查看并清理。';
+  @override
+  String cleanerAppsMacUninstallRunning(String app) => '$app 正在运行，请先退出。';
+  @override
+  String get cleanerAppsMacUninstallProtected =>
+      '此应用属于 macOS 或就是 CB File Hub 本身，因此不会在这里移除。';
+  @override
+  String cleanerAppsMacUninstallDone(String app) =>
+      '已将 $app 移到废纸篓。其残留数据列在“残留应用数据”中。';
+  @override
+  String cleanerAppsMacUninstallFailed(String app) =>
+      '无法将 $app 移到废纸篓，可能需要管理员权限：请在访达中将其拖到废纸篓。';
+  @override
+  String get cleanerAppsOpenLeftovers => '查看残留';
+  @override
+  String get cleanerAppsPosixScanHint =>
+      '大小来自“应用存储”：每个应用本身及其在用户文件夹中的缓存和数据。没有独立应用的命令行工具不会列出。';
+
+  // Cleaner - Docker
+  @override
+  String get cleanerDockerTitle => 'Docker';
+  @override
+  String get cleanerDockerNotRunning =>
+      'Docker 未运行。请启动 Docker Desktop（或 Docker 服务）后重新扫描，即可查看镜像、容器、卷和构建缓存。';
+  @override
+  String cleanerDockerFailed(String error) => 'Docker 没有响应：$error';
+  @override
+  String get cleanerDockerImages => '镜像';
+  @override
+  String get cleanerDockerContainers => '容器';
+  @override
+  String get cleanerDockerVolumes => '卷';
+  @override
+  String get cleanerDockerBuildCache => '构建缓存';
+  @override
+  String cleanerDockerStoppedContainers(int count) => '已停止的容器（$count）';
+  @override
+  String get cleanerDockerStoppedContainersHint =>
+      '未运行的容器及其中写入的文件。需要时可从镜像重新创建。';
+  @override
+  String cleanerDockerDanglingImages(int count) => '无标签镜像（$count）';
+  @override
+  String get cleanerDockerDanglingImagesHint => '重新构建镜像后留下的旧版本，没有任何内容在使用。';
+  @override
+  String cleanerDockerUnusedImages(int count) => '未使用的镜像（$count）';
+  @override
+  String get cleanerDockerUnusedImagesHint => '没有容器使用的镜像。需要时 Docker 会重新下载或构建。';
+  @override
+  String get cleanerDockerBuildCacheHint => '为加速构建而保留的层。每个项目的下一次构建会更慢。';
+  @override
+  String cleanerDockerUnusedVolumes(int count) => '未使用的卷（$count）';
+  @override
+  String get cleanerDockerUnusedVolumesHint =>
+      '没有容器使用的卷。其中的数据（数据库、上传文件）会被永久删除。';
+  @override
+  String cleanerDockerClean(String size) => '清理 Docker（$size）';
+  @override
+  String get cleanerDockerConfirmTitle => '要从 Docker 中删除吗？';
+  @override
+  String get cleanerDockerConfirmBody =>
+      'Docker 会永久删除这些内容，不会移到废纸篓。镜像和构建缓存可以重新下载或构建，但卷中的数据无法恢复。';
+  @override
+  String cleanerDockerRunning(String command) => '正在运行 $command...';
+  @override
+  String cleanerDockerFreed(String size) =>
+      'Docker 已释放 $size。Docker Desktop 会在稍后将空间归还给磁盘。';
 }

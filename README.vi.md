@@ -23,6 +23,7 @@ CB File Hub là ứng dụng quản lý tập tin đa nền tảng dành cho th�
 - **Tập tin mạng và SSH:** SMB, FTP, SFTP, WebDAV, hồ sơ SSH, khóa và terminal.
 - **CB Agent:** tìm tập tin bằng ngôn ngữ tự nhiên, đề xuất tổ chức và hỗ trợ đánh giá trước khi dọn dẹp.
 - **Disk Cleaner (Windows, macOS, Android):** xem thư mục lớn, file tạm, bộ nhớ đệm và chọn chính xác mục cần xử lý.
+- **[Dung lượng ứng dụng](#dung-lượng-ứng-dụng):** xem mỗi ứng dụng đang chiếm gì trên đĩa (bản thân ứng dụng, cache, log, dữ liệu, extension của editor) và phần nào xoá an toàn.
 - **Tăng tốc bằng Rust:** quét ổ đĩa, tìm kiếm, tạo ảnh thu nhỏ, tính hash và xử lý file nén trên luồng native. Xem [số đo hiệu năng](#hiệu-năng-với-rust).
 - **Sao lưu và cá nhân hóa:** sao lưu cài đặt/tag, các tích hợp đám mây khả dụng, giao diện sáng/tối và màu nhấn.
 
@@ -138,13 +139,39 @@ CB File Hub dùng các luồng Rust để quét ổ đĩa, liệt kê và tính 
 
 - Quét thư mục lớn, file tạm, bộ nhớ đệm trình duyệt, Thùng rác và các mục có thể dọn dẹp.
 - Duyệt cây kết quả linh hoạt, chọn theo mục hoặc danh mục và nhờ CB Agent đánh giá.
-- Xem dung lượng ứng dụng đã cài và thông tin sử dụng sẵn có trước khi quyết định xử lý.
+- Trang **Ứng dụng** có trên Windows, macOS và Linux: dung lượng từng ứng dụng đã cài, lần mở gần nhất (Windows qua lịch sử chạy, macOS qua Spotlight; Linux chưa có) và nút gỡ (Windows qua trình gỡ của ứng dụng, macOS chuyển ứng dụng vào Thùng rác; Linux chưa hỗ trợ).
 - Dùng Thùng rác cho thao tác được hỗ trợ; kiểm tra đường dẫn lỗi và kết quả dọn dẹp.
+
+### Dung lượng ứng dụng
+
+Trang **Dung lượng ứng dụng** trong Cleaner liệt kê mọi ứng dụng đã cài. Với mỗi ứng dụng, trang cho biết nó đang chiếm gì trên đĩa: bản thân ứng dụng, cache, log, báo cáo lỗi, web storage và dữ liệu riêng, cùng phần nào xoá được an toàn. Có trên Windows, macOS và Linux. Thư mục được gán cho ứng dụng theo cùng quy tắc với trang Dữ liệu ứng dụng còn sót, nên thư mục không thuộc ứng dụng nào đã cài vẫn nằm ở trang đó.
+
+- **Dọn an toàn, đã tick sẵn:** cache mà ứng dụng tự tạo lại khi mở (ứng dụng Chromium/Electron như Slack, Teams, Discord, editor), log của các phiên trước và file crash cũ.
+- **Tự chọn:** toàn bộ thư mục `Caches/<ứng dụng>` hoặc thư mục log. Ứng dụng sẽ tải hoặc tạo lại, nhưng có thể mở chậm hơn.
+- **Chỉ để xem, không cho dọn:** tài liệu, container sandbox, dữ liệu dùng chung giữa các ứng dụng cùng hãng, web storage và cài đặt.
+- **Ứng dụng đang chạy:** cache được giữ lại. Trên macOS và Linux, việc ứng dụng đang chạy được nhận ra qua danh sách tiến trình; trên Windows, qua tên file chạy của ứng dụng.
+- **Trình soạn thảo code:** VS Code, Cursor, VSCodium, Windsurf, Antigravity và Kiro còn liệt kê từng extension kèm icon, dung lượng cài đặt và dữ liệu, cùng bản extension cũ và dữ liệu của workspace đã xoá.
+- **Docker:** image, container, volume và build cache, đọc qua chính CLI của Docker. Build cache và image không có tag được tick sẵn. Image không dùng và container đã dừng là tự chọn; volume không dùng cũng là tự chọn, kèm cảnh báo dữ liệu sẽ bị xoá vĩnh viễn. Docker tự xoá các mục này sau khi bạn xác nhận; không có gì được chuyển vào Thùng rác.
+
+<p align="center">
+  <img src="screenshots/features/app_storage/vi/docker.png" alt="Docker trong Dung lượng ứng dụng: image, container, volume và build cache" width="80%" />
+</p>
+
+Kết quả hiện ngay khi đo xong các thư mục dữ liệu; dung lượng của bản thân từng ứng dụng hiện sau. Dung lượng thư mục được đo bằng một lần quét Rust, có bản Dart dự phòng. Mọi mục được dọn đều được chuyển nguyên thư mục vào Thùng rác.
+
+<table>
+  <tr>
+    <td width="33%"><img src="screenshots/features/app_storage/vi/windows.png" alt="Trang Dung lượng ứng dụng trên Windows" /><p align="center">Windows</p></td>
+    <td width="33%"><img src="screenshots/features/app_storage/vi/macos.png" alt="Trang Dung lượng ứng dụng trên macOS khi VS Code đang chạy" /><p align="center">macOS</p></td>
+    <td width="33%"><img src="screenshots/features/app_storage/vi/linux.png" alt="Trang Dung lượng ứng dụng trên Linux" /><p align="center">Linux</p></td>
+  </tr>
+</table>
 
 ### File nén, sao lưu và cá nhân hóa
 
 - Duyệt nội dung file nén như thư mục; trích xuất mục đã chọn hoặc toàn bộ.
-- Hỗ trợ ZIP, TAR, GZip, BZip2 và các biến thể TAR phổ biến; dùng 7-Zip đã cài cho các thao tác 7z/RAR bổ sung trên Windows.
+- ZIP, 7z, TAR (cả .tar.gz, .tar.bz2, .tar.xz), GZip và BZip2 dùng được trên Windows, macOS, Linux và Android mà không cần cài thêm công cụ.
+- RAR cần cài 7-Zip nên hiện chỉ dùng được trên Windows.
 - Xuất và khôi phục cài đặt/tag bằng gói ZIP.
 - Sao lưu lên các tích hợp Google Drive, Dropbox, OneDrive khả dụng qua tài khoản của bạn, kể cả nhiều dịch vụ cùng lúc.
 - Chọn sáng/tối, màu nhấn, chế độ xem mặc định, khung xem trước và tùy chọn ảnh thu nhỏ.
@@ -169,5 +196,11 @@ flutter test --no-pub tool/capture_torrent_screenshots_test.dart --dart-define=C
 ```
 
 Ảnh được ghi vào `screenshots/features/torrents/en/` và `vi/`; luồng này dựng widget, không mở ứng dụng desktop hay đọc thư viện torrent của người dùng.
+
+Ảnh trang Dung lượng ứng dụng cho Windows, macOS và Linux được dựng theo cùng cách. Lệnh dưới đây ghi ảnh vào `screenshots/features/app_storage/en/` và `vi/`. Luồng này không đọc thư mục ứng dụng nào:
+
+```bash
+flutter test --no-pub tool/capture_app_storage_screenshots_test.dart --dart-define=CB_CAPTURE_SCREENSHOTS=true
+```
 
 Microsoft Store và Google Play dùng chung mô tả ngắn gọn tại [`store/listings/`](store/listings/), mỗi ngôn ngữ của app một bộ (Anh, Việt, Thổ Nhĩ Kỳ, Trung giản thể). Chỉ cần sửa file `.txt` của từng ngôn ngữ; các dòng gạch đầu dòng cũng tạo danh sách tính năng cho Microsoft Store. File `.json` bên cạnh chứa mô tả ngắn, mã ngôn ngữ Google Play và danh sách ảnh chụp/hero art cho Microsoft Store. CI kiểm tra giới hạn ký tự và kích thước ảnh, tạo artifact `store-listings`, rồi cập nhật nội dung (và ảnh với MSIX) khi submit MSIX/AAB. Xem [hướng dẫn nội dung](store/README.md).

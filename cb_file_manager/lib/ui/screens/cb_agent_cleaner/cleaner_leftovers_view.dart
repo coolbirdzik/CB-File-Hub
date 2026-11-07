@@ -260,10 +260,9 @@ class _CleanerLeftoversViewState extends State<CleanerLeftoversView> {
           onScan: widget.onScan,
         );
       case CleanerAppLeftoversStatus.loading:
-        return ListView(
+        return CleanerScanPanel(
           key: const ValueKey<String>('cleaner-leftovers-loading'),
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-          children: [_ScanCard(title: l.cleanerLeftoversLoading)],
+          title: l.cleanerLeftoversLoading,
         );
       case CleanerAppLeftoversStatus.failure:
         return _CenteredStatus(
@@ -303,16 +302,19 @@ class _CleanerLeftoversViewState extends State<CleanerLeftoversView> {
     final hidden = state.hiddenByActivityCount;
     final sections = <Widget>[
       if (state.isScanning)
-        _ScanCard(
-          key: const ValueKey<String>('cleaner-leftovers-progress'),
-          title: l.cleanerLeftoversMeasuring,
-          detail: l.cleanerLeftoversScanProgress(
-            state.measuredCount,
-            state.totalCount,
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: CleanerScanStrip(
+            key: const ValueKey<String>('cleaner-leftovers-progress'),
+            title: l.cleanerLeftoversMeasuring,
+            trailing: l.cleanerLeftoversScanProgress(
+              state.measuredCount,
+              state.totalCount,
+            ),
+            value: state.totalCount == 0
+                ? null
+                : state.measuredCount / state.totalCount,
           ),
-          value: state.totalCount == 0
-              ? null
-              : state.measuredCount / state.totalCount,
         ),
       _InfoBar(
         key: const ValueKey<String>('cleaner-leftovers-intro-banner'),
@@ -796,74 +798,6 @@ class _SelectAll extends StatelessWidget {
 }
 
 /// Step card shown while folders are listed and measured.
-class _ScanCard extends StatelessWidget {
-  final String title;
-  final String? detail;
-  final double? value;
-
-  const _ScanCard({super.key, required this.title, this.detail, this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: CbDecorations.card(context, radius: 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(
-                    PhosphorIconsLight.magnifyingGlass,
-                    size: 18,
-                    color: theme.colorScheme.primary,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      if (detail != null)
-                        Text(
-                          detail!,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(999),
-              child: LinearProgressIndicator(value: value, minHeight: 8),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 /// Column titles of a location card; widths match [_FolderRow].
 class _ColumnHeader extends StatelessWidget {
   final bool showOpen;

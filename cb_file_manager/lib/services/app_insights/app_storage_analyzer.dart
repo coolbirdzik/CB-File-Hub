@@ -497,6 +497,28 @@ class AppStorageAnalyzer {
   }
 
   /// Returns true only for an exact path or a separator-delimited descendant.
+  /// [isSameOrDescendant] against many roots at once. [normalizedRoots] holds
+  /// [normalizeWindowsPath] results; the cost is one lookup per separator in
+  /// [path] instead of one comparison per root.
+  static bool isSameOrDescendantOfAny(
+    String path,
+    Set<String> normalizedRoots,
+  ) {
+    if (normalizedRoots.isEmpty) return false;
+    final normalizedPath = normalizeWindowsPath(path);
+    if (normalizedRoots.contains(normalizedPath)) return true;
+    for (var i = 0; i < normalizedPath.length; i++) {
+      if (normalizedPath.codeUnitAt(i) != 0x5C) continue; // '\'
+      // A root without a trailing separator matches `root\...`; a drive root
+      // such as `C:\` keeps its separator and matches `C:\...`.
+      if (normalizedRoots.contains(normalizedPath.substring(0, i)) ||
+          normalizedRoots.contains(normalizedPath.substring(0, i + 1))) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   static bool isSameOrDescendant(String path, String root) {
     final normalizedPath = normalizeWindowsPath(path);
     final normalizedRoot = normalizeWindowsPath(root);

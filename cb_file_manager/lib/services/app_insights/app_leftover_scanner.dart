@@ -390,10 +390,25 @@ AppLeftoverMeasurement _measureWindows(String root, int maxEntries) {
 void _offerRootTimes(String root, _NewestActivity newest) {
   final stat = FileStat.statSync(root);
   if (stat.type == FileSystemEntityType.notFound) return;
-  newest.offerRoot(stat.modified.millisecondsSinceEpoch);
-  // `changed` is the creation time on Windows and the inode change time
-  // elsewhere; both move when files are copied or extracted into the folder.
-  newest.offerRoot(stat.changed.millisecondsSinceEpoch);
+  newest.offerRoot(_activityTime(stat));
+}
+
+/// When an entry last showed activity.
+///
+/// Windows: the later of modification and creation (`changed` is the
+/// creation time there), so files copied or extracted with old dates count.
+///
+/// macOS and Linux: the modification time only. `changed` is the inode
+/// change time, which moves on any metadata change: permission and
+/// extended-attribute sweeps, OS upgrades, migrations and restores touch
+/// every folder at once and made years-old leftovers look recent. Copying
+/// or extracting into a folder still shows, through the folder's own
+/// modification time (it changes when entries are added or removed).
+int _activityTime(FileStat stat) {
+  final modified = stat.modified.millisecondsSinceEpoch;
+  if (!Platform.isWindows) return modified;
+  final changed = stat.changed.millisecondsSinceEpoch;
+  return modified > changed ? modified : changed;
 }
 
 AppLeftoverMeasurement _measureDart(String root, int maxEntries) {
@@ -427,12 +442,7 @@ AppLeftoverMeasurement _measureDart(String root, int maxEntries) {
       if (entity is Link) continue;
       try {
         final stat = entity.statSync();
-        final modified = stat.modified.millisecondsSinceEpoch;
-        final changed = stat.changed.millisecondsSinceEpoch;
-        newest.offer(
-          modified > changed ? modified : changed,
-          () => entity.path,
-        );
+        newest.offer(_activityTime(stat), () => entity.path);
         if (entity is File) {
           size += stat.size;
           files++;

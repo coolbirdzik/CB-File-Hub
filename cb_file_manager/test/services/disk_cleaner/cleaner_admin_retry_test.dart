@@ -259,6 +259,32 @@ void main() {
     });
   }
 
+  test('Skip all still reports files a later batch removed', () async {
+    // Smart Clean answers the first failure with Skip all. Files moved by
+    // the following batches were reported as skipped and stayed listed.
+    final trash = _Trash();
+    final service = DiskCleanerService.forTesting(
+      fullDiskScanSpawner: spawnFullDiskScan,
+      trashManager: trash,
+    );
+    final items = [
+      for (var i = 0; i < 200; i++) _item(i == 3 ? 'denied' : 'ok$i'),
+    ];
+    var prompts = 0;
+    final result = await service.cleanJunk(
+      items: items,
+      permanent: false,
+      onDeleteFailure: (_) async {
+        prompts++;
+        return CleanFailureAction.skipAll;
+      },
+    );
+    expect(prompts, 1);
+    expect(trash.attempts.length, greaterThan(1));
+    expect(result.skippedByUser, [items[3].path]);
+    expect(result.succeeded, hasLength(199));
+  });
+
   test(
     'cancelled UAC leaves the target and does not repeatedly offer elevation',
     () async {

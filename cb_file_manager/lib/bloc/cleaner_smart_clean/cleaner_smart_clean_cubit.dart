@@ -6,6 +6,7 @@ import '../../services/app_insights/app_insights_models.dart';
 import '../../services/disk_cleaner/cleaner_installed_apps.dart';
 import '../../services/disk_cleaner/cleaner_item_origin.dart';
 import '../../services/disk_cleaner/cleaner_models.dart';
+import '../../services/disk_cleaner/cleaner_paths.dart';
 import '../../services/disk_cleaner/cleaner_quick_clean.dart';
 import '../../services/disk_cleaner/cleaner_review_candidates.dart';
 import 'cleaner_smart_clean_state.dart';
@@ -318,6 +319,7 @@ class CleanerSmartCleanCubit extends Cubit<CleanerSmartCleanState> {
     }
 
     final succeeded = report.succeeded.toSet();
+    final succeededKeys = succeeded.map(CleanerPaths.key).toSet();
     var movedBytes = 0, movedCount = 0, permanentBytes = 0, permanentCount = 0;
     for (final group in ready.groups) {
       for (final item in [
@@ -340,9 +342,10 @@ class CleanerSmartCleanCubit extends Cubit<CleanerSmartCleanState> {
             : CleanerSmartCleanStatus.ready,
         pendingPaths: pendingPaths,
         groups: [
-          for (final group in state.groups)
-            if (group.withoutPaths(succeeded).items.isNotEmpty)
-              group.withoutPaths(succeeded),
+          for (final group in state.groups.map(
+            (group) => group.withoutKeys(succeededKeys),
+          ))
+            if (group.items.isNotEmpty) group,
         ],
         result: CleanerSmartCleanResult(
           movedBytes: movedBytes,

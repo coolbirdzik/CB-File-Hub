@@ -6922,4 +6922,238 @@ class EnglishLocalizations implements AppLocalizations {
   String get homeTipOpenPalette => 'Open command palette';
   @override
   String get homeTipShowOnHome => 'Show keyboard tips on Home';
+
+  // Cleaner - code editors
+  @override
+  @override
+  @override
+  @override
+  String get cleanerEditorsScan => 'Analyze';
+  @override
+  @override
+  @override
+  String cleanerEditorsRunning(String editor) =>
+      '$editor is running, so its caches are kept. Quit it and analyze again to clean them.';
+  @override
+  String cleanerEditorsTotal(String size) => '$size on disk';
+  @override
+  String get cleanerEditorsCleanableSection => 'Safe to clean';
+  @override
+  String get cleanerEditorsExtensionsSection => 'Extensions by size';
+  @override
+  String get cleanerEditorsReviewSection => 'Review only';
+  @override
+  String cleanerEditorsObsoleteExtensions(int count) =>
+      'Old extension versions ($count)';
+  @override
+  String get cleanerEditorsObsoleteExtensionsHint =>
+      'Uninstalled or replaced versions the editor deletes on its next start.';
+  @override
+  String get cleanerEditorsKindCache => 'Web, script and GPU caches';
+  @override
+  String get cleanerEditorsKindCacheHint => 'Rebuilt on the next launch.';
+  @override
+  String get cleanerEditorsKindDownloads =>
+      'Downloaded extension installers (VSIX)';
+  @override
+  String get cleanerEditorsKindDownloadsHint =>
+      'Older than a day; downloaded again when needed.';
+  @override
+  String get cleanerEditorsKindLogs => 'Old session logs';
+  @override
+  String get cleanerEditorsKindLogsHint =>
+      'Every session except the current one.';
+  @override
+  String get cleanerEditorsKindCrash => 'Crash reports';
+  @override
+  String get cleanerEditorsKindCrashHint =>
+      'Crashpad minidumps older than a day.';
+  @override
+  String cleanerEditorsMissingWorkspaces(int count) =>
+      'Data of deleted workspaces ($count)';
+  @override
+  String get cleanerEditorsMissingWorkspacesHint =>
+      'The folder no longer exists. This can include chat history and editor state for that folder, so check before cleaning.';
+  @override
+  String get cleanerEditorsKindWebStorage => 'Web storage of extension views';
+  @override
+  String get cleanerEditorsKindHistory =>
+      'Local History (backups of your files)';
+  @override
+  String get cleanerEditorsKindSettings => 'Settings and editor state';
+  @override
+  String get cleanerEditorsKindOther => 'Other editor data';
+  @override
+  String cleanerEditorsOrphanData(int count) =>
+      'Data of built-in or removed extensions ($count)';
+  @override
+  String cleanerEditorsActiveWorkspaces(int count) =>
+      'Data of existing workspaces ($count)';
+  @override
+  String cleanerEditorsOtherWorkspaces(int count) =>
+      'Remote workspaces or on disconnected drives ($count)';
+  @override
+  String get cleanerEditorsInstallColumn => 'Install';
+  @override
+  String get cleanerEditorsDataColumn => 'Data';
+  @override
+  String get cleanerEditorsObsoleteBadge => 'Old version';
+  @override
+  String get cleanerEditorsUnregisteredBadge => 'Not registered';
+  @override
+  String cleanerEditorsShowAll(int count) => 'Show all $count';
+  @override
+  String cleanerEditorsSelected(String size) => '$size selected';
+  @override
+  String cleanerEditorsClean(String size) => 'Clean $size';
+  @override
+  String cleanerEditorsConfirmTitle(String destination) =>
+      'Move to $destination?';
+  @override
+  @override
+  String get cleanerEditorsStatExtensions => 'Extensions';
+  @override
+  @override
+  @override
+  String get cleanerEditorsStatCleanable => 'Can be freed';
+  @override
+  String get cleanerEditorsRunningBadge => 'Running';
+
+  // Cleaner - app storage
+  @override
+  String get cleanerAppStorageTitle => 'App storage';
+  @override
+  String get cleanerAppStorageUtilityDescription =>
+      'What each app keeps on disk and what is safe to remove';
+  @override
+  String get cleanerAppStorageIntro =>
+      'Measures what every installed app keeps on disk: the app itself, caches, logs, crash reports, web storage and its own data. Code editors also list each extension. Only what an app can rebuild is offered for cleaning, and nothing changes until you clean.';
+  @override
+  String cleanerAppStorageMeasuring(int done, int total) =>
+      'Measuring app folders... $done of $total';
+  @override
+  String get cleanerAppStorageMeasuringApps =>
+      'Measuring the apps themselves; their sizes appear when done.';
+  @override
+  String get cleanerAppStorageStatApps => 'Apps';
+  @override
+  String get cleanerAppStorageStatTotal => 'On disk';
+  @override
+  String cleanerAppStorageSafe(String size) => '$size safe';
+  @override
+  String get cleanerAppStorageKindInstall => 'The app itself';
+  @override
+  String get cleanerAppStorageKindUserData => 'Documents and app data';
+  @override
+  String get cleanerAppStorageKindShared =>
+      'Shared with apps of the same vendor';
+  @override
+  String get cleanerAppStorageCacheOptionalHint =>
+      'The whole cache folder. The app rebuilds or downloads it again, so it may start slower.';
+  @override
+  String get cleanerAppStorageLogsOptionalHint =>
+      'The whole log folder. Keep it if you are troubleshooting this app.';
+  @override
+  String get cleanerAppStorageLeftoversHint =>
+      'Folders that belong to no installed app are listed on Leftover app data.';
+  @override
+  String get cleanerAppStorageNoneFound => 'No app data was found.';
+  @override
+  String cleanerAppStorageUnreadable(int count) =>
+      '$count folders could not be read, so some sizes are missing. Give CB File Hub Full Disk Access to measure them.';
+  @override
+  String cleanerAppStorageConfirmBody(
+    int count,
+    String size,
+    String destination,
+  ) =>
+      '$count items ($size) will be moved to $destination. Quit these apps first so they do not hold or recreate them.';
+  @override
+  String cleanerAppStorageShowAll(int count) => 'Show all $count apps';
+  @override
+  String get cleanerAppStorageCleanableOnly =>
+      'Only apps with something to clean';
+  @override
+  String get cleanerAppStorageAppsNotMeasured =>
+      'The apps themselves were not measured. Scan again to include their size.';
+  @override
+  String cleanerAppStorageUnreadableGeneric(int count) =>
+      '$count folders could not be read, so some sizes are missing.';
+  @override
+  String get cleanerAppsShowInFinder => 'Show in Finder';
+  @override
+  String cleanerAppsMacUninstallTitle(String app) => 'Move $app to the Trash?';
+  @override
+  String get cleanerAppsMacUninstallBody =>
+      'The app goes to the Trash, so you can put it back. Its caches and data stay; afterwards they are listed under Leftover app data, where you can review and clean them.';
+  @override
+  String cleanerAppsMacUninstallRunning(String app) =>
+      '$app is running. Quit it first.';
+  @override
+  String get cleanerAppsMacUninstallProtected =>
+      'This app is part of macOS or is CB File Hub itself, so it is not removed here.';
+  @override
+  String cleanerAppsMacUninstallDone(String app) =>
+      '$app was moved to the Trash. Its leftover data is listed under Leftover app data.';
+  @override
+  String cleanerAppsMacUninstallFailed(String app) =>
+      '$app could not be moved to the Trash. It may need an administrator: drag it to the Trash in Finder.';
+  @override
+  String get cleanerAppsOpenLeftovers => 'Show leftovers';
+  @override
+  String get cleanerAppsPosixScanHint =>
+      'Sizes come from App storage: each app, its caches and its data in your user folders. Commands without an app of their own are not listed.';
+
+  // Cleaner - Docker
+  @override
+  String get cleanerDockerTitle => 'Docker';
+  @override
+  String get cleanerDockerNotRunning =>
+      'Docker is not running. Start Docker Desktop (or the Docker service) and scan again to see its images, containers, volumes and build cache.';
+  @override
+  String cleanerDockerFailed(String error) => 'Docker did not answer: $error';
+  @override
+  String get cleanerDockerImages => 'Images';
+  @override
+  String get cleanerDockerContainers => 'Containers';
+  @override
+  String get cleanerDockerVolumes => 'Volumes';
+  @override
+  String get cleanerDockerBuildCache => 'Build cache';
+  @override
+  String cleanerDockerStoppedContainers(int count) =>
+      'Stopped containers ($count)';
+  @override
+  String get cleanerDockerStoppedContainersHint =>
+      'Containers that are not running, with files written inside them. Create them again from their image when needed.';
+  @override
+  String cleanerDockerDanglingImages(int count) => 'Untagged images ($count)';
+  @override
+  String get cleanerDockerDanglingImagesHint =>
+      'Leftovers of images that were rebuilt. Nothing uses them.';
+  @override
+  String cleanerDockerUnusedImages(int count) => 'Unused images ($count)';
+  @override
+  String get cleanerDockerUnusedImagesHint =>
+      'Images no container uses. Docker downloads or builds them again when needed.';
+  @override
+  String get cleanerDockerBuildCacheHint =>
+      'Layers kept to speed up builds. The next build of each project takes longer.';
+  @override
+  String cleanerDockerUnusedVolumes(int count) => 'Unused volumes ($count)';
+  @override
+  String get cleanerDockerUnusedVolumesHint =>
+      'Volumes no container uses. Their data (databases, uploads) is deleted for good.';
+  @override
+  String cleanerDockerClean(String size) => 'Clean Docker ($size)';
+  @override
+  String get cleanerDockerConfirmTitle => 'Remove from Docker?';
+  @override
+  String get cleanerDockerConfirmBody =>
+      'Docker deletes these for good; they do not go to the Trash. Images and build cache can be downloaded or rebuilt, but volume data cannot.';
+  @override
+  String cleanerDockerRunning(String command) => 'Running $command...';
+  @override
+  String cleanerDockerFreed(String size) =>
+      'Docker freed $size. Docker Desktop gives the space back to your disk shortly after.';
 }

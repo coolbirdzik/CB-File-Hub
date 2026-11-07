@@ -2165,7 +2165,8 @@ class ToolExecutor {
       'cleanable app data: ${_formatSize(report.cleanableBytes)}',
     );
     buffer.writeln(
-      'Last-opened values are local Windows evidence estimates. Unknown means no reliable evidence was found.',
+      'Last-opened values are local estimates (Windows launch history, or '
+      'Spotlight on macOS). Unknown means no reliable evidence was found.',
     );
 
     if (profiles.isEmpty) {

@@ -150,6 +150,7 @@ const int jobSmartAlbum = 25;
 const int jobArchiveChildren = 26;
 const int jobSyntax = 27;
 const int jobPermanentDelete = 28;
+const int jobRootSizes = 29;
 
 // Job states (job.rs).
 const int jobRunning = 0;

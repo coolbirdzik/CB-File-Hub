@@ -28,6 +28,24 @@ void main() {
 
   String name(String path) => path.split(RegExp(r'[\\/]')).last;
 
+  test('rootSizes sizes each root on its own', () async {
+    final result = await NativeFs.rootSizes([
+      '${root.path}/a',
+      '${root.path}/one.jpg',
+      '${root.path}/missing',
+      '${root.path}/.hidden',
+    ]);
+    expect(result, hasLength(4));
+    expect(
+      (result![0].bytes, result[0].files, result[0].exists),
+      (5 + 7 + 11, 3, true),
+    );
+    expect((result[1].bytes, result[1].files), (3, 1));
+    expect((result[2].bytes, result[2].exists), (0, false));
+    expect(result[3].bytes, 13);
+    expect(await NativeFs.rootSizes(const []), isEmpty);
+  }, skip: skip);
+
   test('directorySize sums files and folders', () async {
     final result = await NativeFs.directorySize(
       files: ['${root.path}/one.jpg'],

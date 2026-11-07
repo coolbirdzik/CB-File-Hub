@@ -21,7 +21,13 @@ enum InstalledAppSource {
   executable,
 }
 
-enum AppUsageSource { userAssist, prefetch }
+enum AppUsageSource {
+  userAssist,
+  prefetch,
+
+  /// macOS Spotlight's `kMDItemLastUsedDate` of the app bundle.
+  spotlight,
+}
 
 enum UsageEvidenceConfidence { high, medium }
 
