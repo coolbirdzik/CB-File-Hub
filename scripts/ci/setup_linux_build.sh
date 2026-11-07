@@ -21,6 +21,7 @@ $SUDO apt-get install -y --no-install-recommends \
   build-essential clang cmake ninja-build pkg-config \
   libgtk-3-dev liblzma-dev libstdc++-12-dev \
   libmpv-dev libepoxy-dev libsecret-1-dev \
+  libavformat-dev libavcodec-dev libavutil-dev libswresample-dev \
   dpkg-dev
 
 # Flutter runs git inside its SDK and the checkout, which belong to another

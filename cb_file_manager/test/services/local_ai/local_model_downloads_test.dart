@@ -133,6 +133,9 @@ void main() {
     server.status = 200;
     downloads.start(_entry);
     expect(downloads.isDownloading(_entry.id), isTrue);
+    // The installer now acquires a cross-window download lock before opening
+    // the request. Wait until this fixture's body actually has a subscriber.
+    await until(() => partFile() != null);
     downloads.cancel(_entry.id);
     server.body.add([1]);
     await until(() => downloads.downloads.isEmpty);

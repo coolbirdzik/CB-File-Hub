@@ -9,6 +9,8 @@ import 'package:media_kit_video/media_kit_video.dart' as video;
 import '../../helpers/core/path_utils.dart';
 import '../network_browsing/smb_service.dart';
 import '../streaming/smb_http_proxy_server.dart';
+import 'media_language_labels.dart';
+import 'subtitle_languages.dart';
 
 /// Preserve literal filename characters, URL escaping and SMB credentials.
 Uri playbackSourceUri(String source) {
@@ -108,7 +110,49 @@ class PlaybackPlayer {
   bool _playRequested = false;
   Future<void>? _disposal;
   Uri? _proxyUrl;
+  String? _subtitleSource;
+  String? _subtitleCacheSource;
+
+  /// Resolved local/UNC/proxy source. Valid only for this player's lifetime.
+  String? get subtitleSource => _subtitleSource;
+
+  /// Original identity survives changes to a temporary SMB proxy URL.
+  String? get subtitleCacheSource => _subtitleCacheSource ?? subtitleSource;
+
+  /// media_kit retains AudioTrack.auto() in its state. mpv's resolved aid
+  /// identifies the actual default track, which need not be the first stream.
+  Future<int> subtitleAudioTrackOrdinal() async {
+    var id = state.track.audio.id;
+    if (_player.platform case final mk.NativePlayer native) {
+      try {
+        id = await native.getProperty('aid');
+      } catch (_) {
+        /* Use state during load/teardown. */
+      }
+    }
+    final tracks = state.tracks.audio
+        .where((t) => t.id != 'auto' && t.id != 'no')
+        .toList();
+    final ordinal = tracks.indexWhere((t) => t.id == id);
+    return ordinal < 0 ? 0 : ordinal;
+  }
+
   Duration? _pendingSeek;
+  String? subtitleAudioLanguageForOrdinal(int ordinal) {
+    final tracks = state.tracks.audio
+        .where((t) => t.id != 'auto' && t.id != 'no')
+        .toList();
+    if (ordinal < 0 || ordinal >= tracks.length) return null;
+    final name = mediaLanguageEnglishName(tracks[ordinal].language);
+    if (name == 'Chinese (Traditional)' || name == 'Chinese (Simplified)') {
+      return 'zh';
+    }
+    for (final language in subtitleSourceLanguages.entries) {
+      if (language.value == name) return language.key;
+    }
+    return null;
+  }
+
   late final StreamSubscription<Duration> _durationSubscription;
   late final List<StreamSubscription<int?>> _sizeSubscriptions;
   PlaybackVideoConfiguration? _videoConfiguration;
@@ -179,6 +223,8 @@ class PlaybackPlayer {
         await native.setProperty('hr-seek', 'no');
       }
     }
+    _subtitleSource = source;
+    _subtitleCacheSource = media.uri;
     await _player.setPlaylistMode(
       configuration.looping ? mk.PlaylistMode.single : mk.PlaylistMode.none,
     );

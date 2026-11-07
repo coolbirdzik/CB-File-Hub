@@ -1,6 +1,50 @@
 import 'package:flutter/material.dart';
 
 abstract class AppLocalizations {
+  String aiSubtitleCacheVersions(int entries);
+  String get aiSubtitleCache;
+  String get aiSubtitleCacheHint;
+  String get aiSubtitleCacheReading;
+  String get aiSubtitleCacheReused;
+  String get aiSubtitleCacheSaved;
+  String get aiSubtitleCacheAutomatic;
+  String get aiSubtitleCacheUnavailable;
+  String get aiSubtitleCacheFailed;
+  String get aiSubtitleCacheClear;
+  String get aiSubtitleRegenerate;
+  String aiSubtitleCacheStats(int entries, String size);
+  String get aiSubtitleLoadingSpeech;
+  String get aiSubtitleLoadingTranslation;
+  String get aiSubtitleRecognizing;
+  String get aiSubtitleTranslating;
+  String get aiSubtitleNoProcessed;
+  String get aiSubtitleComplete;
+  String get aiSubtitleProgress;
+  String aiSubtitleProcessedUntil(String processed, String total);
+  String aiSubtitleProcessingRange(String start, String end);
+
+  String get aiModels;
+  String get aiModelChat;
+  String get aiModelSpeech;
+  String get aiModelTranslation;
+  String get aiSubtitles;
+  String get aiSubtitlesHint;
+  String get aiSubtitleSource;
+  String get aiSubtitleTarget;
+  String get aiSubtitleFollowApp;
+  String get aiSubtitleAuto;
+  String get aiSubtitleBilingual;
+  String get aiSubtitleManage;
+  String get aiSubtitleMissing;
+  String get aiSubtitleLoading;
+  String get aiSubtitleProcessing;
+  String get aiSubtitleLag;
+  String get aiSubtitleFailed;
+  String get aiSubtitleReady;
+  String get aiSubtitleOff;
+  String get aiModelAll;
+  String get aiModelRemoveFailed;
+
   String get sshProxy;
   String get sshProxies;
   String get sshAddProxy;

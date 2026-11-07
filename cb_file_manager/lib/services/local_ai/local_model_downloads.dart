@@ -14,6 +14,7 @@ class LocalModelDownload {
   /// Set when the download failed; it stays listed so the user sees why.
   String? error;
   bool _cancelRequested = false;
+  final _cancelled = Completer<void>();
 
   LocalModelDownload(this.entry) : totalBytes = entry.sizeBytes ?? 0;
 
@@ -69,6 +70,7 @@ class LocalModelDownloads extends ChangeNotifier {
       notifyListeners();
     } else {
       download._cancelRequested = true;
+      if (!download._cancelled.isCompleted) download._cancelled.complete();
     }
   }
 
@@ -78,6 +80,7 @@ class LocalModelDownloads extends ChangeNotifier {
       await _service.installModel(
         download.entry,
         isCancelled: () => download._cancelRequested,
+        cancelSignal: download._cancelled.future,
         onProgress: (progress) {
           download
             ..downloadedBytes = progress.downloadedBytes
@@ -103,6 +106,7 @@ class LocalModelDownloads extends ChangeNotifier {
   void dispose() {
     for (final download in _downloads.values) {
       download._cancelRequested = true;
+      if (!download._cancelled.isCompleted) download._cancelled.complete();
     }
     _completed.close();
     super.dispose();

@@ -10,6 +10,8 @@ import 'dart:io';
 /// Download state for a model.
 enum LocalModelDownloadState { notStarted, downloading, completed, failed }
 
+enum LocalModelPurpose { chat, speech, translation }
+
 /// On-device runtime family required to run an installed artifact.
 enum LocalModelRuntimeKind {
   /// `.litertlm` bundles — run via flutter_gemma LiteRT-LM engine.
@@ -31,6 +33,10 @@ class HuggingFaceModelEntry {
   final String? license;
   final bool compatible;
   final String artifactFileName;
+  final LocalModelPurpose purpose;
+  final String? repositoryId;
+  final String revision;
+  final String? sha256;
 
   const HuggingFaceModelEntry({
     required this.id,
@@ -40,6 +46,10 @@ class HuggingFaceModelEntry {
     this.license,
     this.compatible = true,
     this.artifactFileName = 'model.safetensors',
+    this.purpose = LocalModelPurpose.chat,
+    this.repositoryId,
+    this.revision = 'main',
+    this.sha256,
   });
 
   Map<String, dynamic> toJson() => {
@@ -50,6 +60,10 @@ class HuggingFaceModelEntry {
     'license': license,
     'compatible': compatible,
     'artifactFileName': artifactFileName,
+    'purpose': purpose.name,
+    'repositoryId': repositoryId,
+    'revision': revision,
+    'sha256': sha256,
   };
 
   static HuggingFaceModelEntry fromJson(Map<String, dynamic> json) =>
@@ -62,6 +76,12 @@ class HuggingFaceModelEntry {
         compatible: json['compatible'] as bool? ?? true,
         artifactFileName:
             json['artifactFileName'] as String? ?? 'model.safetensors',
+        purpose: LocalModelPurpose.values.byName(
+          json['purpose'] as String? ?? 'chat',
+        ),
+        repositoryId: json['repositoryId'] as String?,
+        revision: json['revision'] as String? ?? 'main',
+        sha256: json['sha256'] as String?,
       );
 }
 
@@ -71,6 +91,7 @@ class InstalledLocalModel {
   final String displayName;
   final String localPath; // Where the model artifact is stored
   final int sizeBytes;
+  final LocalModelPurpose purpose;
   final DateTime installedAt;
   final String?
   runtimeArtifactId; // Mapped runtime artifact name (if available)
@@ -81,6 +102,7 @@ class InstalledLocalModel {
     required this.localPath,
     required this.sizeBytes,
     required this.installedAt,
+    this.purpose = LocalModelPurpose.chat,
     this.runtimeArtifactId,
   });
 
@@ -91,6 +113,7 @@ class InstalledLocalModel {
     'sizeBytes': sizeBytes,
     'installedAt': installedAt.millisecondsSinceEpoch,
     'runtimeArtifactId': runtimeArtifactId,
+    'purpose': purpose.name,
   };
 
   static InstalledLocalModel fromJson(Map<String, dynamic> json) =>
@@ -103,6 +126,9 @@ class InstalledLocalModel {
           json['installedAt'] as int,
         ),
         runtimeArtifactId: json['runtimeArtifactId'] as String?,
+        purpose: LocalModelPurpose.values.byName(
+          json['purpose'] as String? ?? 'chat',
+        ),
       );
 
   /// Whether the installed artifact can run in a local on-device runtime.
@@ -111,6 +137,7 @@ class InstalledLocalModel {
   /// run through the llama.cpp runtime. Legacy `model.safetensors` downloads
   /// are Transformers-format and cannot run on-device.
   bool get isRunnableArtifact {
+    if (purpose != LocalModelPurpose.chat) return false;
     final lower = localPath.toLowerCase();
     // iOS cannot launch llama-server, so GGUF models only run elsewhere.
     return lower.endsWith('.litertlm') ||

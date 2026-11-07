@@ -11,6 +11,8 @@ import '../../models/local_ai/local_ai_advisor_model.dart';
 import '../../services/disk_cleaner/cleaner_models.dart';
 import '../../utils/app_logger.dart';
 import 'gguf_llama_cpp_runtime.dart';
+import 'subtitle_model_catalog.dart';
+import '../../helpers/core/file_hash.dart';
 import 'litert_lm_runtime.dart';
 
 /// Manages local AI advisor state: HF token storage, model catalog caching,
@@ -27,7 +29,31 @@ class LocalAiAdvisorService {
   static const String _modelStorageDirKey = 'local_ai_model_storage_dir';
   static const String _chatGuideShownKey = 'local_ai_chat_guide_shown';
 
+  final _modelUsers = <String, Set<Future<void> Function()>>{};
+
+  void Function() registerModelUse(String id, Future<void> Function() release) {
+    (_modelUsers[id] ??= {}).add(release);
+    return () => _modelUsers[id]?.remove(release);
+  }
+
+  Future<void> _releaseModelUsers(String id) async {
+    for (final release
+        in _modelUsers[id]?.toList() ?? <Future<void> Function()>[]) {
+      await release();
+    }
+  }
+
   final _installedModelsController = StreamController<void>.broadcast();
+  late String? _installedSnapshot = _prefs.getString(_installedModelsKey);
+
+  Future<void> refreshInstalledModels() async {
+    final before = _installedSnapshot;
+    await _prefs.reload();
+    _installedSnapshot = _prefs.getString(_installedModelsKey);
+    if (before != _installedSnapshot && !_installedModelsController.isClosed) {
+      _installedModelsController.add(null);
+    }
+  }
 
   /// Fires after a model is installed, uninstalled or moved, so open chats can
   /// offer it without being recreated.
@@ -196,7 +222,7 @@ class LocalAiAdvisorService {
   /// Returns the catalog entry matching [catalogId], or the pinned entry's
   /// match, falling back to null when unknown.
   HuggingFaceModelEntry? catalogEntryFor(String catalogId) {
-    for (final entry in _curatedModels) {
+    for (final entry in [..._curatedModels, ...SubtitleModelCatalog.entries]) {
       if (entry.id == catalogId) return entry;
     }
     for (final entry in _getCachedCatalog()) {
@@ -250,11 +276,15 @@ class LocalAiAdvisorService {
   /// For public models, API token is optional.
   Future<List<HuggingFaceModelEntry>> fetchModelCatalog({
     bool forceRefresh = false,
+    bool includeSubtitleModels = false,
   }) async {
     if (!forceRefresh) {
       final cached = _getCachedCatalog();
       if (cached.isNotEmpty) {
-        return _mergeCuratedCatalog(cached);
+        return _mergeCuratedCatalog(
+          cached,
+          includeSubtitleModels: includeSubtitleModels,
+        );
       }
     }
 
@@ -264,12 +294,18 @@ class LocalAiAdvisorService {
     try {
       final fetched = await _fetchFromHuggingFace(token);
       await _cacheCatalog(fetched);
-      return _mergeCuratedCatalog(fetched);
+      return _mergeCuratedCatalog(
+        fetched,
+        includeSubtitleModels: includeSubtitleModels,
+      );
     } catch (e) {
       AppLogger.error('[LocalAI] Failed to fetch HF catalog', error: e);
       // Fall back to cached + curated recommendations.
       final cached = _getCachedCatalog();
-      return _mergeCuratedCatalog(cached);
+      return _mergeCuratedCatalog(
+        cached,
+        includeSubtitleModels: includeSubtitleModels,
+      );
     }
   }
 
@@ -286,11 +322,15 @@ class LocalAiAdvisorService {
   }
 
   List<HuggingFaceModelEntry> _mergeCuratedCatalog(
-    List<HuggingFaceModelEntry> entries,
-  ) {
+    List<HuggingFaceModelEntry> entries, {
+    bool includeSubtitleModels = false,
+  }) {
     final curatedIds = _curatedModels.map((entry) => entry.id).toSet();
     return [
       ..._curatedCatalog,
+      if (includeSubtitleModels &&
+          (Platform.isWindows || Platform.isLinux || Platform.isMacOS))
+        ...SubtitleModelCatalog.entries,
       ...entries.where((entry) => !curatedIds.contains(entry.id)),
     ];
   }
@@ -323,7 +363,12 @@ class LocalAiAdvisorService {
   // ---------------------------------------------------------------------------
 
   /// Returns the list of locally installed models.
-  List<InstalledLocalModel> getInstalledModels() {
+  List<InstalledLocalModel> getInstalledModels() => getManagedModels()
+      .where((m) => m.purpose == LocalModelPurpose.chat)
+      .toList();
+
+  /// Every downloaded artifact, including speech and subtitle translation.
+  List<InstalledLocalModel> getManagedModels() {
     final json = _prefs.getString(_installedModelsKey);
     if (json == null) return [];
     try {
@@ -352,6 +397,7 @@ class LocalAiAdvisorService {
       sizeBytes: model.sizeBytes,
       installedAt: model.installedAt,
       runtimeArtifactId: model.runtimeArtifactId,
+      purpose: model.purpose,
     );
   }
 
@@ -372,7 +418,7 @@ class LocalAiAdvisorService {
   InstalledLocalModel? getSelectedModel() {
     final id = _prefs.getString(_selectedModelIdKey);
     if (id == null) return null;
-    return getInstalledModels().cast<InstalledLocalModel?>().firstWhere(
+    return getManagedModels().cast<InstalledLocalModel?>().firstWhere(
       (m) => m?.catalogId == id,
       orElse: () => null,
     );
@@ -385,6 +431,9 @@ class LocalAiAdvisorService {
 
   /// Marks a model as the active model for inference.
   Future<void> setSelectedModel(String catalogId) async {
+    if (!getInstalledModels().any((m) => m.catalogId == catalogId)) {
+      throw StateError("This model cannot be used by CB Agent.");
+    }
     await _prefs.setString(_selectedModelIdKey, catalogId);
     final model = getSelectedModel();
     if (model != null) {
@@ -443,7 +492,7 @@ class LocalAiAdvisorService {
   Future<List<InstalledLocalModel>> modelsOutsideStorage() async {
     final storageDir = await getModelStorageDirectory();
     final result = <InstalledLocalModel>[];
-    for (final model in getInstalledModels()) {
+    for (final model in getManagedModels()) {
       if (_samePath(model.localPath, _storagePathFor(storageDir, model))) {
         continue;
       }
@@ -487,10 +536,16 @@ class LocalAiAdvisorService {
       return;
     }
 
+    for (final model in pending) {
+      await _releaseModelUsers(model.catalogId);
+    }
+
     // llama-server keeps the GGUF open, which blocks rename/delete on Windows.
-    for (final runtime in [_ggufChatRuntime, _chatRuntime]) {
-      if (runtime is LocalAiModelFileHolder) {
-        await (runtime as LocalAiModelFileHolder).releaseModelFiles();
+    if (pending.any((m) => m.purpose == LocalModelPurpose.chat)) {
+      for (final runtime in [_ggufChatRuntime, _chatRuntime]) {
+        if (runtime is LocalAiModelFileHolder) {
+          await (runtime as LocalAiModelFileHolder).releaseModelFiles();
+        }
       }
     }
 
@@ -508,7 +563,7 @@ class LocalAiAdvisorService {
       );
       movedBytes += sizes[model.catalogId]!;
 
-      final models = getInstalledModels();
+      final models = getManagedModels();
       final index = models.indexWhere((m) => m.catalogId == model.catalogId);
       if (index >= 0) {
         models[index] = InstalledLocalModel(
@@ -518,8 +573,9 @@ class LocalAiAdvisorService {
           sizeBytes: model.sizeBytes,
           installedAt: model.installedAt,
           runtimeArtifactId: model.runtimeArtifactId,
+          purpose: model.purpose,
         );
-        await _saveInstalledModels(models);
+        await _saveInstalledModels(models, changedIds: {model.catalogId});
       }
       await _deleteIfEmpty(File(model.localPath).parent);
     }
@@ -621,9 +677,52 @@ class LocalAiAdvisorService {
     HuggingFaceModelEntry entry, {
     required void Function(ModelDownloadProgress) onProgress,
     bool Function()? isCancelled,
+    Future<void>? cancelSignal,
+  }) async {
+    final storage = await getModelStorageDirectory();
+    // Keep lock files outside model folders so moves/uninstalls can remove
+    // empty artifact directories without deleting a lock another window uses.
+    final directory = Directory(
+      '$storage${Platform.pathSeparator}.download-locks',
+    );
+    await directory.create(recursive: true);
+    final lock = await File(
+      '${directory.path}${Platform.pathSeparator}${entry.id.replaceAll('/', '_')}.lock',
+    ).open(mode: FileMode.append);
+    var locked = false;
+    try {
+      // Non-blocking OS lock: another video window may already be downloading.
+      try {
+        await lock.lock(FileLock.exclusive);
+        locked = true;
+      } on FileSystemException {
+        throw StateError('This model is being downloaded in another window.');
+      }
+      await refreshInstalledModels();
+      return await _installModel(
+        entry,
+        onProgress: onProgress,
+        isCancelled: isCancelled,
+        cancelSignal: cancelSignal,
+      );
+    } finally {
+      if (locked) await lock.unlock();
+      await lock.close();
+    }
+  }
+
+  Future<InstalledLocalModel> _installModel(
+    HuggingFaceModelEntry entry, {
+    required void Function(ModelDownloadProgress) onProgress,
+    bool Function()? isCancelled,
+    Future<void>? cancelSignal,
   }) async {
     AppLogger.info('[LocalAI] Installing model: ${entry.id}');
 
+    if (getManagedModels().any((m) => m.catalogId == entry.id)) {
+      throw StateError("Model already installed.");
+    }
+    if (isCancelled?.call() ?? false) throw const LocalModelDownloadCancelled();
     final storageDir = await getModelStorageDirectory();
     final modelDir = Directory(
       _normalizeLocalPath(
@@ -639,14 +738,20 @@ class LocalAiAdvisorService {
 
     final token = await getHuggingFaceToken();
     final uri = _artifactUri(entry);
-    final request = http.Request('GET', uri)
-      ..followRedirects = true
-      ..headers['Accept'] = 'application/octet-stream';
+    final request =
+        http.AbortableRequest('GET', uri, abortTrigger: cancelSignal)
+          ..followRedirects = true
+          ..headers['Accept'] = 'application/octet-stream';
     if (token != null && token.isNotEmpty) {
       request.headers['Authorization'] = 'Bearer $token';
     }
 
-    final response = await _httpClient.send(request);
+    final http.StreamedResponse response;
+    try {
+      response = await _httpClient.send(request);
+    } on http.RequestAbortedException {
+      throw const LocalModelDownloadCancelled();
+    }
     if (response.statusCode < 200 || response.statusCode >= 300) {
       await response.stream.drain<void>();
       throw HttpException(
@@ -690,10 +795,37 @@ class LocalAiAdvisorService {
       if (await tempFile.exists()) {
         await tempFile.delete();
       }
+      if (isCancelled?.call() ?? false) {
+        throw const LocalModelDownloadCancelled();
+      }
       rethrow;
     }
 
     await sink.close();
+
+    try {
+      if (isCancelled?.call() ?? false) {
+        throw const LocalModelDownloadCancelled();
+      }
+      if (totalBytes > 0 && downloadedBytes != totalBytes ||
+          entry.sizeBytes != null && downloadedBytes != entry.sizeBytes) {
+        throw const FormatException(
+          "Incomplete model download. Retry the download.",
+        );
+      }
+      if (entry.sha256 != null &&
+          (await sha256OfFile(tempPath)).toString() != entry.sha256) {
+        throw const FormatException(
+          "Model checksum mismatch. Retry the download.",
+        );
+      }
+      if (isCancelled?.call() ?? false) {
+        throw const LocalModelDownloadCancelled();
+      }
+    } catch (_) {
+      if (await tempFile.exists()) await tempFile.delete();
+      rethrow;
+    }
 
     final modelFile = File(modelPath);
     if (await modelFile.exists()) {
@@ -710,14 +842,15 @@ class LocalAiAdvisorService {
       sizeBytes: installedSize,
       installedAt: DateTime.now(),
       runtimeArtifactId: entry.artifactFileName,
+      purpose: entry.purpose,
     );
 
-    final current = getInstalledModels();
+    final current = getManagedModels();
     current.add(installed);
-    await _saveInstalledModels(current);
+    await _saveInstalledModels(current, changedIds: {installed.catalogId});
 
     // Auto-select if this is the first model
-    if (getSelectedModel() == null) {
+    if (entry.purpose == LocalModelPurpose.chat && getSelectedModel() == null) {
       await setSelectedModel(entry.id);
     }
 
@@ -737,14 +870,14 @@ class LocalAiAdvisorService {
   Uri _artifactUri(HuggingFaceModelEntry entry) {
     return Uri.https(
       'huggingface.co',
-      '/${entry.id}/resolve/main/${entry.artifactFileName}',
+      '/${entry.repositoryId ?? entry.id}/resolve/${entry.revision}/${entry.artifactFileName}',
       const {'download': 'true'},
     );
   }
 
   /// Uninstalls a model (removes local files and metadata).
   Future<void> uninstallModel(String catalogId) async {
-    final models = getInstalledModels();
+    final models = getManagedModels();
     final target = models.cast<InstalledLocalModel?>().firstWhere(
       (m) => m?.catalogId == catalogId,
       orElse: () => null,
@@ -755,35 +888,73 @@ class LocalAiAdvisorService {
       return;
     }
 
-    // Remove file (stub)
-    try {
-      final file = File(target.localPath);
-      if (await file.exists()) {
-        await file.delete();
+    await _releaseModelUsers(catalogId);
+    if (target.purpose == LocalModelPurpose.chat) {
+      for (final runtime in [_ggufChatRuntime, _chatRuntime]) {
+        if (runtime is LocalAiModelFileHolder) {
+          await (runtime as LocalAiModelFileHolder).releaseModelFiles();
+        }
       }
-    } catch (e) {
-      AppLogger.warning('[LocalAI] Failed to delete model file', error: e);
     }
-
-    // Remove from metadata
+    // Keep the metadata if deletion fails so the user can retry.
+    final file = File(target.localPath);
+    if (await file.exists()) await file.delete();
+    final wasSelected = _prefs.getString(_selectedModelIdKey) == catalogId;
     models.removeWhere((m) => m.catalogId == catalogId);
-    await _saveInstalledModels(models);
-
-    // Clear selection if this was the active model
-    if (getSelectedModel()?.catalogId == catalogId) {
-      await _prefs.remove(_selectedModelIdKey);
-    }
+    await _saveInstalledModels(models, changedIds: {catalogId});
+    if (wasSelected) await _prefs.remove(_selectedModelIdKey);
 
     AppLogger.info('[LocalAI] Model uninstalled: $catalogId');
   }
 
-  Future<void> _saveInstalledModels(List<InstalledLocalModel> models) async {
+  static Future<void> _registryTail = Future<void>.value();
+
+  Future<void> _saveInstalledModels(
+    List<InstalledLocalModel> models, {
+    required Set<String> changedIds,
+  }) async {
+    final previous = _registryTail;
+    final done = Completer<void>();
+    _registryTail = done.future;
+    await previous;
+    RandomAccessFile? lock;
+    var locked = false;
     try {
-      final json = jsonEncode(models.map((m) => m.toJson()).toList());
+      // A stable lock outside the configurable storage folder protects the
+      // shared registry across app/video processes and concurrent downloads.
+      final documents = await _documentsDirectoryProvider();
+      final directory = Directory(
+        '${documents.path}${Platform.pathSeparator}local_ai_models',
+      );
+      await directory.create(recursive: true);
+      lock = await File(
+        '${directory.path}${Platform.pathSeparator}.registry.lock',
+      ).open(mode: FileMode.append);
+      await lock.lock(FileLock.blockingExclusive);
+      locked = true;
+      await _prefs.reload();
+      final merged = getManagedModels()
+        ..removeWhere((m) => changedIds.contains(m.catalogId));
+      merged.addAll(models.where((m) => changedIds.contains(m.catalogId)));
+      final json = jsonEncode(merged.map((m) => m.toJson()).toList());
       await _prefs.setString(_installedModelsKey, json);
-      _installedModelsController.add(null);
+      _installedSnapshot = json;
+      if (!_installedModelsController.isClosed) {
+        _installedModelsController.add(null);
+      }
     } catch (e) {
       AppLogger.error('[LocalAI] Failed to save installed models', error: e);
+      rethrow;
+    } finally {
+      try {
+        if (locked) await lock!.unlock();
+      } finally {
+        try {
+          await lock?.close();
+        } finally {
+          done.complete();
+        }
+      }
     }
   }
 
@@ -894,6 +1065,10 @@ class LocalAiAdvisorService {
   /// Releases both chat runtimes. Must be called on app shutdown so any
   /// spawned llama-server.exe child process is terminated instead of leaking.
   Future<void> dispose() async {
+    for (final id in _modelUsers.keys.toList()) {
+      await _releaseModelUsers(id);
+    }
+    _modelUsers.clear();
     await _installedModelsController.close();
     await _ggufChatRuntime.dispose();
     await _chatRuntime.dispose();

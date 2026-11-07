@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:cb_file_manager/bloc/ai_agent/ai_agent.dart';
 import 'package:cb_file_manager/config/languages/app_localizations_delegate.dart';
@@ -29,6 +30,8 @@ final _installedModel = InstalledLocalModel(
 Future<LocalAiAdvisorService> _registerLocalAi({
   List<InstalledLocalModel> installed = const [],
 }) async {
+  final documents = Directory.systemTemp.createTempSync('cb-chat-guide-');
+  addTearDown(() => documents.deleteSync(recursive: true));
   final prefs = await SharedPreferences.getInstance();
   if (installed.isEmpty) {
     await prefs.remove(_installedModelsKey);
@@ -41,7 +44,9 @@ Future<LocalAiAdvisorService> _registerLocalAi({
   final service = LocalAiAdvisorService(
     secureStorage: const FlutterSecureStorage(),
     prefs: prefs,
+    documentsDirectoryProvider: () async => documents,
   );
+  addTearDown(service.dispose);
   GetIt.instance.registerSingleton<LocalAiAdvisorService>(service);
   return service;
 }
@@ -184,11 +189,12 @@ void main() {
       addTearDown(bloc.close);
       expect(bloc.state.providerModelCatalogs, isEmpty);
 
-      await local.uninstallModel(_installedModel.catalogId);
-
-      final state = await bloc.stream.firstWhere(
+      // Registry persistence can publish while uninstall is still awaiting I/O.
+      final update = bloc.stream.firstWhere(
         (s) => s.providerModelCatalogs.isNotEmpty,
       );
+      await local.uninstallModel(_installedModel.catalogId);
+      final state = await update;
       final catalog = state.providerModelCatalogs.single;
       expect(catalog.providerId, AiAgentBloc.localAiProviderId);
       expect(catalog.models, ['Small']);

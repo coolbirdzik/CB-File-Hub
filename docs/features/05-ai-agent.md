@@ -9,6 +9,7 @@ The AI Agent adds a conversational assistant to CB File Hub for natural-language
 - **Drawer AI Chat tab**: opens `#ai-chat` through `SystemScreenRouter` and renders `AiChatScreen`.
 - **Desktop side panel**: toggled from the tab shell and rendered by `AiSidePanel` beside the active file browser content.
 - **Settings**: `AiSettingsSection` manages provider configuration inside the settings screen.
+- **Local models**: the shared [AI model manager](12-local-ai-subtitles.md) stores CB Agent, speech and translation weights together, with separate task selection.
 
 The side panel is scoped to the active tab. `AiPanelController` owns one `AiAgentBloc` per tab so chat state survives opening and closing the panel, and the panel closes automatically when the active tab changes.
 

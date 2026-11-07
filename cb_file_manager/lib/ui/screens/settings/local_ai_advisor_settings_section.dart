@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/services.dart';
-import 'package:get_it/get_it.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../config/languages/app_localizations.dart';
@@ -15,6 +14,8 @@ import '../../../services/local_ai/local_model_downloads.dart';
 import '../../tab_manager/core/tab_main_screen.dart';
 import 'package:cb_file_manager/config/translation_helper.dart';
 import 'settings_navigation.dart';
+import '../../../services/media/subtitle_services.dart';
+import '../../components/video/subtitle_settings_panel.dart';
 
 /// Settings section for the Local AI Advisor.
 ///
@@ -56,6 +57,7 @@ class _LocalAiAdvisorSettingsSectionState
   late LocalModelDownloads _downloads;
   final _subscriptions = <StreamSubscription<Object?>>[];
   bool _isLoading = true;
+  bool _serviceReady = false;
   String? _hfToken;
   List<InstalledLocalModel> _installed = [];
   InstalledLocalModel? _selectedModel;
@@ -70,12 +72,12 @@ class _LocalAiAdvisorSettingsSectionState
   }
 
   Future<void> _initService() async {
-    final getIt = GetIt.instance;
-    _service = getIt<LocalAiAdvisorService>();
-    _downloads = getIt.isRegistered<LocalModelDownloads>()
-        ? getIt<LocalModelDownloads>()
-        : LocalModelDownloads(_service);
+    final services = await SubtitleServices.load();
+    if (!mounted) return;
+    _service = services.models;
+    _downloads = services.downloads;
     _downloads.addListener(_onDownloadsChanged);
+    _serviceReady = true;
     _subscriptions
       ..add(_service.onInstalledModelsChanged.listen((_) => _loadState()))
       ..add(_downloads.onCompleted.listen(_onModelInstalled));
@@ -87,7 +89,7 @@ class _LocalAiAdvisorSettingsSectionState
   @override
   void dispose() {
     pendingLocalModelInstaller.removeListener(_openPendingInstaller);
-    _downloads.removeListener(_onDownloadsChanged);
+    if (_serviceReady) _downloads.removeListener(_onDownloadsChanged);
     for (final subscription in _subscriptions) {
       subscription.cancel();
     }
@@ -119,8 +121,9 @@ class _LocalAiAdvisorSettingsSectionState
   }
 
   Future<void> _loadState() async {
+    await _service.refreshInstalledModels();
     final token = await _service.getHuggingFaceToken();
-    final installed = _service.getInstalledModels();
+    final installed = _service.getManagedModels();
     final selected = _service.getSelectedModel();
     final maxTokens = _service.getMaxContextTokens();
     final storageDir = await _service.getModelStorageDirectory();
@@ -143,7 +146,9 @@ class _LocalAiAdvisorSettingsSectionState
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
     return widget.buildSectionCard(
-      title: l.localAiAdvisor,
+      title: Platform.isAndroid || Platform.isIOS
+          ? l.localAiAdvisor
+          : l.aiModels,
       icon: PhosphorIconsLight.brain,
       children: [
         if (_isLoading)
@@ -156,6 +161,10 @@ class _LocalAiAdvisorSettingsSectionState
           _buildTokenSection(context, l),
           const Divider(height: 1),
 
+          if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) ...[
+            SubtitleSettingsPanel(models: _service, downloads: _downloads),
+            const Divider(height: 1),
+          ],
           // Installed models section
           _buildInstalledModelsSection(context, l),
           const Divider(height: 1),
@@ -503,7 +512,8 @@ class _LocalAiAdvisorSettingsSectionState
   }) {
     final theme = Theme.of(context);
     final modelPath = _displayPath(model.localPath);
-    final isRunnable = model.isRunnableArtifact;
+    final isRunnable =
+        model.purpose != LocalModelPurpose.chat || model.isRunnableArtifact;
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
@@ -536,7 +546,7 @@ class _LocalAiAdvisorSettingsSectionState
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '${(model.sizeBytes / (1024 * 1024)).toStringAsFixed(0)} MB',
+                      '${modelPurposeLabel(l, model.purpose)} · ${(model.sizeBytes / (1024 * 1024)).toStringAsFixed(0)} MB',
                       style: TextStyle(
                         fontSize: 11,
                         color: theme.colorScheme.onSurfaceVariant,
@@ -545,7 +555,9 @@ class _LocalAiAdvisorSettingsSectionState
                   ],
                 ),
               ),
-              if (!isActive && isRunnable)
+              if (!isActive &&
+                  isRunnable &&
+                  model.purpose == LocalModelPurpose.chat)
                 TextButton(
                   onPressed: () => _setActiveModel(model.catalogId),
                   child: Text(l.selectActiveModel),
@@ -726,7 +738,16 @@ class _LocalAiAdvisorSettingsSectionState
     );
 
     if (confirmed == true) {
-      await _service.uninstallModel(catalogId);
+      try {
+        await _service.uninstallModel(catalogId);
+      } catch (_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(context.tr.aiModelRemoveFailed)),
+          );
+        }
+        return;
+      }
       await _loadState();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -803,25 +824,40 @@ class _ModelBrowserDialog extends StatefulWidget {
 
 class _ModelBrowserDialogState extends State<_ModelBrowserDialog> {
   List<HuggingFaceModelEntry>? _catalog;
+  LocalModelPurpose? _purpose;
   late Set<String> _installedIds = widget.installedIds;
   StreamSubscription<HuggingFaceModelEntry>? _completed;
+  StreamSubscription<void>? _registryChanged;
 
   @override
   void initState() {
     super.initState();
     widget.downloads.addListener(_refresh);
+    _registryChanged = widget.service.onInstalledModelsChanged.listen((_) {
+      if (mounted) {
+        setState(
+          () => _installedIds = widget.service
+              .getManagedModels()
+              .map((m) => m.catalogId)
+              .toSet(),
+        );
+      }
+    });
     _completed = widget.downloads.onCompleted.listen((entry) {
       if (mounted) setState(() => _installedIds = {..._installedIds, entry.id});
     });
-    widget.service.fetchModelCatalog(forceRefresh: true).then((catalog) {
-      if (mounted) setState(() => _catalog = catalog);
-    });
+    widget.service
+        .fetchModelCatalog(forceRefresh: true, includeSubtitleModels: true)
+        .then((catalog) {
+          if (mounted) setState(() => _catalog = catalog);
+        });
   }
 
   @override
   void dispose() {
     widget.downloads.removeListener(_refresh);
     _completed?.cancel();
+    _registryChanged?.cancel();
     super.dispose();
   }
 
@@ -833,7 +869,9 @@ class _ModelBrowserDialogState extends State<_ModelBrowserDialog> {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
-    final catalog = _catalog;
+    final catalog = _catalog
+        ?.where((e) => _purpose == null || e.purpose == _purpose)
+        .toList();
     final recommendedId = widget.service.pinnedModel.id;
 
     return AlertDialog(
@@ -861,6 +899,28 @@ class _ModelBrowserDialogState extends State<_ModelBrowserDialog> {
                     ),
                   ),
                 ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                ChoiceChip(
+                  label: Text(l.aiModelAll),
+                  selected: _purpose == null,
+                  onSelected: (_) => setState(() => _purpose = null),
+                ),
+                for (final purpose in LocalModelPurpose.values)
+                  if (purpose == LocalModelPurpose.chat ||
+                      Platform.isWindows ||
+                      Platform.isMacOS ||
+                      Platform.isLinux)
+                    ChoiceChip(
+                      label: Text(modelPurposeLabel(l, purpose)),
+                      selected: _purpose == purpose,
+                      onSelected: (_) => setState(() => _purpose = purpose),
+                    ),
               ],
             ),
             const SizedBox(height: 12),
@@ -977,7 +1037,7 @@ class _ModelCatalogTile extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  entry.displayName,
+                  "${modelPurposeLabel(l, entry.purpose)} · ${entry.displayName}",
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -1285,3 +1345,49 @@ class _MoveModelsProgressDialogState extends State<_MoveModelsProgressDialog> {
     );
   }
 }
+
+/// Reuses the Settings model manager from a standalone video/PiP window.
+Future<void> showLocalModelManagerDialog(BuildContext context) =>
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(context.tr.aiModels),
+        content: SizedBox(
+          width: 640,
+          height: 560,
+          child: SingleChildScrollView(
+            child: LocalAiAdvisorSettingsSection(
+              buildSectionCard:
+                  ({
+                    required String title,
+                    required IconData icon,
+                    required List<Widget> children,
+                  }) => Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: children,
+                  ),
+              buildCompactSettingTile:
+                  ({
+                    required String title,
+                    required String subtitle,
+                    required IconData icon,
+                    Widget? trailing,
+                    VoidCallback? onTap,
+                  }) => ListTile(
+                    title: Text(title),
+                    subtitle: Text(subtitle),
+                    leading: Icon(icon),
+                    trailing: trailing,
+                    onTap: onTap,
+                  ),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(context.tr.close),
+          ),
+        ],
+      ),
+    );

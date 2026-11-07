@@ -47,7 +47,13 @@ import 'video_player_seek_preview.dart';
 import 'video_player_seek_slider.dart';
 import 'video_player_utils.dart';
 import 'video_player_osd.dart';
+import '../local_subtitle_overlay.dart';
+import '../subtitle_status_overlay.dart';
+import '../subtitle_settings_panel.dart';
+import '../../../../services/media/subtitle_services.dart';
+import '../../../screens/settings/local_ai_advisor_settings_section.dart';
 import 'video_playlist.dart';
+import 'audio_track_choices.dart';
 import 'package:cb_file_manager/config/translation_helper.dart';
 
 part 'video_player.volume.dart';
@@ -375,6 +381,9 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
   bool _isSeeking = false;
   Timer? _seekingTimer;
   Duration? _seekDragPosition;
+  // Bumped by every new seek drag, so a finished drag that is still landing
+  // does not clear the state of the drag that replaced it.
+  int _seekDragGeneration = 0;
   Timer? _seekPreviewTimer;
   Duration? _pendingSeekPreview;
   bool _pendingSeekPreviewExact = false;
@@ -657,6 +666,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
       _seekPreviewTimer = null;
       _pendingSeekPreview = null;
       _seekDragPosition = null;
+      _seekDragGeneration++;
       _isSeeking = false;
       _seekHoverFrames?.dispose();
       _seekHoverFrames = null;
@@ -1225,6 +1235,19 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
     final Widget playerWidget = widget.file != null
         ? _buildLocalFilePlayer()
         : _buildStreamingPlayer();
+    // Local files have their own surface/control layout. Mount the AI session
+    // above both layouts so opening a file also starts subtitle generation.
+    if (widget.fileType == FileCategory.video &&
+        (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
+      return LocalSubtitleLayer(
+        key: ValueKey(
+          '${widget.file?.path ?? widget.smbMrl ?? widget.streamingUrl ?? _tempFile?.path}:${identityHashCode(_player)}',
+        ),
+        player: _player,
+        controlsVisible: _showControls,
+        child: playerWidget,
+      );
+    }
     return playerWidget;
   }
 
@@ -2120,9 +2143,12 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
     if (duration <= Duration.zero) return;
 
     if (_wheelSeekCommitTimer == null) {
+      // A previous burst that is still landing holds its target here; the
+      // reported position lags behind it.
+      final origin = _seekDragPosition ?? player.state.position;
       _startSeekDrag();
-      _wheelSeekOrigin = player.state.position;
-      _seekDragPosition = _wheelSeekOrigin;
+      _wheelSeekOrigin = origin;
+      _seekDragPosition = origin;
     }
 
     final current = _seekDragPosition ?? player.state.position;
@@ -2462,11 +2488,19 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
                               ? 1
                               : duration.inMilliseconds;
                           final value = _seekSliderValue(position, maxMs);
+                          final subtitles = LocalSubtitleScope.of(context);
+                          final subtitleProgress =
+                              subtitles?.preferences.enabled == true
+                              ? subtitles!.progress
+                              : null;
                           return Semantics(
                             container: true,
                             child: SliderTheme(
                               data: SliderTheme.of(context).copyWith(
                                 trackHeight: 2.5,
+                                trackShape: subtitleProgress == null
+                                    ? null
+                                    : SubtitleSeekTrackShape(subtitleProgress),
                                 thumbShape: const RoundSliderThumbShape(
                                   enabledThumbRadius: 7,
                                 ),
@@ -2498,6 +2532,10 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
                       _buildPlayPauseButton(),
                       const SizedBox(width: 8),
                       seekSlider,
+                      if (widget.fileType == FileCategory.video)
+                        LocalSubtitleControls(
+                          onSettings: _showAiSubtitleDialog,
+                        ),
                       if (_hasPlaylist) ...[
                         const SizedBox(width: 8),
                         _buildPlaylistButton(),
@@ -2555,6 +2593,8 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
                     ],
                     if (showSecondaryActions && widget.allowMuting)
                       _buildVolumeControl(),
+                    if (widget.fileType == FileCategory.video)
+                      LocalSubtitleControls(onSettings: _showAiSubtitleDialog),
                     if (showSecondaryActions) ...[
                       const SizedBox(width: 4),
                       _buildAdvancedControlsMenu(),
@@ -2636,14 +2676,54 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
   }
 
   void _showAudioTrackDialog() {
+    final player = _player;
+    if (player == null) return;
     RouteUtils.showAcrylicDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: Text(context.tr.vpAudioTracks),
-        content: Text(context.tr.vpAudioTracksStub),
+        content: SizedBox(
+          width: 420,
+          height: (player.state.tracks.audio.length * 56.0).clamp(112.0, 360.0),
+          child: StreamBuilder(
+            stream: player.stream.track,
+            builder: (context, snapshot) => AudioTrackChoices(
+              tracks: player.state.tracks.audio,
+              selected: player.state.track.audio.id,
+              onSelect: player.controller.setAudioTrack,
+            ),
+          ),
+        ),
         actions: [
           TextButton(
-            onPressed: () => RouteUtils.safePopDialog(context),
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: Text(context.tr.close),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showAiSubtitleDialog() async {
+    final services = await SubtitleServices.load();
+    if (!mounted) return;
+    await RouteUtils.showAcrylicDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(context.tr.aiSubtitles),
+        content: SizedBox(
+          width: 520,
+          child: SingleChildScrollView(
+            child: SubtitleSettingsPanel(
+              models: services.models,
+              downloads: services.downloads,
+              onManageModels: () => showLocalModelManagerDialog(dialogContext),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
             child: Text(context.tr.close),
           ),
         ],
@@ -3243,13 +3323,19 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
     return VideoPlayerAdvancedMenu(
       onScreenshot: _takeScreenshot,
       onAudioTracks: _showAudioTrackDialog,
-      onSubtitles: _showSubtitleDialog,
+      onSubtitles: (Platform.isWindows || Platform.isMacOS || Platform.isLinux)
+          ? _showAiSubtitleDialog
+          : _showSubtitleDialog,
       onSpeed: _showPlaybackSpeedDialog,
       onPip: _togglePictureInPicture,
       onFilters: _showVideoFiltersDialog,
       onSleepTimer: _showSleepTimerDialog,
       onSettings: _showSettingsDialog,
-      hasSubtitles: _subtitleTracks.isNotEmpty,
+      hasSubtitles:
+          _subtitleTracks.isNotEmpty ||
+          Platform.isWindows ||
+          Platform.isMacOS ||
+          Platform.isLinux,
       playbackSpeed: _playbackSpeed,
       isPictureInPicture: _isPictureInPicture,
       sleepDuration: _sleepDuration,
@@ -3610,6 +3696,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
   void _startSeekDrag() {
     // Playback is left running so the audio follows the seek instead of going
     // silent for the duration of the drag.
+    _seekDragGeneration++;
     _seekingTimer?.cancel();
     _hideControlsTimer?.cancel();
     _seekPreviewTimer?.cancel();
@@ -3624,8 +3711,10 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
   }
 
   /// [exact] previews land on the target frame. Keyframe previews are cheaper,
-  /// but land on the keyframe before the target, which can be seconds back.
-  void _seekDuringDrag(double value, {bool exact = false}) {
+  /// but land on the keyframe before the target, which can be seconds back:
+  /// playback then shows those older frames until the final exact seek jumps
+  /// forward. Only long fast-seek steps, which clear a GOP anyway, use them.
+  void _seekDuringDrag(double value, {bool exact = true}) {
     final target = Duration(milliseconds: value.toInt());
     setState(() => _seekDragPosition = target);
 
@@ -3639,8 +3728,8 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
     _pendingSeekPreview = null;
     final player = _player;
     if (target == null || player == null) return;
-    // Slider and wheel previews use keyframes to keep 4K scrubbing responsive;
-    // _finishSeekDrag lands on the exact frame.
+    // Slider and wheel previews are exact; 4K stays responsive because it is
+    // decoded on the GPU (PlaybackVideoConfiguration.gpuDecodeLargeVideos).
     final exact = _pendingSeekPreviewExact;
     final seek = player.seek(target, exact: exact);
     unawaited(seek);
@@ -3675,15 +3764,25 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
         ? previewed
         : player.seek(target);
 
+    // Hold the slider on the target until the seek has landed. Position events
+    // still report the old time before that, and releasing the slider to them
+    // makes it jump back before it moves forward.
     _seekingTimer?.cancel();
-    _seekingTimer = Timer(const Duration(milliseconds: 200), () {
-      if (!mounted) return;
-      setState(() {
-        _isSeeking = false;
-        _seekDragPosition = null;
-      });
-      _startHideControlsTimer();
-    });
+    _seekingTimer = null;
+    final generation = _seekDragGeneration;
+    unawaited(
+      Future.wait<void>([
+        landed.timeout(const Duration(seconds: 3)).catchError((Object _) {}),
+        Future<void>.delayed(const Duration(milliseconds: 200)),
+      ]).then((_) {
+        if (!mounted || generation != _seekDragGeneration) return;
+        setState(() {
+          _isSeeking = false;
+          _seekDragPosition = null;
+        });
+        _startHideControlsTimer();
+      }),
+    );
     return landed;
   }
 

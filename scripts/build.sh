@@ -973,6 +973,10 @@ sign_macos_app() {
         sign_args+=(--keychain "$MACOS_SIGNING_KEYCHAIN")
     fi
 
+    if [ -d "$app/Contents/Helpers/subtitles" ]; then
+        codesign "${sign_args[@]}" "$app/Contents/Helpers/subtitles/cb-subtitle-worker"
+    fi
+
     if [ -d "$app/Contents/Helpers/llama" ]; then
         while IFS= read -r -d '' item; do
             codesign "${sign_args[@]}" "$item"

@@ -344,13 +344,14 @@
 			files = ();
 			inputPaths = (
 				"$(PROJECT_DIR)/../../scripts/bundle_macos_llama_runtime.sh",
+				"$(PROJECT_DIR)/../../scripts/bundle_macos_subtitle_runtime.sh",
 				"$(PROJECT_DIR)/../../scripts/fetch_macos_llama_runtime.sh",
 			);
 			name = "Bundle llama runtime";
 			outputPaths = ();
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/bash;
-			shellScript = "bash \"$PROJECT_DIR/../../scripts/bundle_macos_llama_runtime.sh\"\n";
+			shellScript = "bash \"$PROJECT_DIR/../../scripts/bundle_macos_llama_runtime.sh\"\nbash \"$PROJECT_DIR/../../scripts/bundle_macos_subtitle_runtime.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
 		1899ABCBE89E939D52ACDE99 /* [CP] Check Pods Manifest.lock */ = {

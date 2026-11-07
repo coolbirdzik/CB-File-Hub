@@ -152,6 +152,8 @@ class LlamaCppChatClient {
     final name = catalogId.split('/').last.toLowerCase();
     final instructOnly = name.startsWith('qwen3-4b-instruct-2507');
     final qwen35 = name.startsWith('qwen3.5-');
+    final translation =
+        name.startsWith('hy-mt') || name.startsWith('translategemma');
     // The 2B release defaults to non-thinking; reserve explicit reasoning for 4B.
     final direct =
         enableThinking == false ||
@@ -159,7 +161,7 @@ class LlamaCppChatClient {
         name.startsWith('qwen3.5-2b-');
     return {
       'chat_template_kwargs': {'enable_thinking': enableThinking ?? !direct},
-      'temperature': direct ? 0.7 : (qwen35 ? 1.0 : 0.6),
+      'temperature': translation ? 0.0 : (direct ? 0.7 : (qwen35 ? 1.0 : 0.6)),
       'top_k': 20,
       'top_p': direct ? 0.8 : 0.95,
       'min_p': 0.0,

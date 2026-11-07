@@ -180,3 +180,8 @@ install(DIRECTORY "${PROJECT_BUILD_DIR}/${FLUTTER_ASSET_DIR_NAME}"
 install(FILES "${AOT_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_DATA_DIR}"
   CONFIGURATIONS Profile;Release
   COMPONENT Runtime)
+
+# Local subtitle inference stays in an isolated desktop helper.
+set(CB_SUBTITLE_INSTALL_DIR "${INSTALL_BUNDLE_LIB_DIR}/subtitles")
+add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../../native/subtitles" "${CMAKE_BINARY_DIR}/subtitles")
+add_dependencies(${BINARY_NAME} cb-subtitle-worker)

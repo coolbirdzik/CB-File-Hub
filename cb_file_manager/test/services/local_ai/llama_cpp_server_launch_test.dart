@@ -77,6 +77,27 @@ void main() {
   );
 
   test(
+    'subtitle runtime reserves one full context and a bounded CPU thread budget',
+    () {
+      const launch = LlamaCppServerLaunch(
+        executablePath: 'llama/llama-server.exe',
+        isAndroid: false,
+      );
+      final args = launch.arguments(
+        modelPath: 'translation.gguf',
+        port: 12345,
+        contextTokens: 2048,
+        gpuLayers: 99,
+        parallelSlots: 1,
+        threads: 6,
+      );
+      expect(args[args.indexOf('--parallel') + 1], '1');
+      expect(args[args.indexOf('--threads') + 1], '6');
+      expect(args[args.indexOf('--threads-batch') + 1], '6');
+    },
+  );
+
+  test(
     'macOS resolves the signed bundle helper and retains Metal offload',
     () async {
       final nativeDir = Directory.systemTemp.path;

@@ -55,7 +55,9 @@ class AppSpaceEnvironment {
     );
   }
 
-  p.Context get path => operatingSystem == 'windows' ? p.windows : p.posix;
+  // The OS selects the app layout; the home path selects its filesystem syntax.
+  // This also permits exercising another OS's layout in a local fixture.
+  p.Context get path => p.windows.isAbsolute(home) ? p.windows : p.posix;
 
   EditorStorageEnvironment get editor => EditorStorageEnvironment(
     operatingSystem: operatingSystem,
@@ -304,7 +306,7 @@ class AppSpaceAnalyzer {
           if (environment.appData case final roaming?) (_Base.roaming, roaming),
           if (local != null) ...[
             (_Base.local, local),
-            (_Base.localLow, '${path.dirname(local)}\\LocalLow'),
+            (_Base.localLow, path.join(path.dirname(local), 'LocalLow')),
             (_Base.packages, path.join(local, 'Packages')),
           ],
         ];

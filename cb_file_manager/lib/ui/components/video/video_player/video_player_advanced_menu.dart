@@ -97,7 +97,7 @@ class VideoPlayerAdvancedMenu extends StatelessWidget {
               onScreenshot?.call();
               break;
             case 'audio_tracks':
-              if (Platform.isWindows) onAudioTracks?.call();
+              onAudioTracks?.call();
               break;
             case 'subtitles':
               onSubtitles?.call();
@@ -127,7 +127,7 @@ class VideoPlayerAdvancedMenu extends StatelessWidget {
               title: AppLocalizations.of(context)!.takeScreenshot,
             ),
           ),
-          if (Platform.isWindows)
+          if (Platform.isWindows || Platform.isMacOS || Platform.isLinux)
             PopupMenuItem<String>(
               value: 'audio_tracks',
               child: _VideoPlayerMenuTile(

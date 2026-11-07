@@ -34,7 +34,7 @@ while IFS= read -r -d '' elf; do
     echo "$unresolved"
     missing=1
   fi
-done < <(find "$APP_DIR" -type f \( -name 'cb-file-hub' -o -name '*.so*' \) -print0)
+done < <(find "$APP_DIR" -type f \( -name 'cb-file-hub' -o -name 'cb-subtitle-worker' -o -name '*.so*' \) -print0)
 
 if [ "$missing" -ne 0 ]; then
   exit 1

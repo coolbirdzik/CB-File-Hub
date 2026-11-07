@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:cb_file_manager/config/languages/app_localizations_delegate.dart';
+import 'package:cb_file_manager/services/app_insights/app_insights_models.dart';
+import 'package:cb_file_manager/services/app_insights/windows_app_inventory_service.dart';
 import 'package:cb_file_manager/services/disk_cleaner/cleaner_models.dart';
 import 'package:cb_file_manager/services/disk_cleaner/disk_cleaner_service.dart';
 import 'package:cb_file_manager/services/disk_cleaner/disk_tree_node.dart';
@@ -14,6 +16,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const _gb = 1024 * 1024 * 1024;
+
+class _EmptyInventory extends WindowsAppInventoryService {
+  @override
+  Future<InstalledAppInventoryResult> loadInventory({
+    void Function(InstalledAppInventoryResult)? onSnapshot,
+  }) async => const InstalledAppInventoryResult(apps: []);
+}
 
 class _ObservedFolder extends DiskTreeNode {
   _ObservedFolder()
@@ -164,7 +173,12 @@ Future<void> _pumpCleaner(
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      home: Scaffold(body: CbAgentCleanerScreen(cleanerService: cleaner)),
+      home: Scaffold(
+        body: CbAgentCleanerScreen(
+          cleanerService: cleaner,
+          appInventoryService: _EmptyInventory(),
+        ),
+      ),
     ),
   );
   await tester.pumpAndSettle();

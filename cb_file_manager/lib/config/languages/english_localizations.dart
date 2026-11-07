@@ -2,6 +2,102 @@ import 'app_localizations.dart';
 
 class EnglishLocalizations implements AppLocalizations {
   @override
+  String aiSubtitleCacheVersions(int entries) => '$entries saved versions';
+  @override
+  String get aiSubtitleCache => 'Subtitle cache';
+  @override
+  String get aiSubtitleCacheHint =>
+      'Completed subtitles are saved in the app database and reused next time. Clear the cache to generate them again. Model downloads are kept.';
+  @override
+  String get aiSubtitleCacheReading => 'Checking saved subtitles';
+  @override
+  String get aiSubtitleCacheReused => 'Using saved subtitles';
+  @override
+  String get aiSubtitleCacheSaved => 'Saved for next time';
+  @override
+  String get aiSubtitleCacheAutomatic =>
+      'Subtitles will be saved automatically';
+  @override
+  String get aiSubtitleCacheUnavailable =>
+      'This source cannot be cached reliably';
+  @override
+  String get aiSubtitleCacheFailed =>
+      'Subtitle cache unavailable; results may need to be generated again';
+  @override
+  String get aiSubtitleCacheClear => 'Clear subtitle cache';
+  @override
+  String get aiSubtitleRegenerate => 'Clear and regenerate';
+  @override
+  String aiSubtitleCacheStats(int entries, String size) =>
+      '$entries saved versions · $size of subtitle text';
+  @override
+  String get aiSubtitleLoadingSpeech => 'Loading speech model';
+  @override
+  String get aiSubtitleLoadingTranslation => 'Loading translation model';
+  @override
+  String get aiSubtitleRecognizing => 'Recognizing audio';
+  @override
+  String get aiSubtitleTranslating => 'Translating subtitles';
+  @override
+  String get aiSubtitleNoProcessed => 'No subtitles processed yet';
+  @override
+  String get aiSubtitleComplete => 'Processed to end of video';
+  @override
+  String get aiSubtitleProgress => 'Subtitle processing progress';
+  @override
+  String aiSubtitleProcessedUntil(String processed, String total) =>
+      'Subtitles processed to $processed / $total';
+  @override
+  String aiSubtitleProcessingRange(String start, String end) =>
+      'Processing $start – $end';
+
+  @override
+  String get aiModels => 'AI models · CB Agent & subtitles';
+  @override
+  String get aiModelChat => 'CB Agent';
+  @override
+  String get aiModelSpeech => 'Speech recognition';
+  @override
+  String get aiModelTranslation => 'Subtitle translation';
+  @override
+  String get aiSubtitles => 'Local AI subtitles';
+  @override
+  String get aiSubtitlesHint =>
+      'Generate subtitles from video audio on this desktop. Download speech and translation models below.';
+  @override
+  String get aiSubtitleSource => 'Audio language';
+  @override
+  String get aiSubtitleTarget => 'Subtitle language';
+  @override
+  String get aiSubtitleFollowApp => 'Follow app language';
+  @override
+  String get aiSubtitleAuto => 'Auto detect';
+  @override
+  String get aiSubtitleBilingual => 'Show original text too';
+  @override
+  String get aiSubtitleManage => 'Manage AI models';
+  @override
+  String get aiSubtitleMissing =>
+      'Download or select the required models in AI model settings.';
+  @override
+  String get aiSubtitleLoading => 'Loading subtitle model…';
+  @override
+  String get aiSubtitleProcessing => 'Generating subtitles…';
+  @override
+  String get aiSubtitleLag => 'Subtitles are catching up. Try a smaller model.';
+  @override
+  String get aiSubtitleFailed => 'Subtitle processing failed';
+  @override
+  String get aiSubtitleReady => 'AI subtitles ready';
+  @override
+  String get aiSubtitleOff => 'AI subtitles off';
+  @override
+  String get aiModelAll => 'All models';
+  @override
+  String get aiModelRemoveFailed =>
+      'Could not remove this model. Close apps using it and retry.';
+
+  @override
   String get sshProxy => 'Proxy';
   @override
   String get sshProxies => 'Proxies';

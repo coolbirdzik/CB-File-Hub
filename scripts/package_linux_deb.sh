@@ -99,6 +99,9 @@ if command -v dpkg-shlibdeps >/dev/null; then
     printf 'Source: %s\n\nPackage: %s\nArchitecture: any\n' "$PACKAGE" "$PACKAGE" \
         >"$STAGE/debian/control"
     ELF_FILES=("$ROOT$INSTALL_DIR/$BINARY_NAME")
+    if [ -f "$ROOT$INSTALL_DIR/subtitles/cb-subtitle-worker" ]; then
+        ELF_FILES+=("$ROOT$INSTALL_DIR/subtitles/cb-subtitle-worker")
+    fi
     while IFS= read -r -d '' lib; do
         ELF_FILES+=("$lib")
     done < <(find "$ROOT$INSTALL_DIR/lib" -type f -name '*.so*' -print0)

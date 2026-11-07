@@ -25,7 +25,6 @@ import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/design_system/primitives/cb_inline_rename.dart';
 import 'package:cb_file_manager/design_system/primitives/cb_tooltip.dart';
 import 'package:cb_file_manager/ui/components/common/search_text_field.dart';
-import 'package:cb_file_manager/ui/dialogs/create_file_dialog.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/main.dart';
 import 'package:cb_file_manager/services/windowing/window_startup_payload.dart';
@@ -350,18 +349,20 @@ void main() {
         // Now tap "New Folder" in the background context menu
         await et.tapContextMenuItem('new_folder');
 
-        // Scope to the dialog so we do not hit the address/path TextField.
-        // The dialog opens asynchronously after the menu action; poll for
-        // it so slow CI runners don't fail the immediate expectation.
+        // Desktop creates the folder immediately and edits its name inline.
+        // Scope to that editor so we do not hit the address/path TextField.
         final textField = find.descendant(
-          of: find.byType(AlertDialog),
+          of: find.byWidgetPredicate(
+            (widget) =>
+                widget is InlineRenameField || widget is CbInlineRenamePanel,
+          ),
           matching: find.byType(TextField),
         );
         await pumpUntilFound(tester, textField);
         expect(
           textField,
           findsOneWidget,
-          reason: 'Create folder dialog did not appear',
+          reason: 'The new folder should enter inline rename',
         );
         await et.enterText(
           textField.first,
@@ -375,6 +376,9 @@ void main() {
         final createdPath =
             '${dir.path}${Platform.pathSeparator}$newFolderName';
         await waitForFolderRowVisible(tester, createdPath);
+        expect(await Directory(createdPath).exists(), isTrue);
+        expect(dir.listSync().whereType<Directory>(), hasLength(1));
+        expect(await dummyFile.readAsString(), 'keep empty');
         if (kDebugMode) debugPrint('[E2E] create new folder — SUCCESS');
       } finally {
         await et.screenshot('result');
@@ -1635,24 +1639,27 @@ void main() {
         await et.openBackgroundContextMenu(detail: 'open_bg_menu');
 
         await et.tapContextMenuItem('new_file', detail: 'new_file');
-        final templates = find.byType(CreateFileDialog);
-        await pumpUntilFound(tester, templates);
-        expect(templates, findsOneWidget);
-        final templateSearch = find.descendant(
-          of: templates,
-          matching: find.byType(TextField),
-        );
-        await tester.enterText(templateSearch, 'txt');
-        await tester.pumpAndSettle(const Duration(milliseconds: 300));
-        final textTemplate = find.descendant(
-          of: templates,
-          matching: find.text(
-            AppLocalizations.of(tester.element(templates))!.fileTypeTxt,
-          ),
+        // Desktop presents templates as context-menu actions, then starts
+        // inline rename for the created file.
+        final textTemplate = find.byKey(
+          const ValueKey<String>('context-menu-action-new_template:.txt'),
         );
         await pumpUntilFound(tester, textTemplate);
         expect(textTemplate, findsOneWidget);
-        await tester.tap(textTemplate);
+        await et.tapContextMenuItem(
+          'new_template:.txt',
+          detail: 'text_template',
+        );
+        final renameField = find.descendant(
+          of: find.byWidgetPredicate(
+            (widget) =>
+                widget is InlineRenameField || widget is CbInlineRenamePanel,
+          ),
+          matching: find.byType(TextField),
+        );
+        await pumpUntilFound(tester, renameField);
+        expect(renameField, findsOneWidget);
+        await tester.sendKeyEvent(LogicalKeyboardKey.enter);
         await tester.pumpAndSettle(const Duration(seconds: 2));
         final created = dir
             .listSync()

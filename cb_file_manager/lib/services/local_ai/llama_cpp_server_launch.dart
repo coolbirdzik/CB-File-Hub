@@ -8,10 +8,12 @@ class LlamaCppServerLaunch {
 
   final String executablePath;
   final bool isAndroid;
+  final List<String> argumentsPrefix;
 
   const LlamaCppServerLaunch({
     required this.executablePath,
     required this.isAndroid,
+    this.argumentsPrefix = const [],
   });
 
   String get workingDirectory => File(executablePath).parent.path;
@@ -24,7 +26,10 @@ class LlamaCppServerLaunch {
     required int port,
     required int contextTokens,
     required int gpuLayers,
+    int? parallelSlots,
+    int? threads,
   }) => [
+    ...argumentsPrefix,
     '-m',
     modelPath,
     '--host',
@@ -36,6 +41,24 @@ class LlamaCppServerLaunch {
     '-ngl',
     isAndroid ? '0' : '$gpuLayers',
     '--no-ui',
+    if (!isAndroid && parallelSlots != null) ...[
+      '--parallel',
+      '${parallelSlots.clamp(1, 8)}',
+    ],
+    if (!isAndroid && parallelSlots == 1) ...[
+      '--batch-size',
+      '128',
+      '--ubatch-size',
+      '128',
+      '--cache-ram',
+      '0',
+    ],
+    if (threads != null) ...[
+      '--threads',
+      '${threads.clamp(1, 32)}',
+      '--threads-batch',
+      '${threads.clamp(1, 32)}',
+    ],
     if (isAndroid) ...[
       // One chat slot and bounded scratch buffers on memory-limited devices.
       '--parallel', '1',
@@ -74,6 +97,25 @@ class LlamaCppServerLaunch {
     // Windows isolates llama's Vulkan loader from Flutter's app-root DLLs.
     final exeDir = File(Platform.resolvedExecutable).parent.path;
     final sep = Platform.pathSeparator;
+    if (platform == TargetPlatform.linux) {
+      final bundled = '$exeDir/llama/llama-server';
+      if (File(bundled).existsSync()) {
+        return LlamaCppServerLaunch(executablePath: bundled, isAndroid: false);
+      }
+      for (final dir in (Platform.environment['PATH'] ?? '').split(':')) {
+        if (dir.isEmpty) continue;
+        final candidate = '$dir/llama-server';
+        if (File(candidate).existsSync()) {
+          return LlamaCppServerLaunch(
+            executablePath: candidate,
+            isAndroid: false,
+          );
+        }
+      }
+      throw StateError(
+        'Install llama.cpp with llama-server on PATH to translate subtitles locally.',
+      );
+    }
     return LlamaCppServerLaunch(
       executablePath: '$exeDir${sep}llama$sep$desktopExecutableName',
       isAndroid: false,

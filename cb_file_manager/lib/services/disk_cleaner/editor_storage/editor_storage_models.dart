@@ -40,7 +40,7 @@ class EditorStorageEnvironment {
     this.appData,
   });
 
-  p.Context get path => operatingSystem == 'windows' ? p.windows : p.posix;
+  p.Context get path => p.windows.isAbsolute(home) ? p.windows : p.posix;
 
   String? dataRoot(EditorProduct editor) => switch (operatingSystem) {
     'macos' => path.join(

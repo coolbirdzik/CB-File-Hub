@@ -596,6 +596,9 @@ jobs:
           fi
           echo "MACOS_SIGNING_KEYCHAIN=$KEYCHAIN" >> "$GITHUB_ENV"
 
+      - name: Install subtitle build tools
+        run: brew install cmake pkg-config
+
       - name: Build macOS DMG
         env:
           MACOS_REQUIRE_SIGN_IDENTITY: "1"

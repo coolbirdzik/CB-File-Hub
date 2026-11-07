@@ -2,6 +2,102 @@ import 'app_localizations.dart';
 
 class VietnameseLocalizations implements AppLocalizations {
   @override
+  String aiSubtitleCacheVersions(int entries) => '$entries bản phụ đề';
+  @override
+  String get aiSubtitleCache => 'Cache phụ đề';
+  @override
+  String get aiSubtitleCacheHint =>
+      'Phụ đề đã xử lý được lưu trong database của app để dùng lại lần sau. Xóa cache để tạo lại phụ đề. Model đã tải vẫn được giữ.';
+  @override
+  String get aiSubtitleCacheReading => 'Đang kiểm tra phụ đề đã lưu';
+  @override
+  String get aiSubtitleCacheReused => 'Đang dùng phụ đề đã lưu';
+  @override
+  String get aiSubtitleCacheSaved => 'Đã lưu để dùng lại lần sau';
+  @override
+  String get aiSubtitleCacheAutomatic => 'Phụ đề sẽ được tự động lưu';
+  @override
+  String get aiSubtitleCacheUnavailable =>
+      'Nguồn này chưa hỗ trợ cache đáng tin cậy';
+  @override
+  String get aiSubtitleCacheFailed =>
+      'Cache phụ đề không khả dụng; có thể cần xử lý lại';
+  @override
+  String get aiSubtitleCacheClear => 'Xóa cache phụ đề';
+  @override
+  String get aiSubtitleRegenerate => 'Xóa và tạo lại';
+  @override
+  String aiSubtitleCacheStats(int entries, String size) =>
+      '$entries bản phụ đề · $size dữ liệu văn bản';
+  @override
+  String get aiSubtitleLoadingSpeech => 'Đang nạp model nhận dạng';
+  @override
+  String get aiSubtitleLoadingTranslation => 'Đang nạp model dịch';
+  @override
+  String get aiSubtitleRecognizing => 'Đang nhận dạng audio';
+  @override
+  String get aiSubtitleTranslating => 'Đang dịch phụ đề';
+  @override
+  String get aiSubtitleNoProcessed => 'Chưa xử lý xong đoạn phụ đề nào';
+  @override
+  String get aiSubtitleComplete => 'Đã xử lý đến cuối video';
+  @override
+  String get aiSubtitleProgress => 'Tiến độ xử lý phụ đề';
+  @override
+  String aiSubtitleProcessedUntil(String processed, String total) =>
+      'Phụ đề đã xử lý đến $processed / $total';
+  @override
+  String aiSubtitleProcessingRange(String start, String end) =>
+      'Đang xử lý $start – $end';
+
+  @override
+  String get aiModels => 'Model AI · CB Agent và phụ đề';
+  @override
+  String get aiModelChat => 'CB Agent';
+  @override
+  String get aiModelSpeech => 'Nhận dạng giọng nói';
+  @override
+  String get aiModelTranslation => 'Dịch phụ đề';
+  @override
+  String get aiSubtitles => 'Phụ đề AI local';
+  @override
+  String get aiSubtitlesHint =>
+      'Tạo phụ đề từ audio video trên máy này. Tải model nhận dạng và dịch bên dưới.';
+  @override
+  String get aiSubtitleSource => 'Ngôn ngữ audio';
+  @override
+  String get aiSubtitleTarget => 'Ngôn ngữ phụ đề';
+  @override
+  String get aiSubtitleFollowApp => 'Theo ngôn ngữ ứng dụng';
+  @override
+  String get aiSubtitleAuto => 'Tự nhận diện';
+  @override
+  String get aiSubtitleBilingual => 'Hiện cả nội dung gốc';
+  @override
+  String get aiSubtitleManage => 'Quản lý model AI';
+  @override
+  String get aiSubtitleMissing =>
+      'Tải hoặc chọn model cần dùng trong phần quản lý model AI.';
+  @override
+  String get aiSubtitleLoading => 'Đang nạp model phụ đề…';
+  @override
+  String get aiSubtitleProcessing => 'Đang tạo phụ đề…';
+  @override
+  String get aiSubtitleLag =>
+      'Phụ đề đang xử lý chậm hơn video. Thử model nhỏ hơn.';
+  @override
+  String get aiSubtitleFailed => 'Không thể xử lý phụ đề';
+  @override
+  String get aiSubtitleReady => 'Phụ đề AI đã sẵn sàng';
+  @override
+  String get aiSubtitleOff => 'Phụ đề AI đang tắt';
+  @override
+  String get aiModelAll => 'Tất cả model';
+  @override
+  String get aiModelRemoveFailed =>
+      'Không xóa được model. Đóng ứng dụng đang dùng model rồi thử lại.';
+
+  @override
   String get sshProxy => 'Proxy';
   @override
   String get sshProxies => 'Proxy';

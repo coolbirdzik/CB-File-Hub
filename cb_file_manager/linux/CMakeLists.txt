@@ -128,3 +128,6 @@ if(NOT CMAKE_BUILD_TYPE MATCHES "Debug")
   install(FILES "${AOT_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
     COMPONENT Runtime)
 endif()
+
+add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../../native/subtitles" "${CMAKE_BINARY_DIR}/subtitles")
+add_dependencies(${BINARY_NAME} cb-subtitle-worker)

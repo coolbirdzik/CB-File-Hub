@@ -206,6 +206,7 @@
     {
       "why": "Playback stack: media_kit backend, player UI, PiP and video windows",
       "paths": [
+        "native/subtitles/**",
         "cb_file_manager/lib/services/media/**",
         "cb_file_manager/lib/ui/components/video/**",
         "cb_file_manager/lib/ui/components/pip_window/**",

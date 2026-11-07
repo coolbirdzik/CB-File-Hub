@@ -2,6 +2,100 @@ import 'app_localizations.dart';
 
 class TurkishLocalizations implements AppLocalizations {
   @override
+  String aiSubtitleCacheVersions(int entries) => '$entries kayıtlı sürüm';
+  @override
+  String get aiSubtitleCache => 'Altyazı önbelleği';
+  @override
+  String get aiSubtitleCacheHint =>
+      'Tamamlanan altyazılar uygulama veritabanına kaydedilir ve sonraki açılışta kullanılır. Yeniden oluşturmak için önbelleği temizleyin. İndirilen modeller korunur.';
+  @override
+  String get aiSubtitleCacheReading => 'Kayıtlı altyazılar kontrol ediliyor';
+  @override
+  String get aiSubtitleCacheReused => 'Kayıtlı altyazılar kullanılıyor';
+  @override
+  String get aiSubtitleCacheSaved => 'Sonraki kullanım için kaydedildi';
+  @override
+  String get aiSubtitleCacheAutomatic => 'Altyazılar otomatik kaydedilecek';
+  @override
+  String get aiSubtitleCacheUnavailable =>
+      'Bu kaynak güvenilir şekilde önbelleğe alınamıyor';
+  @override
+  String get aiSubtitleCacheFailed =>
+      'Altyazı önbelleği kullanılamıyor; yeniden oluşturmak gerekebilir';
+  @override
+  String get aiSubtitleCacheClear => 'Altyazı önbelleğini temizle';
+  @override
+  String get aiSubtitleRegenerate => 'Temizle ve yeniden oluştur';
+  @override
+  String aiSubtitleCacheStats(int entries, String size) =>
+      '$entries kayıtlı sürüm · $size altyazı metni';
+  @override
+  String get aiSubtitleLoadingSpeech => 'Konuşma modeli yükleniyor';
+  @override
+  String get aiSubtitleLoadingTranslation => 'Çeviri modeli yükleniyor';
+  @override
+  String get aiSubtitleRecognizing => 'Ses tanınıyor';
+  @override
+  String get aiSubtitleTranslating => 'Altyazılar çevriliyor';
+  @override
+  String get aiSubtitleNoProcessed => 'Henüz altyazı işlenmedi';
+  @override
+  String get aiSubtitleComplete => 'Videonun sonuna kadar işlendi';
+  @override
+  String get aiSubtitleProgress => 'Altyazı işleme ilerlemesi';
+  @override
+  String aiSubtitleProcessedUntil(String processed, String total) =>
+      'Altyazılar $processed / $total noktasına kadar işlendi';
+  @override
+  String aiSubtitleProcessingRange(String start, String end) =>
+      '$start – $end işleniyor';
+
+  @override
+  String get aiModels => 'AI modelleri · CB Agent ve altyazılar';
+  @override
+  String get aiModelChat => 'CB Agent';
+  @override
+  String get aiModelSpeech => 'Konuşma tanıma';
+  @override
+  String get aiModelTranslation => 'Altyazı çevirisi';
+  @override
+  String get aiSubtitles => 'Yerel AI altyazıları';
+  @override
+  String get aiSubtitlesHint =>
+      'Bu bilgisayarda video sesinden altyazı oluşturun. Modelleri aşağıdan indirin.';
+  @override
+  String get aiSubtitleSource => 'Ses dili';
+  @override
+  String get aiSubtitleTarget => 'Altyazı dili';
+  @override
+  String get aiSubtitleFollowApp => 'Uygulama dilini kullan';
+  @override
+  String get aiSubtitleAuto => 'Otomatik algıla';
+  @override
+  String get aiSubtitleBilingual => 'Özgün metni de göster';
+  @override
+  String get aiSubtitleManage => 'AI modellerini yönet';
+  @override
+  String get aiSubtitleMissing => 'Gerekli modelleri indirin veya seçin.';
+  @override
+  String get aiSubtitleLoading => 'Altyazı modeli yükleniyor…';
+  @override
+  String get aiSubtitleProcessing => 'Altyazılar oluşturuluyor…';
+  @override
+  String get aiSubtitleLag => 'Daha küçük bir model deneyin.';
+  @override
+  String get aiSubtitleFailed => 'Altyazı işlenemedi';
+  @override
+  String get aiSubtitleReady => 'AI altyazıları hazır';
+  @override
+  String get aiSubtitleOff => 'AI altyazıları kapalı';
+  @override
+  String get aiModelAll => 'Tüm modeller';
+  @override
+  String get aiModelRemoveFailed =>
+      'Model silinemedi. Modeli kullanan uygulamaları kapatıp tekrar deneyin.';
+
+  @override
   String get sshProxy => 'Vekil sunucu';
   @override
   String get sshProxies => 'Vekil sunucular';

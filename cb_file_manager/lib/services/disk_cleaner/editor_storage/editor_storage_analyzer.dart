@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:path/path.dart' as p;
+
 import '../app_storage/chromium_layout.dart';
 import 'editor_root_sizes.dart';
 import 'editor_storage_models.dart';
@@ -424,7 +426,10 @@ class EditorStorageAnalyzer {
     if (uri == null || uri.scheme != 'file') {
       return (value, EditorWorkspaceStatus.unknown);
     }
-    final windows = environment.operatingSystem == 'windows';
+    final windows =
+        environment.operatingSystem == 'windows' ||
+        (environment.path.style == p.Style.windows &&
+            RegExp(r'^/[A-Za-z]:/').hasMatch(uri.path));
     final String target;
     try {
       target = uri.toFilePath(windows: windows);

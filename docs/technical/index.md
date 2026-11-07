@@ -18,6 +18,8 @@ return here for narrative background.
 12. [12-macos-local-llama.md](12-macos-local-llama.md) — macOS GGUF runtime, architecture selection, and helper signing.
 13. [13-windows-default-file-manager.md](13-windows-default-file-manager.md) — Windows folder defaults, Registry ownership/restoration and runtime verification.
 14. [14-desktop-default-file-manager.md](14-desktop-default-file-manager.md) — Windows, macOS and Linux default-folder integration, opening requests and verification limits.
+15. [15-local-live-subtitles-research.md](15-local-live-subtitles-research.md) — Model research and design; see [desktop local subtitles](../features/12-local-ai-subtitles.md) for the implemented baseline and its limits.
+16. [16-local-subtitle-performance.md](16-local-subtitle-performance.md) — Native acceleration, bounded scheduling, streamed translation and component benchmarks.
 
 The implementation is authoritative. When a technical page conflicts with the
 Agent Graph or source, update the page as part of the same change.

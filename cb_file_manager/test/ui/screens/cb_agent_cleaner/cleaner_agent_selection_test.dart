@@ -9,6 +9,8 @@ import 'package:cb_file_manager/bloc/ai_agent/ai_agent_event.dart';
 import 'package:cb_file_manager/bloc/ai_agent/ai_agent_state.dart';
 import 'package:cb_file_manager/models/ai/ai_provider_model.dart';
 import 'package:cb_file_manager/services/ai/ai_provider_service.dart';
+import 'package:cb_file_manager/services/app_insights/app_insights_models.dart';
+import 'package:cb_file_manager/services/app_insights/windows_app_inventory_service.dart';
 import 'package:cb_file_manager/ui/screens/ai_chat/ai_panel_controller.dart';
 import 'package:cb_file_manager/services/disk_cleaner/cleaner_models.dart';
 import 'package:cb_file_manager/services/disk_cleaner/cleaner_agent_review.dart';
@@ -25,6 +27,13 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get_it/get_it.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+class _EmptyInventory extends WindowsAppInventoryService {
+  @override
+  Future<InstalledAppInventoryResult> loadInventory({
+    void Function(InstalledAppInventoryResult)? onSnapshot,
+  }) async => const InstalledAppInventoryResult(apps: []);
+}
 
 class _Cleaner extends DiskCleanerService {
   final DiskTreeNode root;
@@ -223,6 +232,7 @@ void main() {
                   body: CbAgentCleanerScreen(
                     tabId: tabId,
                     cleanerService: cleaner,
+                    appInventoryService: _EmptyInventory(),
                   ),
                 ),
               ),
@@ -551,6 +561,7 @@ void _toolbarTests() {
                 body: CbAgentCleanerScreen(
                   tabId: tabs.state.activeTabId!,
                   cleanerService: _Cleaner(root),
+                  appInventoryService: _EmptyInventory(),
                 ),
               ),
             ),

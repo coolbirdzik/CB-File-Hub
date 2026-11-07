@@ -2,6 +2,96 @@ import 'app_localizations.dart';
 
 class ChineseLocalizations implements AppLocalizations {
   @override
+  String aiSubtitleCacheVersions(int entries) => '$entries 个已保存版本';
+  @override
+  String get aiSubtitleCache => '字幕缓存';
+  @override
+  String get aiSubtitleCacheHint =>
+      '已完成的字幕会保存在应用数据库中，供下次使用。清除缓存可重新生成字幕，已下载的模型将保留。';
+  @override
+  String get aiSubtitleCacheReading => '正在检查已保存的字幕';
+  @override
+  String get aiSubtitleCacheReused => '正在使用已保存的字幕';
+  @override
+  String get aiSubtitleCacheSaved => '已保存，供下次使用';
+  @override
+  String get aiSubtitleCacheAutomatic => '字幕将自动保存';
+  @override
+  String get aiSubtitleCacheUnavailable => '此来源无法可靠缓存';
+  @override
+  String get aiSubtitleCacheFailed => '字幕缓存不可用，可能需要重新生成';
+  @override
+  String get aiSubtitleCacheClear => '清除字幕缓存';
+  @override
+  String get aiSubtitleRegenerate => '清除并重新生成';
+  @override
+  String aiSubtitleCacheStats(int entries, String size) =>
+      '$entries 个已保存版本 · $size 字幕文本';
+  @override
+  String get aiSubtitleLoadingSpeech => '正在加载语音模型';
+  @override
+  String get aiSubtitleLoadingTranslation => '正在加载翻译模型';
+  @override
+  String get aiSubtitleRecognizing => '正在识别音频';
+  @override
+  String get aiSubtitleTranslating => '正在翻译字幕';
+  @override
+  String get aiSubtitleNoProcessed => '尚未完成字幕处理';
+  @override
+  String get aiSubtitleComplete => '已处理到视频结尾';
+  @override
+  String get aiSubtitleProgress => '字幕处理进度';
+  @override
+  String aiSubtitleProcessedUntil(String processed, String total) =>
+      '字幕已处理至 $processed / $total';
+  @override
+  String aiSubtitleProcessingRange(String start, String end) =>
+      '正在处理 $start – $end';
+
+  @override
+  String get aiModels => 'AI 模型 · CB Agent 与字幕';
+  @override
+  String get aiModelChat => 'CB Agent';
+  @override
+  String get aiModelSpeech => '语音识别';
+  @override
+  String get aiModelTranslation => '字幕翻译';
+  @override
+  String get aiSubtitles => '本地 AI 字幕';
+  @override
+  String get aiSubtitlesHint => '在此电脑上根据视频音频生成字幕。请在下方下载语音和翻译模型。';
+  @override
+  String get aiSubtitleSource => '音频语言';
+  @override
+  String get aiSubtitleTarget => '字幕语言';
+  @override
+  String get aiSubtitleFollowApp => '跟随应用语言';
+  @override
+  String get aiSubtitleAuto => '自动检测';
+  @override
+  String get aiSubtitleBilingual => '同时显示原文';
+  @override
+  String get aiSubtitleManage => '管理 AI 模型';
+  @override
+  String get aiSubtitleMissing => '请在 AI 模型设置中下载或选择所需模型。';
+  @override
+  String get aiSubtitleLoading => '正在加载字幕模型…';
+  @override
+  String get aiSubtitleProcessing => '正在生成字幕…';
+  @override
+  String get aiSubtitleLag => '字幕正在追赶播放进度，请尝试较小的模型。';
+  @override
+  String get aiSubtitleFailed => '字幕处理失败';
+  @override
+  String get aiSubtitleReady => 'AI 字幕已就绪';
+  @override
+  String get aiSubtitleOff => 'AI 字幕已关闭';
+  @override
+  String get aiModelAll => '全部模型';
+  @override
+  String get aiModelRemoveFailed => '无法删除模型，请关闭正在使用它的应用后重试。';
+
+  @override
   String get sshProxy => '代理';
   @override
   String get sshProxies => '代理';

@@ -17,6 +17,7 @@ import 'package:cb_file_manager/helpers/network/network_thumbnail_helper.dart';
 import 'package:cb_file_manager/helpers/tags/tag_thumbnail_manager.dart';
 import 'package:cb_file_manager/helpers/network/win32_smb_helper.dart';
 import 'package:cb_file_manager/services/video_library_cache_service.dart';
+import 'package:cb_file_manager/services/media/subtitle_cache.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';
 import 'package:cb_file_manager/ui/utils/base_screen.dart';
 import 'package:cb_file_manager/ui/utils/format_utils.dart';
@@ -44,6 +45,7 @@ class _CacheManagementScreenState extends State<CacheManagementScreen> {
   _CacheEntry? _networkThumbs;
   _CacheEntry? _videoLibrary;
   _CacheEntry? _tempFiles;
+  _CacheEntry? _subtitleCache;
 
   // Persistent (documents) data — survives OS cache cleanup.
   _CacheEntry? _tagThumbs;
@@ -73,10 +75,22 @@ class _CacheManagementScreenState extends State<CacheManagementScreen> {
       final tempStats = await _directoryStats(tempDir);
       final tagThumbStats = await _directoryStats(tagThumbDir);
       final videoLibStats = await _directoryStats(videoLibDir);
+      final subtitleStats = await SubtitleCache.instance.stats();
 
       if (!mounted) return;
       setState(() {
         _rootPath = root.path;
+        _subtitleCache = _CacheEntry(
+          key: 'subtitles',
+          title: context.tr.aiSubtitleCache,
+          subtitle: context.tr.aiSubtitleCacheHint,
+          icon: Icons.subtitles_outlined,
+          directory: documentsRoot,
+          bytes: subtitleStats.bytes,
+          files: subtitleStats.entries,
+          accent: Colors.tealAccent,
+          directoryActions: false,
+        );
         _photoThumbs = _CacheEntry(
           key: 'photo',
           title: context.tr.cachePhotoThumbs,
@@ -158,14 +172,16 @@ class _CacheManagementScreenState extends State<CacheManagementScreen> {
       (_videoThumbs?.bytes ?? 0) +
       (_networkThumbs?.bytes ?? 0) +
       (_videoLibrary?.bytes ?? 0) +
-      (_tempFiles?.bytes ?? 0);
+      (_tempFiles?.bytes ?? 0) +
+      (_subtitleCache?.bytes ?? 0);
 
   int get _totalFiles =>
       (_photoThumbs?.files ?? 0) +
       (_videoThumbs?.files ?? 0) +
       (_networkThumbs?.files ?? 0) +
       (_videoLibrary?.files ?? 0) +
-      (_tempFiles?.files ?? 0);
+      (_tempFiles?.files ?? 0) +
+      (_subtitleCache?.files ?? 0);
 
   /// Cache buckets (temp/cache root) — safe to clear, will be regenerated.
   List<_CacheEntry> get _entries => [
@@ -174,6 +190,7 @@ class _CacheManagementScreenState extends State<CacheManagementScreen> {
     ?_networkThumbs,
     ?_videoLibrary,
     ?_tempFiles,
+    ?_subtitleCache,
   ];
 
   Future<void> _browseInApp(Directory dir, String title) async {
@@ -198,6 +215,9 @@ class _CacheManagementScreenState extends State<CacheManagementScreen> {
     setState(() => _clearingKeys.add(entry.key));
     try {
       switch (entry.key) {
+        case 'subtitles':
+          await SubtitleCache.instance.clear();
+          break;
         case 'photo':
           await _clearDirectory(entry.directory);
           PhotoThumbnailHelper.clearMemoryCache();
@@ -250,6 +270,7 @@ class _CacheManagementScreenState extends State<CacheManagementScreen> {
       await NetworkThumbnailHelper().clearCache();
       await VideoLibraryCacheService.instance.clearAll();
       await Win32SmbHelper().clearTempFileCache();
+      await SubtitleCache.instance.clear();
       if (mounted) {
         ScaffoldMessenger.of(
           context,
@@ -767,7 +788,9 @@ class _CacheManagementScreenState extends State<CacheManagementScreen> {
                       ),
                     ),
                     Text(
-                      context.tr.cacheFilesCount(entry.files),
+                      entry.key == 'subtitles'
+                          ? context.tr.aiSubtitleCacheVersions(entry.files)
+                          : context.tr.cacheFilesCount(entry.files),
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -805,16 +828,21 @@ class _CacheManagementScreenState extends State<CacheManagementScreen> {
               spacing: 8,
               runSpacing: 8,
               children: [
-                OutlinedButton.icon(
-                  onPressed: () => _browseInApp(entry.directory, entry.title),
-                  icon: const Icon(PhosphorIconsLight.folderOpen, size: 16),
-                  label: Text(l10n?.browse ?? 'Browse in app'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: () => _openInSystem(entry.directory.path),
-                  icon: const Icon(PhosphorIconsLight.arrowSquareOut, size: 16),
-                  label: Text(l10n?.openFolder ?? 'Open folder'),
-                ),
+                if (entry.directoryActions)
+                  OutlinedButton.icon(
+                    onPressed: () => _browseInApp(entry.directory, entry.title),
+                    icon: const Icon(PhosphorIconsLight.folderOpen, size: 16),
+                    label: Text(l10n?.browse ?? 'Browse in app'),
+                  ),
+                if (entry.directoryActions)
+                  OutlinedButton.icon(
+                    onPressed: () => _openInSystem(entry.directory.path),
+                    icon: const Icon(
+                      PhosphorIconsLight.arrowSquareOut,
+                      size: 16,
+                    ),
+                    label: Text(l10n?.openFolder ?? 'Open folder'),
+                  ),
                 FilledButton.tonalIcon(
                   onPressed: busy ? null : () => _clearEntry(entry),
                   icon: busy
@@ -897,6 +925,7 @@ class _CacheEntry {
   /// not disposable cache. It is excluded from "Clear all cache" and shown in
   /// its own section.
   final bool persistent;
+  final bool directoryActions;
 
   const _CacheEntry({
     required this.key,
@@ -908,6 +937,7 @@ class _CacheEntry {
     required this.files,
     required this.accent,
     this.persistent = false,
+    this.directoryActions = true,
   });
 }
 

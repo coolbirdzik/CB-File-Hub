@@ -37,6 +37,12 @@ class WindowsProcessReaper {
   HANDLE? _jobHandle;
   bool _initialized = false;
   bool _available = false;
+  // This entry point is not exposed by the pinned win32 package.
+  static final _setPriorityClass = DynamicLibrary.open('kernel32.dll')
+      .lookupFunction<
+        Int32 Function(Pointer, Uint32),
+        int Function(Pointer, int)
+      >('SetPriorityClass');
 
   /// Lazily creates the kill-on-close job object. Returns false if the job
   /// could not be created (in which case [assignProcess] is a no-op).
@@ -78,7 +84,8 @@ class WindowsProcessReaper {
   /// Assigns the process identified by [pid] to the kill-on-close job so it is
   /// terminated automatically when this app exits. Safe to call for every
   /// spawned server; failures are swallowed (best-effort hardening).
-  void assignProcess(int pid) {
+  void assignProcess(int pid, {bool background = false}) {
+    if (background) lowerPriority(pid);
     if (!_ensureJob()) return;
 
     final handle = OpenProcess(
@@ -91,6 +98,18 @@ class WindowsProcessReaper {
       AssignProcessToJobObject(_jobHandle!, handle);
     } finally {
       CloseHandle(handle);
+    }
+  }
+
+  /// Scheduling remains independent of job availability (nested test hosts
+  /// and restrictive launchers may reject creating/assigning a job).
+  bool lowerPriority(int pid) {
+    final process = OpenProcess(PROCESS_SET_INFORMATION, false, pid).value;
+    if (!process.isValid) return false;
+    try {
+      return _setPriorityClass(process, BELOW_NORMAL_PRIORITY_CLASS) != 0;
+    } finally {
+      CloseHandle(process);
     }
   }
 }

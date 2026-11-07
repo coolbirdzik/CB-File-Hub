@@ -119,11 +119,11 @@ void main() {
   ) async {
     await waitForFileRowVisible(tester, path);
     await rightClickFileRow(tester, path);
-    final item = find.byWidgetPredicate(
-      (widget) =>
-          widget is PopupMenuItem<String> && widget.value == 'torrent_$action',
-    );
+    // Torrent actions use the shared renderer, whose desktop rows are custom
+    // PopupMenuEntry widgets. Address actions by the renderer's stable keys.
+    final item = keyed('context-menu-action-torrent_$action');
     await waitForTorrentWidget(tester, item);
+    await tester.ensureVisible(item);
     await tester.tap(item);
     await tester.pump(const Duration(milliseconds: 200));
   }

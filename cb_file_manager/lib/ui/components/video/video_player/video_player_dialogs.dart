@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../../utils/route.dart';
 import 'video_player_models.dart';
+import '../../../../services/media/media_language_labels.dart';
 import 'package:cb_file_manager/config/translation_helper.dart';
 
 /// One option for [VideoPlayerRadioListContent].
@@ -153,7 +154,12 @@ class SubtitleDialogContent extends StatelessWidget {
     final options = <VideoPlayerRadioOption<int>>[
       VideoPlayerRadioOption<int>(null, context.tr.vpOff),
       ...tracks.asMap().entries.map(
-        (e) => VideoPlayerRadioOption<int>(e.key, e.value.language),
+        (e) => VideoPlayerRadioOption<int>(
+          e.key,
+          mediaLanguageEnglishName(e.value.language) ??
+              mediaLanguageEnglishName(e.value.title) ??
+              'Subtitle track ${e.value.id}',
+        ),
       ),
     ];
     return VideoPlayerRadioListContent<int>(

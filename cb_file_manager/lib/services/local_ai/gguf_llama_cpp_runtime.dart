@@ -45,19 +45,75 @@ class GgufLlamaCppLocalAiChatRuntime
   /// Set to -1 to let the model generate until it emits an end-of-sequence
   /// token (bounded only by the context window).
   final int maxResponseTokens;
+  final int? parallelSlots, threads;
+  final bool allowCpuFallback;
+  bool _cpuFallback = false;
 
   GgufLlamaCppLocalAiChatRuntime({
     this.nGpuLayers = 99,
     this.serverExecutableName = 'llama-server.exe',
     this.maxResponseTokens = 2048,
+    this.serverLaunchOverride,
+    this.parallelSlots,
+    this.threads,
+    this.allowCpuFallback = false,
   });
 
   Process? _serverProcess;
+  bool _disposed = false;
   int? _serverPort;
   String? _loadedModelPath;
   int? _loadedContextSize;
 
   final HttpClient _httpClient = HttpClient();
+  Future<void>? _preparation;
+  String? _preparationPath;
+  int? _preparationTokens;
+  final LlamaCppServerLaunch? serverLaunchOverride;
+
+  /// Preload a dedicated runtime while another model recognizes speech.
+  /// Sending waits for the same preparation instead of starting another server.
+  Future<void> prepareModel({
+    required InstalledLocalModel model,
+    int contextTokens = 2048,
+  }) {
+    if (_preparation != null &&
+        _preparationPath == model.localPath &&
+        _preparationTokens == contextTokens) {
+      return _preparation!;
+    }
+    final previous = _preparation;
+    _preparationPath = model.localPath;
+    _preparationTokens = contextTokens;
+    return _preparation = () async {
+      if (previous != null) {
+        try {
+          await previous;
+        } catch (_) {
+          /* A new preparation may retry. */
+        }
+      }
+      await _prepareModel(model, contextTokens);
+    }();
+  }
+
+  Future<void> _prepareModel(
+    InstalledLocalModel model,
+    int contextTokens,
+  ) async {
+    if (_disposed) throw StateError('Local AI runtime disposed');
+    if (_serverProcess != null &&
+        (_loadedModelPath != model.localPath ||
+            _loadedContextSize != contextTokens)) {
+      await _stopServer();
+    }
+    if (_serverProcess == null) {
+      await for (final _ in _startServer(
+        modelPath: model.localPath,
+        maxTokens: contextTokens,
+      )) {}
+    }
+  }
 
   /// Kill-on-close Job Object so the OS reaps the server if the app dies.
   final WindowsProcessReaper _killOnCloseJob = WindowsProcessReaper.instance;
@@ -143,6 +199,8 @@ class GgufLlamaCppLocalAiChatRuntime
     int maxTokens = 4096,
     bool? enableThinking,
   }) async* {
+    final preparation = _preparation;
+    if (preparation != null) await preparation;
     final modelPath = model.localPath;
     // Restart the server if the model or context window changed.
     final needsRestart =
@@ -187,10 +245,13 @@ class GgufLlamaCppLocalAiChatRuntime
     required String modelPath,
     required int maxTokens,
   }) async* {
-    final launch = await LlamaCppServerLaunch.resolve(
-      platform: defaultTargetPlatform,
-      desktopExecutableName: serverExecutableName,
-    );
+    if (_disposed) throw StateError('Local AI runtime disposed');
+    final launch =
+        serverLaunchOverride ??
+        await LlamaCppServerLaunch.resolve(
+          platform: defaultTargetPlatform,
+          desktopExecutableName: serverExecutableName,
+        );
     final serverPath = launch.executablePath;
     if (!File(serverPath).existsSync()) {
       throw StateError(
@@ -205,17 +266,25 @@ class GgufLlamaCppLocalAiChatRuntime
     yield '${_statusPrefix}Starting local AI server...';
 
     final port = await _findFreePort();
+    if (_disposed) return;
     final process = await Process.start(
       serverPath,
       launch.arguments(
         modelPath: modelPath,
         port: port,
         contextTokens: maxTokens,
-        gpuLayers: nGpuLayers,
+        gpuLayers: _cpuFallback ? 0 : nGpuLayers,
+        parallelSlots: parallelSlots,
+        threads: threads,
       ),
       workingDirectory: launch.workingDirectory,
       environment: launch.environment,
     );
+    if (_disposed) {
+      process.kill();
+      await process.exitCode;
+      return;
+    }
     _serverProcess = process;
     _serverPort = port;
 
@@ -223,7 +292,10 @@ class GgufLlamaCppLocalAiChatRuntime
     // automatically if this app process dies (crash, taskkill, or normal exit),
     // preventing orphaned llama-server.exe processes that would hold VRAM/port.
     if (Platform.isWindows) {
-      _killOnCloseJob.assignProcess(process.pid);
+      _killOnCloseJob.assignProcess(
+        process.pid,
+        background: parallelSlots == 1,
+      );
     }
 
     // Drain output so the process does not block on a full pipe buffer.
@@ -265,6 +337,15 @@ class GgufLlamaCppLocalAiChatRuntime
       await _stopServer();
       await stderrDone.timeout(const Duration(seconds: 2), onTimeout: () {});
       final details = stderrTail.trim();
+      if (allowCpuFallback && !_cpuFallback && nGpuLayers > 0 && !_disposed) {
+        _cpuFallback = true;
+        AppLogger.warning(
+          '[LocalAI] GPU model startup failed; retrying on CPU.',
+        );
+        yield '${_statusPrefix}GPU unavailable; loading on CPU...';
+        yield* _startServer(modelPath: modelPath, maxTokens: maxTokens);
+        return;
+      }
       if (details.isNotEmpty) {
         AppLogger.error('[LocalAI] llama-server startup failed:\n$details');
       }
@@ -275,6 +356,9 @@ class GgufLlamaCppLocalAiChatRuntime
     }
 
     _loadedModelPath = modelPath;
+    if (Platform.isWindows && parallelSlots == 1) {
+      _killOnCloseJob.lowerPriority(process.pid);
+    }
     _loadedContextSize = maxTokens;
     yield '${_statusPrefix}Ready';
   }
@@ -282,6 +366,7 @@ class GgufLlamaCppLocalAiChatRuntime
   /// Polls GET /health until it returns {"status":"ok"} or the timeout elapses.
   /// Returns false if the server process exits first or the timeout is hit.
   Future<bool> _waitForHealth(int port, Process process) async {
+    final startup = Stopwatch()..start();
     final deadline = DateTime.now().add(const Duration(seconds: 120));
     var processAlive = true;
     unawaited(process.exitCode.then((_) => processAlive = false));
@@ -292,6 +377,7 @@ class GgufLlamaCppLocalAiChatRuntime
         final request = await _httpClient
             .getUrl(Uri.parse('http://127.0.0.1:$port/health'))
             .timeout(const Duration(seconds: 3));
+        request.persistentConnection = false;
         final response = await request.close().timeout(
           const Duration(seconds: 3),
         );
@@ -302,7 +388,9 @@ class GgufLlamaCppLocalAiChatRuntime
       } catch (_) {
         // Server not accepting connections yet; keep polling.
       }
-      await Future<void>.delayed(const Duration(milliseconds: 300));
+      await Future<void>.delayed(
+        Duration(milliseconds: startup.elapsedMilliseconds < 5000 ? 100 : 300),
+      );
     }
     return false;
   }
@@ -332,11 +420,17 @@ class GgufLlamaCppLocalAiChatRuntime
   /// Stops the server so Windows releases its lock on the model file. The
   /// next request starts it again.
   @override
-  Future<void> releaseModelFiles() => _stopServer();
+  Future<void> releaseModelFiles() {
+    _preparation = null;
+    _preparationPath = null;
+    _preparationTokens = null;
+    return _stopServer();
+  }
 
   /// Stops the server process and releases the HTTP client.
   @override
   Future<void> dispose() async {
+    _disposed = true;
     await _stopServer();
     _httpClient.close(force: true);
   }

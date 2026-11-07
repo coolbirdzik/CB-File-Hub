@@ -26,6 +26,7 @@ import 'dart:io';
 
 import 'package:cb_file_manager/e2e/cb_e2e_config.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
+import 'package:cb_file_manager/helpers/files/folder_sort_manager.dart';
 import 'package:cb_file_manager/design_system/primitives/cb_inline_rename.dart';
 import 'package:cb_file_manager/main.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
@@ -192,6 +193,9 @@ void main() {
       );
 
       try {
+        // Media-only folders default to grid even when the global default is
+        // list. An explicit folder preference keeps this a list-view test.
+        await FolderSortManager().saveFolderViewMode(dir.path, ViewMode.list);
         await runCbFileApp();
         await tester.pumpAndSettle(const Duration(seconds: 5));
         await et.init('video context menu in list view');
