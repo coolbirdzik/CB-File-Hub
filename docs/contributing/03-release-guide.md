@@ -20,16 +20,24 @@ This ensures every build (even the same tag pushed multiple times) gets a unique
 
 ```bash
 # 1. Create a patch/minor/major release
-make release-patch   # bump x.x.{Y+1}
-make release-minor  # bump x.{Y+1}.0
-make release-major  # bump {X+1}.0.0
+just release-patch   # bump x.x.{Y+1}
+just release-minor  # bump x.{Y+1}.0
+just release-major  # bump {X+1}.0.0
 
 # 2. Push to trigger CI builds
 git push origin main && git push origin v1.2.3
 ```
 
-> **Note:** `make release-*` automatically runs `make verify` first (`dart format` + `flutter analyze`).
-> If code checks fail, the release is blocked until fixed.
+> **Note:** `just release-*` first runs `just verify` (`dart format` + `flutter analyze`), then the
+> local E2E gate (`scripts/release_e2e_gate.mjs`): every CI E2E suite must pass on Windows on the
+> exact commit being released (clean working tree required). If either fails, the release stops
+> before the version commit and tag are created.
+>
+> Each suite's pass is recorded under `cb_file_manager/build/release-e2e/<fingerprint>/`, so after
+> a failure, rerunning on the same source only runs the suites that have not passed. Committing a
+> fix changes the fingerprint and runs every suite again. Run the gate on its own with
+> `just release-e2e` (`just release-e2e --status` shows what has passed); logs are in
+> `cb_file_manager/build/e2e-logs/<suite>.log`.
 
 CI will automatically:
 1. Validate the tag matches `pubspec.yaml` version.

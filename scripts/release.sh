@@ -1,5 +1,6 @@
 #!/bin/bash
-# Bump version, commit, create annotated tag, then push branch + tag
+# Run the local E2E gate, then bump version, commit, create annotated tag, then
+# push branch + tag.
 # Usage: bash scripts/release.sh patch|minor|major
 #
 # When run interactively (TTY), lists available git remotes and lets you pick
@@ -28,6 +29,12 @@ fi
 
 NEW_VER=$(bash scripts/version.sh name | awk -F. "$BUMP")
 TAG="v$NEW_VER"
+
+# Every CI E2E suite must pass locally on this exact commit before anything is
+# committed or tagged. Passes are recorded per suite, so a rerun on the same
+# source only runs what has not passed yet. See scripts/release_e2e_gate.mjs.
+echo "Running local E2E gate before releasing $NEW_VER..."
+node scripts/release_e2e_gate.mjs
 
 echo "Creating $1 release: $NEW_VER"
 bash scripts/version.sh set-version "$NEW_VER"
