@@ -51,10 +51,12 @@ jobs:
         run: |
           node --test scripts/tests/store_listings.test.mjs scripts/tests/google_play_listings.test.mjs
           node scripts/store_listings.mjs > store-listings-preview.json
-      - name: Test Windows build tooling
+      - name: Test desktop build tooling
         run: |
           python3 -m unittest discover -s scripts/tests -p test_fetch_subtitle_vulkan.py
           node --test scripts/tests/windows_build.test.mjs
+          node --test scripts/tests/linux_package.test.mjs
+          node --test scripts/tests/macos_subtitle_bundle.test.mjs
       - uses: actions/upload-artifact@v7.0.1
         with:
           name: store-listings
@@ -192,7 +194,9 @@ jobs:
           echo "- **DMG**: \`CBFileHub-$VERSION-macos.dmg\` - Universal (Apple Silicon + Intel), macOS 12+" >> release_notes.md
           echo "" >> release_notes.md
           echo "### Linux (x64)" >> release_notes.md
-          echo "- **Debian 12+, Ubuntu 24.04+, Mint 22**: \`CBFileHub-$VERSION-linux-amd64.deb\` or portable \`CBFileHub-$VERSION-linux-x64.tar.gz\`" >> release_notes.md
+          echo "- **Debian 12**: \`CBFileHub-$VERSION-linux-amd64.deb\` or portable \`CBFileHub-$VERSION-linux-x64.tar.gz\`" >> release_notes.md
+          echo "- **Debian 13**: \`CBFileHub-$VERSION-linux-debian13-amd64.deb\` or portable \`CBFileHub-$VERSION-linux-debian13-x64.tar.gz\`" >> release_notes.md
+          echo "- **Ubuntu 24.04, Mint 22**: \`CBFileHub-$VERSION-linux-ubuntu24.04-amd64.deb\` or portable \`CBFileHub-$VERSION-linux-ubuntu24.04-x64.tar.gz\`" >> release_notes.md
           echo "- **Ubuntu 22.04, Mint 21**: \`CBFileHub-$VERSION-linux-ubuntu22.04-amd64.deb\` or portable \`CBFileHub-$VERSION-linux-ubuntu22.04-x64.tar.gz\`" >> release_notes.md
           echo "" >> release_notes.md
           echo "## 🚀 Installation" >> release_notes.md
@@ -224,9 +228,9 @@ jobs:
           echo "4. Confirm **Open Anyway** and enter your password" >> release_notes.md
           echo "" >> release_notes.md
           echo "### Linux" >> release_notes.md
-          echo "**.deb (Debian/Ubuntu):** \`sudo apt install ./CBFileHub-$VERSION-linux-amd64.deb\`, then start **CB File Hub** from the app menu or run \`cb-file-hub\`." >> release_notes.md
+          echo "**.deb (Debian/Ubuntu):** download the package matching your distro above and run \`sudo apt install ./<downloaded-file>.deb\`, then start **CB File Hub** from the app menu or run \`cb-file-hub\`." >> release_notes.md
           echo "" >> release_notes.md
-          echo "**Portable tar.gz:** install \`libgtk-3-0\`, \`libmpv2\` (\`libmpv1\` on Ubuntu 22.04) and \`libsecret-1-0\`, extract the archive and run \`cb-file-hub/cb-file-hub\`. Trash moves need \`gio\` (libglib2.0-bin) or \`trash-cli\`; torrents need \`aria2\`." >> release_notes.md
+          echo "**Portable tar.gz:** choose the archive matching your distro. GTK 3, libmpv, libsecret and that distro's FFmpeg runtime libraries are required; the .deb installs these automatically. Extract and run \`cb-file-hub/cb-file-hub\`. Trash moves need \`gio\` (libglib2.0-bin) or \`trash-cli\`; torrents need \`aria2\`." >> release_notes.md
 
           # Save to output
           {
@@ -584,6 +588,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7.0.1
 
+      - name: Setup Node for bundle signing checks
+        uses: actions/setup-node@v7.0.0
+        with:
+          node-version: "22"
+
+      - name: Verify subtitle bundle layout and code signing
+        run: node --test scripts/tests/macos_subtitle_bundle.test.mjs
+
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -668,9 +680,9 @@ jobs:
           path: ${{ env.PROJECT_DIR }}/build/macos/dmg/*.dmg
 
   # Build Linux .deb + portable tar.gz. Each package is built inside the
-  # oldest distro it targets, so its glibc and libmpv soname match:
-  # - debian12: Debian 12+, Ubuntu 23.04+/24.04, Mint 22 (libmpv2).
-  # - ubuntu22.04: Ubuntu 22.04, Mint 21, Pop!_OS 22.04 (libmpv1).
+  # target distro: libmpv and the subtitle worker's FFmpeg sonames differ.
+  # A Debian 12 worker needs libavcodec59, Debian 13 needs libavcodec61,
+  # Ubuntu 24.04 needs libavcodec60 and Ubuntu 22.04 needs libavcodec58.
   build-linux:
     name: build-linux (${{ matrix.distro }})
     runs-on: ubuntu-latest
@@ -684,6 +696,12 @@ jobs:
           - distro: debian12
             image: debian:12
             suffix: ""
+          - distro: debian13
+            image: debian:13
+            suffix: debian13
+          - distro: ubuntu24.04
+            image: ubuntu:24.04
+            suffix: ubuntu24.04
           - distro: ubuntu22.04
             image: ubuntu:22.04
             suffix: ubuntu22.04
@@ -767,9 +785,9 @@ jobs:
         include:
           - artifact: linux-debian12
             image: debian:12
-          - artifact: linux-debian12
+          - artifact: linux-debian13
             image: debian:13
-          - artifact: linux-debian12
+          - artifact: linux-ubuntu24.04
             image: ubuntu:24.04
           - artifact: linux-ubuntu22.04
             image: ubuntu:22.04

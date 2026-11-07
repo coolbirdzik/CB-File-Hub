@@ -9,9 +9,10 @@
 # application id so docks match the running window.
 #
 # Depends is computed with dpkg-shlibdeps from the libraries the bundle really
-# links, so a package built on Ubuntu 22.04 (libmpv1) and one built on
-# Debian 12 (libmpv2) each ask for the right libmpv. Without dpkg-shlibdeps a
-# conservative static list is used.
+# links, including the subtitle worker's distro-specific FFmpeg ABI and libmpv.
+# Build a separate package on each supported distro; newer FFmpeg sonames
+# cannot satisfy an older worker's dependencies. Without dpkg-shlibdeps a
+# conservative static list is used only for bundles without a subtitle worker.
 #
 # Environment overrides: DEB_ARCH (default from uname -m), DEB_MAINTAINER.
 set -euo pipefail
@@ -111,7 +112,7 @@ if command -v dpkg-shlibdeps >/dev/null; then
         -l"$ROOT$INSTALL_DIR/lib" "${ELF_FILES[@]/#/-e}" 2>"$STAGE/shlibdeps.log")"; then
         DEPENDS="${SHLIBS#shlibs:Depends=}"
     else
-        echo "package_linux_deb: dpkg-shlibdeps failed, using fallback Depends" >&2
+        echo "package_linux_deb: dpkg-shlibdeps failed" >&2
         cat "$STAGE/shlibdeps.log" >&2 || true
     fi
 
@@ -139,7 +140,13 @@ if command -v dpkg-shlibdeps >/dev/null; then
         DEPENDS=$stripped
     fi
 fi
-[ -n "$DEPENDS" ] || DEPENDS=$FALLBACK_DEPENDS
+if [ -z "$DEPENDS" ]; then
+    # Omitting FFmpeg dependencies produces an installable but broken worker.
+    if [ -f "$ROOT$INSTALL_DIR/subtitles/cb-subtitle-worker" ]; then
+        die "cannot derive subtitle worker dependencies; install dpkg-dev and fix dpkg-shlibdeps errors"
+    fi
+    DEPENDS=$FALLBACK_DEPENDS
+fi
 
 INSTALLED_SIZE="$(du -sk --exclude=DEBIAN "$ROOT" | cut -f1)"
 

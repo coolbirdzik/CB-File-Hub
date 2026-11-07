@@ -36,10 +36,12 @@ jobs:
         run: node --test scripts/tests/store_listings.test.mjs scripts/tests/google_play_listings.test.mjs
       - name: Validate E2E suite selection rules
         run: node --test scripts/tests/e2e_select.test.mjs
-      - name: Test Windows build tooling
+      - name: Test desktop build tooling
         run: |
           python3 -m unittest discover -s scripts/tests -p test_fetch_subtitle_vulkan.py
           node --test scripts/tests/windows_build.test.mjs
+          node --test scripts/tests/linux_package.test.mjs
+          node --test scripts/tests/macos_subtitle_bundle.test.mjs
 
   # Analyze and test
   analyze:

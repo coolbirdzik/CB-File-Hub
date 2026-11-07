@@ -345,6 +345,7 @@
 			inputPaths = (
 				"$(PROJECT_DIR)/../../scripts/bundle_macos_llama_runtime.sh",
 				"$(PROJECT_DIR)/../../scripts/bundle_macos_subtitle_runtime.sh",
+				"$(PROJECT_DIR)/../../scripts/stage_macos_subtitle_runtime.sh",
 				"$(PROJECT_DIR)/../../scripts/fetch_macos_llama_runtime.sh",
 			);
 			name = "Bundle llama runtime";

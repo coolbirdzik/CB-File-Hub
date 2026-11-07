@@ -75,19 +75,20 @@ function parseCommits(body) {
   return items;
 }
 
-function describeAsset(name) {
+export function describeAsset(name) {
   const lower = name.toLowerCase();
   if (lower.endsWith(".zip")) return { platform: "windows", label: "Portable", ext: "zip" };
   if (lower.endsWith(".msi")) return { platform: "windows", label: "Installer", ext: "msi" };
   if (lower.endsWith(".msix")) return { platform: "windows", label: "MSIX", ext: "msix" };
   if (lower.endsWith(".dmg")) return { platform: "macos", label: "macOS DMG", ext: "dmg" };
   if (lower.includes("linux") && (lower.endsWith(".deb") || lower.endsWith(".tar.gz"))) {
-    // The ubuntu22.04 build links libmpv1; the default one targets Debian 12+ / Ubuntu 24.04+.
-    const legacy = lower.includes("ubuntu22.04");
+    // The subtitle worker links the distro's FFmpeg ABI directly.
+    const distro = lower.includes("ubuntu22.04") ? "Ubuntu 22.04 / Mint 21"
+      : lower.includes("ubuntu24.04") ? "Ubuntu 24.04 / Mint 22"
+      : lower.includes("debian13") ? "Debian 13" : "Debian 12";
     const ext = lower.endsWith(".deb") ? "deb" : "tar.gz";
     const label = ext === "deb"
-      ? (legacy ? "Ubuntu 22.04 (.deb)" : "Debian 12+ / Ubuntu 24.04+ (.deb)")
-      : (legacy ? "Linux portable (Ubuntu 22.04)" : "Linux portable");
+      ? `${distro} (.deb)` : `Linux portable (${distro})`;
     return { platform: "linux", label, ext };
   }
   if (lower.endsWith(".apk")) {
@@ -139,7 +140,9 @@ async function main() {
   console.log(`fetch-releases: ${releases.length} releases, ${kept} changes -> ${OUT}`);
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}

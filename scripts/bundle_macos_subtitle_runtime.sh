@@ -52,16 +52,6 @@ for arch in ${ARCHS:-$(uname -m)}; do
     cmake --build "$build" --config Release --target cb-subtitle-worker --parallel 4
     helpers+=("$build/bin/cb-subtitle-worker")
 done
-dest="$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Helpers/subtitles"
-mkdir -p "$dest"
-lipo -create "${helpers[@]}" -output "$dest/cb-subtitle-worker"
-# The shipped helper must not depend on the build machine's package manager.
-if otool -L "$dest/cb-subtitle-worker" | grep -Eq '/(opt/homebrew|usr/local)/'; then
-    echo 'error: Subtitle helper has an unbundled package-manager dependency'; exit 1
-fi
-if [ "${CODE_SIGNING_ALLOWED:-YES}" != NO ]; then
-    codesign --force --sign "${EXPANDED_CODE_SIGN_IDENTITY:--}" --timestamp=none "$dest/cb-subtitle-worker"
-fi
-cp "$build/_deps/whisper-src/LICENSE" "$dest/LICENSE-whisper"
-cp "$source_dir/COPYING.LGPLv2.1" "$dest/LICENSE-FFmpeg"
-cp "$REPO_DIR/native/subtitles/THIRD_PARTY_NOTICES.md" "$dest/"
+bash "$SCRIPT_DIR/stage_macos_subtitle_runtime.sh" \
+    "$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH" \
+    "$build/_deps/whisper-src/LICENSE" "$source_dir/COPYING.LGPLv2.1" "${helpers[@]}"

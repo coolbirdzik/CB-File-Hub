@@ -92,7 +92,7 @@ build_windows_release:
       - $RELEASE_OUTPUT_DIR/windows/
 
 # Same distro split as the GitHub workflow: each package is built on the
-# oldest distro it targets (glibc and libmpv soname).
+# target distro (glibc, libmpv and the subtitle worker's FFmpeg sonames).
 build_linux_release:
   stage: build
   image: $LINUX_IMAGE
@@ -100,6 +100,10 @@ build_linux_release:
     matrix:
       - LINUX_IMAGE: "debian:12"
         LINUX_DISTRO: debian12
+      - LINUX_IMAGE: "debian:13"
+        LINUX_DISTRO: debian13
+      - LINUX_IMAGE: "ubuntu:24.04"
+        LINUX_DISTRO: ubuntu24.04
       - LINUX_IMAGE: "ubuntu:22.04"
         LINUX_DISTRO: ubuntu22.04
   needs:

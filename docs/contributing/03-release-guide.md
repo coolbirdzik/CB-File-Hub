@@ -156,7 +156,7 @@ Android uses max(6, next Google Play versionCode):
     ├─ Android:  versionName=1.2.3, versionCode=6 or higher
     ├─ Windows:  portable/MSI/MSIX built from build number 6
     ├─ macOS:    CFBundleShortVersion=1.2.3, CFBundleVersion=6
-    └─ Linux:    .deb + tar.gz (Debian 12 and Ubuntu 22.04 containers),
+    └─ Linux:    .deb + tar.gz (Debian 12/13 and Ubuntu 22.04/24.04 containers),
                  each .deb installed on clean images by test-linux-packages
     │
     ▼  only when quality, every build and the Linux package tests passed
@@ -196,6 +196,15 @@ This is fully **repo-based** — no dependency on GitHub Run IDs, works with any
 | Windows | `CBFileManager-{ver}-windows-portable.zip` | No install needed |
 | Windows | `CBFileManager-Setup-{ver}.msi` | Classic desktop installer |
 | Windows | `CBFileManager-{ver}.msix` | Microsoft Store only (workflow artifact + automatic Store publication after certification, not on GitHub Release) |
+| Linux (Debian 12) | `CBFileHub-{ver}-linux-amd64.deb`, `CBFileHub-{ver}-linux-x64.tar.gz` | FFmpeg 5 / libavcodec59 |
+| Linux (Debian 13) | `CBFileHub-{ver}-linux-debian13-amd64.deb`, `CBFileHub-{ver}-linux-debian13-x64.tar.gz` | FFmpeg 7 / libavcodec61 |
+| Linux (Ubuntu 24.04 / Mint 22) | `CBFileHub-{ver}-linux-ubuntu24.04-amd64.deb`, `CBFileHub-{ver}-linux-ubuntu24.04-x64.tar.gz` | FFmpeg 6 / libavcodec60 |
+| Linux (Ubuntu 22.04 / Mint 21) | `CBFileHub-{ver}-linux-ubuntu22.04-amd64.deb`, `CBFileHub-{ver}-linux-ubuntu22.04-x64.tar.gz` | FFmpeg 4 / libavcodec58 |
+
+Choose the build matching the distribution. The subtitle worker links FFmpeg
+directly, so sharing the `libmpv2` soname does not make Debian 12, Debian 13 and
+Ubuntu 24.04 packages interchangeable. CI installs each package in a clean image
+of its target distro and checks all bundled ELF files, including the worker.
 
 ---
 

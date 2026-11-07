@@ -63,6 +63,22 @@ access; install a certificate-signed release.
 No hardened runtime: without a Team ID, library validation would refuse the
 bundled frameworks.
 
+## Subtitle helper layout
+
+`Contents/Helpers/subtitles/` contains only the signed `cb-subtitle-worker`.
+Its Whisper/FFmpeg licenses and third-party notices are installed under
+`Contents/Resources/subtitles/`. Apple's [nested-code rules](https://developer.apple.com/library/archive/technotes/tn2206/)
+reject unsigned data files placed in `Helpers`, even when the executable itself
+is signed. The staging script also removes old license copies from `Helpers`
+when rebuilding an existing app bundle.
+
+`node --test scripts/tests/macos_subtitle_bundle.test.mjs` checks this staging
+step without compiling FFmpeg or whisper.cpp. On macOS it uses a real Mach-O
+helper, signs the enclosing test app ad-hoc and verifies it with
+`codesign --verify --deep --strict`. The release job runs this check before the
+full app build. Other hosts check layout with stubbed Apple command-line tools;
+they cannot validate a macOS signature.
+
 ## Creating the certificate (one time only)
 
 1. Keychain Access > Certificate Assistant > Create a Certificate...

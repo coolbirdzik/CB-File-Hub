@@ -8,16 +8,16 @@ const github = "https://github.com/coolbirdzik/CB-File-Hub";
 const assets = data.releases.flatMap((r) => r.assets);
 const latestDmg = assets.find((a) => a.platform === "macos");
 const latestMsi = assets.find((a) => a.platform === "windows" && a.ext === "msi");
-// Linux: the default .deb targets Debian 12+ / Ubuntu 24.04+; the "-ubuntu22.04" one is the legacy build.
-// Undefined until a release ships Linux packages, so the site only offers Linux once there is a file.
-const latestDeb = assets.find((a) => a.platform === "linux" && a.ext === "deb" && !a.name.includes("ubuntu22.04"));
+// Linux packages have different FFmpeg ABIs. Let users choose their distro on
+// the releases page instead of sending everyone the Debian 12 package.
+const hasLinuxPackage = assets.some((a) => a.platform === "linux" && a.ext === "deb");
 
 export const links = {
   microsoftStore: "https://apps.microsoft.com/detail/9nchpzkc4m5c",
   googlePlay: "https://play.google.com/store/apps/details?id=com.cbv.filehub",
   windows: latestMsi?.url ?? `${github}/releases/latest`,
   macos: latestDmg?.url ?? `${github}/releases/latest`,
-  linux: latestDeb?.url,
+  linux: hasLinuxPackage ? "/releases/" : undefined,
   privacy: "/privacy",
   terms: "/terms",
   releases: "/releases/",
