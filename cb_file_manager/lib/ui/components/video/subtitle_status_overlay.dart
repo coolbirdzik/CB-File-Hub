@@ -249,7 +249,7 @@ class SubtitleControlButton extends StatelessWidget {
   }
 }
 
-/// Paints the AI rail directly below the playback track, sharing its exact rect.
+/// Tints only unplayed parts of the existing track with AI progress.
 /// Slider hit testing, keyboard seeking and the playback thumb stay unchanged.
 class SubtitleSeekTrackShape extends RoundedRectSliderTrackShape {
   final SubtitleProgress progress;
@@ -281,7 +281,7 @@ class SubtitleSeekTrackShape extends RoundedRectSliderTrackShape {
       isEnabled: isEnabled,
       additionalActiveTrackHeight: additionalActiveTrackHeight,
     );
-    if (progress.phase == SubtitlePhase.off) return;
+    if (progress.phase == SubtitlePhase.off || !isEnabled) return;
     final track = getPreferredRect(
       parentBox: parentBox,
       offset: offset,
@@ -289,12 +289,30 @@ class SubtitleSeekTrackShape extends RoundedRectSliderTrackShape {
       isEnabled: isEnabled,
       isDiscrete: isDiscrete,
     );
+    if (track.isEmpty) return;
+    final ltr = textDirection == TextDirection.ltr;
+    final thumbX = thumbCenter.dx.clamp(track.left, track.right);
     context.canvas.save();
-    context.canvas.translate(track.left, track.bottom + 2);
+    context.canvas.clipRRect(
+      RRect.fromRectAndRadius(track, Radius.circular(track.height / 2)),
+    );
+    // Played media stays white. AI ranges only tint what lies ahead of the
+    // playback thumb, on the same baseline and within the same track height.
+    context.canvas.clipRect(
+      Rect.fromLTRB(
+        ltr ? thumbX : track.left,
+        track.top,
+        ltr ? track.right : thumbX,
+        track.bottom,
+      ),
+    );
+    context.canvas.translate(ltr ? track.left : track.right, track.top);
+    if (!ltr) context.canvas.scale(-1, 1);
     SubtitleTimelinePainter(
       progress,
       showPosition: false,
-    ).paint(context.canvas, Size(track.width, 2));
+      showBackground: false,
+    ).paint(context.canvas, track.size);
     context.canvas.restore();
   }
 }
@@ -303,8 +321,12 @@ class SubtitleSeekTrackShape extends RoundedRectSliderTrackShape {
 /// unprocessed prefix as complete. Amber denotes the current unfinished chunk.
 class SubtitleTimelinePainter extends CustomPainter {
   final SubtitleProgress progress;
-  final bool showPosition;
-  SubtitleTimelinePainter(this.progress, {this.showPosition = true});
+  final bool showPosition, showBackground;
+  SubtitleTimelinePainter(
+    this.progress, {
+    this.showPosition = true,
+    this.showBackground = true,
+  });
   @override
   void paint(Canvas canvas, Size size) {
     final track = RRect.fromRectAndRadius(
@@ -313,7 +335,9 @@ class SubtitleTimelinePainter extends CustomPainter {
     );
     canvas.save();
     canvas.clipRRect(track);
-    canvas.drawRRect(track, Paint()..color = Colors.white24);
+    if (showBackground) {
+      canvas.drawRRect(track, Paint()..color = Colors.white24);
+    }
     final duration = progress.duration.inMilliseconds;
     if (duration > 0) {
       double x(Duration value) =>
@@ -349,5 +373,6 @@ class SubtitleTimelinePainter extends CustomPainter {
   @override
   bool shouldRepaint(SubtitleTimelinePainter oldDelegate) =>
       oldDelegate.progress != progress ||
-      oldDelegate.showPosition != showPosition;
+      oldDelegate.showPosition != showPosition ||
+      oldDelegate.showBackground != showBackground;
 }

@@ -166,8 +166,21 @@ class ExtraPromo:
 
 
 TORRENT_SOURCE = ROOT / "screenshots" / "features" / "torrents"
+SUBTITLE_SOURCE = ROOT / "screenshots" / "features" / "local_subtitles"
 
 EXTRA_DESKTOP_PROMOS = [
+    ExtraPromo(13, "subtitles:player", {
+        "en": PromoSpec("local_ai_subtitles", "Subtitles. On your device.", "Recognize speech and translate video subtitles locally. Pick your language and keep watching.", (75, 204, 185)),
+        "vi": PromoSpec("phu_de_ai_local", "Phụ đề AI ngay trên máy", "Nhận diện lời nói và dịch phụ đề video ngay trên máy. Chọn ngôn ngữ rồi tiếp tục xem.", (75, 204, 185)),
+        "tr": PromoSpec("yerel_ai_altyazilar", "Altyazılar kendi cihazınızda", "Konuşmayı tanıyın, video altyazılarını yerel olarak çevirin. Dilinizi seçin ve izlemeye devam edin.", (75, 204, 185)),
+        "zh": PromoSpec("bendi_ai_zimu", "字幕，就在你的设备上", "在本机识别语音并翻译视频字幕。选择语言，继续观看。", (75, 204, 185)),
+    }),
+    ExtraPromo(14, "subtitles:models", {
+        "en": PromoSpec("subtitle_models", "Your models. Your language.", "Manage speech and translation models with CB Agent. Reuse saved subtitles or regenerate when needed.", (54, 166, 255)),
+        "vi": PromoSpec("model_phu_de", "Model và ngôn ngữ của bạn", "Quản lý model nhận diện và dịch cùng CB Agent. Dùng lại phụ đề đã lưu hoặc chủ động tạo lại.", (54, 166, 255)),
+        "tr": PromoSpec("altyazi_modelleri", "Modelleriniz. Diliniz.", "Konuşma ve çeviri modellerini CB Agent ile yönetin. Kaydedilen altyazıları kullanın veya yeniden oluşturun.", (54, 166, 255)),
+        "zh": PromoSpec("zimu_moxing", "你的模型，你的语言", "与 CB Agent 一起管理语音和翻译模型。复用已保存的字幕，或按需重新生成。", (54, 166, 255)),
+    }),
     ExtraPromo(11, "torrent:qbittorrent", {
         "en": PromoSpec("torrent_library", "Your torrent library", "Import qBittorrent backups and keep .torrent files and magnet links in one searchable library.", (75, 204, 143)),
         "vi": PromoSpec("thu_vien_torrent", "Thư viện torrent của bạn", "Nhập bản sao lưu qBittorrent, gom file .torrent và magnet vào một thư viện có tìm kiếm.", (75, 204, 143)),
@@ -188,8 +201,9 @@ def extra_promo_source(extra: ExtraPromo, language: str, desktop_source: Path) -
     if kind == "desktop":
         source = desktop_source / name
     else:
-        localized = TORRENT_SOURCE / language / f"{name}.png"
-        source = localized if localized.exists() else TORRENT_SOURCE / "en" / f"{name}.png"
+        root = {"torrent": TORRENT_SOURCE, "subtitles": SUBTITLE_SOURCE}[kind]
+        localized = root / language / f"{name}.png"
+        source = localized if localized.exists() else root / "en" / f"{name}.png"
     if not source.exists():
         raise SystemExit(f"Missing promo source: {source}")
     return source
@@ -548,6 +562,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--mobile-source", type=Path, default=DEFAULT_MOBILE_SOURCE)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--desktop-only", action="store_true", help="Regenerate only desktop promos and the Store hero art.")
+    parser.add_argument("--feature", choices=sorted({e.source.split(':')[0] for e in EXTRA_DESKTOP_PROMOS if not e.source.startswith('desktop:')}),
+        help="Render only this feature's desktop promos, leaving other images and Store hero art untouched.")
+    parser.add_argument("--website-output", type=Path,
+        help="Also export English/Vietnamese subtitle WebP previews into this website media directory.")
     parser.add_argument(
         "--languages",
         default=",".join(["en", "vi", *EXTRA_DESKTOP_LANGUAGES]),
@@ -558,12 +576,12 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main() -> None:
     args = build_parser().parse_args()
-    desktop_sources = discover_desktop_sources(args.desktop_source)
-    mobile_sources = [] if args.desktop_only else discover_mobile_sources(args.mobile_source)
+    desktop_sources = [] if args.feature else discover_desktop_sources(args.desktop_source)
+    mobile_sources = [] if args.desktop_only or args.feature else discover_mobile_sources(args.mobile_source)
 
-    if not desktop_sources:
+    if not desktop_sources and not args.feature:
         raise SystemExit(f"No desktop screenshots found in {args.desktop_source}")
-    if not args.desktop_only and not mobile_sources:
+    if not args.desktop_only and not args.feature and not mobile_sources:
         raise SystemExit(f"No mobile screenshots found in {args.mobile_source}")
 
     desktop_output = args.output / "desktop"
@@ -586,15 +604,32 @@ def main() -> None:
         if code in languages:
             desktop_targets.append((code, specs, args.output / code / "desktop"))
 
+    extras = [e for e in EXTRA_DESKTOP_PROMOS if not args.feature or e.source.startswith(args.feature + ':')]
     for code, specs, output in desktop_targets:
         for index, source in enumerate(desktop_sources):
             spec = specs[index % len(specs)]
             create_desktop_promo(source, output / desktop_promo_filename(index, spec), spec)
-        for extra in EXTRA_DESKTOP_PROMOS:
+        for extra in extras:
             spec = extra.specs[code]
             source = extra_promo_source(extra, code, args.desktop_source)
             create_desktop_promo(source, output / f"{extra.slot:02d}_{spec.stem}.png", spec, extra.crop)
-        print(f"Created {len(desktop_sources) + len(EXTRA_DESKTOP_PROMOS)} desktop promo images in {output}")
+        print(f"Created {len(desktop_sources) + len(extras)} desktop promo images in {output}")
+
+    if args.website_output and any(e.source.startswith('subtitles:') for e in extras):
+        args.website_output.mkdir(parents=True, exist_ok=True)
+        for language in sorted(languages & {"en", "vi"}):
+            for scene in ("player", "models"):
+                source = SUBTITLE_SOURCE / language / f"{scene}.png"
+                with Image.open(source) as capture:
+                    capture.convert("RGB").save(args.website_output / f"subtitles-{scene}-{language}.webp", quality=90, method=6)
+            spec = next(e for e in extras if e.source == "subtitles:player").specs[language]
+            directory = args.output / "desktop" if language == "en" else args.output / language / "desktop"
+            with Image.open(directory / f"13_{spec.stem}.png") as promo:
+                promo.convert("RGB").resize((1200, 675), Image.Resampling.LANCZOS).save(
+                    args.website_output / f"subtitles-promo-{language}.webp", quality=90, method=6)
+
+    if args.feature:
+        return
 
     create_store_hero(args.output / "store" / "hero_16x9.png")
     print(f"Created Microsoft Store hero art in {args.output / 'store'}")

@@ -164,8 +164,9 @@ errors and retry instead of delaying video playback automatically.
 Desktop playback controls include a small **CC** button. Its tooltip and menu
 show model loading, recognition, translation, the language pair, processed time
 and cache state. Settings, retry and clear/regenerate are available from that
-menu. A two-pixel AI rail immediately below the existing seek track paints
-finished intervals in teal and the current unfinished chunk in amber. The
+menu. The existing seek track tints finished AI intervals ahead of playback in
+teal and the current unfinished chunk in amber. Played media stays white; the
+track keeps one baseline and its original height. The
 playback thumb, keyboard seeking and drag behavior retain their normal role.
 No separate AI status panel covers the picture; hiding controls leaves only
 caption text visible and keeps recognition running. Local files and network

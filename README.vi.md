@@ -15,6 +15,7 @@ CB File Hub là ứng dụng quản lý tập tin đa nền tảng dành cho th�
 
 ## Tính năng nổi bật
 
+- **[Phụ đề AI chạy local trên desktop](#phụ-đề-ai-chạy-local-trên-desktop):** nhận diện lời nói, dịch phụ đề khi xem video, quản lý model và lưu cache cho lần sau.
 - **Duyệt tập tin linh hoạt:** nhiều tab, chia đôi, ghim vị trí, khôi phục phiên và các chế độ xem quen thuộc.
 - **Thư viện torrent:** index chung, nơi lưu tùy chọn, nhập từ ứng dụng khác, hợp nhất mục trùng và quản lý tải xuống.
 - **Ảnh, video và âm thanh:** thư viện trực quan, hình thu nhỏ, trình xem, chỉnh sửa ảnh và trình phát tích hợp.
@@ -26,6 +27,27 @@ CB File Hub là ứng dụng quản lý tập tin đa nền tảng dành cho th�
 - **[Dung lượng ứng dụng](#dung-lượng-ứng-dụng):** xem mỗi ứng dụng đang chiếm gì trên đĩa (bản thân ứng dụng, cache, log, dữ liệu, extension của editor) và phần nào xoá an toàn.
 - **Tăng tốc bằng Rust:** quét ổ đĩa, tìm kiếm, tạo ảnh thu nhỏ, tính hash và xử lý file nén trên luồng native. Xem [số đo hiệu năng](#hiệu-năng-với-rust).
 - **Sao lưu và cá nhân hóa:** sao lưu cài đặt/tag, các tích hợp đám mây khả dụng, giao diện sáng/tối và màu nhấn.
+
+## Phụ đề AI chạy local trên desktop
+
+**Tạo và dịch phụ đề khi xem video, với cả nhận diện lẫn dịch chạy ngay trên máy tính của bạn.** Chọn ngôn ngữ muốn đọc hoặc mặc định theo ngôn ngữ app; có tiếng Nhật, Việt, Anh và các ngôn ngữ được model hỗ trợ.
+
+![CB File Hub tạo phụ đề local, với phụ đề Nhật và Việt mẫu cùng tiến độ AI trên một thanh seek](screenshots/promo/vi/desktop/13_phu_de_ai_local.png)
+
+- **Xử lý tại máy:** tải Whisper và model dịch một lần; sau đó có thể tạo phụ đề cho video cục bộ khi offline. Không gửi audio hay bản chép lời đến dịch vụ AI đám mây.
+- **Ngay trong controls:** một thanh seek hiển thị tiến độ phát và AI. Nút **CC** chứa trạng thái, cài đặt, thử lại và **Xóa và tạo lại**.
+- **Quản lý model chung:** model nhận diện, dịch và CB Agent ở **Cài đặt → Model AI · CB Agent & phụ đề**, có tải, hủy, xóa và chuyển nơi lưu.
+- **Lưu cho lần sau:** phụ đề hoàn tất được cache trong SQLite, dùng lại khi mở hoặc tua video; có thể chủ động xóa cache từng video hoặc toàn bộ.
+
+**Bản xem trước desktop:** cần bản desktop có tính năng này và model đã tải. Các bản phát hành cũ có thể chưa có. Hỗ trợ video cục bộ và VOD mạng có timeline tua được; chưa hỗ trợ live stream không tua được. Tốc độ phụ thuộc phần cứng và model. Xem [hướng dẫn model và cache](docs/features/12-local-ai-subtitles.md).
+
+<details><summary>Model, ngôn ngữ và cache phụ đề</summary>
+
+![Cài đặt phụ đề AI với Whisper Small, Hy-MT2, audio Japanese và đầu ra Vietnamese](screenshots/features/local_subtitles/vi/models.png)
+
+</details>
+
+Ảnh dựng từ widget thật của app với hình minh họa và dữ liệu phụ đề mẫu, dùng để giới thiệu giao diện; không phải phép đo độ chính xác hay hiệu năng AI. [Tạo lại ảnh chụp và ảnh promo](screenshots/features/local_subtitles/README.md).
 
 ## Tự chọn thời điểm lấy thumbnail video
 

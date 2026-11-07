@@ -37,6 +37,7 @@ void main() {
           appBar: VideoPlayerAppBar(
             title: 'sample.mp4',
             showWindowControls: false,
+            actions: [SizedBox(width: 120)],
           ),
         ),
       ),
@@ -46,6 +47,11 @@ void main() {
     final dragArea = find.byType(DragToMoveArea);
     expect(dragArea, findsOneWidget);
     expect(tester.getSize(dragArea).height, kToolbarHeight);
+    expect(find.text('sample.mp4'), findsOneWidget);
+    expect(
+      tester.getCenter(find.text('CB File Hub')).dx,
+      tester.getCenter(find.byType(Scaffold)).dx,
+    );
 
     final bounds = tester.getRect(dragArea);
     final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);

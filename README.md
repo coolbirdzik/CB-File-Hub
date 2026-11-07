@@ -1,6 +1,6 @@
 # CB File Hub: All-in-One File Manager for Windows, macOS, Linux and Android
 
-**One app for your files, servers and storage.** CB File Hub combines a tabbed file manager, an SSH client with SFTP, network shares (SMB, FTP, WebDAV), an AI file assistant, a disk cleaner, a photo and video library, file tags and a torrent library, so you do not need a separate tool for each job.
+**One app for your files, servers and storage — now with local AI video subtitles.** CB File Hub combines a tabbed file manager, an SSH client with SFTP, network shares (SMB, FTP, WebDAV), an AI file assistant, a disk cleaner, a photo and video library, file tags and a torrent library, so you do not need a separate tool for each job.
 
 [![Build and Test](https://github.com/coolbirdzik/cb-file-hub/actions/workflows/build-test.yml/badge.svg)](https://github.com/coolbirdzik/cb-file-hub/actions/workflows/build-test.yml)
 [![Build and Release](https://github.com/coolbirdzik/CB-File-Hub/actions/workflows/release.yml/badge.svg)](https://github.com/coolbirdzik/CB-File-Hub/actions/workflows/release.yml)
@@ -18,14 +18,31 @@
   <a href="README.vi.md">Tiếng Việt</a>
 </p>
 
-<p align="center">
-  <img src="screenshots/promo/desktop/01_file_browser.png" alt="CB File Hub desktop file manager with tabs, tags and file preview" />
-</p>
+## Local AI subtitles on your desktop
+
+**Turn video speech into subtitles and translate them while you watch, with recognition and translation running on your own computer.** Choose your subtitle language, or follow the app language by default. Japanese, English, Vietnamese and other model-supported languages are available.
+
+<p align="center"><img src="screenshots/promo/desktop/13_local_ai_subtitles.png" alt="CB File Hub desktop player with bilingual Japanese and English demo subtitles and AI progress on one seek track" /></p>
+
+- **Local processing:** download Whisper and the translation model once; local videos can then be subtitled offline. No audio or transcript is sent to a cloud AI service.
+- **Built into playback:** one seek track shows playback and AI progress. The small **CC** menu holds status, settings, retry and **Clear and regenerate**.
+- **Models in one place:** manage speech, translation and CB Agent downloads together in **Settings → AI models · CB Agent & subtitles**.
+- **Ready next time:** completed subtitles are cached in the app's SQLite database and reused when you reopen or seek. Clear a video version or all subtitle cache whenever needed.
+
+**Desktop preview:** requires a desktop build containing this feature and downloaded models. Older releases may not include it. Supports seekable local videos and suitable network VOD; non-seekable live streams are not supported. Startup and processing speed depend on hardware and models. See [setup, models and cache](docs/features/12-local-ai-subtitles.md).
+
+<details><summary>Models, language choices and saved subtitle cache</summary>
+<p align="center"><img src="screenshots/features/local_subtitles/en/models.png" alt="Local AI subtitle settings with Whisper Small, Hy-MT2, Japanese audio, English subtitle output and subtitle cache" /></p>
+</details>
+
+The screenshots render the app's production widgets with an original demo illustration and authored subtitle data. They illustrate the interface, not recognition accuracy or processing speed. [Reproduce the captures and promo images](screenshots/features/local_subtitles/README.md).
 
 ## Features
 
 ### File manager
 Tabs and tear-off windows, split panes, grid and list views with previews, pinned locations, keyboard shortcuts and a fast recursive search.
+
+<p align="center"><img src="screenshots/promo/desktop/01_file_browser.png" alt="CB File Hub desktop file manager with tabs, tags and file preview" /></p>
 
 Open archives like folders and extract selected items or everything. ZIP, 7z, TAR (including .tar.gz, .tar.bz2 and .tar.xz), GZip and BZip2 work on Windows, macOS, Linux and Android without extra tools. RAR needs 7-Zip installed, so it works on Windows only. Settings and tags can be exported to a ZIP backup.
 

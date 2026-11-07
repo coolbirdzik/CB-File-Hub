@@ -43,7 +43,7 @@ export function Hero() {
     <section aria-labelledby="hero-title" className="relative isolate overflow-hidden pt-28 sm:pt-32 lg:pt-36">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <a
-          href="#ssh"
+          href="#local-subtitles"
           className="rise glass group inline-flex items-center gap-2.5 rounded-full py-1.5 pr-4 pl-1.5 text-sm font-medium transition-colors hover:border-accent/40"
         >
           <span className="inline-flex items-center gap-1.5 rounded-full bg-accent px-2.5 py-1 text-xs font-semibold text-accent-ink">
@@ -51,7 +51,7 @@ export function Hero() {
             <T en="New" vi="Mới" />
           </span>
           <span className="text-muted transition-colors group-hover:text-ink">
-            <T en="SSH manager with SFTP, tunnels and Termius import" vi="Quản lý SSH với SFTP, tunnel và nhập từ Termius" />
+            <T en="Local AI subtitles, built into your video player" vi="Phụ đề AI chạy local, ngay trong trình phát video" />
           </span>
           <ArrowRight size={14} weight="bold" className="text-muted transition-transform duration-300 group-hover:translate-x-0.5" />
         </a>
@@ -68,8 +68,8 @@ export function Hero() {
           <Rise delay={0.35} className="lg:col-span-5 lg:pb-2">
             <p className="max-w-[46ch] text-lg leading-relaxed text-muted">
               <T
-                en="The all-in-one file manager: browse, tag and play your files, manage SSH servers, clean your disk and ask an AI assistant, in one fast app."
-                vi="Trình quản lý tệp tất cả trong một: duyệt, gắn thẻ, phát tệp, quản lý máy chủ SSH, dọn ổ đĩa và hỏi trợ lý AI, trong một ứng dụng nhanh."
+                en="The all-in-one file manager: browse, tag and play your files, generate video subtitles locally, manage SSH servers, clean your disk and ask an AI assistant."
+                vi="Trình quản lý tệp tất cả trong một: duyệt, gắn thẻ, phát tệp, tạo phụ đề video ngay trên máy, quản lý SSH, dọn ổ đĩa và hỏi trợ lý AI."
               />
             </p>
             <div className="mt-7 flex flex-wrap items-center gap-3">

@@ -27,6 +27,7 @@ export const links = {
 // Anchor ids are kept from the previous static site so existing deep links still work.
 // Rooted at "/" so the same links work from /releases and the 404 page.
 export const nav = [
+  { href: "/#local-subtitles", en: "AI subtitles", vi: "Phụ đề AI" },
   { href: "/#experience", en: "Experience", vi: "Trải nghiệm" },
   { href: "/#features", en: "Features", vi: "Tính năng" },
   { href: "/#platforms", en: "Platforms", vi: "Nền tảng" },

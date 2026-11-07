@@ -1,5 +1,6 @@
 import 'package:cb_file_manager/services/windowing/windows_engine_host.dart';
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../../utils/fluent_background.dart';
@@ -57,29 +58,53 @@ class _VideoPlayerAppBarState extends State<VideoPlayerAppBar> {
   @override
   Widget build(BuildContext context) {
     final onClose = widget.onClose ?? _onCloseDefault;
-    return FluentBackground.appBar(
-      context: context,
-      // The bar floats over black video content and its foreground is white,
-      // so the scrim stays dark whatever the app theme is — a light
-      // scaffoldBackgroundColor here would wash the icons out.
-      backgroundColor: Colors.black.withValues(alpha: widget.opacity),
-      title: _buildTitle(),
-      leading: _isDesktopPlatform
-          ? IconButton(
-              icon: const Icon(
-                PhosphorIconsLight.arrowLeft,
-                color: Colors.white,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final titleWidth = math.max(0.0, constraints.maxWidth / 2 - 144);
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            FluentBackground.appBar(
+              context: context,
+              // The bar floats over black video content and its foreground is white,
+              // so the scrim stays dark whatever the app theme is — a light
+              // scaffoldBackgroundColor here would wash the icons out.
+              backgroundColor: Colors.black.withValues(alpha: widget.opacity),
+              title: _buildTitle(titleWidth),
+              leading: _isDesktopPlatform
+                  ? IconButton(
+                      icon: const Icon(
+                        PhosphorIconsLight.arrowLeft,
+                        color: Colors.white,
+                      ),
+                      onPressed: onClose,
+                    )
+                  : null,
+              actions: _buildActions(onClose),
+              blurAmount: widget.blurAmount,
+              opacity: widget.opacity,
+            ),
+            const Positioned.fill(
+              child: IgnorePointer(
+                child: Center(
+                  child: Text(
+                    'CB File Hub',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
               ),
-              onPressed: onClose,
-            )
-          : null,
-      actions: _buildActions(onClose),
-      blurAmount: widget.blurAmount,
-      opacity: widget.opacity,
+            ),
+          ],
+        );
+      },
     );
   }
 
-  Widget _buildTitle() {
+  Widget _buildTitle(double maxWidth) {
     final content = Row(
       children: [
         const Icon(
@@ -107,7 +132,17 @@ class _VideoPlayerAppBarState extends State<VideoPlayerAppBar> {
     // visible title strip is draggable, including its empty top/bottom space.
     if (_isDesktopPlatform) {
       return DragToMoveArea(
-        child: SizedBox(height: kToolbarHeight, child: content),
+        child: SizedBox(
+          height: kToolbarHeight,
+          width: double.infinity,
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: maxWidth),
+              child: content,
+            ),
+          ),
+        ),
       );
     }
     return content;

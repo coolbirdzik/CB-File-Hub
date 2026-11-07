@@ -5,6 +5,7 @@ import 'package:cb_file_manager/design_system/primitives/cb_slider.dart';
 import 'package:cb_file_manager/services/media/subtitle_progress.dart';
 import 'package:cb_file_manager/ui/components/video/subtitle_status_overlay.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -278,6 +279,96 @@ void main() {
     expect(ended, isTrue);
     expect(changed, greaterThan(.25));
     expect(tester.takeException(), isNull);
+  });
+  testWidgets('AI tint uses one track and leaves played media white', (
+    tester,
+  ) async {
+    const key = ValueKey('single-seek-track');
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: SizedBox(
+              width: 400,
+              height: 48,
+              child: RepaintBoundary(
+                key: key,
+                child: SliderTheme(
+                  data: const SliderThemeData(
+                    trackHeight: 2.5,
+                    trackShape: SubtitleSeekTrackShape(
+                      SubtitleProgress(
+                        phase: SubtitlePhase.processing,
+                        stage: SubtitleWorkStage.recognizing,
+                        duration: Duration(seconds: 100),
+                        position: Duration(seconds: 25),
+                        completed: [
+                          SubtitleTimeRange(
+                            Duration.zero,
+                            Duration(seconds: 50),
+                          ),
+                        ],
+                        pending: SubtitleTimeRange(
+                          Duration(seconds: 50),
+                          Duration(seconds: 60),
+                        ),
+                      ),
+                    ),
+                  ),
+                  child: CbSlider(
+                    value: .25,
+                    activeColor: Colors.white,
+                    inactiveColor: Colors.white24,
+                    onChanged: (_) {},
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    final boundary = tester.renderObject<RenderRepaintBoundary>(
+      find.byKey(key),
+    );
+    final bytes = await tester.runAsync(() async {
+      final image = await boundary.toImage(pixelRatio: 1);
+      try {
+        return await image.toByteData(
+          format: ui.ImageByteFormat.rawStraightRgba,
+        );
+      } finally {
+        image.dispose();
+      }
+    });
+    final coloredRows = <int>{};
+    for (var y = 0; y < 48; y++) {
+      for (var x = 0; x < 400; x++) {
+        final index = (y * 400 + x) * 4;
+        final r = bytes!.getUint8(index),
+            g = bytes.getUint8(index + 1),
+            b = bytes.getUint8(index + 2);
+        if ((g > r + 50 && b > r + 30) || (r > g + 25 && g > b + 25)) {
+          coloredRows.add(y);
+        }
+      }
+    }
+    expect(coloredRows, isNotEmpty);
+    expect(
+      coloredRows.every((y) => y >= 22 && y <= 25),
+      isTrue,
+      reason:
+          'AI colors must stay inside the main track, with no second rail below it.',
+    );
+    final played = (24 * 400 + 40) * 4;
+    expect(
+      [
+        bytes!.getUint8(played),
+        bytes.getUint8(played + 1),
+        bytes.getUint8(played + 2),
+      ],
+      [255, 255, 255],
+    );
   });
   test(
     'timeline paints actual finished ranges rather than an unprocessed seek prefix',

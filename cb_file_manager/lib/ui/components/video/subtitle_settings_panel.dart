@@ -9,6 +9,7 @@ import '../../../../services/local_ai/local_ai_advisor_service.dart';
 import '../../../../services/local_ai/local_model_downloads.dart';
 import '../../../../services/local_ai/subtitle_model_catalog.dart';
 import '../../../../services/media/subtitle_preferences.dart';
+import '../../../../services/media/subtitle_cache.dart';
 import 'subtitle_cache_controls.dart';
 
 String modelPurposeLabel(AppLocalizations l, LocalModelPurpose purpose) =>
@@ -22,11 +23,13 @@ class SubtitleSettingsPanel extends StatefulWidget {
   final LocalAiAdvisorService models;
   final LocalModelDownloads downloads;
   final VoidCallback? onManageModels;
+  final SubtitleCache? cache;
   const SubtitleSettingsPanel({
     super.key,
     required this.models,
     required this.downloads,
     this.onManageModels,
+    this.cache,
   });
   @override
   State<SubtitleSettingsPanel> createState() => _SubtitleSettingsPanelState();
@@ -121,7 +124,7 @@ class _SubtitleSettingsPanelState extends State<SubtitleSettingsPanel> {
               icon: const Icon(Icons.download_outlined),
               label: Text(l.aiSubtitleManage),
             ),
-          const SubtitleCacheControls(),
+          SubtitleCacheControls(cache: widget.cache),
         ],
       ),
     );
