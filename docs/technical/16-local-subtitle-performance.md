@@ -34,6 +34,14 @@ cross the Flutter UI isolate. The implementation and UI are described in
 
 ## Repeatable checks
 
+Windows builds download pinned Vulkan tools with `scripts/fetch_subtitle_vulkan.py`
+and verify both archive SHA-256 hashes before extraction. The tools stay in the
+ignored `cb_file_manager/windows/subtitle-vulkan/` directory so `flutter clean`
+does not discard them. Windows CI jobs cache the extracted tools, without the
+large SDK installer. The download URLs use [LunarG's documented](https://vulkan.lunarg.com/content/view/latest-sdk-version-api) `?Human=true`
+parameter for shared-IP download limits, with bounded retries for transient
+HTTP/network failures. The SDK installer is never executed.
+
 Run all Flutter commands in `cb_file_manager/`. These are opt-in component
 benchmarks; they do not launch or control the application and are not E2E runners.
 

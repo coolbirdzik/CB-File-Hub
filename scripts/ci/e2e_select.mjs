@@ -30,11 +30,13 @@ export const fingerprintPaths = [
   'cb_file_manager',
   'mobile_smb_native',
   'cb_native',
+  'native/subtitles',
   'build.config',
   '.github/workflows/build-test.yml',
   'scripts/ci',
   'scripts/fetch_llama_runtime.sh',
   'scripts/fetch_aria2_runtime.sh',
+  'scripts/fetch_subtitle_vulkan.py',
 ];
 
 export const fullRunLabel = 'e2e:full';

@@ -16,6 +16,7 @@ _bmad
 *.pfx
 .kilo
 .gitnexus/
+__pycache__/
 
 # Build-time secrets/config (see .env.example)
 .env

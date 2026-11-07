@@ -18,7 +18,9 @@ option(CB_SUBTITLE_VULKAN "Accelerate subtitle inference with Vulkan" ${WIN32})
 if(CB_SUBTITLE_VULKAN AND WIN32)
   # Build-only tools live in an ignored workspace cache. The downloader treats
   # the SDK as an archive; it never installs an SDK or modifies the machine.
-  set(CB_SUBTITLE_VULKAN_TOOLS "${CMAKE_CURRENT_LIST_DIR}/../../cb_file_manager/build/subtitle-deps/vulkan")
+  # Keep this outside build/: release builds run flutter clean before CMake.
+  set(CB_SUBTITLE_VULKAN_TOOLS "${CMAKE_CURRENT_LIST_DIR}/../../cb_file_manager/windows/subtitle-vulkan"
+    CACHE PATH "Pinned subtitle Vulkan build tools")
   find_package(Python3 REQUIRED COMPONENTS Interpreter)
   execute_process(COMMAND "${Python3_EXECUTABLE}"
     "${CMAKE_CURRENT_LIST_DIR}/../../scripts/fetch_subtitle_vulkan.py"
@@ -26,7 +28,7 @@ if(CB_SUBTITLE_VULKAN AND WIN32)
     --cmake "${CMAKE_COMMAND}"
     RESULT_VARIABLE CB_VULKAN_FETCH_RESULT
     OUTPUT_VARIABLE CB_VULKAN_FETCH_OUTPUT ERROR_VARIABLE CB_VULKAN_FETCH_ERROR
-    TIMEOUT 600)
+    TIMEOUT 900)
   if(NOT CB_VULKAN_FETCH_RESULT EQUAL 0)
     message(FATAL_ERROR "Cannot prepare subtitle Vulkan build tools: ${CB_VULKAN_FETCH_ERROR}\nSet CB_SUBTITLE_VULKAN=OFF for a CPU-only build.")
   endif()

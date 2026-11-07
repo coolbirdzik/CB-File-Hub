@@ -36,6 +36,10 @@ jobs:
         run: node --test scripts/tests/store_listings.test.mjs scripts/tests/google_play_listings.test.mjs
       - name: Validate E2E suite selection rules
         run: node --test scripts/tests/e2e_select.test.mjs
+      - name: Test Windows build tooling
+        run: |
+          python3 -m unittest discover -s scripts/tests -p test_fetch_subtitle_vulkan.py
+          node --test scripts/tests/windows_build.test.mjs
 
   # Analyze and test
   analyze:
@@ -117,6 +121,18 @@ jobs:
           }
 
       # The fetch scripts verify SHA-256 and skip when the cached files match.
+      # Extracted tools only; installers are large and are not needed on a hit.
+      - name: Cache subtitle Vulkan build tools
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.PROJECT_DIR }}/windows/subtitle-vulkan/Bin
+            ${{ env.PROJECT_DIR }}/windows/subtitle-vulkan/Include
+            ${{ env.PROJECT_DIR }}/windows/subtitle-vulkan/Lib
+            ${{ env.PROJECT_DIR }}/windows/subtitle-vulkan/LICENSE-VulkanRT.txt
+            ${{ env.PROJECT_DIR }}/windows/subtitle-vulkan/.ready
+          key: subtitle-vulkan-windows-x64-${{ hashFiles('scripts/fetch_subtitle_vulkan.py') }}
+
       - name: Cache llama.cpp and aria2 runtimes
         uses: actions/cache@v4
         with:
@@ -205,6 +221,18 @@ jobs:
           Get-ChildItem -Path $pdfxDir -Include "*.cmake","*.txt","*.in" -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
             (Get-Content $_.FullName) -replace 'cmake_minimum_required\(VERSION [0-9.]+\)', 'cmake_minimum_required(VERSION 3.14)' | Set-Content $_.FullName
           }
+
+      # Extracted tools only; installers are large and are not needed on a hit.
+      - name: Cache subtitle Vulkan build tools
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.PROJECT_DIR }}/windows/subtitle-vulkan/Bin
+            ${{ env.PROJECT_DIR }}/windows/subtitle-vulkan/Include
+            ${{ env.PROJECT_DIR }}/windows/subtitle-vulkan/Lib
+            ${{ env.PROJECT_DIR }}/windows/subtitle-vulkan/LICENSE-VulkanRT.txt
+            ${{ env.PROJECT_DIR }}/windows/subtitle-vulkan/.ready
+          key: subtitle-vulkan-windows-x64-${{ hashFiles('scripts/fetch_subtitle_vulkan.py') }}
 
       - name: Cache llama.cpp and aria2 runtimes
         uses: actions/cache@v4

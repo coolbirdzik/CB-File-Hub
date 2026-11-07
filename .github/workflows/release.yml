@@ -51,6 +51,10 @@ jobs:
         run: |
           node --test scripts/tests/store_listings.test.mjs scripts/tests/google_play_listings.test.mjs
           node scripts/store_listings.mjs > store-listings-preview.json
+      - name: Test Windows build tooling
+        run: |
+          python3 -m unittest discover -s scripts/tests -p test_fetch_subtitle_vulkan.py
+          node --test scripts/tests/windows_build.test.mjs
       - uses: actions/upload-artifact@v7.0.1
         with:
           name: store-listings
@@ -312,6 +316,18 @@ jobs:
           key: cargo-${{ runner.os }}-${{ hashFiles('cb_native/rust/Cargo.lock') }}
           restore-keys: cargo-${{ runner.os }}-
 
+      # Extracted tools only; installers are large and are not needed on a hit.
+      - name: Cache subtitle Vulkan build tools
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.PROJECT_DIR }}/windows/subtitle-vulkan/Bin
+            ${{ env.PROJECT_DIR }}/windows/subtitle-vulkan/Include
+            ${{ env.PROJECT_DIR }}/windows/subtitle-vulkan/Lib
+            ${{ env.PROJECT_DIR }}/windows/subtitle-vulkan/LICENSE-VulkanRT.txt
+            ${{ env.PROJECT_DIR }}/windows/subtitle-vulkan/.ready
+          key: subtitle-vulkan-windows-x64-${{ hashFiles('scripts/fetch_subtitle_vulkan.py') }}
+
       - name: Ensure build script is executable
         shell: bash
         run: chmod +x scripts/build.sh
@@ -385,6 +401,18 @@ jobs:
           dotnet tool install --global wix --version 4.0.5
           wix extension add -g WixToolset.UI.wixext/4.0.5
           echo "$env:USERPROFILE\.dotnet\tools" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      # Extracted tools only; installers are large and are not needed on a hit.
+      - name: Cache subtitle Vulkan build tools
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.PROJECT_DIR }}/windows/subtitle-vulkan/Bin
+            ${{ env.PROJECT_DIR }}/windows/subtitle-vulkan/Include
+            ${{ env.PROJECT_DIR }}/windows/subtitle-vulkan/Lib
+            ${{ env.PROJECT_DIR }}/windows/subtitle-vulkan/LICENSE-VulkanRT.txt
+            ${{ env.PROJECT_DIR }}/windows/subtitle-vulkan/.ready
+          key: subtitle-vulkan-windows-x64-${{ hashFiles('scripts/fetch_subtitle_vulkan.py') }}
 
       - name: Ensure build script is executable
         shell: bash
@@ -513,6 +541,18 @@ jobs:
           echo "MSIX_VERSION=$MSIX_VERSION" >> "$GITHUB_ENV"
           echo "msix_version=$MSIX_VERSION" >> "$GITHUB_OUTPUT"
           echo "Microsoft Store MSIX version resolved to $MSIX_VERSION"
+
+      # Extracted tools only; installers are large and are not needed on a hit.
+      - name: Cache subtitle Vulkan build tools
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.PROJECT_DIR }}/windows/subtitle-vulkan/Bin
+            ${{ env.PROJECT_DIR }}/windows/subtitle-vulkan/Include
+            ${{ env.PROJECT_DIR }}/windows/subtitle-vulkan/Lib
+            ${{ env.PROJECT_DIR }}/windows/subtitle-vulkan/LICENSE-VulkanRT.txt
+            ${{ env.PROJECT_DIR }}/windows/subtitle-vulkan/.ready
+          key: subtitle-vulkan-windows-x64-${{ hashFiles('scripts/fetch_subtitle_vulkan.py') }}
 
       - name: Ensure build script is executable
         shell: bash

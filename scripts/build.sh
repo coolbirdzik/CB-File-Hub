@@ -489,13 +489,21 @@ build_windows_portable() {
     local VERSION_CODE
     VERSION_NAME=$(get_version_name)
     VERSION_CODE=$(get_windows_version_code)
-    if ! flutter build windows --release --build-name "$VERSION_NAME" --build-number "$VERSION_CODE" "${CLOUD_DEFINES[@]}" 2>&1 | tee /tmp/flutter_build.log; then
+    local WINDOWS_BUILD_LOG="$BUILD_DIR/windows-build.log"
+    mkdir -p "$BUILD_DIR"
+    # tee succeeding must not hide flutter's non-zero exit code. Scope pipefail
+    # here so unrelated platform signing/menu pipelines retain their behavior.
+    if ! (set -o pipefail; flutter build windows --release --build-name "$VERSION_NAME" --build-number "$VERSION_CODE" "${CLOUD_DEFINES[@]}" 2>&1 | tee "$WINDOWS_BUILD_LOG"); then
         # Check if it's the known CMake/VS race condition error
-        if grep -q "MSB3073\|CMake.*failed\|Visual Studio" /tmp/flutter_build.log 2>/dev/null; then
+        if grep -q "MSB3073\|CMake.*failed\|Visual Studio" "$WINDOWS_BUILD_LOG" 2>/dev/null; then
             print_warning "First build failed (known CMake race condition)"
             print_info "Retrying build automatically..."
             sleep 2
-            flutter build windows --release --build-name "$VERSION_NAME" --build-number "$VERSION_CODE" "${CLOUD_DEFINES[@]}"
+            if ! flutter build windows --release --build-name "$VERSION_NAME" --build-number "$VERSION_CODE" "${CLOUD_DEFINES[@]}"; then
+                print_error "Windows build failed after retry."
+                cd ..
+                return 1
+            fi
         else
             # Different error, don't retry
             cd ..

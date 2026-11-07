@@ -38,6 +38,7 @@ lib/generated_plugin_registrant.dart
 # scripts/fetch_llama_runtime.sh, not committed to git.
 /windows/llama/
 /windows/aria2/
+/windows/subtitle-vulkan/
 
 # Exceptions to above rules.
 !/packages/flutter_tools/test/data/dart_dependencies_test/**/.packages

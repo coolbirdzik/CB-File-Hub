@@ -11,6 +11,8 @@ import shutil
 import struct
 import subprocess
 import tempfile
+import time
+import urllib.error
 import urllib.request
 import zipfile
 import zlib
@@ -37,12 +39,30 @@ def download(url, target, digest):
         return target.is_file() and sha256(target) == digest
     if valid():
         return
-    partial = target.with_suffix('.part')
-    with urllib.request.urlopen(url, timeout=120) as response, partial.open('wb') as output:
-        shutil.copyfileobj(response, output, 1024 * 1024)
-    if sha256(partial) != digest:
-        raise RuntimeError('Vulkan build-tool download checksum mismatch')
-    os.replace(partial, target)
+    request = urllib.request.Request(url, headers={'User-Agent': 'CB-File-Hub-build-tools/1.0'})
+    for attempt in range(3):
+        partial = None
+        try:
+            # Independent CMake configurations must not share a partial file.
+            with tempfile.NamedTemporaryFile(dir=target.parent, prefix=target.name + '.',
+                    suffix='.part', delete=False) as output:
+                partial = Path(output.name)
+                with urllib.request.urlopen(request, timeout=120) as response:
+                    shutil.copyfileobj(response, output, 1024 * 1024)
+            if sha256(partial) != digest:
+                raise RuntimeError('Vulkan build-tool download checksum mismatch')
+            os.replace(partial, target)
+            return
+        except urllib.error.HTTPError as error:
+            if error.code not in (403, 408, 429, 500, 502, 503, 504) or attempt == 2:
+                raise
+        except (urllib.error.URLError, TimeoutError, ConnectionError):
+            if attempt == 2:
+                raise
+        finally:
+            if partial is not None:
+                partial.unlink(missing_ok=True)
+        time.sleep(2 ** attempt)
 
 
 def fetch(root, cmake):
@@ -53,8 +73,10 @@ def fetch(root, cmake):
         return
     sdk = root / 'sdk.exe'
     runtime = root / 'runtime.zip'
-    download(URL + f'vulkansdk-windows-X64-{VERSION}.exe', sdk, SDK_SHA)
-    download(URL + 'vulkan-runtime-components.zip', runtime, RT_SHA)
+    # LunarG documents Human=true for shared IPs hitting its download limit:
+    # https://vulkan.lunarg.com/content/view/latest-sdk-version-api
+    download(URL + f'vulkansdk-windows-X64-{VERSION}.exe?Human=true', sdk, SDK_SHA)
+    download(URL + 'vulkan-runtime-components.zip?Human=true', runtime, RT_SHA)
     data = sdk.read_bytes()
     signature, offset = b'7z\xbc\xaf\x27\x1c', 0
     # The Qt installer contains several independent 7z payloads. Only extract
