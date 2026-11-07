@@ -270,8 +270,9 @@ void main() {
           navigatorKey.currentState!.pop();
           await tester.pump(const Duration(milliseconds: 300));
           final dialogContext = navigatorKey.currentState!.context;
-          if (!dialogContext.mounted)
+          if (!dialogContext.mounted) {
             throw StateError('Capture navigator is unmounted');
+          }
           // Only UI is shown; all settings/cache data belong to this test process.
           final dialog = showDialog<void>(
             context: dialogContext,
