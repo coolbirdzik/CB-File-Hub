@@ -11,6 +11,7 @@ import '../editor_storage/editor_storage_models.dart';
 import 'app_space_models.dart';
 import 'chromium_layout.dart';
 import 'running_processes.dart';
+import '../storage_path_context.dart';
 
 /// Where the current user's per-app folders are.
 class AppSpaceEnvironment {
@@ -57,7 +58,7 @@ class AppSpaceEnvironment {
 
   // The OS selects the app layout; the home path selects its filesystem syntax.
   // This also permits exercising another OS's layout in a local fixture.
-  p.Context get path => p.windows.isAbsolute(home) ? p.windows : p.posix;
+  p.Context get path => storagePathContext(home);
 
   EditorStorageEnvironment get editor => EditorStorageEnvironment(
     operatingSystem: operatingSystem,

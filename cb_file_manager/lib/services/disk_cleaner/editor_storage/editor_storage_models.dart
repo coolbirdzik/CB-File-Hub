@@ -1,4 +1,5 @@
 import 'package:path/path.dart' as p;
+import '../storage_path_context.dart';
 
 /// A VS Code family editor: where it keeps its data and its extensions.
 class EditorProduct {
@@ -40,7 +41,7 @@ class EditorStorageEnvironment {
     this.appData,
   });
 
-  p.Context get path => p.windows.isAbsolute(home) ? p.windows : p.posix;
+  p.Context get path => storagePathContext(home);
 
   String? dataRoot(EditorProduct editor) => switch (operatingSystem) {
     'macos' => path.join(
