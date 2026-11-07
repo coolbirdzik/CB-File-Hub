@@ -296,15 +296,19 @@ bump-build: verify
     git add {{pubspec}}
     git commit -m "chore: bump build number to $(bash scripts/version.sh build)" || echo "Nothing to commit"
 
-# Create patch release (x.x.X), then pick a remote and push branch + tag
+# Release E2E gate alone (also runs inside release-*): CI E2E suites not yet passed on HEAD; --status shows progress
+release-e2e *args:
+    node scripts/release_e2e_gate.mjs {{args}}
+
+# Create patch release (x.x.X) after verify + the local E2E gate, then pick a remote and push branch + tag
 release-patch: verify
     PUBSPEC={{pubspec}} bash scripts/release.sh patch
 
-# Create minor release (x.X.0), then pick a remote and push branch + tag
+# Create minor release (x.X.0) after verify + the local E2E gate, then pick a remote and push branch + tag
 release-minor: verify
     PUBSPEC={{pubspec}} bash scripts/release.sh minor
 
-# Create major release (X.0.0), then pick a remote and push branch + tag
+# Create major release (X.0.0) after verify + the local E2E gate, then pick a remote and push branch + tag
 release-major: verify
     PUBSPEC={{pubspec}} bash scripts/release.sh major
 

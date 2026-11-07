@@ -55,7 +55,7 @@ Run from repo root via `just` (requires Git Bash on Windows):
 
 ### E2E execution policy
 
-Do **not** run any E2E test command unless the user explicitly authorizes it in the current request. This includes `just e2e`, `just e2e-parallel`, `just e2e-serial`, `just e2e-plain`, `just e2e-failed`, `just e2e-file`, direct `flutter test integration_test ...` commands, and any equivalent E2E runner. Unit/widget tests, analysis, formatting, and builds may still be run when appropriate.
+Do **not** run any E2E test command unless the user explicitly authorizes it in the current request. This includes `just e2e`, `just e2e-parallel`, `just e2e-serial`, `just e2e-plain`, `just e2e-failed`, `just e2e-file`, direct `flutter test integration_test ...` commands, and any equivalent E2E runner, including `just release-*`, `just release-e2e` and `scripts/release.sh` (they run the release E2E gate). Unit/widget tests, analysis, formatting, and builds may still be run when appropriate.
 
 E2E parallel defaults to half the CPU cores (clamped 2..6). Override via:
 
@@ -258,6 +258,7 @@ calling isolate:
 ## Release workflow
 
 - Version lives in `cb_file_manager/pubspec.yaml`. Use `just release-patch`, `just release-minor`, or `just release-major`.
+- Release E2E gate: `scripts/release.sh` first runs `scripts/release_e2e_gate.mjs`, which requires a clean tree on Windows and runs every CI E2E suite (`scripts/ci/e2e_run.mjs`) on HEAD. Any failure blocks the release before the version commit/tag. Passes are recorded per suite in `cb_file_manager/build/release-e2e/<fingerprint>/`, so reruns on the same source only run the failed suites; `just release-e2e` runs the gate alone, `just release-e2e --status` shows it.
 - Tags matching `v*.*.*` trigger the release CI pipeline (GitHub Actions + GitLab CI).
 - Build number: the workflow computes `pubspec build + 1`, passes it to every desktop build as `CB_BUILD_NUMBER`, and commits it to `main` (`bump-build-number`) only after the GitHub Release exists. Google Play and Microsoft Store submissions (`publish-*` jobs) also run only after the release; the `quality` job gates everything. See `docs/contributing/03-release-guide.md`.
 - Linux: `just linux` (= `scripts/build.sh linux`) writes `build/linux/portable/CBFileHub-<ver>-linux-x64.tar.gz` and, when `dpkg-deb` exists, a `.deb` via `scripts/package_linux_deb.sh` (installs to `/opt/cb-file-hub`, Depends from `dpkg-shlibdeps`). Build deps: `scripts/ci/setup_linux_build.sh`. Release CI builds inside `debian:12` (Debian 12+/Ubuntu 24.04, libmpv2) and `ubuntu:22.04` (`-ubuntu22.04` assets, libmpv1) because glibc and the libmpv soname differ, then installs each `.deb` on clean images (`scripts/ci/smoke_test_linux_deb.sh`).
