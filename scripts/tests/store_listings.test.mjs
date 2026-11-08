@@ -10,6 +10,7 @@ import {
   loadStoreListings, loadGooglePlayListings, loadGooglePlayImages, applyStoreListings, requiredStoreLocales,
 } from '../store_listings.mjs';
 import { writeStoredZip } from '../stored_zip.mjs';
+import { bundleStoreListings } from '../bundle_store_listings.mjs';
 
 const repo = fileURLToPath(new URL('../../', import.meta.url));
 const englishBase = {
@@ -69,7 +70,7 @@ test('checked-in listings cover every app language and meet Store text limits', 
     for (const capability of ['SSH', 'SMB', 'WebDAV', 'GGUF', 'Google Drive', 'Dropbox', 'OneDrive', 'ZIP']) {
       assert.ok(listing.description.includes(capability), capability);
     }
-    assert.equal(listing.features.length, 12);
+    assert.equal(listing.features.length, 13);
     assert.ok(!listing.description.includes('\r'));
     assert.deepEqual(listing.features, listing.description.split('\n')
       .filter((line) => line.startsWith('- ')).map((line) => line.slice(2)));
@@ -179,6 +180,8 @@ test('every listing ships localized screenshots and the shared hero art', () => 
     const names = screenshots.map((image) => path.basename(image.source));
     assert.ok(names.some((name) => name.startsWith('11_')), `${locale} shows the torrent library`);
     assert.ok(names.some((name) => name.startsWith('12_')), `${locale} shows tag assignment`);
+    assert.ok(names[1].startsWith('13_'), `${locale} highlights video translation as the second screenshot`);
+    assert.ok(names[2].startsWith('14_'), `${locale} shows subtitle model and language settings`);
     assert.deepEqual(images.filter((image) => image.imageType === 'PromotionalArt16x9')
       .map((image) => path.basename(image.source)), ['hero_16x9.png']);
     for (const image of images) {
@@ -190,6 +193,65 @@ test('every listing ships localized screenshots and the shared hero art', () => 
     const localized = content[locale].images.filter((image) => image.imageType === 'Screenshot');
     assert.ok(localized.every((image) => !english.includes(image.source)), `${locale} uses its own screenshots`);
   }
+});
+
+test('subtitle descriptions disclose desktop support, model downloads and hardware-dependent speed', () => {
+  const content = loadStoreListings();
+  const play = loadGooglePlayListings();
+  const wording = {
+    'en-us': [/On desktop/, /as you watch/, /Download speech and translation models/, /hardware/],
+    'vi-vn': [/Trên máy tính/, /dịch video khi xem/, /tải model/, /phần cứng/],
+    'tr-tr': [/Masaüstünde/, /izlerken/, /modellerini indirin/, /donanıma/],
+    'zh-cn': [/桌面端/, /边看边翻译/, /下载/, /硬件/],
+  };
+  const languages = { 'en-us': 'en-US', 'vi-vn': 'vi', 'tr-tr': 'tr-TR', 'zh-cn': 'zh-CN' };
+  for (const [locale, patterns] of Object.entries(wording)) {
+    const feature = content[locale].features[3];
+    for (const pattern of patterns) assert.match(feature, pattern, locale);
+    assert.equal(play[languages[locale]].fullDescription, content[locale].description);
+  }
+});
+
+test('submission bundle is portable and preserves both stores text, image bytes and order', (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cb-listing-bundle-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const bundle = path.join(directory, 'listings');
+  bundleStoreListings(bundle);
+  assert.deepEqual(loadGooglePlayListings(bundle), loadGooglePlayListings());
+  const original = loadStoreListings();
+  for (const [locale, listing] of Object.entries(loadStoreListings(bundle))) {
+    assert.equal(listing.description, original[locale].description);
+    assert.deepEqual(listing.features, original[locale].features);
+    assert.deepEqual(listing.images.map(({ source, ...image }) => image),
+      original[locale].images.map(({ source, ...image }) => image));
+    for (const [index, image] of listing.images.entries()) {
+      assert.ok(image.source.startsWith(`${bundle}${path.sep}`));
+      assert.deepEqual(fs.readFileSync(image.source), fs.readFileSync(original[locale].images[index].source));
+    }
+  }
+  const originalPlay = loadGooglePlayImages();
+  for (const [language, types] of Object.entries(loadGooglePlayImages(bundle))) {
+    for (const [type, images] of Object.entries(types)) {
+      assert.deepEqual(images.map(({ source, ...image }) => image),
+        originalPlay[language][type].map(({ source, ...image }) => image));
+      for (const image of images) assert.ok(image.source.startsWith(`${bundle}${path.sep}`));
+    }
+  }
+  // Publishers can relocate the artifact onto a different OS/runner.
+  const moved = path.join(directory, 'downloaded');
+  fs.renameSync(bundle, moved);
+  assert.deepEqual(loadGooglePlayListings(moved), loadGooglePlayListings());
+  assert.deepEqual(Object.keys(loadGooglePlayImages(moved)), Object.keys(originalPlay));
+  assert.equal(Object.keys(loadStoreListings(moved)).length, requiredStoreLocales.length);
+  assert.throws(() => bundleStoreListings(moved), /already exists/);
+});
+
+test('invalid sources fail bundling before an uploadable snapshot is created', (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cb-listing-invalid-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const output = path.join(directory, 'listings');
+  assert.throws(() => bundleStoreListings(output, directory), /Missing required Store listing/);
+  assert.equal(fs.existsSync(output), false);
 });
 
 test('updates text, replaces managed images and preserves other Store data', () => {
@@ -352,6 +414,8 @@ function runSubmit(t, { commitStatus = 'PreProcessing', statusDetails = {} } = {
   const result = path.join(directory, 'requests.json');
   const uploaded = path.join(directory, 'uploaded.zip');
   const mock = path.join(directory, 'mock.mjs');
+  const listingBundle = path.join(directory, 'store-submission', 'listings');
+  bundleStoreListings(listingBundle);
   fs.writeFileSync(msix, 'test package');
   fs.writeFileSync(mock, `
     import fs from 'node:fs';
@@ -395,7 +459,7 @@ function runSubmit(t, { commitStatus = 'PreProcessing', statusDetails = {} } = {
       ...process.env, PARTNER_CENTER_TENANT_ID: 'tenant', PARTNER_CENTER_CLIENT_ID: 'client',
       PARTNER_CENTER_CLIENT_SECRET: 'test-only', PARTNER_CENTER_APP_ID: 'app',
       PARTNER_CENTER_PACKAGE_PATH: msix, PARTNER_CENTER_PACKAGE_FILE_NAME: 'new.msix',
-      PARTNER_CENTER_LISTINGS_DIR: path.join(repo, 'store/listings'),
+      PARTNER_CENTER_LISTINGS_DIR: listingBundle,
       PARTNER_CENTER_COMMIT_SUBMISSION: 'true', PARTNER_CENTER_TARGET_PUBLISH_MODE: 'Immediate',
       PARTNER_CENTER_COMMIT_POLL_SECONDS: '0', RUNNER_TEMP: directory,
       TEST_REQUESTS: result, TEST_UPLOADED: uploaded,

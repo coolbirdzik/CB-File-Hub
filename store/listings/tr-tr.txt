@@ -3,6 +3,7 @@ CB File Hub dosyalarınızı, medyanızı ve uzak depolamanızı tek bir uygulam
 - Klasörlerde sekmelerle gezinin, bölünmüş görünüm kullanın, konumları sabitleyin ve çalışma alanınızı geri yükleyin.
 - Liste, ızgara, ayrıntılar, ağaç veya sütun görünümünü seçin. Arayın, sıralayın ve birden çok dosya seçin; büyük klasörler isteğe bağlı yüklenir.
 - Fotoğrafları görüntüleyin, resimleri düzenleyin ve video kitaplıklarına göz atın. Medyayı altyazı ve ses parçalarıyla oynatın; masaüstünde resim içinde resim kullanın.
+- Masaüstünde izlerken yerel yapay zekâyla video çevirin; çift dilli altyazı ve SRT kaydı kullanın. Önce konuşma ve çeviri modellerini indirin; işlem hızı donanıma bağlıdır.
 - Koleksiyonları etiketler, albümler ve otomatik albüm kurallarıyla düzenleyin.
 - SMB, FTP, SFTP ve WebDAV depolamaya bağlanın. SSH bağlantılarını yönetin ve yerleşik terminali kullanın.
 - .torrent dosyalarını ve magnet bağlantılarını aranabilir tek bir kitaplıkta tutun. Yinelenenleri birleştirin, magnet bağlantılarını kopyalayın ve dosyaların nerede saklanacağını seçin.

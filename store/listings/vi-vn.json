@@ -29,6 +29,16 @@
       "description": "Tập tin cục bộ, tab, tag và xem trước nhanh trong một không gian gọn gàng."
     },
     {
+      "file": "../../screenshots/promo/vi/desktop/13_phu_de_ai_local.png",
+      "imageType": "Screenshot",
+      "description": "Dịch video ngay khi xem trên máy tính với AI cục bộ và phụ đề song ngữ. Cần tải model trước; tốc độ tùy phần cứng."
+    },
+    {
+      "file": "../../screenshots/promo/vi/desktop/14_model_phu_de.png",
+      "imageType": "Screenshot",
+      "description": "Chọn model nhận diện, model dịch, ngôn ngữ phụ đề và cách lưu phụ đề."
+    },
+    {
       "file": "../../screenshots/promo/vi/desktop/02_thu_vien_anh.png",
       "imageType": "Screenshot",
       "description": "Quét album, thư mục media và bộ sưu tập hình ảnh mà không mất ngữ cảnh."
@@ -49,11 +59,6 @@
       "description": "Xem lại hành động của trợ lý trước khi bất kỳ thay đổi nào diễn ra."
     },
     {
-      "file": "../../screenshots/promo/vi/desktop/06_hoi_dap_ai.png",
-      "imageType": "Screenshot",
-      "description": "Trò chuyện với trợ lý hiểu ngữ cảnh ngay bên cạnh workspace."
-    },
-    {
       "file": "../../screenshots/promo/vi/desktop/12_gan_tag.png",
       "imageType": "Screenshot",
       "description": "Chọn tag phổ biến, tag gần đây hoặc duyệt cây tag ngay bên cạnh tập tin."
@@ -62,11 +67,6 @@
       "file": "../../screenshots/promo/vi/desktop/07_quan_ly_tag.png",
       "imageType": "Screenshot",
       "description": "Tạo hệ thống nhẹ cho dự án, tài liệu tham khảo và bộ sưu tập media."
-    },
-    {
-      "file": "../../screenshots/promo/vi/desktop/08_tap_tin_theo_tag.png",
-      "imageType": "Screenshot",
-      "description": "Tạo phân cấp tag cha con và mở đúng nhánh bạn đang cần."
     },
     {
       "file": "../../screenshots/promo/vi/desktop/10_don_dep_o_dia.png",

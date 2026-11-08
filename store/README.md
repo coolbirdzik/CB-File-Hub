@@ -48,7 +48,7 @@ The validator enforces:
   feature graphics, and 32-bit RGBA PNGs for the icon. It applies a conservative
   local limit of 8 MiB per non-icon image and rejects duplicate images in a group.
 
-The checked-in copy is about 1,400 characters per language. Describe what users
+The checked-in copy stays under 2,000 characters per language. Describe what users
 can do in plain language and mark features limited to desktop or Windows.
 Do not paste the full README into a listing.
 
@@ -63,17 +63,35 @@ and the [Play image upload API](https://developers.google.com/android-publisher/
 
 Microsoft screenshots are the desktop promo images from `scripts/make_promo_images.py`
 (`screenshots/promo/desktop/`, `vi/desktop/`, `tr/desktop/`, `zh/desktop/`),
-captioned with each promo's subtitle. Each listing uses the Store maximum of 10:
-file browser, gallery, torrent library (`11_*`, the qBittorrent import dialog
-from `screenshots/features/torrents/`), three CB Agent scenes, tag assignment
-(`12_*`), tag management, tag tree and disk cleaner. The album detail promo is
-kept for the README but left out of the Store. Every language also uses the
+captioned in each listing. Each listing uses the Store maximum of 10, in order:
+file browser, video translation (`13_*`), subtitle models/languages (`14_*`),
+gallery, torrent library (`11_*`, the qBittorrent import dialog from
+`screenshots/features/torrents/`), CB Agent search and approval, tag assignment
+(`12_*`), tag management and disk cleaner. Album detail, AI conversation and
+tag tree promos remain available for the README. Every language also uses the
 text-free hero art `screenshots/promo/store/hero_16x9.png`. Regenerate with:
 
 ```bash
 python scripts/make_promo_images.py --desktop-only            # all languages
 python scripts/make_promo_images.py --desktop-only --languages tr,zh
 ```
+
+To refresh only subtitle screenshots and their Store promos:
+
+```bash
+cd cb_file_manager
+flutter test --no-pub tool/capture_subtitle_screenshots_test.dart --dart-define=CB_CAPTURE_SCREENSHOTS=true
+cd ..
+python scripts/make_promo_images.py --feature subtitles
+```
+
+This opt-in widget capture renders production controls with authored demo
+video artwork and subtitle cues. It does not record a running native player or
+measure recognition/translation speed. English and Vietnamese have localized
+captures; Turkish and Chinese promos use the English UI with localized copy.
+The descriptions disclose desktop-only AI subtitles, required model downloads
+and hardware-dependent processing speed. Android does not run this pipeline,
+so the Play artwork continues to show supported Android features.
 
 Google Play uses four phone promos from `screenshots/promo/mobile/`, four
 7-inch tablet promos from `screenshots/promo/tablet7/`,
@@ -93,7 +111,19 @@ node --test scripts/tests/store_listings.test.mjs scripts/tests/google_play_list
 ```
 
 CI checks this on pushes and pull requests. The release workflow also uploads
-`store-listings`, a JSON preview for both stores, before their build jobs.
+`store-listings` before its build jobs: `preview.json` plus a portable
+`listings/` directory containing the validated descriptions, configurations
+and all referenced images. Both Store publish jobs download this artifact and
+submit from `store-submission/listings`; missing artwork fails validation before
+submission. The Android-only workflow builds and archives the same snapshot
+before its AAB build and submits that snapshot with its bundle.
+
+Create the same portable snapshot locally in a new output directory:
+
+```bash
+node scripts/bundle_store_listings.mjs cb_file_manager/build/store-submission/listings
+node scripts/store_listings.mjs cb_file_manager/build/store-submission/listings
+```
 
 ## Release integration
 
@@ -126,7 +156,8 @@ without managing artwork. The same environment variable works for local CLI
 use. No additional credentials are needed for image uploads.
 
 `STORE_LISTINGS_DIR` selects another directory for the Google Play script;
-`PARTNER_CENTER_LISTINGS_DIR` does the same for Microsoft. CI uses `store/listings`.
+`PARTNER_CENTER_LISTINGS_DIR` does the same for Microsoft. CI snapshots
+`store/listings` and points both publishers at the validated snapshot.
 For manual cleanup of an uncommitted Play edit, set `GOOGLE_PLAY_EDIT_ID` and run
 `node scripts/google_play_listings.mjs discard` with the same account/package.
 The preparation script itself never commits an edit.

@@ -29,6 +29,16 @@
       "description": "Local files, tabs, tags, and rich previews in one focused desktop view."
     },
     {
+      "file": "../../screenshots/promo/desktop/13_local_ai_subtitles.png",
+      "imageType": "Screenshot",
+      "description": "Translate video as you watch on desktop with local AI and bilingual subtitles. Download models first; speed depends on hardware."
+    },
+    {
+      "file": "../../screenshots/promo/desktop/14_subtitle_models.png",
+      "imageType": "Screenshot",
+      "description": "Choose speech and translation models, subtitle languages and saved subtitle settings."
+    },
+    {
       "file": "../../screenshots/promo/desktop/02_gallery_hub.png",
       "imageType": "Screenshot",
       "description": "Scan albums, media folders, and visual collections without losing context."
@@ -49,11 +59,6 @@
       "description": "Review assistant actions before anything changes in your files."
     },
     {
-      "file": "../../screenshots/promo/desktop/06_ai_conversation.png",
-      "imageType": "Screenshot",
-      "description": "Keep a file-aware conversation beside the workspace you are using."
-    },
-    {
       "file": "../../screenshots/promo/desktop/12_tag_assignment.png",
       "imageType": "Screenshot",
       "description": "Pick popular or recent tags, or browse the tag tree, without leaving your files."
@@ -62,11 +67,6 @@
       "file": "../../screenshots/promo/desktop/07_tag_management.png",
       "imageType": "Screenshot",
       "description": "Build lightweight systems for projects, references, and media collections."
-    },
-    {
-      "file": "../../screenshots/promo/desktop/08_tagged_files.png",
-      "imageType": "Screenshot",
-      "description": "Build parent-child tag hierarchies and expand the exact branch you need."
     },
     {
       "file": "../../screenshots/promo/desktop/10_disk_cleaner.png",

@@ -50,7 +50,8 @@ jobs:
       - name: Validate shared Microsoft Store and Google Play listings and images
         run: |
           node --test scripts/tests/store_listings.test.mjs scripts/tests/google_play_listings.test.mjs
-          node scripts/store_listings.mjs > store-listings-preview.json
+          node scripts/bundle_store_listings.mjs "$RUNNER_TEMP/store-submission/listings"
+          node scripts/store_listings.mjs "$RUNNER_TEMP/store-submission/listings" > "$RUNNER_TEMP/store-submission/preview.json"
       - name: Test desktop build tooling
         run: |
           python3 -m unittest discover -s scripts/tests -p test_fetch_subtitle_vulkan.py
@@ -60,7 +61,8 @@ jobs:
       - uses: actions/upload-artifact@v7.0.1
         with:
           name: store-listings
-          path: store-listings-preview.json
+          path: ${{ runner.temp }}/store-submission/
+          if-no-files-found: error
 
   # Generate release notes from commits
   generate-release-notes:
@@ -1035,7 +1037,7 @@ jobs:
   # Store submissions, after the GitHub release exists.
   publish-google-play:
     runs-on: ubuntu-latest
-    needs: [generate-release-notes, create-release]
+    needs: [generate-release-notes, validate-store-listings, create-release]
     environment: Production
     timeout-minutes: 30
     steps:
@@ -1053,13 +1055,19 @@ jobs:
           name: android-aab
           path: android-aab
 
+      - name: Download validated Store descriptions and artwork
+        uses: actions/download-artifact@v8.0.1
+        with:
+          name: store-listings
+          path: store-submission
+
       - name: Prepare Google Play descriptions and images in the release edit
         id: play_listing
         if: (github.event.inputs.play_track || vars.GOOGLE_PLAY_TRACK || 'internal') != 'internalsharing'
         env:
           GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
           GOOGLE_PLAY_PACKAGE_NAME: ${{ vars.GOOGLE_PLAY_PACKAGE_NAME || 'com.cbv.filehub' }}
-          STORE_LISTINGS_DIR: store/listings
+          STORE_LISTINGS_DIR: store-submission/listings
           GOOGLE_PLAY_UPDATE_IMAGES: ${{ vars.GOOGLE_PLAY_UPDATE_IMAGES || 'true' }}
         run: |
           EDIT_ID="$(node scripts/google_play_listings.mjs prepare)"
@@ -1087,7 +1095,7 @@ jobs:
 
   publish-microsoft-store:
     runs-on: windows-latest
-    needs: [generate-release-notes, build-windows-msix, create-release]
+    needs: [generate-release-notes, validate-store-listings, build-windows-msix, create-release]
     environment: Production
     # Partner Center commit processing alone may take up to 30 minutes.
     timeout-minutes: 60
@@ -1120,6 +1128,12 @@ jobs:
           "PARTNER_CENTER_PACKAGE_PATH=$($source.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "PARTNER_CENTER_PACKAGE_FILE_NAME=CBFileHub-$version-$msixVersion.msix" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
+      - name: Download validated Store descriptions and artwork
+        uses: actions/download-artifact@v8.0.1
+        with:
+          name: store-listings
+          path: store-submission
+
       - name: Submit MSIX, listings and images to Microsoft Store for automatic publishing
         shell: bash
         env:
@@ -1127,7 +1141,7 @@ jobs:
           PARTNER_CENTER_CLIENT_ID: ${{ secrets.PARTNER_CENTER_CLIENT_ID }}
           PARTNER_CENTER_CLIENT_SECRET: ${{ secrets.PARTNER_CENTER_CLIENT_SECRET }}
           PARTNER_CENTER_APP_ID: ${{ vars.PARTNER_CENTER_APP_ID }}
-          PARTNER_CENTER_LISTINGS_DIR: store/listings
+          PARTNER_CENTER_LISTINGS_DIR: store-submission/listings
           # Release builds always submit for certification and publish once approved.
           PARTNER_CENTER_COMMIT_SUBMISSION: "true"
           PARTNER_CENTER_TARGET_PUBLISH_MODE: "Immediate"

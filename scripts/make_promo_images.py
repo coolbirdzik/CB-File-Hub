@@ -170,10 +170,10 @@ SUBTITLE_SOURCE = ROOT / "screenshots" / "features" / "local_subtitles"
 
 EXTRA_DESKTOP_PROMOS = [
     ExtraPromo(13, "subtitles:player", {
-        "en": PromoSpec("local_ai_subtitles", "Subtitles. On your device.", "Recognize speech and translate video subtitles locally. Pick your language and keep watching.", (75, 204, 185)),
-        "vi": PromoSpec("phu_de_ai_local", "Phụ đề AI ngay trên máy", "Nhận diện lời nói và dịch phụ đề video ngay trên máy. Chọn ngôn ngữ rồi tiếp tục xem.", (75, 204, 185)),
-        "tr": PromoSpec("yerel_ai_altyazilar", "Altyazılar kendi cihazınızda", "Konuşmayı tanıyın, video altyazılarını yerel olarak çevirin. Dilinizi seçin ve izlemeye devam edin.", (75, 204, 185)),
-        "zh": PromoSpec("bendi_ai_zimu", "字幕，就在你的设备上", "在本机识别语音并翻译视频字幕。选择语言，继续观看。", (75, 204, 185)),
+        "en": PromoSpec("local_ai_subtitles", "Translate as you watch", "Local AI subtitles on desktop, with bilingual display. Download models first; speed depends on your hardware.", (75, 204, 185)),
+        "vi": PromoSpec("phu_de_ai_local", "Dịch video ngay khi xem", "Phụ đề AI trên máy tính, hiển thị song ngữ. Tải model trước; tốc độ xử lý tùy phần cứng.", (75, 204, 185)),
+        "tr": PromoSpec("yerel_ai_altyazilar", "İzlerken çevirin", "Masaüstünde yerel AI ile çift dilli altyazı. Önce modelleri indirin; hız donanıma bağlıdır.", (75, 204, 185)),
+        "zh": PromoSpec("bendi_ai_zimu", "边看视频，边翻译", "桌面端本地 AI 双语字幕。需先下载模型；处理速度取决于硬件。", (75, 204, 185)),
     }),
     ExtraPromo(14, "subtitles:models", {
         "en": PromoSpec("subtitle_models", "Your models. Your language.", "Manage speech and translation models with CB Agent. Reuse saved subtitles or regenerate when needed.", (54, 166, 255)),

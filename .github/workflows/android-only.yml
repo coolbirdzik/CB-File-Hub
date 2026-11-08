@@ -68,7 +68,15 @@ jobs:
       - name: Validate release tooling and Google Play listings
         run: |
           node --test scripts/check_android_page_sizes.test.mjs scripts/tests/store_listings.test.mjs scripts/tests/google_play_listings.test.mjs
-          node scripts/store_listings.mjs > "$RUNNER_TEMP/store-listings-preview.json"
+          node scripts/bundle_store_listings.mjs "$RUNNER_TEMP/store-submission/listings"
+          node scripts/store_listings.mjs "$RUNNER_TEMP/store-submission/listings" > "$RUNNER_TEMP/store-submission/preview.json"
+
+      - name: Upload validated Store descriptions and artwork
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: store-listings
+          path: ${{ runner.temp }}/store-submission/
+          if-no-files-found: error
 
       - name: Read version without changing pubspec or tags
         id: version
@@ -167,7 +175,7 @@ jobs:
         if: inputs.play_track != 'internalsharing'
         env:
           GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
-          STORE_LISTINGS_DIR: store/listings
+          STORE_LISTINGS_DIR: ${{ runner.temp }}/store-submission/listings
           GOOGLE_PLAY_UPDATE_IMAGES: ${{ vars.GOOGLE_PLAY_UPDATE_IMAGES || 'true' }}
         run: |
           EDIT_ID="$(node scripts/google_play_listings.mjs prepare)"

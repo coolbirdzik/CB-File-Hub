@@ -3,6 +3,7 @@ CB File Hub kết hợp quản lý tập tin, thư viện đa phương tiện v�
 - Duyệt thư mục theo tab, chia đôi khung xem, ghim vị trí và khôi phục phiên làm việc.
 - Chọn chế độ danh sách, lưới, chi tiết, cây hoặc cột. Tìm kiếm, sắp xếp, chọn nhiều và tải mục theo nhu cầu khi thư mục lớn.
 - Xem ảnh, chỉnh sửa ảnh và duyệt thư viện video. Phát đa phương tiện với phụ đề, track âm thanh và cửa sổ nổi trên máy tính.
+- Trên máy tính, dịch video khi xem bằng phụ đề AI cục bộ, hiển thị song ngữ và lưu SRT. Cần tải model nhận diện và dịch trước; tốc độ xử lý tùy phần cứng.
 - Sắp xếp bộ sưu tập bằng tag, album và quy tắc tạo album tự động.
 - Kết nối lưu trữ SMB, FTP, SFTP và WebDAV. Quản lý kết nối SSH và dùng terminal tích hợp.
 - Quản lý file .torrent và magnet trong thư viện chung có tìm kiếm. Hợp nhất mục trùng, sao chép magnet và chọn nơi lưu file.

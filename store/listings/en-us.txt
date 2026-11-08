@@ -3,6 +3,7 @@ CB File Hub brings your files, media and remote storage into one app.
 - Browse folders in tabs, use split view, pin locations and restore your workspace.
 - Choose list, grid, details, tree or column views. Search, sort and select multiple files, with on-demand loading for large folders.
 - View photos, edit images and browse video libraries. Play media with subtitles and audio tracks; use picture-in-picture on desktop.
+- On desktop, translate video as you watch with local AI subtitles, bilingual display and saved SRT files. Download speech and translation models first; processing speed depends on your hardware.
 - Organize collections with tags, albums and automatic album rules.
 - Connect to SMB, FTP, SFTP and WebDAV storage. Manage SSH connections and use the built-in terminal.
 - Keep .torrent files and magnet links in one searchable library. Merge duplicates, copy magnet links and choose where files are stored.
