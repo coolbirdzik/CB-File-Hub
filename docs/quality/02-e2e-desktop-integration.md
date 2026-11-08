@@ -125,6 +125,15 @@ Observation windows that are themselves under test (playback position changes,
 tooltip delay, accessibility churn, debounce and SQLite busy timeout) remain
 intentional; do not mechanically shorten them.
 
+Menu helpers should open a known parent by its stable action key before trying
+unrelated submenus. In the 2026-11-08 desktop report, finding `new_folder` and
+`new_file` took 12.36 s and 12.31 s: each search first exhausted two six-second
+waits in View and Sort. `tapContextMenuItem` now prioritizes `new_submenu`, keeps
+the six-second async-load allowance, and retains generic discovery as a
+fallback. Widget tests cover delayed loading, localized labels and the
+`new_file_more` alias without opening unrelated submenus. The full desktop
+speedup from this change has not yet been measured.
+
 ## Diagnostics and timing
 
 - Full unit/widget events: `build/unit_test_report.jsonl`; failure-only console

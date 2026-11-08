@@ -11,6 +11,8 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
+import '../../../../integration_test/e2e_keys.dart' as e2e_keys;
+
 Future<void> openPopup(
   WidgetTester tester,
   List<ContextMenuAction> actions, {
@@ -72,6 +74,77 @@ const loadedActions = <ContextMenuSection>[
 ];
 
 void main() {
+  for (final actionId in ['new_folder', 'new_file']) {
+    testWidgets('creation helper opens New directly for $actionId', (
+      tester,
+    ) async {
+      final opened = <String>[];
+      String? selected;
+      await openPopup(tester, [
+        for (final id in ['view', 'sort', 'new_submenu'])
+          ContextMenuAction(
+            id: id,
+            // Keyed navigation also works without English display labels.
+            label: id == 'new_submenu' ? 'Tạo mới' : id,
+            icon: PhosphorIconsLight.folder,
+            loadChildSections: (_) async {
+              opened.add(id);
+              await Future<void>.delayed(const Duration(milliseconds: 200));
+              return [
+                ContextMenuSection(
+                  actions: [
+                    ContextMenuAction(
+                      id: id == 'new_submenu'
+                          ? (actionId == 'new_file'
+                                ? 'new_file_more'
+                                : actionId)
+                          : '${id}_option',
+                      label: id == 'new_submenu'
+                          ? 'Mục cần tạo'
+                          : 'Other option',
+                      icon: PhosphorIconsLight.file,
+                      onSelected: (_) => selected = actionId,
+                    ),
+                  ],
+                ),
+              ];
+            },
+          ),
+      ], locale: const Locale('vi'));
+      await e2e_keys.tapContextMenuItem(tester, actionId);
+      expect(opened, ['new_submenu']);
+      expect(selected, actionId);
+      expect(find.byType(PopupMenuItem<String>), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('menu helper retains generic submenu discovery', (tester) async {
+    var selected = false;
+    await openPopup(tester, [
+      ContextMenuAction(
+        id: 'custom_submenu',
+        label: 'Custom tools',
+        icon: PhosphorIconsLight.folder,
+        childSections: [
+          ContextMenuSection(
+            actions: [
+              ContextMenuAction(
+                id: 'custom_action',
+                label: 'Run custom tool',
+                icon: PhosphorIconsLight.file,
+                onSelected: (_) => selected = true,
+              ),
+            ],
+          ),
+        ],
+      ),
+    ]);
+    await e2e_keys.tapContextMenuItem(tester, 'custom_action');
+    expect(selected, isTrue);
+    expect(tester.takeException(), isNull);
+  });
+
   for (final fail in [false, true]) {
     testWidgets('lazy menu shows busy cursor until settled (error: $fail)', (
       tester,

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:cb_file_manager/services/media/subtitle_cache.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -14,6 +15,70 @@ void main() {
     cache = SubtitleCache(openDatabase: () async => db);
   });
   tearDown(() => db.close());
+
+  test(
+    'cache reads stay available during another connection\'s write',
+    () async {
+      final dir = await Directory.systemTemp.createTemp('subtitle-read-lock-');
+      final path = '${dir.path}/app.sqlite';
+      final holder = await databaseFactoryFfiNoIsolate.openDatabase(
+        path,
+        options: OpenDatabaseOptions(singleInstance: false),
+      );
+      await holder.rawQuery('PRAGMA journal_mode = WAL');
+      final reader = await databaseFactoryFfi.openDatabase(
+        path,
+        options: OpenDatabaseOptions(singleInstance: false),
+      );
+      final readingCache = SubtitleCache(openDatabase: () async => reader);
+      final revision = await readingCache.revision();
+      await readingCache.save('video', revision, 0, 8000, [
+        const LocalSubtitleCue(0, 8000, 'original', 'translation'),
+      ]);
+      await reader.rawQuery('PRAGMA busy_timeout = 100');
+      final locked = Completer<void>();
+      final release = Completer<void>();
+      final writing = holder.transaction((txn) async {
+        await txn.delete('subtitle_cache_chunks');
+        await txn.rawUpdate(
+          'UPDATE subtitle_cache_meta SET revision = revision + 1',
+        );
+        locked.complete();
+        await release.future;
+      });
+      try {
+        await locked.future;
+        final snapshot = await readingCache
+            .read('video', 0, 8000)
+            .timeout(const Duration(seconds: 2));
+        expect(snapshot.revision, revision);
+        expect(snapshot.ranges.single.end.inMilliseconds, 8000);
+        expect(snapshot.cues.single.text, 'translation');
+        final reopened = SubtitleCache(openDatabase: () async => reader);
+        expect(
+          (await reopened.read('video', 0, 8000)).cues.single.text,
+          'translation',
+        );
+        final missing = await reopened.read('missing', 0, 8000);
+        expect(missing.revision, revision);
+        expect(missing.ranges, isEmpty);
+        expect(missing.cues, isEmpty);
+        expect(release.isCompleted, isFalse);
+        release.complete();
+        await writing;
+        final cleared = await readingCache.read('video', 0, 8000);
+        expect(cleared.revision, revision + 1);
+        expect(cleared.ranges, isEmpty);
+        expect(cleared.cues, isEmpty);
+      } finally {
+        if (!release.isCompleted) release.complete();
+        await writing;
+        await reader.close();
+        await holder.close();
+        await dir.delete(recursive: true);
+      }
+    },
+  );
 
   test(
     'saved subtitles survive closing and reopening the database file',

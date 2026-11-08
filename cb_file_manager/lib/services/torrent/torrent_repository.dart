@@ -572,17 +572,17 @@ class TorrentRepository {
       ).split(' ').where((s) => s.isNotEmpty)) {
         where.add(
           "instr(COALESCE(search_name, lower(name)) || ' ' || "
-          "COALESCE(search_group, lower(group_name)) || ' ' || hash, ?) > 0",
+          "COALESCE(search_group, lower(group_name)) || ' ' || hash, ?${args.length + 1}) > 0",
         );
         args.add(word);
       }
     }
     if (status != null) {
-      where.add('status = ?');
+      where.add('status = ?${args.length + 1}');
       args.add(status);
     }
     if (category != null) {
-      where.add('category = ?');
+      where.add('category = ?${args.length + 1}');
       args.add(category);
     }
     final clause = where.isEmpty ? '' : 'WHERE ${where.join(' AND ')}';
@@ -605,9 +605,8 @@ class TorrentRepository {
         };
     final start = offset < 0 ? 0 : offset;
     final take = limit.clamp(1, maxPageSize);
-    // A transaction keeps count/page consistent while scanning imports rows.
-    return db.transaction((txn) async {
-      if (regex != null) {
+    if (regex != null) {
+      return db.transaction((txn) async {
         final entries = <TorrentEntry>[];
         var count = 0, scanned = 0;
         while (true) {
@@ -633,19 +632,26 @@ class TorrentRepository {
           }
         }
         return TorrentPage(entries, count);
-      }
-      final count =
-          (await txn.rawQuery(
-                'SELECT COUNT(*) AS n FROM torrents $clause',
-                args,
-              )).first['n']
-              as int;
-      final rows = await txn.rawQuery(
-        'SELECT * FROM torrents $clause ORDER BY $order, hash LIMIT ? OFFSET ?',
-        [...args, take, start],
-      );
-      return TorrentPage(rows.map(TorrentEntry.fromMap).toList(), count);
-    });
+      });
+    }
+    // One SELECT keeps count/page on the same snapshot without BEGIN IMMEDIATE.
+    // Numbered parameters let both subqueries reuse the filters' bindings.
+    final rows = await db.rawQuery(
+      '''WITH total AS (SELECT COUNT(*) AS n FROM torrents $clause),
+      page AS (SELECT * FROM torrents $clause ORDER BY $order, hash
+        LIMIT ?${args.length + 1} OFFSET ?${args.length + 2})
+      SELECT page.*, total.n AS _page_total
+      FROM total LEFT JOIN page ON 1
+      ORDER BY $order, hash''',
+      [...args, take, start],
+    );
+    return TorrentPage(
+      rows
+          .where((row) => row['hash'] != null)
+          .map(TorrentEntry.fromMap)
+          .toList(),
+      rows.first['_page_total'] as int,
+    );
   }
 
   Future<TorrentEntry?> get(String hash) async {

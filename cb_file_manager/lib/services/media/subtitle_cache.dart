@@ -50,6 +50,18 @@ class SubtitleCache {
 
   Future<Database> _initialize() async {
     final db = await _open();
+    final tables = await db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN (?, ?)",
+      ['subtitle_cache_meta', 'subtitle_cache_chunks'],
+    );
+    if (tables.length == 2 &&
+        (await db.query(
+          'subtitle_cache_meta',
+          columns: ['id'],
+          where: 'id = 1',
+        )).isNotEmpty) {
+      return db;
+    }
     await db.transaction((txn) async {
       await txn.execute('''CREATE TABLE IF NOT EXISTS subtitle_cache_meta (
         id INTEGER PRIMARY KEY CHECK(id = 1), revision INTEGER NOT NULL)''');
@@ -70,45 +82,38 @@ class SubtitleCache {
 
   Future<SubtitleCacheSnapshot> read(String key, int from, int to) async {
     final db = await _database();
-    return db.transaction((txn) async {
-      final revision = await _revision(txn);
-      final rows = await txn.query(
-        'subtitle_cache_chunks',
-        columns: ['start_ms', 'end_ms'],
-        where: 'cache_key = ?',
-        whereArgs: [key],
-        orderBy: 'start_ms',
-      );
-      final ranges = <SubtitleTimeRange>[];
-      for (final row in rows) {
-        final start = Duration(milliseconds: row['start_ms'] as int);
-        final end = Duration(milliseconds: row['end_ms'] as int);
-        if (ranges.isNotEmpty && ranges.last.end >= start) {
-          final old = ranges.removeLast();
-          ranges.add(
-            SubtitleTimeRange(old.start, old.end > end ? old.end : end),
-          );
-        } else {
-          ranges.add(SubtitleTimeRange(start, end));
-        }
+    // Revision, coverage and windowed cues must come from one SQLite snapshot.
+    // Decode/merge after the SELECT releases the shared connection's lock.
+    final rows = await db.rawQuery(
+      '''SELECT m.revision, c.start_ms, c.end_ms,
+      CASE WHEN c.end_ms > ? AND c.start_ms < ? THEN c.cues END AS cues
+      FROM subtitle_cache_meta m
+      LEFT JOIN subtitle_cache_chunks c ON c.cache_key = ?
+      WHERE m.id = 1 ORDER BY c.start_ms''',
+      [from, to, key],
+    );
+    final ranges = <SubtitleTimeRange>[];
+    final cues = <LocalSubtitleCue>[];
+    for (final row in rows) {
+      if (row['start_ms'] == null) continue;
+      final start = Duration(milliseconds: row['start_ms'] as int);
+      final end = Duration(milliseconds: row['end_ms'] as int);
+      if (ranges.isNotEmpty && ranges.last.end >= start) {
+        final old = ranges.removeLast();
+        ranges.add(SubtitleTimeRange(old.start, old.end > end ? old.end : end));
+      } else {
+        ranges.add(SubtitleTimeRange(start, end));
       }
-      final chunks = await txn.query(
-        'subtitle_cache_chunks',
-        columns: ['cues'],
-        where: 'cache_key = ? AND end_ms > ? AND start_ms < ?',
-        whereArgs: [key, from, to],
-        orderBy: 'start_ms',
-      );
-      final cues = <LocalSubtitleCue>[];
-      for (final chunk in chunks) {
+      final payload = row['cues'] as String?;
+      if (payload != null) {
         cues.addAll(
-          (jsonDecode(chunk['cues'] as String) as List).map(
+          (jsonDecode(payload) as List).map(
             (c) => LocalSubtitleCue.fromJson(c as List<dynamic>),
           ),
         );
       }
-      return SubtitleCacheSnapshot(revision, ranges, cues);
-    });
+    }
+    return SubtitleCacheSnapshot(rows.first['revision'] as int, ranges, cues);
   }
 
   /// Revision checked inside the write transaction: a late worker, including

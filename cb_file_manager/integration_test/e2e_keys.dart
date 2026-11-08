@@ -321,7 +321,7 @@ Future<void> rightClickFileRow(WidgetTester tester, String absolutePath) async {
 ///    submenu. Submenu triggers are `PopupMenuItem` with `enabled: false` and no
 ///    `value`; their children are `InkWell` widgets in an `OverlayEntry` — NOT
 ///    `PopupMenuItem<String>`. This function handles that automatically by tapping
-///    each disabled `PopupMenuItem` in turn until the target label appears.
+///    the known parent first, then exploring other triggers as a fallback.
 ///
 /// Example usage:
 ///   await tapContextMenuItem(tester, 'copy');      // Copy file
@@ -402,8 +402,9 @@ Future<void> tapContextMenuItem(WidgetTester tester, String actionId) async {
   // On Windows desktop, items like 'new_folder' live inside a submenu.
   // Submenu triggers are `PopupMenuItem<String>` with `enabled: false` and no value —
   // tapping them inserts an OverlayEntry with InkWell rows for each child action.
-  // Try each disabled PopupMenuItem in turn; once the target label becomes visible
-  // (as Text inside the OverlayEntry), tap it.
+  // Creation actions belong to New. Opening View and Sort first spends a full
+  // timeout on each unrelated submenu and may enumerate native shell items.
+  // Retain generic exploration for menus without a known parent/key.
   if (kDebugMode) {
     debugPrint('[E2E] tapContextMenuItem: trying submenu exploration');
   }
@@ -416,23 +417,36 @@ Future<void> tapContextMenuItem(WidgetTester tester, String actionId) async {
       '[E2E] tapContextMenuItem: found $triggerCount submenu trigger(s)',
     );
   }
-  for (var i = 0; i < triggerCount; i++) {
+  final creationAction = actionIds.any(
+    (id) => const {'new_folder', 'new_file', 'new_file_more'}.contains(id),
+  );
+  final parent = creationAction
+      ? _findFirstVisibleContextMenuAction({'new_submenu'})
+      : null;
+  final preferredTriggers = parent == null
+      ? const <Element>[]
+      : find.ancestor(of: parent, matching: submenuTriggerFinder).evaluate();
+  final preferredIndex = submenuTriggerFinder.evaluate().toList().indexWhere(
+    preferredTriggers.contains,
+  );
+  final triggerOrder = [
+    if (preferredIndex >= 0) preferredIndex,
+    for (var i = 0; i < triggerCount; i++)
+      if (i != preferredIndex) i,
+  ];
+  for (final i in triggerOrder) {
     final trigger = submenuTriggerFinder.at(i);
     await tester.ensureVisible(trigger);
     await tester.tap(trigger, warnIfMissed: false);
     // Submenu sections load asynchronously (e.g. Windows registry
     // enumeration for "New" items). Poll for the target instead of using
     // fixed pumps: slow CI runners regularly exceed a fixed 900 ms window.
-    final deadline = DateTime.now().add(const Duration(seconds: 6));
-    while (DateTime.now().isBefore(deadline)) {
+    await waitForE2ECondition(tester, () {
       final polledKeyed = _findFirstVisibleContextMenuAction(actionIds);
       final polledText = _findFirstVisibleText(labels);
-      if ((polledKeyed != null && polledKeyed.evaluate().isNotEmpty) ||
-          (polledText != null && polledText.evaluate().isNotEmpty)) {
-        break;
-      }
-      await tester.pump(const Duration(milliseconds: 100));
-    }
+      return (polledKeyed != null && polledKeyed.evaluate().isNotEmpty) ||
+          (polledText != null && polledText.evaluate().isNotEmpty);
+    }, timeout: const Duration(seconds: 6));
 
     final retryKeyedFinder = _findFirstVisibleContextMenuAction(actionIds);
     if (retryKeyedFinder != null && retryKeyedFinder.evaluate().isNotEmpty) {

@@ -22,7 +22,7 @@ void main() {
   });
   tearDown(() => db.close());
 
-  test('ready startup does not wait for another process write lock', () async {
+  test('ready startup and pages do not wait for another writer', () async {
     final root = await Directory.systemTemp.createTemp('cb-startup-lock-');
     final databasePath = p.join(root.path, 'startup.sqlite');
     final holder = await databaseFactoryFfiNoIsolate.openDatabase(
@@ -39,11 +39,33 @@ void main() {
     await repository.initialize();
     // A fully migrated library from previous builds has no progress table.
     await reader.execute('DROP TABLE torrent_index_migrations');
+    final batch = reader.batch();
+    for (var i = 0; i < 3; i++) {
+      batch.insert('torrents', {
+        'hash': i.toString().padLeft(40, '0'),
+        'name': 'Torrent $i',
+        'torrent_path': '/$i.torrent',
+        'category': i == 1 ? 'audio' : 'video',
+        'total_bytes': i,
+        'file_count': 1,
+        'added_at': i,
+      });
+    }
+    await batch.commit(noResult: true);
     await reader.execute('PRAGMA busy_timeout = 100');
     final locked = Completer<void>();
     final release = Completer<void>();
     final writing = holder.transaction((txn) async {
       await txn.insert('counter', {'value': 1});
+      await txn.insert('torrents', {
+        'hash': '3'.padLeft(40, '0'),
+        'name': 'Torrent 3',
+        'torrent_path': '/3.torrent',
+        'category': 'video',
+        'total_bytes': 3,
+        'file_count': 1,
+        'added_at': 3,
+      });
       locked.complete();
       await release.future;
     });
@@ -56,9 +78,28 @@ void main() {
         throwsA(isA<DatabaseException>()),
       );
       await repository.initialize().timeout(const Duration(seconds: 2));
+      final page = await repository
+          .page(
+            query: 'torrent',
+            status: 'library',
+            category: 'video',
+            sort: SortOption.nameDesc,
+            offset: 1,
+            limit: 1,
+          )
+          .timeout(const Duration(seconds: 2));
+      expect(page.total, 2);
+      expect(page.entries.single.name, 'Torrent 0');
+      final beyondEnd = await repository.page(offset: 100);
+      expect(beyondEnd.total, 3);
+      expect(beyondEnd.entries, isEmpty);
+      expect((await repository.page(query: 'missing')).total, 0);
       expect(release.isCompleted, isFalse);
-    } finally {
       release.complete();
+      await writing;
+      expect((await repository.page(category: 'video')).total, 3);
+    } finally {
+      if (!release.isCompleted) release.complete();
       await writing;
       await reader.close();
       await holder.close();
