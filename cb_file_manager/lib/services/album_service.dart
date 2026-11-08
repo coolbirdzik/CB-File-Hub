@@ -268,12 +268,25 @@ class AlbumService {
     if (filePaths.isEmpty) return 0;
 
     final database = await _getDatabase();
-    int successCount = 0;
+    const batchSize = 512;
+    final candidates = <String>{};
 
-    await database.transaction((txn) async {
-      for (final filePath in filePaths) {
-        final exists = await _isFileInAlbumTxn(txn, albumId, filePath);
-        if (exists) continue;
+    // Network filesystem calls can stall; do not hold SQLite while probing.
+    for (var offset = 0; offset < filePaths.length; offset += batchSize) {
+      final end = offset + batchSize < filePaths.length
+          ? offset + batchSize
+          : filePaths.length;
+      final chunk = filePaths.sublist(offset, end);
+      final existingPaths = await _getExistingAlbumPaths(
+        database,
+        albumId,
+        chunk,
+      );
+
+      for (final filePath in chunk) {
+        if (existingPaths.contains(filePath) || candidates.contains(filePath)) {
+          continue;
+        }
 
         FileStat? stat;
         try {
@@ -281,26 +294,52 @@ class AlbumService {
         } catch (_) {
           // File may not exist or be inaccessible
         }
-        if (stat == null) continue;
-
-        final nextOrderIndex =
-            sqflite.Sqflite.firstIntValue(
-              await txn.rawQuery(
-                'SELECT MAX(order_index) FROM album_files WHERE album_id = ?',
-                <Object?>[albumId],
-              ),
-            ) ??
-            -1;
-
-        final albumFile = AlbumFile(
-          albumId: albumId,
-          filePath: filePath,
-          orderIndex: nextOrderIndex + 1,
-        );
-
-        await txn.insert('album_files', albumFile.toDatabaseMap());
-        successCount++;
+        if (stat != null) candidates.add(filePath);
       }
+    }
+    if (candidates.isEmpty) return 0;
+
+    final candidatePaths = candidates.toList();
+    // Batch SQL without changing the import's all-or-nothing behavior.
+    final successCount = await database.transaction((txn) async {
+      var nextOrderIndex =
+          sqflite.Sqflite.firstIntValue(
+            await txn.rawQuery(
+              'SELECT MAX(order_index) FROM album_files WHERE album_id = ?',
+              <Object?>[albumId],
+            ),
+          ) ??
+          -1;
+      var added = 0;
+
+      for (
+        var offset = 0;
+        offset < candidatePaths.length;
+        offset += batchSize
+      ) {
+        final end = offset + batchSize < candidatePaths.length
+            ? offset + batchSize
+            : candidatePaths.length;
+        final chunk = candidatePaths.sublist(offset, end);
+        // Recheck after probing in case another import inserted these paths.
+        final existingPaths = await _getExistingAlbumPaths(txn, albumId, chunk);
+        final batch = txn.batch();
+
+        for (final filePath in chunk) {
+          if (existingPaths.contains(filePath)) continue;
+
+          final albumFile = AlbumFile(
+            albumId: albumId,
+            filePath: filePath,
+            orderIndex: ++nextOrderIndex,
+          );
+
+          batch.insert('album_files', albumFile.toDatabaseMap());
+          added++;
+        }
+        await batch.commit(noResult: true);
+      }
+      return added;
     });
 
     if (successCount > 0) {
@@ -313,21 +352,20 @@ class AlbumService {
     return successCount;
   }
 
-  /// Checks if a file is already in an album (within an active transaction).
-  Future<bool> _isFileInAlbumTxn(
-    DatabaseExecutor txn,
+  /// Finds existing paths using the database or an active transaction.
+  Future<Set<String>> _getExistingAlbumPaths(
+    DatabaseExecutor database,
     int albumId,
-    String filePath,
+    List<String> filePaths,
   ) async {
-    final count =
-        sqflite.Sqflite.firstIntValue(
-          await txn.rawQuery(
-            'SELECT COUNT(*) FROM album_files WHERE album_id = ? AND file_path = ?',
-            <Object?>[albumId, filePath],
-          ),
-        ) ??
-        0;
-    return count > 0;
+    final placeholders = List.filled(filePaths.length, '?').join(', ');
+    final rows = await database.query(
+      'album_files',
+      columns: <String>['file_path'],
+      where: 'album_id = ? AND file_path IN ($placeholders)',
+      whereArgs: <Object?>[albumId, ...filePaths],
+    );
+    return rows.map((row) => row['file_path'] as String).toSet();
   }
 
   Future<int> addFolderToAlbum(

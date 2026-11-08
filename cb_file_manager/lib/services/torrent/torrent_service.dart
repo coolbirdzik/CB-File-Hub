@@ -52,6 +52,9 @@ Future<Uint8List> _readTorrentBytes(String path) async {
 Future<TorrentMetainfo> _readTorrent(String path) async =>
     TorrentMetainfo.parseAsync(await _readTorrentBytes(path));
 
+Future<List<TorrentFileItem>> _listTorrentFiles(String path) async =>
+    TorrentMetainfo.listFiles(await _readTorrentBytes(path));
+
 Future<void> _writeQbittorrentBackup(String path, List<int> bytes) async {
   final archive = File(path);
   await archive.parent.create(recursive: true);
@@ -73,8 +76,12 @@ class TorrentService extends ChangeNotifier {
     'connections': null,
   };
   static final instance = TorrentService._();
-  TorrentService._() : _engine = Aria2Engine(), _sourceDiscovery = null;
+  TorrentService._()
+    : _engine = Aria2Engine(),
+      _sourceDiscovery = null,
+      _fetchMetadataDefault = true;
 
+  /// Tests opt into automatic magnet metadata fetching, which contacts peers.
   @visibleForTesting
   TorrentService.forTesting({
     required this.repository,
@@ -82,10 +89,12 @@ class TorrentService extends ChangeNotifier {
     required String stateDirectory,
     Aria2Engine? engine,
     this._sourceDiscovery = _noDiscoveredSources,
+    bool fetchMagnetMetadataByDefault = false,
   }) : _prefs = preferences,
        _stateDirectory = p.normalize(stateDirectory),
        _initialized = true,
-       _engine = engine ?? Aria2Engine();
+       _engine = engine ?? Aria2Engine(),
+       _fetchMetadataDefault = fetchMagnetMetadataByDefault;
 
   late TorrentRepository repository;
   late SharedPreferences _prefs;
@@ -110,6 +119,25 @@ class TorrentService extends ChangeNotifier {
   Future<void> _backgroundImports = Future<void>.value();
   bool get ownsEngine => _engine.running;
 
+  // Null on a singleton retained by hot reload; production fetches by default.
+  final bool? _fetchMetadataDefault;
+  final _metadataJobs = <String, Future<void>>{};
+  final _metadataErrors = <String, String>{};
+  final _metadataCancelled = <String>{};
+  final _metadataCaptures = <String>{};
+  ({String hash, String path, List<TorrentFileItem> files})? _filesCache;
+  bool _disposed = false;
+
+  /// How often a metadata-only task is polled, and how long it may take.
+  @visibleForTesting
+  Duration metadataPollInterval = const Duration(seconds: 1);
+  @visibleForTesting
+  Duration metadataTimeout = const Duration(minutes: 5);
+
+  // One metadata task at a time: each occupies one of aria2's
+  // `max-concurrent-downloads` slots, which payload downloads share.
+  Future<void> _metadataQueue = Future<void>.value();
+
   String? get libraryDirectory => _prefs.getString('torrent.libraryDirectory');
   String get storageMode => _prefs.getString('torrent.storageMode') ?? 'index';
   String? get executable => _prefs.getString('torrent.executable');
@@ -122,6 +150,13 @@ class TorrentService extends ChangeNotifier {
       _prefs.getBool('torrent.startImmediately') ?? true;
   String? get defaultDownloadDirectory =>
       _prefs.getString('torrent.lastDownloadDirectory');
+
+  /// Whether added magnets fetch their name and file list from peers right
+  /// away, even when their download is paused.
+  bool get fetchMagnetMetadata =>
+      _prefs.getBool('torrent.fetchMagnetMetadata') ??
+      _fetchMetadataDefault ??
+      true;
   List<String> get scanRoots => _prefs.getStringList('torrent.scanRoots') ?? [];
   String get scanLogPath =>
       _currentScanLog ?? p.join(_stateDirectory, 'last-scan.log');
@@ -678,6 +713,11 @@ class TorrentService extends ChangeNotifier {
     }
   }
 
+  Future<void> setFetchMagnetMetadata(bool enabled) async {
+    await _prefs.setBool('torrent.fetchMagnetMetadata', enabled);
+    notifyListeners();
+  }
+
   Future<void> setStartDownloadsImmediately(bool enabled) async {
     await _prefs.setBool('torrent.startImmediately', enabled);
     notifyListeners();
@@ -716,8 +756,8 @@ class TorrentService extends ChangeNotifier {
           .map((drive) => drive.path)
           .toList();
 
-  /// Organizes metainfo according to the user's chosen mode. Only explicit
-  /// download actions ever contact trackers/peers.
+  /// Organizes metainfo according to the user's chosen mode. File imports
+  /// never contact trackers/peers.
   Future<bool> importFile(
     String source, {
     TorrentMoveSource? approvedSource,
@@ -1176,7 +1216,250 @@ class TorrentService extends ChangeNotifier {
     final existed = await repository.get(link.hash) != null;
     final entry = await repository.importMagnet(link, touch: true);
     notifyListeners();
+    _autoFetchMetadata(entry);
     return (entry: entry, existed: existed);
+  }
+
+  /// Interactive magnet adds only: scans and client imports never contact
+  /// peers by themselves.
+  void _autoFetchMetadata(TorrentEntry entry) {
+    if (!fetchMagnetMetadata ||
+        !(Platform.isWindows || Platform.isLinux || Platform.isMacOS) ||
+        entry.torrentPath.isNotEmpty ||
+        const ['active', 'waiting'].contains(entry.status)) {
+      return;
+    }
+    unawaited(fetchMetadata(entry));
+  }
+
+  bool isFetchingMetadata(String hash) => _metadataJobs.containsKey(hash);
+  String? metadataError(String hash) => _metadataErrors[hash];
+
+  // Distinct from the payload task GID (`hash.substring(0, 16)`).
+  static String _metadataGid(String hash) => hash.substring(16, 32);
+
+  /// Payload files of an entry with metainfo. Magnets list nothing until their
+  /// metadata has been fetched.
+  Future<List<TorrentFileItem>> files(TorrentEntry entry) async {
+    final path = entry.torrentPath;
+    if (path.isEmpty) return const [];
+    final cached = _filesCache;
+    if (cached != null && cached.hash == entry.hash && cached.path == path) {
+      return cached.files;
+    }
+    final files = await Isolate.run(() => _listTorrentFiles(path));
+    _filesCache = (hash: entry.hash, path: path, files: files);
+    return files;
+  }
+
+  /// Fetches a magnet's metainfo (name and file list) from peers without its
+  /// payload, also while its download is paused, then imports it.
+  Future<void> fetchMetadata(TorrentEntry entry) {
+    final hash = entry.hash;
+    if (entry.torrentPath.isNotEmpty || entry.sourceUri == null) {
+      return Future<void>.value();
+    }
+    final running = _metadataJobs[hash];
+    if (running != null) return running;
+    _metadataErrors.remove(hash);
+    _metadataCancelled.remove(hash);
+    final queued = _metadataQueue.then((_) => _fetchMetadata(hash));
+    _metadataQueue = queued.then((_) {}, onError: (Object _) {});
+    late final Future<void> job;
+    job = queued
+        .catchError((Object e) {
+          if (!_metadataCancelled.contains(hash)) {
+            _metadataErrors[hash] = e is TimeoutException
+                ? 'Timed out waiting for torrent metadata from peers'
+                : e.toString();
+          }
+        })
+        .whenComplete(() {
+          if (identical(_metadataJobs[hash], job)) _metadataJobs.remove(hash);
+          _metadataCancelled.remove(hash);
+          if (!_disposed) notifyListeners();
+        });
+    _metadataJobs[hash] = job;
+    notifyListeners();
+    return job;
+  }
+
+  /// Stops a running metadata fetch; the entry stays a magnet.
+  Future<void> cancelMetadata(String hash) async {
+    if (!_metadataJobs.containsKey(hash)) return;
+    _metadataCancelled.add(hash);
+    if (_engine.running) await _discardTask(_metadataGid(hash));
+    if (!_disposed) notifyListeners();
+  }
+
+  Future<void> _fetchMetadata(String hash) async {
+    if (_metadataCancelled.contains(hash) || _disposed) return;
+    final directory = p.join(_stateDirectory, 'magnet-metadata');
+    final saved = p.join(directory, '$hash.torrent');
+    // A file from an earlier fetch may not have reached the index yet.
+    if (await _importFetchedMetadata(hash, saved, temporary: true)) return;
+    await Directory(directory).create(recursive: true);
+    await _ensureEngine();
+    final gid = _metadataGid(hash);
+    var added = false;
+    // The payload task's action lock orders this against download/resume,
+    // which cancel this task: aria2 cannot start both for one info hash.
+    await _withTorrentLock(hash, () async {
+      final entry = await repository.get(hash);
+      if (entry == null ||
+          entry.torrentPath.isNotEmpty ||
+          entry.sourceUri == null ||
+          _metadataCancelled.contains(hash) ||
+          const ['active', 'waiting'].contains(entry.status)) {
+        return;
+      }
+      await _validateEntry(entry);
+      try {
+        await _engine.call('removeDownloadResult', [gid]);
+      } on Aria2RpcException catch (_) {}
+      await _engine.addMagnetMetadata(entry.sourceUri!, directory, gid);
+      added = true;
+    });
+    if (!added) return;
+    try {
+      // Metadata is small: take the next free slot ahead of queued payloads.
+      try {
+        await _engine.call('changePosition', [gid, 0, 'POS_SET']);
+      } on Aria2RpcException catch (_) {}
+      // Only time spent searching peers counts; queued time does not.
+      final searching = Stopwatch();
+      while (true) {
+        await Future<void>.delayed(metadataPollInterval);
+        if (_metadataCancelled.contains(hash) || _disposed) return;
+        final status =
+            await _engine.call('tellStatus', [
+                  gid,
+                  ['status', 'errorMessage'],
+                ])
+                as Map<String, dynamic>;
+        final state = status['status'];
+        if (state == 'complete') break;
+        if (state == 'removed') return;
+        if (state == 'error') {
+          throw StateError(
+            status['errorMessage'] as String? ?? 'Torrent metadata failed',
+          );
+        }
+        if (state == 'active') {
+          searching.start();
+        } else {
+          searching.stop();
+        }
+        if (searching.elapsed > metadataTimeout) {
+          throw TimeoutException('Torrent metadata', metadataTimeout);
+        }
+      }
+    } finally {
+      try {
+        if (_engine.running) await _discardTask(gid);
+      } catch (_) {
+        // Cleanup must not replace the fetch result; aria2 forgets the task
+        // when it stops anyway.
+      }
+    }
+    if (!await _importFetchedMetadata(hash, saved, temporary: true)) {
+      throw StateError('aria2 did not save the torrent metadata');
+    }
+  }
+
+  /// Imports metainfo aria2 saved for [hash]. [temporary] files belong to this
+  /// app's metadata folder and are removed once a durable copy is indexed.
+  Future<bool> _importFetchedMetadata(
+    String hash,
+    String path, {
+    required bool temporary,
+  }) async {
+    final file = File(path);
+    if (!await file.exists()) return false;
+    try {
+      final info = await Isolate.run(() => _readTorrent(path));
+      if (info.hash != hash) throw const FormatException('Wrong torrent');
+    } on FormatException {
+      if (temporary) await file.delete();
+      return false;
+    }
+    await _ensureImportSchema();
+    final entry = await repository.get(hash);
+    // Removed meanwhile: do not resurrect it.
+    if (entry == null || entry.torrentPath.isNotEmpty) {
+      if (temporary) await file.delete();
+      return entry != null;
+    }
+    // Keep the entry's place in newest-first order.
+    if (temporary) await file.setLastModified(entry.modifiedAt);
+    await _importFile(
+      path,
+      mode: 'copy',
+      root: storageMode == 'index' || libraryDirectory == null
+          ? p.join(_stateDirectory, 'opened-torrents')
+          : libraryDirectory,
+    );
+    if (temporary) {
+      await repository.db.delete(
+        'torrent_sources',
+        where: 'path = ?',
+        whereArgs: [p.normalize(p.absolute(path))],
+      );
+      await file.delete();
+    }
+    try {
+      await _replacePausedMagnetTask(hash);
+    } catch (_) {
+      // The metainfo is indexed; sync re-adds a missing paused task from it.
+    }
+    if (!_disposed) notifyListeners();
+    return true;
+  }
+
+  /// A paused magnet task would fetch the metadata again on resume; replace it
+  /// with a paused task for the now known metainfo.
+  Future<void> _replacePausedMagnetTask(String hash) =>
+      _withTorrentLock(hash, () async {
+        final entry = await repository.get(hash);
+        if (entry == null ||
+            entry.status != 'paused' ||
+            entry.gid == null ||
+            entry.downloadDir == null ||
+            entry.torrentPath.isEmpty ||
+            !_engine.running) {
+          return;
+        }
+        await _discardTask(entry.gid!);
+        await _addTask(entry, entry.downloadDir!, entry.gid!, paused: true);
+      });
+
+  /// Removes an engine task and its result, waiting until aria2 has released
+  /// its info hash and GID.
+  Future<void> _discardTask(String gid) async {
+    try {
+      await _engine.call('forceRemove', [gid]);
+    } on Aria2RpcException catch (_) {
+      // Not found, or already complete/stopped.
+    }
+    for (var i = 0; i < 30; i++) {
+      try {
+        final status =
+            await _engine.call('tellStatus', [
+                  gid,
+                  ['status'],
+                ])
+                as Map<String, dynamic>;
+        if (const ['complete', 'error', 'removed'].contains(status['status'])) {
+          break;
+        }
+      } on Aria2RpcException catch (_) {
+        break;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    }
+    try {
+      await _engine.call('removeDownloadResult', [gid]);
+    } on Aria2RpcException catch (_) {}
   }
 
   Future<TorrentEntry> openSource(
@@ -1328,28 +1611,57 @@ class TorrentService extends ChangeNotifier {
     }
   }
 
-  Future<void> _action(
-    String hash,
-    Future<void> Function(TorrentEntry) action,
-  ) async {
+  Future<T> _withTorrentLock<T>(String hash, Future<T> Function() body) async {
     while (!_actions.add(hash)) {
       await Future<void>.delayed(const Duration(milliseconds: 20));
     }
     try {
-      final current = await repository.get(hash);
-      if (current == null) return;
-      await action(current);
-      lastError = null;
+      return await body();
     } finally {
       _actions.remove(hash);
+    }
+  }
+
+  Future<void> _action(
+    String hash,
+    Future<void> Function(TorrentEntry) action,
+  ) async {
+    try {
+      await _withTorrentLock(hash, () async {
+        final current = await repository.get(hash);
+        if (current == null) return;
+        await action(current);
+        lastError = null;
+      });
+    } finally {
       notifyListeners();
     }
+  }
+
+  /// Under the action lock: the payload cannot start while a metadata-only
+  /// task holds the same info hash in aria2.
+  Future<void> _cancelMetadataForPayload(String hash) async {
+    if (!_metadataJobs.containsKey(hash)) return;
+    _metadataCancelled.add(hash);
+    await _discardTask(_metadataGid(hash));
   }
 
   Future<void> download(
     TorrentEntry entry,
     String destination, {
     bool startImmediately = true,
+  }) async {
+    await _download(entry, destination, startImmediately: startImmediately);
+    if (!startImmediately) {
+      final current = await repository.get(entry.hash);
+      if (current != null) _autoFetchMetadata(current);
+    }
+  }
+
+  Future<void> _download(
+    TorrentEntry entry,
+    String destination, {
+    required bool startImmediately,
   }) => _action(entry.hash, (entry) async {
     if (entry.status == 'active' || entry.status == 'waiting') {
       throw StateError(
@@ -1359,6 +1671,7 @@ class TorrentService extends ChangeNotifier {
     await Directory(destination).create(recursive: true);
     await _validateEntry(entry);
     await _ensureEngine();
+    if (startImmediately) await _cancelMetadataForPayload(entry.hash);
     // A paused task may be saved to a different destination. Remove its engine
     // task under the same action lock; existing payloads remain on disk.
     if (entry.status == 'paused') await _stop(entry);
@@ -1391,6 +1704,7 @@ class TorrentService extends ChangeNotifier {
   Future<void> resume(TorrentEntry entry) => _action(entry.hash, (entry) async {
     if (entry.status != 'paused') return;
     await _ensureEngine();
+    await _cancelMetadataForPayload(entry.hash);
     final task = await _ensureTask(entry);
     await _engine.call('unpause', [task['gid'] ?? entry.gid]);
     await repository.update(entry.hash, {
@@ -1400,7 +1714,10 @@ class TorrentService extends ChangeNotifier {
     });
   });
 
-  Future<void> stop(TorrentEntry entry) => _action(entry.hash, _stop);
+  Future<void> stop(TorrentEntry entry) => _action(entry.hash, (entry) async {
+    await cancelMetadata(entry.hash);
+    await _stop(entry);
+  });
 
   Future<void> _stop(TorrentEntry entry) async {
     // A second window must acquire ownership before changing task intent.
@@ -1456,6 +1773,7 @@ class TorrentService extends ChangeNotifier {
   }
 
   Future<void> remove(TorrentEntry entry) => _action(entry.hash, (entry) async {
+    await cancelMetadata(entry.hash);
     await _stop(entry);
     await repository.remove(entry.hash);
     // Metainfo and downloaded files are retained on disk.
@@ -1583,6 +1901,11 @@ class TorrentService extends ChangeNotifier {
                   ? status['errorMessage'] as String?
                   : null,
             });
+            if (entry.torrentPath.isEmpty &&
+                entry.downloadDir != null &&
+                info != null) {
+              _captureDownloadedMetadata(entry);
+            }
             changed = true;
           } catch (e) {
             if (e is Aria2RpcException ||
@@ -1617,8 +1940,25 @@ class TorrentService extends ChangeNotifier {
     }
   }
 
+  /// A started magnet saves `<hash>.torrent` beside its payload
+  /// (`bt-save-metadata`); index it so the file list becomes available.
+  /// Runs outside the per-torrent lock that [sync] holds for [entry].
+  void _captureDownloadedMetadata(TorrentEntry entry) {
+    if (!_metadataCaptures.add(entry.hash)) return;
+    unawaited(
+      _importFetchedMetadata(
+            entry.hash,
+            p.join(entry.downloadDir!, '${entry.hash}.torrent'),
+            temporary: false,
+          )
+          .catchError((Object _) => false)
+          .whenComplete(() => _metadataCaptures.remove(entry.hash)),
+    );
+  }
+
   @override
   void dispose() {
+    _disposed = true;
     _pollTimer?.cancel();
     _scanTimer?.cancel();
     cancelScan();

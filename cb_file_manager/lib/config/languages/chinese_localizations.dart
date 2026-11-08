@@ -73,6 +73,52 @@ class ChineseLocalizations implements AppLocalizations {
   @override
   String get aiSubtitleManage => '管理 AI 模型';
   @override
+  String get aiSubtitleFilesSection => '字幕文件';
+  @override
+  String get aiSubtitleFileAppOnly => '仅保存在应用内';
+  @override
+  String get aiSubtitleFileAppOnlyHint =>
+      '不创建任何文件。在 CB File Hub 中重新打开视频即可立即显示字幕。';
+  @override
+  String get aiSubtitleFileAsk => '完成后提示保存';
+  @override
+  String get aiSubtitleFileAskHint =>
+      '将处理整个视频，包括播放位置之前的部分。完成后会出现提示，让你选择 SRT 文件的保存位置。';
+  @override
+  String get aiSubtitleFileSubs => '自动保存到 Subs 文件夹';
+  @override
+  String get aiSubtitleFileSubsHint =>
+      '处理整个视频后，在视频旁写入 Subs/<视频名>.<语言>.srt。VLC 会自动识别；其他播放器可能需要手动指定位置。';
+  @override
+  String get aiSubtitleFileHidden => '隐藏保存在视频旁';
+  @override
+  String get aiSubtitleFileHiddenHint =>
+      '处理整个视频后，以隐藏属性写入 <视频名>.<语言>.srt。资源管理器和访达默认不显示；CB File Hub 仍会列出隐藏文件。';
+  @override
+  String get aiSubtitleExportSrt => '导出 SRT…';
+  @override
+  String get aiSubtitleExportIncomplete => '视频部分片段尚无字幕；文件仅包含已完成的部分。';
+  @override
+  String get aiSubtitleExportEmpty => '暂无可导出的字幕。';
+  @override
+  String get aiSubtitleExportReady => '整个视频的字幕已生成。';
+  @override
+  String get aiSubtitleExportLocalOnly => '自动保存字幕文件仅支持本机或网络共享中的视频。';
+  @override
+  String aiSubtitleExportSaved(String path) => '字幕已保存：$path';
+  @override
+  String aiSubtitleExportFailed(String error) => '无法保存字幕：$error';
+  @override
+  String get aiSubtitleModelsSection => '模型';
+  @override
+  String get aiSubtitleLanguagesSection => '语言';
+  @override
+  String get aiModelTierFast => '快速';
+  @override
+  String get aiModelTierBalanced => '均衡';
+  @override
+  String get aiModelTierAccurate => '最准确';
+  @override
   String get aiSubtitleMissing => '请在 AI 模型设置中下载或选择所需模型。';
   @override
   String get aiSubtitleLoading => '正在加载字幕模型…';
@@ -438,6 +484,29 @@ class ChineseLocalizations implements AppLocalizations {
   String get torrentOpenFolder => '打开下载文件夹';
   @override
   String get torrentDesktopOnly => '种子下载需要桌面版 aria2。可在可访问的本地文件夹上建立索引。';
+  @override
+  String get torrentFiles => '种子中的文件';
+  @override
+  String torrentFilesSummary(int count, String size) => '$count 个文件 · $size';
+  @override
+  String get torrentFilesSelectHint => '选择一个种子以查看其文件。';
+  @override
+  String get torrentFilesLoading => '正在读取文件列表…';
+  @override
+  String get torrentToggleFiles => '文件列表';
+  @override
+  String get torrentMetadataMissing => '尚未获取此磁力链接的名称和文件列表。';
+  @override
+  String get torrentFetchMetadata => '获取文件列表';
+  @override
+  String get torrentFetchingMetadata => '正在从对等节点获取名称和文件列表…';
+  @override
+  String get torrentMetadataFailed => '无法获取文件列表';
+  @override
+  String get torrentFetchMagnetMetadata => '添加磁力链接后立即获取文件列表';
+  @override
+  String get torrentFetchMagnetMetadataHint =>
+      '仅为获取种子名称和文件列表而连接对等节点，即使下载已暂停。开始下载前不会下载任何内容。';
   @override
   String torrentStatus(String status) =>
       const {

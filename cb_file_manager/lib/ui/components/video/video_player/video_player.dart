@@ -108,6 +108,10 @@ class VideoPlayer extends StatefulWidget {
   final bool showStreamingSpeed;
   final VoidCallback? onToggleStreamingSpeed;
 
+  /// AI subtitles generate to the end of the media, also while paused. Compact
+  /// previews pass false to stay within a short window around the playhead.
+  final bool continuousAiSubtitles;
+
   const VideoPlayer._({
     super.key,
     this.file,
@@ -138,6 +142,7 @@ class VideoPlayer extends StatefulWidget {
     this.initiallyFullScreen = false,
     this.showStreamingSpeed = false,
     this.onToggleStreamingSpeed,
+    this.continuousAiSubtitles = true,
   }) : assert(
          file != null ||
              streamingUrl != null ||
@@ -171,6 +176,7 @@ class VideoPlayer extends StatefulWidget {
     bool initiallyFullScreen = false,
     bool showStreamingSpeed = false,
     VoidCallback? onToggleStreamingSpeed,
+    bool continuousAiSubtitles = true,
   }) : this._(
          key: key,
          file: file,
@@ -199,6 +205,7 @@ class VideoPlayer extends StatefulWidget {
          initiallyFullScreen: initiallyFullScreen,
          showStreamingSpeed: showStreamingSpeed,
          onToggleStreamingSpeed: onToggleStreamingSpeed,
+         continuousAiSubtitles: continuousAiSubtitles,
        );
 
   /// Constructor for streaming URL playback
@@ -1245,6 +1252,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
         ),
         player: _player,
         controlsVisible: _showControls,
+        continuous: widget.continuousAiSubtitles,
         child: playerWidget,
       );
     }

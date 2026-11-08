@@ -77,6 +77,56 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get aiSubtitleManage => 'Manage AI models';
   @override
+  String get aiSubtitleFilesSection => 'Subtitle files';
+  @override
+  String get aiSubtitleFileAppOnly => 'Keep in the app only';
+  @override
+  String get aiSubtitleFileAppOnlyHint =>
+      'No file is created. Reopening the video in CB File Hub shows its subtitles instantly.';
+  @override
+  String get aiSubtitleFileAsk => 'Offer to save when finished';
+  @override
+  String get aiSubtitleFileAskHint =>
+      'The whole video is processed, including parts before the playhead. When it is done, a notice lets you save an SRT file wherever you choose.';
+  @override
+  String get aiSubtitleFileSubs => 'Save to a Subs folder automatically';
+  @override
+  String get aiSubtitleFileSubsHint =>
+      'The whole video is processed, then Subs/<video>.<language>.srt is written next to it. VLC finds it automatically; other players may need to be told where to look.';
+  @override
+  String get aiSubtitleFileHidden => 'Save next to the video, hidden';
+  @override
+  String get aiSubtitleFileHiddenHint =>
+      'The whole video is processed, then <video>.<language>.srt is written with the hidden attribute. Explorer and Finder hide it by default; CB File Hub still lists hidden files.';
+  @override
+  String get aiSubtitleExportSrt => 'Export SRT…';
+  @override
+  String get aiSubtitleExportIncomplete =>
+      'Parts of the video have no subtitles yet; the file contains what is finished.';
+  @override
+  String get aiSubtitleExportEmpty => 'There are no subtitles to export yet.';
+  @override
+  String get aiSubtitleExportReady =>
+      'Subtitles for the whole video are ready.';
+  @override
+  String get aiSubtitleExportLocalOnly =>
+      'Automatic subtitle files need a video on this computer or a network share.';
+  @override
+  String aiSubtitleExportSaved(String path) => 'Subtitles saved: $path';
+  @override
+  String aiSubtitleExportFailed(String error) =>
+      'Could not save subtitles: $error';
+  @override
+  String get aiSubtitleModelsSection => 'Models';
+  @override
+  String get aiSubtitleLanguagesSection => 'Languages';
+  @override
+  String get aiModelTierFast => 'Fast';
+  @override
+  String get aiModelTierBalanced => 'Balanced';
+  @override
+  String get aiModelTierAccurate => 'Most accurate';
+  @override
   String get aiSubtitleMissing =>
       'Download or select the required models in AI model settings.';
   @override
@@ -479,6 +529,32 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get torrentDesktopOnly =>
       'Torrent downloads require desktop aria2. Indexing is available on accessible local folders.';
+  @override
+  String get torrentFiles => 'Files in torrent';
+  @override
+  String torrentFilesSummary(int count, String size) => '$count files · $size';
+  @override
+  String get torrentFilesSelectHint => 'Select one torrent to see its files.';
+  @override
+  String get torrentFilesLoading => 'Reading the file list…';
+  @override
+  String get torrentToggleFiles => 'File list';
+  @override
+  String get torrentMetadataMissing =>
+      'The name and file list of this magnet link have not been fetched yet.';
+  @override
+  String get torrentFetchMetadata => 'Fetch file list';
+  @override
+  String get torrentFetchingMetadata =>
+      'Fetching the name and file list from peers…';
+  @override
+  String get torrentMetadataFailed => 'Could not fetch the file list';
+  @override
+  String get torrentFetchMagnetMetadata =>
+      'Fetch the file list of added magnet links right away';
+  @override
+  String get torrentFetchMagnetMetadataHint =>
+      'Contacts peers only for the torrent name and file list, even when the download is paused. No content is downloaded until you start it.';
   @override
   String torrentStatus(String status) =>
       const {

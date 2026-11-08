@@ -74,19 +74,23 @@ class SubtitleCaptionOverlay extends StatelessWidget {
   }
 }
 
-enum _SubtitleAction { settings, retry, regenerate }
+enum _SubtitleAction { settings, retry, regenerate, export }
 
 /// One CC button in the existing playback row. Details/actions appear on demand.
 class SubtitleControlButton extends StatelessWidget {
   final SubtitleProgress? progress;
   final VoidCallback onSettings, onRetry;
   final VoidCallback? onRegenerate;
+
+  /// Saves finished cues as an SRT file wherever the user chooses.
+  final VoidCallback? onExport;
   const SubtitleControlButton({
     super.key,
     this.progress,
     required this.onSettings,
     required this.onRetry,
     this.onRegenerate,
+    this.onExport,
   });
 
   @override
@@ -188,6 +192,8 @@ class SubtitleControlButton extends StatelessWidget {
             onRetry();
           case _SubtitleAction.regenerate:
             onRegenerate?.call();
+          case _SubtitleAction.export:
+            onExport?.call();
         }
       },
       itemBuilder: (context) => [
@@ -210,6 +216,12 @@ class SubtitleControlButton extends StatelessWidget {
         ),
         if (failed)
           PopupMenuItem(value: _SubtitleAction.retry, child: Text(l.retry)),
+        if (onExport != null && progress.completed.isNotEmpty)
+          PopupMenuItem(
+            key: const ValueKey('ai-subtitle-export'),
+            value: _SubtitleAction.export,
+            child: Text(l.aiSubtitleExportSrt),
+          ),
         if (onRegenerate != null)
           PopupMenuItem(
             key: const ValueKey('ai-subtitle-regenerate'),

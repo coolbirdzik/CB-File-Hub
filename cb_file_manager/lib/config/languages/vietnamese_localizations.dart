@@ -76,6 +76,55 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get aiSubtitleManage => 'Quản lý model AI';
   @override
+  String get aiSubtitleFilesSection => 'File phụ đề';
+  @override
+  String get aiSubtitleFileAppOnly => 'Chỉ lưu trong app';
+  @override
+  String get aiSubtitleFileAppOnlyHint =>
+      'Không tạo file nào. Mở lại video trong CB File Hub là có phụ đề ngay.';
+  @override
+  String get aiSubtitleFileAsk => 'Hỏi lưu khi tạo xong';
+  @override
+  String get aiSubtitleFileAskHint =>
+      'Xử lý cả video, kể cả phần trước vị trí đang xem. Khi xong sẽ có thông báo để bạn chọn nơi lưu file SRT.';
+  @override
+  String get aiSubtitleFileSubs => 'Tự lưu vào thư mục Subs';
+  @override
+  String get aiSubtitleFileSubsHint =>
+      'Xử lý cả video rồi ghi Subs/<tên video>.<ngôn ngữ>.srt cạnh video. VLC tự nhận; player khác có thể phải chỉ đường dẫn.';
+  @override
+  String get aiSubtitleFileHidden => 'Tự lưu cạnh video, ẩn file';
+  @override
+  String get aiSubtitleFileHiddenHint =>
+      'Xử lý cả video rồi ghi <tên video>.<ngôn ngữ>.srt với thuộc tính ẩn. Explorer và Finder mặc định không hiện; CB File Hub vẫn liệt kê file ẩn.';
+  @override
+  String get aiSubtitleExportSrt => 'Xuất SRT…';
+  @override
+  String get aiSubtitleExportIncomplete =>
+      'Một số đoạn của video chưa có phụ đề; file chỉ gồm phần đã xong.';
+  @override
+  String get aiSubtitleExportEmpty => 'Chưa có phụ đề để xuất.';
+  @override
+  String get aiSubtitleExportReady => 'Đã tạo xong phụ đề cho cả video.';
+  @override
+  String get aiSubtitleExportLocalOnly =>
+      'Tự lưu file phụ đề chỉ hỗ trợ video trên máy hoặc thư mục chia sẻ mạng.';
+  @override
+  String aiSubtitleExportSaved(String path) => 'Đã lưu phụ đề: $path';
+  @override
+  String aiSubtitleExportFailed(String error) =>
+      'Không lưu được phụ đề: $error';
+  @override
+  String get aiSubtitleModelsSection => 'Model';
+  @override
+  String get aiSubtitleLanguagesSection => 'Ngôn ngữ';
+  @override
+  String get aiModelTierFast => 'Nhanh';
+  @override
+  String get aiModelTierBalanced => 'Cân bằng';
+  @override
+  String get aiModelTierAccurate => 'Chính xác nhất';
+  @override
   String get aiSubtitleMissing =>
       'Tải hoặc chọn model cần dùng trong phần quản lý model AI.';
   @override
@@ -427,6 +476,32 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get torrentDesktopOnly =>
       'Tải torrent cần aria2 trên máy tính. Có thể index các thư mục cục bộ được phép truy cập.';
+  @override
+  String get torrentFiles => 'Tệp trong torrent';
+  @override
+  String torrentFilesSummary(int count, String size) => '$count tệp · $size';
+  @override
+  String get torrentFilesSelectHint => 'Chọn một torrent để xem danh sách tệp.';
+  @override
+  String get torrentFilesLoading => 'Đang đọc danh sách tệp…';
+  @override
+  String get torrentToggleFiles => 'Danh sách tệp';
+  @override
+  String get torrentMetadataMissing =>
+      'Chưa lấy tên và danh sách tệp của liên kết magnet này.';
+  @override
+  String get torrentFetchMetadata => 'Lấy danh sách tệp';
+  @override
+  String get torrentFetchingMetadata =>
+      'Đang lấy tên và danh sách tệp từ peer…';
+  @override
+  String get torrentMetadataFailed => 'Không lấy được danh sách tệp';
+  @override
+  String get torrentFetchMagnetMetadata =>
+      'Lấy danh sách tệp của magnet ngay khi thêm';
+  @override
+  String get torrentFetchMagnetMetadataHint =>
+      'Chỉ kết nối peer để lấy tên và danh sách tệp, kể cả khi đang tạm dừng. Nội dung chỉ được tải khi bạn bắt đầu tải.';
   @override
   String torrentStatus(String status) =>
       const {

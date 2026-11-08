@@ -12,6 +12,7 @@ import 'subtitle_preferences.dart';
 import 'subtitle_worker.dart';
 import 'subtitle_progress.dart';
 import 'subtitle_cache.dart';
+import 'subtitle_srt.dart';
 
 export 'subtitle_progress.dart';
 export 'subtitle_cache.dart' show LocalSubtitleCue;
@@ -24,6 +25,20 @@ class LocalSubtitleSession extends ChangeNotifier {
   final LocalAiAdvisorService models;
   final SubtitleCache? cache;
   final Future<String?> Function()? sourceFingerprint;
+
+  /// Full players generate to the end of the media, paused or not. A compact
+  /// preview (the file browser pane) stays within [previewRunwayMs] of the
+  /// playhead so selecting a video does not process the whole file.
+  final bool continuous;
+  static const previewRunwayMs = 30000;
+
+  /// Writes SRT sidecars in the automatic file modes.
+  final SubtitleSrtWriter srtWriter;
+  String? _exportToken;
+  bool _committedThisGeneration = false;
+  bool _exportPrompt = false;
+  bool _nonLocalReported = false;
+  SubtitleExportNotice? _exportNotice;
   String? _cacheKey;
   bool _cacheChecked = false;
   int? _cacheRevision;
@@ -52,8 +67,20 @@ class LocalSubtitleSession extends ChangeNotifier {
   String? _workerModelPath, _translatorModelPath;
   bool _workerLoading = false, _translationBusy = false;
   _RecognitionTask? _recognitionTask, _prefetched;
-  int _lookAheadMs = 12000;
-  double _processingMs = 0;
+
+  /// Smoothed native recognition time; null until one chunk was measured.
+  double? _recognitionMs;
+
+  /// Measured time to load the speech worker, the cost of killing it.
+  int? _workerLoadMs;
+
+  /// Set after a cache failure that may have lost evicted cues; the session
+  /// then regenerates in memory instead of trusting stale processed ranges.
+  bool _cacheDisabled = false;
+
+  /// Advanced by seeks. A chunk started for an older cursor is abandoned
+  /// without unloading models; [_generation] still guards setting changes.
+  int _epoch = 0;
   late String _settingsSnapshot = _settingsSignature;
   late String _modelsSnapshot = _modelsSignature;
   late String _audioSelection = player.state.track.audio.id;
@@ -75,7 +102,9 @@ class LocalSubtitleSession extends ChangeNotifier {
   bool get lagging =>
       preferences.enabled &&
       (phase == SubtitlePhase.processing || phase == SubtitlePhase.loading) &&
-      player.state.position.inMilliseconds > _nextMs + 2000;
+      player.state.position.inMilliseconds > _nextMs + 2000 &&
+      _unprocessedAt(player.state.position.inMilliseconds) ==
+          player.state.position.inMilliseconds;
   List<LocalSubtitleCue> get cues => List.unmodifiable(_cues);
   SubtitleProgress get progress => SubtitleProgress(
     phase: phase,
@@ -131,7 +160,10 @@ class LocalSubtitleSession extends ChangeNotifier {
     this.translateText,
     this.cache,
     this.sourceFingerprint,
-  }) : createWorker = createWorker ?? SubtitleWorker.new,
+    this.continuous = true,
+    SubtitleSrtWriter? srtWriter,
+  }) : srtWriter = srtWriter ?? SubtitleSrtWriter(preferences.prefs),
+       createWorker = createWorker ?? SubtitleWorker.new,
        createTranslator =
            createTranslator ??
            (() => GgufLlamaCppLocalAiChatRuntime(
@@ -205,21 +237,133 @@ class LocalSubtitleSession extends ChangeNotifier {
       restart();
     } else {
       // Display-only changes must not unload models or invalidate finished text.
+      // A new file mode may need a sidecar for subtitles that are already done.
+      _checkExport();
       notifyListeners();
     }
   }
 
+  /// "Ask" mode: true once after the whole video was generated in this
+  /// session. The UI consumes it and offers a save action; it never opens a
+  /// dialog by itself.
+  bool takeExportPrompt() {
+    final prompt = _exportPrompt;
+    _exportPrompt = false;
+    return prompt;
+  }
+
+  /// The latest automatic sidecar result, consumed by the UI once.
+  SubtitleExportNotice? takeExportNotice() {
+    final notice = _exportNotice;
+    _exportNotice = null;
+    return notice;
+  }
+
+  /// Language code used in exported file names (`video.<code>.srt`).
+  String get exportLanguage => preferences.resolvedTarget;
+
+  /// Every finished cue of the current settings, for an SRT file. Cached
+  /// sessions read SQLite because only a window is kept in memory.
+  Future<List<LocalSubtitleCue>> exportCues() async {
+    final key = _cacheKey;
+    if (cache != null && key != null) {
+      final snapshot = await cache!.read(
+        key,
+        0,
+        player.state.duration.inMilliseconds + 1,
+      );
+      return snapshot.cues;
+    }
+    return [..._cues]..sort((a, b) => a.startMs.compareTo(b.startMs));
+  }
+
+  /// Whole-media modes process regions before the playhead once everything
+  /// after it is done, so the file covers the entire video.
+  bool get _fillsWholeMedia =>
+      continuous && preferences.fileMode != SubtitleFileMode.appOnly;
+
+  int _nextWorkStart() {
+    final ahead = _unprocessedAt(_cursor);
+    if (_schedulable(ahead) || !_fillsWholeMedia) return ahead;
+    final first = _unprocessedAt(0);
+    return _schedulable(first) ? first : ahead;
+  }
+
+  void _checkExport() {
+    // Previews never write files: selecting a short clip must not litter.
+    if (_disposed || !continuous || !preferences.enabled) return;
+    final mode = preferences.fileMode;
+    if (mode == SubtitleFileMode.appOnly || !progress.reachedEnd) return;
+    final token = mode == SubtitleFileMode.askWhenDone
+        ? '$_generation|${mode.name}'
+        : '$_generation|${mode.name}|${preferences.bilingual}';
+    if (_exportToken == token) return;
+    _exportToken = token;
+    if (mode == SubtitleFileMode.askWhenDone) {
+      // Reopening a video that was finished earlier does not prompt again.
+      if (_committedThisGeneration) {
+        _exportPrompt = true;
+        notifyListeners();
+      }
+      return;
+    }
+    unawaited(_writeSidecar(mode, _generation));
+  }
+
+  Future<void> _writeSidecar(SubtitleFileMode mode, int generation) async {
+    final video = subtitleLocalVideoPath(player.subtitleCacheSource);
+    if (video == null) {
+      if (!_nonLocalReported) {
+        _nonLocalReported = true;
+        _exportNotice = const SubtitleExportNotice(localOnly: true);
+        notifyListeners();
+      }
+      return;
+    }
+    try {
+      final cues = await exportCues();
+      if (_disposed || generation != _generation || cues.isEmpty) return;
+      final result = await srtWriter.write(
+        videoPath: video,
+        language: exportLanguage,
+        mode: mode,
+        bytes: srtBytes(formatSrt(cues, bilingual: preferences.bilingual)),
+      );
+      if (_disposed || !result.changed) return;
+      _exportNotice = SubtitleExportNotice(path: result.path);
+      notifyListeners();
+    } catch (e) {
+      if (_disposed) return;
+      _exportNotice = SubtitleExportNotice(error: e);
+      notifyListeners();
+    }
+  }
+
+  /// Generation continues from the playhead to the end of the media, also
+  /// while paused; only disposing the session (leaving or closing the player)
+  /// or disabling subtitles stops it.
   bool get _needsWork =>
       !_disposed &&
       preferences.enabled &&
       _seekDebounce?.isActive != true &&
       phase != SubtitlePhase.failed &&
       phase != SubtitlePhase.missingModels &&
-      ((_nextMs < player.state.duration.inMilliseconds &&
-              _nextMs <= player.state.position.inMilliseconds + _lookAheadMs) ||
+      (_schedulable(_nextWorkStart()) ||
           (_cacheKey != null &&
               player.state.position.inMilliseconds - _cacheReadPosition >=
                   10000));
+
+  bool _schedulable(int position) =>
+      position < player.state.duration.inMilliseconds &&
+      (continuous ||
+          position <= player.state.position.inMilliseconds + previewRunwayMs);
+
+  /// The next position to recognize. Falling more than eight seconds behind
+  /// playback skips ahead to the playhead instead of restarting the session.
+  int get _cursor {
+    final position = player.state.position.inMilliseconds;
+    return _nextMs < position - 8000 ? position : _nextMs;
+  }
 
   void _drive() {
     if (_needsWork && _busyGeneration == null) unawaited(_process(_generation));
@@ -282,11 +426,14 @@ class LocalSubtitleSession extends ChangeNotifier {
     _completed.clear();
     _cacheKey = null;
     _cacheChecked = false;
+    _committedThisGeneration = false;
     _cacheRevision = null;
     _cacheReadPosition = -100000;
     _cacheTrack = null;
     _cacheState = cache == null
         ? SubtitleCacheState.unavailable
+        : _cacheDisabled
+        ? SubtitleCacheState.failed
         : SubtitleCacheState.checking;
     _pending = null;
     _stage = preferences.enabled
@@ -315,8 +462,8 @@ class LocalSubtitleSession extends ChangeNotifier {
   void _tick() {
     if (_disposed || !preferences.enabled) return;
     final position = player.state.position.inMilliseconds;
-    // Continuous playback changes at most ~400 ms/tick at 2x; a larger jump
-    // cancels both native and translation work instead of showing stale text.
+    // Continuous playback changes at most ~400 ms/tick at 2x; a larger jump is
+    // a seek. It moves the cursor but keeps finished cues and warm models.
     final elapsed = _clock.elapsedMilliseconds - _lastTickMs;
     _lastTickMs = _clock.elapsedMilliseconds;
     final expectedAdvance = math.max(
@@ -325,7 +472,7 @@ class LocalSubtitleSession extends ChangeNotifier {
     );
     if (position < _lastPosition - 500 ||
         position > _lastPosition + expectedAdvance) {
-      _restart(debounce: true);
+      _seek(position);
       return;
     }
     _lastPosition = position;
@@ -349,11 +496,106 @@ class LocalSubtitleSession extends ChangeNotifier {
       _lastDurationMs = currentDuration;
       notifyListeners();
     }
-    if (_nextMs < position - 8000 && _busyGeneration == null) {
-      restart();
+    _drive();
+  }
+
+  /// A position-only change. Finished cues, processed ranges, the cache key
+  /// and loaded models stay valid; only work for the old cursor is abandoned.
+  void _seek(int position) {
+    if (_disposed) return;
+    if (phase == SubtitlePhase.failed || phase == SubtitlePhase.missingModels) {
+      // Nothing warm survives a failure; a seek retries as it always did.
+      _restart(debounce: true);
       return;
     }
-    _drive();
+    _lastPosition = position;
+    final pending = _pending;
+    final next = _unprocessedAt(position);
+    if (pending != null &&
+        next >= pending.start.inMilliseconds &&
+        next < pending.end.inMilliseconds) {
+      // Seeking within finished media (arrow keys, small drags) still needs
+      // the chunk being generated next; keep it and only show cached cues.
+      _cacheReadPosition = -100000;
+      unawaited(_readCacheWindow(_generation, position));
+      notifyListeners();
+      return;
+    }
+    _epoch++;
+    _nextMs = position;
+    _partialCue = null;
+    _pending = null;
+    _prefetched = null;
+    // Native recognition cannot be interrupted. Wait for the stale request
+    // when that is quicker than reloading the weights; without measurements
+    // (a cold first chunk) reload, as before continuous generation.
+    final task = _recognitionTask;
+    final expected = _recognitionMs, load = _workerLoadMs;
+    if (task != null &&
+        !task.done &&
+        (expected == null ||
+            load == null ||
+            expected - task.runningMs > load)) {
+      _dropWorker();
+    }
+    if (_stage != SubtitleWorkStage.loadingSpeech &&
+        _stage != SubtitleWorkStage.loadingTranslation) {
+      _stage = SubtitleWorkStage.idle;
+    }
+    if (phase == SubtitlePhase.processing) phase = SubtitlePhase.ready;
+    _cacheReadPosition = -100000;
+    unawaited(_readCacheWindow(_generation, position));
+    _seekDebounce?.cancel();
+    _seekDebounce = Timer(const Duration(milliseconds: 200), () {
+      _seekDebounce = null;
+      _drive();
+    });
+    notifyListeners();
+  }
+
+  /// Shows cached cues at a new position without waiting for a busy chunk.
+  Future<void> _readCacheWindow(int generation, int position) async {
+    final key = _cacheKey;
+    if (cache == null || key == null) return;
+    try {
+      final snapshot = await cache!.read(
+        key,
+        math.max(0, position - 60000),
+        position + 30000,
+      );
+      if (_disposed || generation != _generation || key != _cacheKey) return;
+      // A changed revision is handled by the next chunk, which restarts.
+      if (snapshot.revision != _cacheRevision) return;
+      _mergeCues(snapshot.cues);
+      notifyListeners();
+    } catch (_) {
+      // The next chunk reads the cache again and records any failure.
+    }
+  }
+
+  void _mergeCues(Iterable<LocalSubtitleCue> cues) {
+    final byTime = {
+      for (final c in [..._cues, ...cues]) '${c.startMs}:${c.endMs}': c,
+    };
+    _cues
+      ..clear()
+      ..addAll(byTime.values)
+      ..sort((a, b) => a.startMs.compareTo(b.startMs));
+    _trimCues();
+  }
+
+  /// Cached cues can be read again, so only a window around the playhead is
+  /// kept. Without a cache every generated cue stays in memory (a few MB for a
+  /// feature film); dropping them would leave processed ranges blank forever.
+  void _trimCues() {
+    if (cache == null || _cacheKey == null) return;
+    final position = player.state.position.inMilliseconds;
+    _cues.removeWhere(
+      (c) =>
+          (c.endMs < position - 60000 || c.startMs > position + 120000) &&
+          // Overlap trimming of the next chunk needs the cue before it.
+          (c.endMs < _nextMs - 10000 || c.startMs > _nextMs),
+    );
   }
 
   /// Clears this video/configuration and cancels work before starting again.
@@ -379,7 +621,7 @@ class LocalSubtitleSession extends ChangeNotifier {
   }
 
   Future<void> _readCache(int generation, String source, int track) async {
-    if (cache == null) return;
+    if (cache == null || _cacheDisabled) return;
     try {
       if (_cacheTrack != null && _cacheTrack != track) {
         restart();
@@ -433,15 +675,7 @@ class LocalSubtitleSession extends ChangeNotifier {
       _completed
         ..clear()
         ..addAll(snapshot.ranges);
-      final byTime = {
-        for (final c in [..._cues, ...snapshot.cues])
-          '${c.startMs}:${c.endMs}': c,
-      };
-      _cues
-        ..clear()
-        ..addAll(byTime.values);
-      _cues.sort((a, b) => a.startMs.compareTo(b.startMs));
-      _cues.removeWhere((c) => c.endMs < position - 60000);
+      _mergeCues(snapshot.cues);
       _cacheState = snapshot.ranges.isEmpty
           ? SubtitleCacheState.automatic
           : SubtitleCacheState.reused;
@@ -453,6 +687,12 @@ class LocalSubtitleSession extends ChangeNotifier {
       }
     } catch (_) {
       if (generation != _generation) return;
+      if (_cacheRevision != null) {
+        // An earlier read succeeded, so evicted cues relied on the cache.
+        _cacheDisabled = true;
+        restart();
+        return;
+      }
       _cacheChecked = true;
       _cacheKey = null;
       _cacheState = SubtitleCacheState.failed;
@@ -572,10 +812,6 @@ class LocalSubtitleSession extends ChangeNotifier {
     }
     final source = player.subtitleSource;
     if (source == null) return;
-    if (_nextMs < player.state.position.inMilliseconds - 8000) {
-      restart();
-      return;
-    }
     if (player.state.duration == Duration.zero) {
       if (player.state.position.inSeconds > 5) {
         phase = SubtitlePhase.failed;
@@ -587,16 +823,20 @@ class LocalSubtitleSession extends ChangeNotifier {
       return;
     }
     _busyGeneration = generation;
-    final processing = Stopwatch()..start();
+    final epoch = _epoch;
+    // Settings changes and seeks both make this chunk's results unusable.
+    bool stale() => generation != _generation || epoch != _epoch;
     final target = preferences.resolvedTarget;
+    final chunkCues = <LocalSubtitleCue>[];
+    var committed = false;
     try {
       final selected = await player.subtitleAudioTrackOrdinal();
-      if (generation != _generation) return;
+      if (stale()) return;
       await _readCache(generation, source, selected);
-      if (generation != _generation) return;
+      if (stale()) return;
       final duration = player.state.duration.inMilliseconds;
-      if (_nextMs >= duration ||
-          _nextMs > player.state.position.inMilliseconds + _lookAheadMs) {
+      _nextMs = _nextWorkStart();
+      if (!_schedulable(_nextMs)) {
         phase = SubtitlePhase.ready;
         _stage = SubtitleWorkStage.idle;
         _modelName = null;
@@ -613,9 +853,14 @@ class LocalSubtitleSession extends ChangeNotifier {
             ?.displayName;
         return;
       }
-      if (generation != _generation) return;
-      if (preferences.resolvedSourceLanguage != 'auto' &&
-          preferences.resolvedSourceLanguage != target &&
+      if (stale()) return;
+      // Warm the translator beside the speech model. In full players Auto
+      // detection usually finds a foreign language, so it is prepared then
+      // too; this costs memory when the audio is in the subtitle language.
+      // Previews wait for a detected language, as clicking through files
+      // would otherwise load and unload translation weights repeatedly.
+      if (preferences.resolvedSourceLanguage != target &&
+          (continuous || preferences.resolvedSourceLanguage != 'auto') &&
           _translator == null &&
           translateText == null) {
         final model = _model(
@@ -628,7 +873,7 @@ class LocalSubtitleSession extends ChangeNotifier {
           _prepareTranslation(model);
         }
       }
-      if (generation != _generation) return;
+      if (stale()) return;
       if (_worker == null) {
         phase = SubtitlePhase.loading;
         _work(SubtitleWorkStage.loadingSpeech, speech.displayName);
@@ -640,25 +885,46 @@ class LocalSubtitleSession extends ChangeNotifier {
           speech.catalogId,
           _releaseForManagement,
         );
+        final loading = Stopwatch()..start();
         try {
           await worker.start(speech.localPath);
+          _workerLoadMs = loading.elapsedMilliseconds;
         } finally {
           if (identical(_worker, worker)) _workerLoading = false;
         }
       }
-      if (generation != _generation) return;
-      if (_nextMs < player.state.position.inMilliseconds - 8000) {
-        // Model startup can finish after playback has moved on. Keep the warm
-        // model and start where the user is, without decoding expired chunks.
-        _nextMs = player.state.position.inMilliseconds;
-      }
-      if (_nextMs >= duration) {
+      if (stale()) return;
+      // Model startup can finish after playback has moved on. Keep the warm
+      // model and start where the user is, without decoding expired chunks.
+      _nextMs = _nextWorkStart();
+      if (!_schedulable(_nextMs)) {
         phase = SubtitlePhase.ready;
         _stage = SubtitleWorkStage.idle;
         _pending = null;
         return;
       }
       final chunkStart = _nextMs;
+      final key = _cacheKey;
+      if (cache != null &&
+          key != null &&
+          _cacheRevision != null &&
+          chunkStart > 0 &&
+          !_cues.any(
+            (c) => c.endMs > chunkStart - 10000 && c.startMs < chunkStart,
+          )) {
+        // A backfill chunk starts far from the playhead window.
+        try {
+          final before = await cache!.read(
+            key,
+            math.max(0, chunkStart - 10000),
+            chunkStart,
+          );
+          if (stale()) return;
+          if (before.revision == _cacheRevision) _mergeCues(before.cues);
+        } catch (_) {
+          // Overlap trimming is best effort; the chunk itself still runs.
+        }
+      }
       final start = math.max(0, _nextMs - 800);
       final end = _chunkEnd(chunkStart, duration);
       _pending = SubtitleTimeRange(
@@ -678,7 +944,14 @@ class LocalSubtitleSession extends ChangeNotifier {
           ? queued
           : _recognize(generation, source, selected, chunkStart, end);
       final result = (await task.future).value;
-      if (generation != _generation) return;
+      final measured = task.elapsedMs;
+      if (measured != null) {
+        final previous = _recognitionMs;
+        _recognitionMs = previous == null
+            ? measured.toDouble()
+            : previous * .7 + measured * .3;
+      }
+      if (stale()) return;
       final language =
           result['language'] as String? ?? preferences.resolvedSourceLanguage;
       _detectedLanguage = language;
@@ -700,12 +973,11 @@ class LocalSubtitleSession extends ChangeNotifier {
         notifyListeners();
         return;
       }
-      if (generation != _generation) return;
-      // A single bounded look-ahead request overlaps CPU/GPU recognition with
-      // translation. No PCM or model tensors cross into the Flutter isolate.
+      if (stale()) return;
+      // One recognition request runs ahead, overlapping CPU/GPU recognition
+      // with translation. No PCM or model tensors cross into this isolate.
       final next = _unprocessedAt(end);
-      if (next < duration &&
-          next <= player.state.position.inMilliseconds + _lookAheadMs) {
+      if (_schedulable(next)) {
         _prefetched = _recognize(
           generation,
           source,
@@ -714,7 +986,6 @@ class LocalSubtitleSession extends ChangeNotifier {
           _chunkEnd(next, duration),
         );
       }
-      final chunkCues = <LocalSubtitleCue>[];
       LocalSubtitleCue? previous;
       for (final cue in _cues) {
         if (cue.startMs < chunkStart &&
@@ -723,7 +994,7 @@ class LocalSubtitleSession extends ChangeNotifier {
         }
       }
       for (final raw in segments) {
-        if (generation != _generation) return;
+        if (stale()) return;
         final segment = raw as Map<String, dynamic>;
         var original = (segment['text'] as String).trim();
         var from = (segment['start_ms'] as num).toInt().clamp(start, end);
@@ -749,7 +1020,7 @@ class LocalSubtitleSession extends ChangeNotifier {
             );
             _prepareTranslation(translation);
             final preparation = await _translationPreparation;
-            if (generation != _generation) return;
+            if (stale()) return;
             if (preparation != null) {
               Error.throwWithStackTrace(preparation.$1, preparation.$2);
             }
@@ -758,6 +1029,8 @@ class LocalSubtitleSession extends ChangeNotifier {
             final translator = _translator!;
             _translationBusy = true;
             try {
+              // Leaving this loop cancels the HTTP stream, so a seek stops
+              // the old request without unloading llama-server.
               await for (final chunk in translator.sendDirectConversationStream(
                 model: translation,
                 maxTokens: 2048,
@@ -770,7 +1043,7 @@ class LocalSubtitleSession extends ChangeNotifier {
                   },
                 ],
               )) {
-                if (generation != _generation) return;
+                if (stale()) return;
                 if (chunk == '[STATUS]Ready' || !chunk.startsWith('[STATUS]')) {
                   if (_stage != SubtitleWorkStage.translating) {
                     _work(
@@ -796,7 +1069,7 @@ class LocalSubtitleSession extends ChangeNotifier {
             if (text.isEmpty) throw StateError('Translation returned no text');
           }
         }
-        if (generation != _generation) return;
+        if (stale()) return;
         previous = LocalSubtitleCue(from, to, original, text);
         _partialCue = null;
         chunkCues.add(previous);
@@ -804,6 +1077,7 @@ class LocalSubtitleSession extends ChangeNotifier {
         // commit still wait for the whole chunk to finish successfully.
         _cues.add(previous);
       }
+      // Every segment is finished: a seek arriving now must not discard it.
       if (generation != _generation) return;
       if (cache != null && _cacheKey != null && _cacheRevision != null) {
         try {
@@ -822,29 +1096,28 @@ class LocalSubtitleSession extends ChangeNotifier {
           _cacheState = SubtitleCacheState.saved;
         } catch (_) {
           if (generation != _generation) return;
-          _cacheState = SubtitleCacheState.failed;
-          _cacheKey = null;
+          // Saved cues outside the playhead window were evicted from memory
+          // and can no longer be read back; regenerate without the cache.
+          _cacheDisabled = true;
+          restart();
+          return;
         }
       }
+      // The chunk's range was recognized even if a seek arrived during the
+      // cache write; its cues are complete and remain valid.
+      committed = true;
+      _committedThisGeneration = true;
       _cues.sort((a, b) => a.startMs.compareTo(b.startMs));
       _markProcessed(chunkStart, end);
-      _nextMs = end;
+      if (epoch == _epoch) _nextMs = end;
       _pending = null;
       _stage = SubtitleWorkStage.idle;
-      // Keep at most two minutes of cues and no more than 256 segments.
-      _cues.removeWhere(
-        (c) => c.endMs < player.state.position.inMilliseconds - 60000,
-      );
-      if (_cues.length > 256) _cues.removeRange(0, _cues.length - 256);
+      _trimCues();
       phase = SubtitlePhase.ready;
-      _processingMs = _processingMs == 0
-          ? processing.elapsedMilliseconds.toDouble()
-          : _processingMs * .75 + processing.elapsedMilliseconds * .25;
-      _lookAheadMs = (8000 + _processingMs * player.state.rate * 2)
-          .round()
-          .clamp(12000, 40000);
     } catch (e) {
-      if (generation == _generation && !_disposed) {
+      // A seek may have stopped the worker under this chunk; that is not a
+      // failure of the subtitle pipeline.
+      if (generation == _generation && epoch == _epoch && !_disposed) {
         phase = SubtitlePhase.failed;
         _stage = SubtitleWorkStage.idle;
         _pending = null;
@@ -855,7 +1128,13 @@ class LocalSubtitleSession extends ChangeNotifier {
         _prefetched = null;
       }
     } finally {
+      // An abandoned chunk is redone later; keeping its partial cues would
+      // duplicate them when the range is recognized again.
+      if (!committed && chunkCues.isNotEmpty) {
+        _cues.removeWhere(chunkCues.contains);
+      }
       if (_busyGeneration == generation) _busyGeneration = null;
+      if (!_disposed && generation == _generation) _checkExport();
       if (!_disposed) notifyListeners();
       // Fill the runway without an extra 100–200 ms polling gap per chunk.
       if (_needsWork) scheduleMicrotask(_drive);
@@ -887,6 +1166,12 @@ class LocalSubtitleSession extends ChangeNotifier {
 class _RecognitionTask {
   final int generation, start, end, track;
   bool done = false;
+
+  /// Native time for a successful request, used to decide whether a seek
+  /// waits for it or reloads the worker.
+  int? elapsedMs;
+  final _watch = Stopwatch()..start();
+  int get runningMs => _watch.elapsedMilliseconds;
   late final Future<_RecognitionOutcome> future;
   _RecognitionTask(
     this.generation,
@@ -895,10 +1180,12 @@ class _RecognitionTask {
     this.track,
     Future<Map<String, dynamic>> request,
   ) {
+    final watch = _watch;
     // A discarded prefetch must absorb cancellation errors until consumed.
     future = request.then(
       (value) {
         done = true;
+        elapsedMs = watch.elapsedMilliseconds;
         return _RecognitionOutcome(value, null, null);
       },
       onError: (Object error, StackTrace trace) {
@@ -952,4 +1239,14 @@ String trimSubtitleOverlap(String previous, String next) {
     }
   }
   return next;
+}
+
+/// One automatic sidecar outcome for the player to announce.
+class SubtitleExportNotice {
+  final String? path;
+  final Object? error;
+
+  /// The source is an http/SMB proxy; its folder cannot be written.
+  final bool localOnly;
+  const SubtitleExportNotice({this.path, this.error, this.localOnly = false});
 }

@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:cb_file_manager/services/torrent/aria2_engine.dart';
+import 'package:cb_file_manager/services/torrent/magnet_link.dart';
 import 'package:cb_file_manager/services/torrent/torrent_repository.dart';
 import 'package:cb_file_manager/services/torrent/torrent_service.dart';
 import 'package:cb_file_manager/services/torrent/torrent_metainfo.dart';
@@ -93,6 +95,32 @@ class FakeEngine extends Aria2Engine {
     return add('', destination, gid, paused: paused);
   }
 
+  final metadataRequests = <String>[];
+  final positions = <String>[];
+
+  /// Saved as the fetched metainfo; null leaves the metadata task running.
+  Uint8List? metadataBytes;
+
+  /// Status of an unfinished metadata task.
+  String metadataStatus = 'active';
+
+  @override
+  Future<String> addMagnetMetadata(
+    String uri,
+    String directory,
+    String gid,
+  ) async {
+    metadataRequests.add(gid);
+    final bytes = metadataBytes;
+    if (bytes != null) {
+      await File(
+        p.join(directory, '${MagnetLink.parse(uri).hash}.torrent'),
+      ).writeAsBytes(bytes);
+    }
+    tasks[gid] = {'status': bytes == null ? metadataStatus : 'complete'};
+    return gid;
+  }
+
   @override
   Future<Object?> call(String method, [List<Object?> args = const []]) async {
     final gid = args.first as String;
@@ -118,6 +146,9 @@ class FakeEngine extends Aria2Engine {
       case 'forceRemove':
         tasks.remove(gid);
         return gid;
+      case 'changePosition':
+        positions.add(gid);
+        return 0;
       default:
         throw StateError(method);
     }
@@ -1544,5 +1575,199 @@ void main() {
     expect(await file.exists(), isTrue);
     expect(await payload.readAsString(), 'retain me');
     expect(engine.tasks, isEmpty);
+  });
+  group('magnet metadata', () {
+    final multiFile = Uint8List.fromList(
+      bencode({
+        'info': {
+          'name': 'Show',
+          'piece length': 16384,
+          'pieces': Uint8List(20),
+          'files': [
+            {
+              'length': 3,
+              'path': ['S01', 'e1.mkv'],
+            },
+            {
+              'length': 2,
+              'path': ['e2.mkv'],
+            },
+          ],
+        },
+      }),
+    );
+    final hash = TorrentMetainfo.parse(multiFile).hash;
+    final magnet = 'magnet:?xt=urn:btih:$hash&dn=Unknown';
+
+    setUp(() => service.metadataPollInterval = Duration.zero);
+
+    test('is not fetched for added magnets unless enabled', () async {
+      await service.importMagnet(magnet);
+      expect(service.isFetchingMetadata(hash), isFalse);
+      expect(engine.metadataRequests, isEmpty);
+    });
+
+    test(
+      'added magnet fetches its name and file list without payload',
+      () async {
+        await service.setFetchMagnetMetadata(true);
+        engine.metadataBytes = multiFile;
+        final added = await service.importMagnet(magnet);
+        expect(service.isFetchingMetadata(hash), isTrue);
+        await service.fetchMetadata(added);
+        final entry = (await repo.get(hash))!;
+        expect(service.metadataError(hash), isNull);
+        expect(engine.metadataRequests, [hash.substring(16, 32)]);
+        expect(engine.addedMagnets, isEmpty);
+        expect(engine.tasks, isEmpty);
+        expect(entry.torrentPath, isNotEmpty);
+        expect(entry.name, 'Show');
+        expect(entry.fileCount, 2);
+        expect(entry.totalBytes, 5);
+        expect(entry.status, 'library');
+        expect(entry.sourceUri, startsWith('magnet:'));
+        expect(
+          File(
+            p.join(root.path, 'magnet-metadata', '$hash.torrent'),
+          ).existsSync(),
+          isFalse,
+        );
+        expect(await repo.sources(hash), [entry.torrentPath]);
+        final files = await service.files(entry);
+        expect(files.map((file) => (file.path, file.length)), [
+          ('S01/e1.mkv', 3),
+          ('e2.mkv', 2),
+        ]);
+      },
+    );
+
+    test(
+      'paused magnet download gets metadata and a paused metainfo task',
+      () async {
+        var entry = await service.importMagnet(magnet);
+        final destination = p.join(root.path, 'payload');
+        await service.download(entry, destination, startImmediately: false);
+        expect(engine.addedMagnets, hasLength(1));
+        engine.metadataBytes = multiFile;
+        await service.fetchMetadata((await repo.get(hash))!);
+        entry = (await repo.get(hash))!;
+        expect(service.metadataError(hash), isNull);
+        expect(entry.status, 'paused');
+        expect(entry.downloadDir, destination);
+        expect(entry.torrentPath, isNotEmpty);
+        // The paused magnet task was replaced by one for the metainfo.
+        expect(engine.addedMagnets, hasLength(1));
+        expect(engine.addedDirectories, [destination, destination]);
+        expect(engine.tasks.keys, [entry.gid]);
+        expect(engine.tasks[entry.gid]!['status'], 'paused');
+      },
+    );
+
+    test('resume cancels a running metadata fetch first', () async {
+      var entry = await service.importMagnet(magnet);
+      await service.download(
+        entry,
+        p.join(root.path, 'payload'),
+        startImmediately: false,
+      );
+      entry = (await repo.get(hash))!;
+      final metadataGid = hash.substring(16, 32);
+      final fetch = service.fetchMetadata(entry);
+      while (!engine.tasks.containsKey(metadataGid)) {
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+      }
+      await service.resume(entry);
+      await fetch;
+      expect(engine.tasks.containsKey(metadataGid), isFalse);
+      expect(service.isFetchingMetadata(hash), isFalse);
+      expect(service.metadataError(hash), isNull);
+      entry = (await repo.get(hash))!;
+      expect(entry.status, 'waiting');
+      expect(entry.torrentPath, isEmpty);
+    });
+
+    test('metadata jobs run one at a time, first in aria2 queue', () async {
+      final first = await service.importMagnet(magnet);
+      final second = await service.importMagnet(
+        'magnet:?xt=urn:btih:${'c' * 40}&dn=Other',
+      );
+      final firstGid = hash.substring(16, 32);
+      final firstFetch = service.fetchMetadata(first);
+      final secondFetch = service.fetchMetadata(second);
+      expect(service.isFetchingMetadata(second.hash), isTrue);
+      while (!engine.tasks.containsKey(firstGid)) {
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(engine.metadataRequests, [firstGid]);
+      expect(engine.positions, [firstGid]);
+      await File(
+        p.join(root.path, 'magnet-metadata', '$hash.torrent'),
+      ).writeAsBytes(multiFile);
+      engine.tasks[firstGid]!['status'] = 'complete';
+      await firstFetch;
+      expect((await repo.get(hash))!.torrentPath, isNotEmpty);
+      while (engine.metadataRequests.length < 2) {
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+      }
+      expect(engine.metadataRequests.last, ('c' * 40).substring(16, 32));
+      await service.cancelMetadata(second.hash);
+      await secondFetch;
+      expect(service.metadataError(second.hash), isNull);
+    });
+
+    test('only active peer search counts toward the timeout', () async {
+      service.metadataPollInterval = const Duration(milliseconds: 2);
+      service.metadataTimeout = const Duration(milliseconds: 30);
+      engine.metadataStatus = 'waiting';
+      final entry = await service.importMagnet(magnet);
+      final fetch = service.fetchMetadata(entry);
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+      expect(service.isFetchingMetadata(hash), isTrue);
+      engine.tasks[hash.substring(16, 32)]!['status'] = 'active';
+      await fetch;
+      expect(service.metadataError(hash), contains('Timed out'));
+      expect(engine.tasks, isEmpty);
+      expect((await repo.get(hash))!.torrentPath, isEmpty);
+    });
+
+    test('a removed entry is not restored by its metadata', () async {
+      final entry = await service.importMagnet(magnet);
+      final fetch = service.fetchMetadata(entry);
+      while (engine.metadataRequests.isEmpty) {
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+      }
+      await service.remove(entry);
+      await fetch;
+      expect(await repo.get(hash), isNull);
+    });
+
+    test('started magnet indexes the metainfo aria2 saved', () async {
+      var entry = await service.importMagnet(magnet);
+      final destination = p.join(root.path, 'payload');
+      await service.download(entry, destination);
+      entry = (await repo.get(hash))!;
+      await File(p.join(destination, '$hash.torrent')).writeAsBytes(multiFile);
+      engine.tasks[entry.gid!] = {
+        'status': 'active',
+        'completedLength': '0',
+        'totalLength': '5',
+        'downloadSpeed': '0',
+        'bittorrent': {
+          'info': {'name': 'Show'},
+        },
+      };
+      await service.sync();
+      for (var i = 0; i < 200; i++) {
+        if ((await repo.get(hash))!.torrentPath.isNotEmpty) break;
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+      entry = (await repo.get(hash))!;
+      expect(entry.torrentPath, isNotEmpty);
+      expect(entry.fileCount, 2);
+      expect(entry.status, 'active');
+      // The user's payload folder keeps aria2's copy.
+      expect(File(p.join(destination, '$hash.torrent')).existsSync(), isTrue);
+    });
   });
 }

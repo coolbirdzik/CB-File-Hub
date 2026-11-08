@@ -11,6 +11,7 @@ import 'package:cb_file_manager/services/media/media_kit_playback.dart';
 import 'package:cb_file_manager/services/media/subtitle_preferences.dart';
 import 'package:cb_file_manager/services/media/subtitle_worker.dart';
 import 'package:cb_file_manager/services/media/subtitle_cache.dart';
+import 'package:cb_file_manager/services/media/subtitle_srt.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:media_kit/media_kit.dart' as mk;
@@ -18,12 +19,16 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class _Platform extends mk.PlatformPlayer {
   _Platform() : super(configuration: const mk.PlayerConfiguration()) {
-    state = state.copyWith(duration: const Duration(minutes: 2));
+    // Generation runs to the end of the media, so a 16 s clip is two chunks.
+    state = state.copyWith(duration: const Duration(seconds: 16));
   }
 }
 
 class _Playback extends PlaybackPlayer {
   int audioTrack = 0;
+  String? cacheSource;
+  @override
+  String? get subtitleCacheSource => cacheSource ?? subtitleSource;
   _Playback(_Platform native)
     : super(player: mk.Player(platformPlayer: native));
   @override
@@ -35,6 +40,7 @@ class _Playback extends PlaybackPlayer {
 class _Worker extends SubtitleWorker {
   String language = 'en';
   String? recognizedText;
+  bool uniqueText = false;
   bool stopped = false;
   final requests = <Map<String, Object?>>[];
   Completer<Map<String, dynamic>>? gate;
@@ -55,8 +61,9 @@ class _Worker extends SubtitleWorker {
         {
           'start_ms': start,
           'end_ms': start + (command['duration_ms']! as int),
-          'text':
-              recognizedText ?? (start == 0 ? 'hello world' : 'world again'),
+          'text': uniqueText
+              ? 'line $start'
+              : recognizedText ?? (start == 0 ? 'hello world' : 'world again'),
         },
       ],
     };
@@ -65,6 +72,26 @@ class _Worker extends SubtitleWorker {
   @override
   Future<void> stop() async {
     stopped = true;
+  }
+}
+
+class _CountingWriter extends SubtitleSrtWriter {
+  int writes = 0;
+  _CountingWriter(super.prefs) : super(setHidden: (_, _) async {});
+  @override
+  Future<SubtitleSrtWrite> write({
+    required String videoPath,
+    required String language,
+    required SubtitleFileMode mode,
+    required List<int> bytes,
+  }) {
+    writes++;
+    return super.write(
+      videoPath: videoPath,
+      language: language,
+      mode: mode,
+      bytes: bytes,
+    );
   }
 }
 
@@ -173,8 +200,8 @@ void main() {
     cacheDb = null;
     await sandbox.delete(recursive: true);
   });
-  Future<void> until(bool Function() condition) async {
-    for (var i = 0; i < 300 && !condition(); i++) {
+  Future<void> until(bool Function() condition, {int tries = 300}) async {
+    for (var i = 0; i < tries && !condition(); i++) {
       await Future<void>.delayed(const Duration(milliseconds: 10));
     }
     expect(condition(), isTrue);
@@ -186,6 +213,8 @@ void main() {
     SubtitleCache? cache,
     Future<String?> Function()? fingerprint,
     GgufLlamaCppLocalAiChatRuntime Function()? runtime,
+    bool continuous = true,
+    SubtitleSrtWriter? writer,
   }) {
     final s = LocalSubtitleSession(
       player: player,
@@ -195,7 +224,10 @@ void main() {
       translateText: translate,
       cache: cache,
       sourceFingerprint: fingerprint ?? () async => 'movie-v1',
-      createTranslator: runtime,
+      // Auto mode prewarms the translator; never start a real llama-server.
+      createTranslator: runtime ?? _Translator.new,
+      continuous: continuous,
+      srtWriter: writer,
     );
     sessions.add(s);
     return s;
@@ -217,6 +249,7 @@ void main() {
     final first = _Worker()..gate = Completer<Map<String, dynamic>>();
     final next = _Worker();
     var count = 0;
+    native.state = native.state.copyWith(duration: const Duration(seconds: 66));
     final s = session(() => count++ == 0 ? first : next);
     await until(() => first.requests.isNotEmpty);
     native.state = native.state.copyWith(position: const Duration(seconds: 50));
@@ -373,6 +406,7 @@ void main() {
     () async {
       native.state = native.state.copyWith(
         position: const Duration(seconds: 50),
+        duration: const Duration(seconds: 66),
       );
       final worker = _Worker();
       final s = session(() => worker);
@@ -621,38 +655,41 @@ void main() {
   );
 
   test(
-    'idle seeks and bilingual changes keep the loaded speech worker',
+    'seeking into processed media keeps cues and the loaded speech worker',
     () async {
+      native.state = native.state.copyWith(
+        duration: const Duration(seconds: 66),
+      );
       final worker = _Worker();
       var started = 0;
       final s = session(() {
         started++;
         return worker;
       });
-      await until(
-        () => s.progress.processedUntil == const Duration(seconds: 16),
-      );
+      await until(() => s.progress.reachedEnd);
       await preferences.setBilingual(true);
       expect(s.cues, isNotEmpty);
-      expect(worker.requests.length, 2);
+      final requests = worker.requests.length;
       native.state = native.state.copyWith(
         position: const Duration(seconds: 50),
       );
-      await until(
-        () =>
-            s.progress.completed.isNotEmpty &&
-            s.progress.completed.first.start == const Duration(seconds: 50),
-      );
+      await until(() => s.text == 'world again'); // The 48–56 s cue.
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      expect(worker.requests.length, requests); // Nothing is recognized twice.
+      expect(s.progress.reachedEnd, isTrue);
       expect(started, 1);
       expect(worker.stopped, isFalse);
     },
   );
 
   test(
-    'speech and translation models prepare concurrently and stay warm on an idle seek',
+    'speech and translation models prepare concurrently and stay warm on a seek',
     () async {
       await preferences.setSource('ja');
       await preferences.setTarget('vi');
+      native.state = native.state.copyWith(
+        duration: const Duration(seconds: 66),
+      );
       final speechReady = Completer<void>();
       final worker = _Worker()
         ..startGate = speechReady
@@ -674,20 +711,15 @@ void main() {
       expect(s.cues, isEmpty);
       runtime.gate!.complete();
       speechReady.complete();
-      await until(
-        () => s.progress.processedUntil == const Duration(seconds: 16),
-      );
+      await until(() => s.progress.reachedEnd);
       native.state = native.state.copyWith(
         position: const Duration(seconds: 50),
       );
-      await until(
-        () =>
-            s.progress.completed.isNotEmpty &&
-            s.progress.completed.first.start == const Duration(seconds: 50),
-      );
+      await until(() => s.text == 'Bản dịch');
       expect(created, 1);
       expect(runtime.preparations, 1);
       expect(runtime.disposed, isFalse);
+      expect(worker.stopped, isFalse);
     },
   );
 
@@ -776,6 +808,327 @@ void main() {
       expect((await cache.stats()).entries, 1);
     },
   );
+
+  test(
+    'generation continues while paused until the end of the media',
+    () async {
+      native.state = native.state.copyWith(
+        duration: const Duration(seconds: 66),
+      );
+      expect(native.state.playing, isFalse);
+      final worker = _Worker();
+      final s = session(() => worker);
+      await until(() => s.progress.reachedEnd);
+      expect(player.state.position, Duration.zero);
+      expect(s.progress.processedUntil, const Duration(seconds: 66));
+      expect(worker.requests.length, 9); // 8 s chunks up to 66 s.
+      expect(s.phase, SubtitlePhase.ready);
+    },
+  );
+
+  test(
+    'a warm seek abandons the old chunk without unloading either model',
+    () async {
+      await preferences.setSource('ja');
+      await preferences.setTarget('vi');
+      native.state = native.state.copyWith(
+        duration: const Duration(seconds: 66),
+      );
+      final stream = StreamController<String>();
+      var sends = 0;
+      final runtime = _Translator()
+        ..output = () => sends++ == 0 ? stream.stream : Stream.value('Mới');
+      final worker = _Worker()..language = 'ja';
+      var created = 0;
+      final s = session(() {
+        created++;
+        return worker;
+      }, runtime: () => runtime);
+      await until(() => stream.hasListener);
+      stream.add('Cũ');
+      await until(() => s.text == 'Cũ');
+      native.state = native.state.copyWith(
+        position: const Duration(seconds: 40),
+      );
+      await until(() => s.progress.pending == null);
+      stream.add(' nữa'); // The abandoned loop sees the seek and cancels.
+      await until(() => !stream.hasListener);
+      await until(
+        () => s.progress.processedUntil == const Duration(seconds: 66),
+      );
+      expect(s.progress.completed.first.start, const Duration(seconds: 40));
+      expect(s.cues.where((c) => c.startMs < 8000), isEmpty);
+      expect(s.cues.every((c) => c.text == 'Mới'), isTrue);
+      expect(worker.stopped, isFalse);
+      expect(created, 1);
+      expect(runtime.preparations, 1);
+      expect(runtime.disposed, isFalse);
+      await stream.close();
+    },
+  );
+
+  test(
+    'without a cache, generating far ahead keeps the cues at the playhead',
+    () async {
+      // More cues than the old 256-cue cap, generated while paused at 0.
+      native.state = native.state.copyWith(
+        duration: const Duration(minutes: 36),
+      );
+      final worker = _Worker()..uniqueText = true;
+      final s = session(() => worker);
+      await until(() => s.progress.reachedEnd, tries: 1500);
+      expect(s.cues.length, greaterThan(256));
+      expect(s.cues.first.startMs, 0);
+      await until(() => s.text == 'line 0');
+    },
+  );
+
+  test('Auto source prewarms the translator beside the speech model', () async {
+    await preferences.setTarget('vi');
+    expect(preferences.resolvedSourceLanguage, 'auto');
+    final speechReady = Completer<void>();
+    final runtime = _Translator();
+    final s = session(
+      () => _Worker()
+        ..startGate = speechReady
+        ..language = 'ja',
+      runtime: () => runtime,
+    );
+    await until(
+      () =>
+          runtime.preparations == 1 &&
+          s.progress.stage == SubtitleWorkStage.loadingSpeech,
+    );
+    speechReady.complete();
+    await until(() => s.text == 'Bản dịch');
+    expect(runtime.preparations, 1);
+  });
+
+  test('a compact preview stays within its runway while paused', () async {
+    native.state = native.state.copyWith(duration: const Duration(minutes: 2));
+    final worker = _Worker();
+    final s = session(() => worker, continuous: false);
+    await until(() => s.progress.processedUntil == const Duration(seconds: 32));
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    // 0–8 … 24–32 s: the next chunk would start beyond 30 s of runway.
+    expect(s.progress.processedUntil, const Duration(seconds: 32));
+    expect(worker.requests.length, 4);
+    expect(s.phase, SubtitlePhase.ready);
+  });
+
+  test(
+    'a seek waits for measured recognition that is quicker than a reload',
+    () async {
+      native.state = native.state.copyWith(
+        duration: const Duration(seconds: 66),
+      );
+      final loaded = Completer<void>();
+      final first = Completer<Map<String, dynamic>>();
+      final worker = _Worker()
+        ..startGate = loaded
+        ..gate = first;
+      var started = 0;
+      final s = session(() {
+        started++;
+        return worker;
+      });
+      await until(() => s.progress.stage == SubtitleWorkStage.loadingSpeech);
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+      loaded.complete(); // Measured load ≈ 400 ms.
+      await until(() => worker.requests.isNotEmpty);
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+      final prefetch = Completer<Map<String, dynamic>>();
+      worker.gate = prefetch;
+      first.complete({'language': 'en', 'segments': []}); // ≈ 80 ms.
+      await until(() => worker.requests.length == 2);
+      native.state = native.state.copyWith(
+        position: const Duration(seconds: 40),
+      );
+      await until(() => s.progress.pending == null);
+      expect(worker.stopped, isFalse);
+      worker.gate = null;
+      prefetch.complete({
+        'language': 'en',
+        'segments': [
+          {'start_ms': 8000, 'end_ms': 16000, 'text': 'stale prefetch'},
+        ],
+      });
+      await until(
+        () => s.progress.processedUntil == const Duration(seconds: 66),
+      );
+      expect(s.cues.any((c) => c.original == 'stale prefetch'), isFalse);
+      expect(s.progress.completed.last.start, const Duration(seconds: 40));
+      expect(started, 1);
+      expect(worker.stopped, isFalse);
+    },
+  );
+
+  test(
+    'cached far-ahead chunks still trim overlap with the previous cue',
+    () async {
+      final cache = await createCache();
+      native.state = native.state.copyWith(
+        duration: const Duration(minutes: 4),
+      );
+      final worker = _Worker()..uniqueText = true;
+      final s = session(() => worker, cache: cache);
+      await until(() => s.progress.reachedEnd, tries: 1000);
+      native.state = native.state.copyWith(
+        position: const Duration(seconds: 200),
+      );
+      await until(
+        () => s.cues.any((c) => c.startMs >= 192000 && c.startMs < 208000),
+      );
+      final cues = s.cues;
+      for (var i = 1; i < cues.length; i++) {
+        expect(
+          cues[i].startMs,
+          greaterThanOrEqualTo(cues[i - 1].endMs),
+          reason: '${cues[i - 1].startMs} -> ${cues[i].startMs}',
+        );
+      }
+    },
+  );
+
+  test(
+    'a seek within finished media keeps the chunk being generated',
+    () async {
+      await preferences.setSource('ja');
+      await preferences.setTarget('vi');
+      native.state = native.state.copyWith(
+        duration: const Duration(seconds: 66),
+      );
+      final held = StreamController<String>();
+      var sends = 0;
+      final runtime = _Translator()
+        ..output = () => sends++ == 3 ? held.stream : Stream.value('Dịch');
+      final worker = _Worker()
+        ..language = 'ja'
+        ..uniqueText = true;
+      final s = session(() => worker, runtime: () => runtime);
+      await until(() => held.hasListener); // Translating the 24–32 s chunk.
+      native.state = native.state.copyWith(
+        position: const Duration(seconds: 10),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+      expect(held.hasListener, isTrue);
+      held.add('Giữ');
+      await held.close();
+      await until(() => s.progress.reachedEnd);
+      expect(worker.requests.length, 9); // No chunk was recognized twice.
+      expect(s.cues.any((c) => c.text == 'Giữ'), isTrue);
+      expect(worker.stopped, isFalse);
+    },
+  );
+
+  test('a seek after a failure retries the pipeline', () async {
+    await preferences.setSource('ja');
+    await preferences.setTarget('vi');
+    native.state = native.state.copyWith(duration: const Duration(seconds: 66));
+    final first = _Translator()..preparationError = StateError('load failed');
+    var created = 0;
+    final s = session(
+      () => _Worker()..language = 'ja',
+      runtime: () => created++ == 0 ? first : _Translator(),
+    );
+    await until(() => s.phase == SubtitlePhase.failed);
+    native.state = native.state.copyWith(position: const Duration(seconds: 40));
+    await until(() => s.text == 'Bản dịch');
+    expect(created, 2);
+  });
+
+  group('subtitle files', () {
+    late String video;
+    late _CountingWriter writer;
+    setUp(() async {
+      video = '${sandbox.path}${Platform.pathSeparator}movie.mkv';
+      await File(video).writeAsBytes([7]);
+      player.cacheSource = video;
+      writer = _CountingWriter(prefs);
+    });
+    String subsFile() =>
+        '${sandbox.path}${Platform.pathSeparator}Subs${Platform.pathSeparator}movie.en.srt';
+
+    test('Subs mode backfills before the playhead and writes once', () async {
+      await preferences.setFileMode(SubtitleFileMode.subsFolder);
+      native.state = native.state.copyWith(
+        position: const Duration(seconds: 50),
+        duration: const Duration(seconds: 66),
+      );
+      final worker = _Worker()..uniqueText = true;
+      final s = session(() => worker, writer: writer);
+      await until(() => s.progress.reachedEnd && writer.writes == 1);
+      expect(s.progress.completed.single.start, Duration.zero);
+      await until(() => File(subsFile()).existsSync());
+      final srt = await File(subsFile()).readAsString();
+      expect(srt, contains('line 0'));
+      expect(srt, contains('line 49200'));
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      expect(writer.writes, 1);
+      expect(await File(video).readAsBytes(), [7]);
+    });
+
+    test('ask mode prompts once and writes nothing by itself', () async {
+      await preferences.setFileMode(SubtitleFileMode.askWhenDone);
+      final s = session(_Worker.new, writer: writer);
+      var prompts = 0;
+      s.addListener(() {
+        if (s.takeExportPrompt()) prompts++;
+      });
+      await until(() => prompts == 1);
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      expect(prompts, 1);
+      expect(writer.writes, 0);
+      expect(await s.exportCues(), isNotEmpty);
+    });
+
+    test('a finished short clip in the preview never writes a file', () async {
+      await preferences.setFileMode(SubtitleFileMode.subsFolder);
+      final s = session(_Worker.new, writer: writer, continuous: false);
+      await until(() => s.progress.reachedEnd);
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      expect(writer.writes, 0);
+      expect(File(subsFile()).existsSync(), isFalse);
+    });
+
+    test('app-only mode writes nothing until a file mode is chosen', () async {
+      final s = session(_Worker.new, writer: writer);
+      await until(() => s.progress.reachedEnd);
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      expect(writer.writes, 0);
+      await preferences.setFileMode(SubtitleFileMode.subsFolder);
+      SubtitleExportNotice? notice;
+      await until(() => (notice ??= s.takeExportNotice()) != null);
+      expect(notice!.path, subsFile());
+      expect(File(subsFile()).existsSync(), isTrue);
+    });
+
+    test('remote sources report once that files need a local video', () async {
+      player.cacheSource = 'http://127.0.0.1:9/movie.mkv';
+      await preferences.setFileMode(SubtitleFileMode.subsFolder);
+      final s = session(_Worker.new, writer: writer);
+      await until(() => s.progress.reachedEnd);
+      SubtitleExportNotice? notice;
+      await until(() => (notice ??= s.takeExportNotice()) != null);
+      expect(notice!.localOnly, isTrue);
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      expect(s.takeExportNotice(), isNull); // Reported once.
+      expect(writer.writes, 0);
+    });
+  });
+
+  test('closing the player stops the worker and the translator', () async {
+    await preferences.setSource('ja');
+    await preferences.setTarget('vi');
+    final worker = _Worker()..language = 'ja';
+    final runtime = _Translator();
+    final s = session(() => worker, runtime: () => runtime);
+    await until(() => s.cues.isNotEmpty);
+    s.dispose();
+    sessions.remove(s);
+    expect(worker.stopped, isTrue);
+    expect(runtime.disposed, isTrue);
+  });
 
   test('overlap matching respects words and unspaced text', () {
     expect(

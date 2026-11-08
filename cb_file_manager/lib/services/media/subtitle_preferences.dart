@@ -3,8 +3,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../config/language_controller.dart';
 import 'subtitle_languages.dart';
+import 'subtitle_srt.dart';
 
 export 'subtitle_languages.dart';
+export 'subtitle_srt.dart' show SubtitleFileMode;
 
 /// Shared by Settings and every desktop player, including a separate video window.
 class SubtitlePreferences extends ChangeNotifier {
@@ -29,18 +31,38 @@ class SubtitlePreferences extends ChangeNotifier {
   String get translationModel =>
       prefs.getString('ai_subtitles_translation') ?? 'tencent/Hy-MT2-1.8B-GGUF';
   String get sourceLanguage => prefs.getString('ai_subtitles_source') ?? 'auto';
-  String get resolvedSourceLanguage =>
-      subtitleSourceLanguagesFor(speechModel).containsKey(sourceLanguage)
-      ? sourceLanguage
-      : 'auto';
+  String get resolvedSourceLanguage {
+    final supported = subtitleSourceLanguagesFor(speechModel);
+    if (supported.containsKey(sourceLanguage)) return sourceLanguage;
+    // A single-language model has no Auto option; use its only language.
+    return subtitleModelDetectsLanguage(speechModel)
+        ? 'auto'
+        : supported.keys.single;
+  }
+
   String get targetLanguage =>
       prefs.getString('ai_subtitles_target') ?? followApp;
   String get resolvedTarget => targetLanguage == followApp
       ? (prefs.getString('selected_language') ??
             LanguageController().currentLocale.languageCode)
       : targetLanguage;
+
+  /// Not part of a session's settings signature: changing it never discards
+  /// generated subtitles, it only changes what happens once they are done.
+  SubtitleFileMode get fileMode {
+    final mode = SubtitleFileMode.values
+        .where((m) => m.name == prefs.getString('ai_subtitles_file_mode'))
+        .firstOrNull;
+    return mode != null && SubtitleFileMode.available.contains(mode)
+        ? mode
+        : SubtitleFileMode.appOnly;
+  }
+
+  Future<void> setFileMode(SubtitleFileMode value) =>
+      _set('file_mode', value.name);
+
   String get _signature =>
-      '$enabled|$speechModel|$translationModel|$sourceLanguage|$targetLanguage|$bilingual|$resolvedTarget';
+      '$enabled|$speechModel|$translationModel|$sourceLanguage|$targetLanguage|$bilingual|$resolvedTarget|${fileMode.name}';
 
   /// Other desktop windows have their own preference cache.
   Future<void> refresh() async {

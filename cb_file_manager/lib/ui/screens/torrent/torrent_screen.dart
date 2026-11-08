@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:convert';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter/foundation.dart' show setEquals;
 import 'package:flutter/services.dart';
 import '../../../bloc/selection/selection.dart';
 
@@ -36,6 +37,7 @@ import '../../components/common/file_details_columns.dart';
 import 'torrent_details_columns.dart';
 import 'torrent_download_dialog.dart';
 import 'torrent_error_dialog.dart';
+import 'torrent_files_pane.dart';
 import 'torrent_link_dialog.dart';
 import 'torrent_client_import_dialog.dart';
 import 'torrent_move_confirmation_dialog.dart';
@@ -94,6 +96,8 @@ class _TorrentScreenState extends State<TorrentScreen> {
   ColumnVisibility _columns = const ColumnVisibility();
   Set<String> _torrentColumns = Set.of(TorrentDetailsColumns.defaults);
   bool _previewVisible = false;
+  bool _filesPaneVisible = true;
+  double _filesPaneHeight = 220;
   bool _showFileTags = false;
   Map<String, List<String>> _fileTags = {};
   StreamSubscription<String>? _tagChanges;
@@ -132,6 +136,7 @@ class _TorrentScreenState extends State<TorrentScreen> {
   AppLocalizations get l => AppLocalizations.of(context)!;
   bool get _desktop =>
       Platform.isWindows || Platform.isLinux || Platform.isMacOS;
+  static const _minFilesPaneHeight = 96.0;
 
   @override
   void initState() {
@@ -185,6 +190,10 @@ class _TorrentScreenState extends State<TorrentScreen> {
             jsonDecode(savedColumns) as Map<String, dynamic>,
           );
     _previewVisible = prefs.getBool('torrent.preview') ?? false;
+    _filesPaneVisible = prefs.getBool('torrent.filesPane') ?? true;
+    _filesPaneHeight = (prefs.getDouble('torrent.filesPaneHeight') ?? 220)
+        .clamp(_minFilesPaneHeight, 2000)
+        .toDouble();
     _torrentColumns =
         (prefs.getStringList('torrent.detailColumns') ??
                 TorrentDetailsColumns.defaults.toList())
@@ -521,9 +530,10 @@ class _TorrentScreenState extends State<TorrentScreen> {
         }
       }
       final visiblePaths = result.entries.map(_filePath).toSet();
-      if (_selection.state.allSelectedPaths.any(
-        (path) => !visiblePaths.contains(path),
-      )) {
+      if (_remapFetchedMagnets(
+        result.entries,
+        visiblePaths,
+      ).any((path) => !visiblePaths.contains(path))) {
         _clearSelection();
       }
     } catch (e, stack) {
@@ -1077,6 +1087,53 @@ class _TorrentScreenState extends State<TorrentScreen> {
       ? entry.torrentPath
       : '#torrents/${entry.hash}.torrent';
 
+  static final _virtualPath = RegExp(r'^#torrents/([0-9a-f]{40})\.torrent$');
+
+  /// A magnet whose metadata was fetched now has a metainfo path instead of
+  /// its virtual one. Keep it selected, so the files pane follows it.
+  /// Returns every selected path after remapping.
+  Iterable<String> _remapFetchedMagnets(
+    List<TorrentEntry> entries,
+    Set<String> visiblePaths,
+  ) {
+    final selection = _selection.state;
+    if (selection.selectedFilePaths.every(visiblePaths.contains)) {
+      return selection.allSelectedPaths;
+    }
+    final paths = {for (final entry in entries) entry.hash: _filePath(entry)};
+    String remap(String path) {
+      final hash = _virtualPath.firstMatch(path)?.group(1);
+      return hash == null ? path : paths[hash] ?? path;
+    }
+
+    final selected = selection.selectedFilePaths.map(remap).toSet();
+    if (setEquals(selected, selection.selectedFilePaths)) {
+      return selection.allSelectedPaths;
+    }
+    final last = selection.lastSelectedPath;
+    _selection.add(
+      SelectItemsInRect(
+        folderPaths: const {},
+        filePaths: selected,
+        lastSelectedPath: last == null ? null : remap(last),
+        isCtrlPressed: false,
+        isShiftPressed: true,
+      ),
+    );
+    return [...selected, ...selection.selectedFolderPaths];
+  }
+
+  /// The files pane follows exactly one selected torrent.
+  TorrentEntry? _filesPaneEntry(SelectionState selection) {
+    final paths = selection.selectedFilePaths;
+    return paths.length == 1 ? _entryForPath(paths.single) : null;
+  }
+
+  void _toggleFilesPane() {
+    setState(() => _filesPaneVisible = !_filesPaneVisible);
+    unawaited(_preferences?.setBool('torrent.filesPane', _filesPaneVisible));
+  }
+
   TorrentEntry? _entryForPath(String path) {
     for (final entry in _data.entries) {
       if (_filePath(entry) == path) return entry;
@@ -1528,6 +1585,15 @@ class _TorrentScreenState extends State<TorrentScreen> {
               ],
               _filterMenu(),
               CbButton.icon(
+                key: const ValueKey('torrent-files-pane-toggle'),
+                icon: PhosphorIconsLight.listBullets,
+                tooltip: l.torrentToggleFiles,
+                variant: _filesPaneVisible
+                    ? CbButtonVariant.secondary
+                    : CbButtonVariant.ghost,
+                onPressed: !_ready ? null : _toggleFilesPane,
+              ),
+              CbButton.icon(
                 key: const ValueKey('torrent-settings-action'),
                 icon: PhosphorIconsLight.gear,
                 tooltip: l.settings,
@@ -1803,6 +1869,34 @@ class _TorrentScreenState extends State<TorrentScreen> {
                                     keyboard,
                                   ),
                           ),
+                          if (_ready && _filesPaneVisible)
+                            TorrentFilesPane(
+                              service: _service,
+                              entry: _filesPaneEntry(selection),
+                              height: _filesPaneHeight.clamp(
+                                _minFilesPaneHeight,
+                                (MediaQuery.sizeOf(context).height * 0.6).clamp(
+                                  _minFilesPaneHeight,
+                                  double.infinity,
+                                ),
+                              ),
+                              onResize: (delta) => setState(
+                                () => _filesPaneHeight =
+                                    (_filesPaneHeight + delta).clamp(
+                                      _minFilesPaneHeight,
+                                      MediaQuery.sizeOf(context).height * 0.6,
+                                    ),
+                              ),
+                              onResizeEnd: () => unawaited(
+                                _preferences?.setDouble(
+                                  'torrent.filesPaneHeight',
+                                  _filesPaneHeight,
+                                ),
+                              ),
+                              onClose: _toggleFilesPane,
+                              formatSize: _size,
+                              canFetchMetadata: _desktop,
+                            ),
                           if (_ready)
                             Padding(
                               padding: EdgeInsets.fromLTRB(
@@ -2273,6 +2367,18 @@ class _TorrentSettingsState extends State<_TorrentSettings> {
                   onPressed: _busy ? null : () => _run(_saveDownloadDirectory),
                 ),
               ],
+            ),
+            CheckboxListTile(
+              key: const ValueKey('torrent-fetch-magnet-metadata'),
+              contentPadding: EdgeInsets.zero,
+              controlAffinity: ListTileControlAffinity.leading,
+              title: Text(l.torrentFetchMagnetMetadata),
+              subtitle: Text(l.torrentFetchMagnetMetadataHint),
+              value: service.fetchMagnetMetadata,
+              onChanged: _busy
+                  ? null
+                  : (value) =>
+                        _run(() => service.setFetchMagnetMetadata(value!)),
             ),
             CheckboxListTile(
               key: const ValueKey('torrent-default-start-immediately'),

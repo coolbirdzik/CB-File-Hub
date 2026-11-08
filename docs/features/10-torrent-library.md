@@ -103,10 +103,43 @@ links, including base32 hashes. HTTP fetches have timeouts, a five-redirect limi
 and a 16 MiB metainfo limit. The downloaded bytes are validated before a hash-named
 metainfo file is saved; HTML/error responses are rejected in the editable dialog.
 Payload destination and immediate-start choices are shown after adding the link.
-Magnets are indexed offline by info-hash; peers are contacted only after the user
-confirms immediate start or resumes the paused task. The original URI is persisted,
+Magnets are indexed by info-hash immediately. On desktop, an interactively added
+magnet (link dialog, `magnet:` association, background receipt, or the download
+form with **Start downloading immediately** unchecked) then fetches only its
+metainfo: a metadata-only aria2 task (`bt-metadata-only`, GID
+`hash[16:32]`) contacts peers for the torrent name and file list, even while the
+payload task is paused. The saved `<hash>.torrent` is imported like an opened
+file (a durable copy in the library or `opened-torrents` folder) and the
+temporary copy in `<state>/magnet-metadata` is removed. A paused magnet task is
+then replaced by a paused task for that metainfo, so resuming does not wait for
+peers again. Metadata tasks run one at a time (each uses one of aria2's three
+download slots, shared with payloads) and are moved to the front of aria2's
+queue. A fetch gives up after 5 minutes of active peer search (time spent
+queued does not count); the files pane offers a retry.
+aria2 refuses to start a payload while a metadata task holds the same info hash,
+so Download/Resume cancel a running fetch first, and Stop/Remove cancel it too.
+Metainfo fetching never downloads payload data. Turn it off with **Torrent →
+Settings → Fetch the file list of added magnet links right away**
+(`torrent.fetchMagnetMetadata`); the files pane can still fetch it on request.
+Folder/drive scans, F5 and client imports never fetch magnet metadata.
+The original URI is persisted,
 and aria2 metadata tasks are followed to their payload GIDs so pause/resume/stop act
-on the actual download. Metainfo downloads alone never start payload transfers.
+on the actual download. A started magnet's `<hash>.torrent` (saved beside its
+payload by `bt-save-metadata`) is indexed once aria2 reports its metainfo, so its
+file list becomes available too.
+
+### Files pane
+
+A pane below the library lists the payload files of the single selected torrent:
+path inside the torrent (folders dimmed), size, and a file count/total in the
+header. BEP 47 padding files are hidden. The list is read lazily from the
+metainfo on disk off the UI isolate (`TorrentMetainfo.listFiles`); it is not
+stored in the index. Magnets without metainfo show their fetch state with
+**Fetch file list**, **Cancel** or **Retry**. When a magnet's metainfo arrives,
+its library row changes from a virtual path to the metainfo path; the selection
+follows it by info hash. The list button in the torrent command row and the
+pane's close button toggle it (`torrent.filesPane`); drag its top edge to resize
+(`torrent.filesPaneHeight`).
 
 **Import** is a toolbar dropdown with `.torrent` file selection and client
 imports. qBittorrent keeps its dedicated backup/recovery and confirmed cleanup
@@ -201,7 +234,7 @@ source paths when the canonical archive is missing. Otherwise the importer reads
 the resume's v1 info hash, name, tracker tiers, category, saved payload directory
 and original added time. Embedded `info` is recovered without changing its bytes;
 entries without `info` are indexed as offline magnets. Those entries obtain
-metadata only when the user explicitly downloads. Import never treats qBit's
+metadata only when the user explicitly downloads or fetches their file list. Import never treats qBit's
 piece flags or cumulative traffic as verified aria2 progress or live seed counts.
 
 Every `.fastresume` is copied byte-for-byte under
@@ -356,8 +389,9 @@ task counters, state and group are retained. Later refreshes skip unchanged file
 Pause, resume, stop, retry and open-download-folder actions are available. The
 app restores active/queued/paused task intent after restart and aria2 uses its
 `.aria2` control files plus integrity checking to reuse verified payload pieces.
-Pause or stop before selecting a different destination. Importing never starts a download
-or contacts trackers by itself. Seeding stops at completion (`seed-time=0`).
+Pause or stop before selecting a different destination. Importing never starts a
+payload download. Apart from the magnet metadata fetch described above, it does
+not contact trackers or peers by itself. Seeding stops at completion (`seed-time=0`).
 
 Windows bundles the official aria2 1.37.0 x64 runtime as a separate subprocess.
 Its RPC endpoint binds loopback with a random secret; a file lock prevents two
@@ -385,6 +419,7 @@ Run from `cb_file_manager`:
 ```sh
 flutter test test/services/torrent
 flutter test test/ui/screens/torrent_screen_test.dart
+flutter test test/ui/screens/torrent_files_pane_test.dart
 flutter test test/ui/tab_manager/torrent_tab_reuse_test.dart
 flutter test test/services/windowing/torrent_window_focus_test.dart
 flutter analyze

@@ -18,6 +18,7 @@ void main() {
     VoidCallback? retry,
     VoidCallback? settings,
     VoidCallback? regenerate,
+    VoidCallback? export,
   }) async {
     await tester.pumpWidget(
       MaterialApp(
@@ -59,6 +60,7 @@ void main() {
                             onSettings: settings ?? () {},
                             onRetry: retry ?? () {},
                             onRegenerate: regenerate,
+                            onExport: export,
                           ),
                         ],
                       ),
@@ -103,6 +105,39 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('ai-subtitle-regenerate')));
     await tester.pumpAndSettle();
     expect(regenerated, isTrue);
+  });
+
+  testWidgets('finished subtitles can be exported as SRT on request', (
+    tester,
+  ) async {
+    var exported = 0;
+    const progress = SubtitleProgress(
+      phase: SubtitlePhase.ready,
+      duration: Duration(minutes: 2),
+      position: Duration.zero,
+      completed: [SubtitleTimeRange(Duration.zero, Duration(seconds: 40))],
+    );
+    await show(tester, progress, export: () => exported++);
+    await tester.tap(find.byKey(const ValueKey('ai-subtitle-control')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('ai-subtitle-export')));
+    await tester.pumpAndSettle();
+    expect(exported, 1);
+    await show(
+      tester,
+      const SubtitleProgress(
+        phase: SubtitlePhase.processing,
+        duration: Duration(minutes: 2),
+        position: Duration.zero,
+        completed: [],
+      ),
+      export: () => exported++,
+    );
+    await tester.tap(find.byKey(const ValueKey('ai-subtitle-control')));
+    // The busy spinner never settles; give the menu its opening time.
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.byKey(const ValueKey('ai-subtitle-status')), findsOneWidget);
+    expect(find.byKey(const ValueKey('ai-subtitle-export')), findsNothing);
   });
 
   testWidgets('recognized audio and output languages use English labels', (

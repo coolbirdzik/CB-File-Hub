@@ -157,6 +157,10 @@ void main() {
     ('unsloth/Qwen3.5-2B-GGUF', 0.7, 20, 0.8, false),
     ('unsloth/Qwen3.5-4B-GGUF', 1.0, 20, 0.95, true),
     ('unsloth/Qwen3-4B-Instruct-2507-GGUF', 0.7, 20, 0.8, false),
+    // Every subtitle translation artifact must get deterministic sampling.
+    ('tencent/Hy-MT2-1.8B-GGUF', 0.0, 20, 0.95, true),
+    ('tencent/Hy-MT2-1.8B-GGUF-Q8_0', 0.0, 20, 0.95, true),
+    ('tencent/Hy-MT2-7B-GGUF', 0.0, 20, 0.95, true),
   ]) {
     test('uses publisher generation settings for ${profile.$1}', () async {
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);

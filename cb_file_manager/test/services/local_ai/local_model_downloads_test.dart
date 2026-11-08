@@ -217,7 +217,14 @@ void main() {
       // updated on the next frame. Without this pump the middle catalog entry
       // can still report a position underneath the dialog's Close button.
       await tester.pump();
-      expect(find.text('Recommended'), findsOneWidget);
+      // The subtitle panel behind the dialog has its own recommendation tags.
+      expect(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.text('Recommended'),
+        ),
+        findsOneWidget,
+      );
       expect(install.hitTestable(), findsOneWidget);
       await tester.tap(install.hitTestable());
       await tester.pump();

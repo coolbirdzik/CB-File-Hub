@@ -178,6 +178,8 @@ class FilePreviewPane extends StatelessWidget {
           showControls: true,
           allowFullScreen: true,
           allowMuting: true,
+          // Selecting a file must not process the whole video in background.
+          continuousAiSubtitles: false,
         ),
       );
     }

@@ -215,10 +215,8 @@ void main() {
           });
           await Future<void>.delayed(const Duration(milliseconds: 200));
         }
-        await until(
-          'Idle pipeline before seek',
-          () => session.phase == SubtitlePhase.ready,
-        );
+        // Generation is continuous now, so the pipeline is normally busy
+        // here; this measures a warm seek during work, not an idle one.
         expect(
           firstVisibleMs,
           isNotNull,
@@ -261,12 +259,12 @@ void main() {
         expect(
           workers.length,
           loadedWorkers,
-          reason: 'An idle seek should keep speech weights loaded',
+          reason: 'A warm seek should keep speech weights loaded',
         );
         expect(
           translators.length,
           loadedTranslators,
-          reason: 'An idle seek should keep translation weights loaded',
+          reason: 'A warm seek should keep translation weights loaded',
         );
         session.dispose();
         sessions.remove(session);

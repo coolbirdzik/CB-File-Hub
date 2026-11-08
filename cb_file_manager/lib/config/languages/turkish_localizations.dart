@@ -76,6 +76,55 @@ class TurkishLocalizations implements AppLocalizations {
   @override
   String get aiSubtitleManage => 'AI modellerini yönet';
   @override
+  String get aiSubtitleFilesSection => 'Altyazı dosyaları';
+  @override
+  String get aiSubtitleFileAppOnly => 'Yalnızca uygulamada tut';
+  @override
+  String get aiSubtitleFileAppOnlyHint =>
+      'Dosya oluşturulmaz. Videoyu CB File Hub içinde yeniden açınca altyazılar hemen görünür.';
+  @override
+  String get aiSubtitleFileAsk => 'Bitince kaydetmeyi öner';
+  @override
+  String get aiSubtitleFileAskHint =>
+      'Oynatma konumundan önceki bölümler dahil tüm video işlenir. Bitince bir bildirim, SRT dosyasını istediğiniz yere kaydetmenizi sağlar.';
+  @override
+  String get aiSubtitleFileSubs => 'Otomatik olarak Subs klasörüne kaydet';
+  @override
+  String get aiSubtitleFileSubsHint =>
+      'Tüm video işlenir, ardından videonun yanına Subs/<video>.<dil>.srt yazılır. VLC bunu otomatik bulur; diğer oynatıcılarda konum belirtmek gerekebilir.';
+  @override
+  String get aiSubtitleFileHidden => 'Videonun yanına gizli kaydet';
+  @override
+  String get aiSubtitleFileHiddenHint =>
+      'Tüm video işlenir, ardından <video>.<dil>.srt gizli özniteliğiyle yazılır. Explorer ve Finder varsayılan olarak gizler; CB File Hub gizli dosyaları yine listeler.';
+  @override
+  String get aiSubtitleExportSrt => 'SRT olarak dışa aktar…';
+  @override
+  String get aiSubtitleExportIncomplete =>
+      'Videonun bazı bölümlerinde henüz altyazı yok; dosya yalnızca bitmiş kısmı içerir.';
+  @override
+  String get aiSubtitleExportEmpty => 'Henüz dışa aktarılacak altyazı yok.';
+  @override
+  String get aiSubtitleExportReady => 'Videonun tamamı için altyazılar hazır.';
+  @override
+  String get aiSubtitleExportLocalOnly =>
+      'Otomatik altyazı dosyaları için video bu bilgisayarda veya bir ağ paylaşımında olmalıdır.';
+  @override
+  String aiSubtitleExportSaved(String path) => 'Altyazı kaydedildi: $path';
+  @override
+  String aiSubtitleExportFailed(String error) =>
+      'Altyazı kaydedilemedi: $error';
+  @override
+  String get aiSubtitleModelsSection => 'Modeller';
+  @override
+  String get aiSubtitleLanguagesSection => 'Diller';
+  @override
+  String get aiModelTierFast => 'Hızlı';
+  @override
+  String get aiModelTierBalanced => 'Dengeli';
+  @override
+  String get aiModelTierAccurate => 'En doğru';
+  @override
   String get aiSubtitleMissing => 'Gerekli modelleri indirin veya seçin.';
   @override
   String get aiSubtitleLoading => 'Altyazı modeli yükleniyor…';
@@ -482,6 +531,33 @@ class TurkishLocalizations implements AppLocalizations {
   @override
   String get torrentDesktopOnly =>
       'Torrent indirmeleri masaüstü aria2 gerektirir. Erişilebilir yerel klasörlerde dizinleme kullanılabilir.';
+  @override
+  String get torrentFiles => 'Torrent içindeki dosyalar';
+  @override
+  String torrentFilesSummary(int count, String size) => '$count dosya · $size';
+  @override
+  String get torrentFilesSelectHint =>
+      'Dosyalarını görmek için bir torrent seçin.';
+  @override
+  String get torrentFilesLoading => 'Dosya listesi okunuyor…';
+  @override
+  String get torrentToggleFiles => 'Dosya listesi';
+  @override
+  String get torrentMetadataMissing =>
+      'Bu magnet bağlantısının adı ve dosya listesi henüz alınmadı.';
+  @override
+  String get torrentFetchMetadata => 'Dosya listesini al';
+  @override
+  String get torrentFetchingMetadata =>
+      'Ad ve dosya listesi eşlerden alınıyor…';
+  @override
+  String get torrentMetadataFailed => 'Dosya listesi alınamadı';
+  @override
+  String get torrentFetchMagnetMetadata =>
+      'Eklenen magnet bağlantılarının dosya listesini hemen al';
+  @override
+  String get torrentFetchMagnetMetadataHint =>
+      'İndirme duraklatılmış olsa bile eşlere yalnızca torrent adı ve dosya listesi için bağlanır. Siz başlatana kadar içerik indirilmez.';
   @override
   String torrentStatus(String status) =>
       const {

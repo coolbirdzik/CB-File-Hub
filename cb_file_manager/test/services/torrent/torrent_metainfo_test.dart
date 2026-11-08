@@ -184,4 +184,43 @@ void main() {
       );
     }
   });
+
+  test('lists files in order, skipping padding but keeping indexes', () {
+    final bytes = Uint8List.fromList(
+      bencode({
+        'info': {
+          'name': 'Album',
+          'piece length': 16384,
+          'pieces': Uint8List(20),
+          'files': [
+            {
+              'length': 3,
+              'path': ['CD1', '01.flac'],
+              'path.utf-8': ['CD1', 'Bài 1.flac'],
+            },
+            {
+              'length': 10,
+              'attr': 'p',
+              'path': ['.pad', '10'],
+            },
+            {
+              'length': 2,
+              'path': ['cover.jpg'],
+            },
+          ],
+        },
+      }),
+    );
+    final files = TorrentMetainfo.listFiles(bytes);
+    expect(files.map((f) => (f.index, f.path, f.length)), [
+      (1, 'CD1/Bài 1.flac', 3),
+      (3, 'cover.jpg', 2),
+    ]);
+    final single = TorrentMetainfo.listFiles(
+      Uint8List.fromList(
+        bencode({'info': torrentInfo(name: 'a.mkv', size: 7)}),
+      ),
+    );
+    expect(single.map((f) => (f.index, f.path, f.length)), [(1, 'a.mkv', 7)]);
+  });
 }

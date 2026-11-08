@@ -7,6 +7,18 @@ import 'package:cb_native/cb_native.dart';
 
 import 'bencode_reader.dart';
 
+/// One payload file listed in a torrent's metainfo.
+class TorrentFileItem {
+  /// 1-based position in the metainfo file list (aria2 numbers files this way).
+  final int index;
+
+  /// Path inside the torrent, `/`-separated. Multi-file torrents omit the
+  /// top-level torrent name; single-file torrents use that name.
+  final String path;
+  final int length;
+  const TorrentFileItem(this.index, this.path, this.length);
+}
+
 /// Reads v1/hybrid metainfo without re-encoding `info`: hashes must use the
 /// original bytes, including for torrents produced by noncanonical encoders.
 class TorrentMetainfo {
@@ -160,6 +172,50 @@ class TorrentMetainfo {
       pieceLength: info['piece length'] as int,
       pieceCount: pieces.length ~/ 20,
     );
+  }
+
+  /// Lists payload files in metainfo order. BEP 47 padding files are omitted;
+  /// [TorrentFileItem.index] keeps their original numbering.
+  static List<TorrentFileItem> listFiles(Uint8List bytes) {
+    if (bytes.length > 16 * 1024 * 1024) {
+      throw const FormatException('Torrent exceeds 16 MiB');
+    }
+    final root = BencodeReader(bytes).read();
+    final info = root is Map<String, Object> ? root['info'] : null;
+    if (info is! Map<String, Object>) {
+      throw const FormatException('Missing torrent info');
+    }
+    final name = _text(info['name.utf-8'] ?? info['name']);
+    final files = info['files'];
+    if (files == null) {
+      return [TorrentFileItem(1, name, _length(info['length']))];
+    }
+    if (files is! List<Object>) {
+      throw const FormatException('Invalid file list');
+    }
+    final result = <TorrentFileItem>[];
+    for (var i = 0; i < files.length; i++) {
+      final file = files[i];
+      if (file is! Map<String, Object>) {
+        throw const FormatException('Invalid torrent file');
+      }
+      final attributes = file['attr'];
+      if (attributes is Uint8List && attributes.contains(0x70 /* p */)) {
+        continue;
+      }
+      final components = file['path.utf-8'] ?? file['path'];
+      if (components is! List<Object> || components.isEmpty) {
+        throw const FormatException('Missing file path');
+      }
+      result.add(
+        TorrentFileItem(
+          i + 1,
+          components.map(_text).join('/'),
+          _length(file['length']),
+        ),
+      );
+    }
+    return result;
   }
 
   /// Native parsing validates and hashes on a Rust thread. The fallback retains

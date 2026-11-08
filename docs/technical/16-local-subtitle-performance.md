@@ -8,17 +8,23 @@ cross the Flutter UI isolate. The implementation and UI are described in
 ## Scheduling
 
 - Recognize eight seconds of media with 800 ms overlap, then prepare at most
-  one additional recognition request while translation finishes. Look-ahead
-  adapts from twelve to forty media seconds using recent processing time and
-  playback rate. This bounds speculative work and memory.
+  one additional recognition request while translation finishes. Generation is
+  continuous from the playhead to the end of the media, paused or not, so
+  playback normally runs over finished subtitles. Falling more than eight
+  seconds behind moves the cursor to the playhead without reloading anything.
+  Work stops when the player is disposed. Helpers stay below normal priority,
+  but the CPU/GPU remains busy while paused until the media is finished. The
+  file browser preview keeps a fixed 30 s runway instead.
 - Publish translated tokens provisionally, then complete each cue. Commit
   recognition and translation together to SQLite only when the chunk succeeds;
   unfinished text cannot become persistent cache data.
-- Keep idle models across seeks. Debounce scrubbing for 200 ms, cancel busy
-  work, reject stale generations and resume at the current playback position
-  if processing falls behind. Display-only settings reuse model state.
-- Prepare speech and translation models concurrently when the source language
-  is already known. Auto detection uses supported track metadata or a longer
+- Seeks keep both models, cues and processed ranges. Debounce scrubbing for
+  200 ms; abandon the chunk in progress (cancel its translation stream, drop
+  unsaved cues) and kill the whisper worker only when timing is unknown or
+  the expected remaining recognition exceeds the measured worker load time.
+  Settings changes still restart the session.
+  Display-only settings reuse model state.
+- Prepare speech and translation models concurrently, also in Auto mode. Auto detection uses supported track metadata or a longer
   language-only context; two confident contiguous detections permit brief reuse.
 - Windows uses Vulkan by default and retries a failed GPU worker on CPU.
   Base/Small prepare a temporary CPU context before asynchronous GPU warm-up.
@@ -94,9 +100,9 @@ were warm; these numbers are not cold-start guarantees or cross-device targets.
 | ASR model initialization | 1,030 ms |
 | Auto detection on those eight requests | Japanese on every request |
 | Japanese → Vietnamese first visible subtitle | 3,002 ms |
-| Idle uncached seek, first visible translated subtitle | 559 ms |
+| Idle uncached seek, first visible translated subtitle (previous bounded scheduler) | 559 ms |
 | Cached reopen, first visible subtitle | 102 ms; cue data restored in 11 ms |
-| Processing runway after five seconds at playback 1x | 11.85–19.65 s; no lagging samples in the 15 s run |
+| Processing runway after five seconds at playback 1x (previous bounded scheduler) | 11.85–19.65 s; no lagging samples in the 15 s run |
 | Service event-loop 16 ms probe | 0.976 ms p95 lateness; 51.072 ms maximum |
 
 The service test retained one speech and one translation runtime across the

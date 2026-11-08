@@ -276,6 +276,33 @@ class Aria2Engine {
         as String;
   }
 
+  /// Downloads only a magnet's metainfo, never its payload. aria2 saves it as
+  /// `<directory>/<hex info hash>.torrent` when the task completes.
+  ///
+  /// This task may coexist with a paused payload task for the same torrent,
+  /// but aria2 rejects starting that payload ("InfoHash is already
+  /// registered") until this task is removed.
+  Future<String> addMagnetMetadata(
+    String uri,
+    String directory,
+    String gid,
+  ) async {
+    MagnetLink.parse(uri);
+    return await call('addUri', [
+          [uri],
+          {
+            'dir': directory,
+            'gid': gid,
+            'pause': 'false',
+            'seed-time': '0',
+            'bt-metadata-only': 'true',
+            'bt-save-metadata': 'true',
+            'follow-torrent': 'false',
+          },
+        ])
+        as String;
+  }
+
   static Future<bool> _tryLock(RandomAccessFile lock) async {
     try {
       await lock.lock(FileLock.exclusive);

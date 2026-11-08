@@ -1,3 +1,5 @@
+import '../local_ai/subtitle_model_catalog.dart';
+
 /// Language codes match the pinned whisper.cpp 1.9.5 language table.
 /// Labels stay English independently of the application UI locale.
 final subtitleSourceLanguages = _alphabetical({
@@ -108,11 +110,22 @@ final _legacyWhisperLanguages = Map<String, String>.unmodifiable({
     if (entry.key != 'yue') entry.key: entry.value,
 });
 
-/// Base/Small have 99 language tokens; Large v3 Turbo adds Cantonese.
-Map<String, String> subtitleSourceLanguagesFor(String modelId) =>
-    modelId == 'whisper/base' || modelId == 'whisper/small'
-    ? _legacyWhisperLanguages
-    : subtitleSourceLanguages;
+/// Whisper v1/v2-era models have 99 language tokens; v3 adds Cantonese.
+/// Single-language fine-tunes accept only their own language. Unknown IDs keep
+/// the complete list.
+Map<String, String> subtitleSourceLanguagesFor(String modelId) {
+  final profile = SubtitleModelCatalog.profiles[modelId];
+  if (profile == null) return subtitleSourceLanguages;
+  final only = profile.onlyLanguage;
+  if (only != null) {
+    return Map.unmodifiable({only: subtitleSourceLanguages[only] ?? only});
+  }
+  return profile.cantonese ? subtitleSourceLanguages : _legacyWhisperLanguages;
+}
+
+/// Whether the speech model can detect the audio language by itself.
+bool subtitleModelDetectsLanguage(String modelId) =>
+    SubtitleModelCatalog.profiles[modelId]?.onlyLanguage == null;
 
 /// Translation targets are independent of the larger ASR language list.
 final subtitleTargetLanguages = _alphabetical({

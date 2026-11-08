@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../../services/media/local_subtitle_session.dart';
 import '../../../../services/media/media_kit_playback.dart';
 import '../../../../services/media/subtitle_services.dart';
+import 'subtitle_srt_export.dart';
 import 'subtitle_status_overlay.dart';
 
 /// Shared outer layer for local-file and network player layouts. Keeping the
@@ -12,12 +13,14 @@ import 'subtitle_status_overlay.dart';
 class LocalSubtitleLayer extends StatelessWidget {
   final PlaybackPlayer? player;
   final bool controlsVisible;
+  final bool continuous;
   final Widget child;
 
   const LocalSubtitleLayer({
     super.key,
     required this.player,
     required this.controlsVisible,
+    this.continuous = true,
     required this.child,
   });
 
@@ -29,6 +32,7 @@ class LocalSubtitleLayer extends StatelessWidget {
       key: ObjectKey(playback),
       player: playback,
       controlsVisible: controlsVisible,
+      continuous: continuous,
       child: child,
     );
   }
@@ -37,11 +41,15 @@ class LocalSubtitleLayer extends StatelessWidget {
 class LocalSubtitleOverlay extends StatefulWidget {
   final PlaybackPlayer player;
   final bool controlsVisible;
+
+  /// See [LocalSubtitleSession.continuous].
+  final bool continuous;
   final Widget child;
   const LocalSubtitleOverlay({
     super.key,
     required this.player,
     required this.controlsVisible,
+    this.continuous = true,
     required this.child,
   });
   @override
@@ -50,6 +58,8 @@ class LocalSubtitleOverlay extends StatefulWidget {
 
 class _LocalSubtitleOverlayState extends State<LocalSubtitleOverlay> {
   LocalSubtitleSession? _session;
+  final _snackBars =
+      <ScaffoldFeatureController<SnackBar, SnackBarClosedReason>>[];
   @override
   void initState() {
     super.initState();
@@ -64,12 +74,27 @@ class _LocalSubtitleOverlayState extends State<LocalSubtitleOverlay> {
       preferences: services.preferences,
       models: services.models,
       cache: services.cache,
-    );
+      continuous: widget.continuous,
+    )..addListener(_announceExports);
     setState(() {});
+  }
+
+  void _announceExports() {
+    final session = _session;
+    if (!mounted || session == null) return;
+    _snackBars.addAll(announceSubtitleExports(context, session));
   }
 
   @override
   void dispose() {
+    _session?.removeListener(_announceExports);
+    for (final snackBar in _snackBars) {
+      try {
+        snackBar.close();
+      } catch (_) {
+        // Already dismissed.
+      }
+    }
     _session?.dispose();
     super.dispose();
   }
@@ -127,6 +152,9 @@ class LocalSubtitleControls extends StatelessWidget {
       progress: session?.progress,
       onSettings: onSettings,
       onRetry: session?.restart ?? onSettings,
+      onExport: session == null
+          ? null
+          : () => exportSubtitleSrt(context, session),
       onRegenerate: session?.canRegenerate == true
           ? () async {
               try {
