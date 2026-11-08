@@ -1,9 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../config/languages/app_localizations.dart';
+import '../../../../design_system/cb_design_system.dart';
 import '../../../../models/local_ai/local_ai_advisor_model.dart';
 import '../../../../services/local_ai/local_ai_advisor_service.dart';
 import '../../../../services/local_ai/local_model_downloads.dart';
@@ -176,21 +178,15 @@ class _SubtitleSettingsPanelState extends State<SubtitleSettingsPanel> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        DropdownButtonFormField<SubtitleFileMode>(
+        CbSelect<SubtitleFileMode>(
           key: ValueKey('ai-subtitle-file-mode:${selected.name}'),
-          initialValue: selected,
-          isExpanded: true,
-          decoration: InputDecoration(labelText: l.aiSubtitleFilesSection),
+          value: selected,
+          expand: true,
           items: [
             for (final mode in SubtitleFileMode.available)
-              DropdownMenuItem(
-                value: mode,
-                child: Text(text(mode).$1, overflow: TextOverflow.ellipsis),
-              ),
+              CbSelectItem(value: mode, label: text(mode).$1),
           ],
-          onChanged: (mode) {
-            if (mode != null) unawaited(prefs.setFileMode(mode));
-          },
+          onChanged: (mode) => unawaited(prefs.setFileMode(mode)),
         ),
         const SizedBox(height: 6),
         Text(
@@ -224,44 +220,20 @@ class _SubtitleSettingsPanelState extends State<SubtitleSettingsPanel> {
     Map<String, String> options,
     Future<void> Function(String) changed,
   ) {
-    final field = DropdownButtonFormField<String>(
+    final l = AppLocalizations.of(context)!;
+    return CbSelect<String>(
       key: ValueKey('$label:$selected'),
-      initialValue: options.containsKey(selected)
-          ? selected
-          : options.keys.first,
-      isExpanded: true,
-      decoration: InputDecoration(labelText: label),
-      items: options.entries
-          .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
-          .toList(),
-      onChanged: (value) {
-        if (value != null) unawaited(changed(value));
-      },
-    );
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(child: field),
-        const SizedBox(width: 4),
-        IconButton(
-          key: ValueKey('subtitle-language-search:$label'),
-          tooltip: '${AppLocalizations.of(context)!.search}: $label',
-          icon: const Icon(Icons.search),
-          onPressed: options.length < 2
-              ? null
-              : () async {
-                  final value = await showDialog<String>(
-                    context: context,
-                    builder: (_) => _SubtitleLanguageSearch(
-                      label: label,
-                      selected: selected,
-                      options: options,
-                    ),
-                  );
-                  if (value != null && mounted) await changed(value);
-                },
-        ),
+      label: label,
+      value: options.containsKey(selected) ? selected : options.keys.first,
+      expand: true,
+      searchable: options.length > 8,
+      searchPlaceholder: l.search,
+      items: [
+        for (final e in options.entries)
+          // The code is matched by the filter but never shown.
+          CbSelectItem(value: e.key, label: e.value, keywords: e.key),
       ],
+      onChanged: (value) => unawaited(changed(value)),
     );
   }
 
@@ -303,48 +275,25 @@ class _SubtitleSettingsPanelState extends State<SubtitleSettingsPanel> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        DropdownButtonFormField<String>(
+        CbSelect<String>(
           key: ValueKey('subtitle-model:${purpose.name}:$selected'),
-          initialValue: selectedEntry?.id,
-          isExpanded: true,
-          decoration: InputDecoration(labelText: modelPurposeLabel(l, purpose)),
-          selectedItemBuilder: (_) => [
-            for (final e in entries)
-              Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: Text(e.displayName, overflow: TextOverflow.ellipsis),
-              ),
-          ],
+          label: modelPurposeLabel(l, purpose),
+          value: selectedEntry?.id,
+          expand: true,
           items: [
             for (final e in entries)
-              DropdownMenuItem(
+              CbSelectItem(
                 value: e.id,
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        e.displayName,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    if (installedIds.contains(e.id))
-                      Padding(
-                        padding: const EdgeInsetsDirectional.only(start: 8),
-                        child: Icon(
-                          Icons.check_circle,
-                          size: 16,
-                          color: theme.colorScheme.primary,
-                        ),
-                      ),
-                    const SizedBox(width: 8),
-                    Text(_size(e), style: muted),
-                  ],
-                ),
+                label: e.sizeBytes == null
+                    ? e.displayName
+                    : '${e.displayName} · ${_size(e)}',
+                triggerLabel: e.displayName,
+                icon: installedIds.contains(e.id)
+                    ? PhosphorIconsLight.checkCircle
+                    : null,
               ),
           ],
-          onChanged: (value) {
-            if (value != null) unawaited(changed(value));
-          },
+          onChanged: (value) => unawaited(changed(value)),
         ),
         if (selectedEntry != null) ...[
           const SizedBox(height: 8),
@@ -436,80 +385,6 @@ class _SubtitleSettingsPanelState extends State<SubtitleSettingsPanel> {
           ),
         ],
       ),
-    );
-  }
-}
-
-/// The full model language list remains A–Z, with English names and code search.
-class _SubtitleLanguageSearch extends StatefulWidget {
-  final String label, selected;
-  final Map<String, String> options;
-  const _SubtitleLanguageSearch({
-    required this.label,
-    required this.selected,
-    required this.options,
-  });
-  @override
-  State<_SubtitleLanguageSearch> createState() =>
-      _SubtitleLanguageSearchState();
-}
-
-class _SubtitleLanguageSearchState extends State<_SubtitleLanguageSearch> {
-  String _query = '';
-  @override
-  Widget build(BuildContext context) {
-    final l = AppLocalizations.of(context)!;
-    final entries = widget.options.entries
-        .where(
-          (entry) =>
-              entry.value.toLowerCase().contains(_query) ||
-              entry.key.toLowerCase().contains(_query),
-        )
-        .toList();
-    return AlertDialog(
-      title: Text(widget.label),
-      content: SizedBox(
-        width: 440,
-        height: 400,
-        child: Column(
-          children: [
-            TextField(
-              key: const ValueKey('subtitle-language-filter'),
-              autofocus: true,
-              decoration: InputDecoration(
-                labelText: l.search,
-                prefixIcon: const Icon(Icons.search),
-              ),
-              onChanged: (value) =>
-                  setState(() => _query = value.trim().toLowerCase()),
-            ),
-            const SizedBox(height: 8),
-            Expanded(
-              child: ListView.builder(
-                itemCount: entries.length,
-                itemBuilder: (context, index) {
-                  final entry = entries[index];
-                  return ListTile(
-                    key: ValueKey('subtitle-language-option:${entry.key}'),
-                    title: Text(entry.value),
-                    selected: entry.key == widget.selected,
-                    trailing: entry.key == widget.selected
-                        ? const Icon(Icons.check)
-                        : null,
-                    onTap: () => Navigator.of(context).pop(entry.key),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text(l.cancel),
-        ),
-      ],
     );
   }
 }

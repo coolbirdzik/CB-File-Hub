@@ -1,4 +1,6 @@
 import 'package:cb_file_manager/config/languages/app_localizations_delegate.dart';
+import 'package:cb_file_manager/config/theme_config.dart';
+import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:cb_file_manager/models/local_ai/local_ai_advisor_model.dart';
 import 'package:cb_file_manager/services/local_ai/local_ai_advisor_service.dart';
 import 'package:cb_file_manager/services/local_ai/local_model_downloads.dart';
@@ -27,6 +29,7 @@ void main() {
     });
     await tester.pumpWidget(
       MaterialApp(
+        theme: ThemeConfig.getLightTheme(),
         locale: const Locale('vi'),
         supportedLocales: const [Locale('vi'), Locale('en')],
         localizationsDelegates: const [
@@ -45,15 +48,10 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  DropdownButton<String> field(WidgetTester tester, String key) =>
-      tester.widget(
-        find.descendant(
-          of: find.byKey(ValueKey(key)),
-          matching: find.byType(DropdownButton<String>),
-        ),
-      );
-  List<String> labels(DropdownButton<String> field) =>
-      field.items!.map((item) => (item.child as Text).data!).toList();
+  CbSelect<String> field(WidgetTester tester, String key) =>
+      tester.widget(find.byKey(ValueKey(key)));
+  List<String> labels(CbSelect<String> field) =>
+      field.items.map((item) => item.label).toList();
   void expectAlphabeticalEnglish(List<String> names) {
     expect(
       names,
@@ -71,14 +69,14 @@ void main() {
     (tester) async {
       await showPanel(tester);
       final audio = field(tester, 'Ngôn ngữ audio:auto');
-      expect(audio.items!.length, 100); // Auto + all 99 Base/Small languages.
+      expect(audio.items.length, 100); // Auto + all 99 Base/Small languages.
       expect(labels(audio).first, 'Auto detect');
       expectAlphabeticalEnglish(labels(audio).skip(1).toList());
       expect(
-        audio.items!.map((item) => item.value),
+        audio.items.map((item) => item.value),
         containsAll(['sv', 'cy', 'haw', 'la', 'jw', 'kn']),
       );
-      expect(audio.items!.map((item) => item.value), isNot(contains('ug')));
+      expect(audio.items.map((item) => item.value), isNot(contains('ug')));
       expect(tester.takeException(), isNull);
     },
   );
@@ -98,36 +96,23 @@ void main() {
         'Chinese (Traditional)',
       ]),
     );
-    expect(target.items!.map((item) => item.value), contains('ug'));
-    expect(target.items!.map((item) => item.value), isNot(contains('sv')));
+    expect(target.items.map((item) => item.value), contains('ug'));
+    expect(target.items.map((item) => item.value), isNot(contains('sv')));
   });
 
   testWidgets(
     'Japanese can be found and selected for audio on every speech model',
     (tester) async {
       await showPanel(tester);
-      final search = find.byKey(
-        const ValueKey('subtitle-language-search:Ngôn ngữ audio'),
-      );
-      await tester.ensureVisible(search);
-      await tester.tap(search);
+      final select = find.byKey(const ValueKey('Ngôn ngữ audio:auto'));
+      await tester.ensureVisible(select);
+      await tester.tap(select);
       await tester.pumpAndSettle();
-      await tester.enterText(
-        find.byKey(const ValueKey('subtitle-language-filter')),
-        'Japanese',
-      );
+      await tester.enterText(find.byType(TextField), 'Japanese');
       await tester.pumpAndSettle();
-      expect(
-        find.byKey(const ValueKey('subtitle-language-option:ja')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const ValueKey('subtitle-language-option:en')),
-        findsNothing,
-      );
-      await tester.tap(
-        find.byKey(const ValueKey('subtitle-language-option:ja')),
-      );
+      expect(find.text('Japanese'), findsWidgets);
+      expect(find.text('English'), findsNothing);
+      await tester.tap(find.text('Japanese').last);
       await tester.pumpAndSettle();
       for (final model in [
         'whisper/base',
@@ -152,18 +137,13 @@ void main() {
     tester,
   ) async {
     await showPanel(tester);
-    final search = find.byKey(
-      const ValueKey('subtitle-language-search:Ngôn ngữ phụ đề'),
-    );
-    await tester.ensureVisible(search);
-    await tester.tap(search);
+    final select = find.byKey(const ValueKey('Ngôn ngữ phụ đề:app'));
+    await tester.ensureVisible(select);
+    await tester.tap(select);
     await tester.pumpAndSettle();
-    await tester.enterText(
-      find.byKey(const ValueKey('subtitle-language-filter')),
-      'ja',
-    );
+    await tester.enterText(find.byType(TextField), 'ja');
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('subtitle-language-option:ja')));
+    await tester.tap(find.text('Japanese').last);
     await tester.pumpAndSettle();
     expect(preferences.resolvedTarget, 'ja');
     expect(field(tester, 'Ngôn ngữ phụ đề:ja').value, 'ja');
@@ -176,7 +156,7 @@ void main() {
       await preferences.setSpeechModel('whisper/large-v3-turbo');
       await tester.pumpAndSettle();
       final audio = field(tester, 'Ngôn ngữ audio:auto');
-      expect(audio.items!.length, 101);
+      expect(audio.items.length, 101);
       expect(labels(audio), contains('Cantonese'));
       await preferences.setSource('yue');
       await tester.pumpAndSettle();
@@ -251,10 +231,14 @@ void main() {
       );
       await tester.pumpAndSettle();
       for (final entry in SubtitleModelCatalog.forPurpose(purpose)) {
-        expect(find.text(entry.displayName), findsWidgets, reason: entry.id);
+        expect(
+          find.textContaining(entry.displayName),
+          findsWidgets,
+          reason: entry.id,
+        );
       }
       expect(
-        find.text('574 MB'),
+        find.textContaining('574 MB'),
         purpose == LocalModelPurpose.speech ? findsWidgets : findsNothing,
       );
       expect(tester.takeException(), isNull, reason: purpose.name);
