@@ -1061,6 +1061,21 @@ void main() {
         await et.tapFileRow(targetFile.path, detail: 'select_file');
         await et.pumpAndSettle();
 
+        // Selection, layout and pointer focus can settle in separate frames.
+        // Wait for the file list to own the keyboard before sending Enter.
+        final keyboard = tester
+            .widgetList<Focus>(find.byType(Focus))
+            .map((widget) => widget.focusNode)
+            .whereType<FocusNode>()
+            .singleWhere(
+              (node) => node.debugLabel == 'tabbed-folder-list-keyboard',
+            );
+        expect(
+          await waitForE2ECondition(tester, () => keyboard.hasPrimaryFocus),
+          isTrue,
+          reason: 'Selecting a file must return keyboard focus to its list',
+        );
+
         // Press Enter key
         if (kDebugMode) debugPrint('[E2E] Pressing Enter key');
         await et.keyPress(LogicalKeyboardKey.enter);

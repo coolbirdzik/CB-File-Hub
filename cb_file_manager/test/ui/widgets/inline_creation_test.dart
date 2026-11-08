@@ -11,6 +11,7 @@ import 'package:cb_file_manager/ui/screens/folder_list/folder_list_event.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:cb_file_manager/ui/tab_manager/components/folder_context_menu.dart';
 import 'package:cb_file_manager/ui/widgets/inline_rename_field.dart';
+import 'package:cb_file_manager/ui/widgets/compact_file_list_content.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -32,6 +33,38 @@ class _RecordingFolderBloc extends Cubit<FolderListState>
 }
 
 void main() {
+  testWidgets('a retained compact row follows the inline rename scope', (
+    tester,
+  ) async {
+    final controller = InlineRenameController();
+    final bloc = _RecordingFolderBloc();
+    addTearDown(() async {
+      controller.dispose();
+      await bloc.close();
+    });
+    final folderPath = p.join('folder', 'New Folder');
+    final row = CompactFileListContent(path: folderPath, isFolder: true);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: BlocProvider<FolderListBloc>.value(
+            value: bloc,
+            child: InlineRenameScope(controller: controller, child: row),
+          ),
+        ),
+      ),
+    );
+    expect(find.byType(InlineRenameField), findsNothing);
+    controller.startRename(folderPath, commitOnBlur: true);
+    await tester.pump();
+    await tester.pump();
+    expect(find.byType(InlineRenameField), findsOneWidget);
+    expect(controller.focusNode!.hasFocus, isTrue);
+    controller.cancelRename();
+    await tester.pump();
+    expect(find.byType(InlineRenameField), findsNothing);
+  });
+
   test('new folders skip both existing files and folders', () async {
     final root = await Directory.systemTemp.createTemp('cb-inline-create-');
     addTearDown(() => root.delete(recursive: true));

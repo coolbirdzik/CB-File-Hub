@@ -227,6 +227,8 @@ class InlineRenameScope extends InheritedNotifier<InlineRenameController> {
   }
 
   static InlineRenameController? maybeOf(BuildContext context) {
-    return context.findAncestorWidgetOfExactType<InlineRenameScope>()?.notifier;
+    // File rows may be retained by the list/layout builders. They still need
+    // to rebuild when a rename starts or ends, even without a parent update.
+    return of(context);
   }
 }
