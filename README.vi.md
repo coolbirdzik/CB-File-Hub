@@ -6,7 +6,9 @@
 
 <p align="center"><img src="cb_file_manager/assets/images/logo_circle.png" alt="Logo CB File Hub" width="160" /></p>
 
-CB File Hub là ứng dụng quản lý tập tin đa nền tảng dành cho thư viện dữ liệu lớn. Ứng dụng kết hợp duyệt tập tin, tab, tag, album, quản lý và tải torrent, xem/chỉnh sửa đa phương tiện, truy cập mạng/SSH, sao lưu cài đặt và tag, dọn ổ đĩa cùng trợ lý AI trong một không gian làm việc.
+<p align="center"><img src="screenshots/promo/vi/desktop/01_duyet_tap_tin.png" alt="Trình quản lý tập tin CB File Hub với tab, tag và xem trước" /></p>
+
+**Công cụ tất cả-trong-một cho tập tin và media của bạn.** CB File Hub gộp trình quản lý tập tin nhiều tab, thư viện ảnh/video và **dịch video theo thời gian thực** trong một ứng dụng: xem video bằng một ngôn ngữ, đọc phụ đề trực tiếp bằng 38 ngôn ngữ khác, tất cả chạy ngay trên máy của bạn. Ngoài ra còn có SSH/SFTP, tập tin mạng, trợ lý AI, tag, quản lý và tải torrent, sao lưu cài đặt và tag, dọn ổ đĩa.
 
 - [Tải từ Microsoft Store](https://apps.microsoft.com/detail/9nchpzkc4m5c)
 - [Tải từ Google Play](https://play.google.com/store/apps/details?id=com.cbv.filehub)
@@ -15,10 +17,10 @@ CB File Hub là ứng dụng quản lý tập tin đa nền tảng dành cho th�
 
 ## Tính năng nổi bật
 
-- **[Phụ đề AI chạy local trên desktop](#phụ-đề-ai-chạy-local-trên-desktop):** nhận diện lời nói, dịch phụ đề khi xem video, quản lý model và lưu cache cho lần sau.
+- **[Dịch video theo thời gian thực](#dịch-video-theo-thời-gian-thực-trên-desktop):** nhận diện lời nói, dịch phụ đề khi xem video, quản lý model và lưu cache cho lần sau.
+- **Ảnh, video và âm thanh:** thư viện trực quan, hình thu nhỏ, trình xem, chỉnh sửa ảnh và trình phát tích hợp.
 - **Duyệt tập tin linh hoạt:** nhiều tab, chia đôi, ghim vị trí, khôi phục phiên và các chế độ xem quen thuộc.
 - **Thư viện torrent:** index chung, nơi lưu tùy chọn, nhập từ ứng dụng khác, hợp nhất mục trùng và quản lý tải xuống.
-- **Ảnh, video và âm thanh:** thư viện trực quan, hình thu nhỏ, trình xem, chỉnh sửa ảnh và trình phát tích hợp.
 - **[Tự chọn thời điểm lấy thumbnail video](#tự-chọn-thời-điểm-lấy-thumbnail-video):** chọn ảnh đại diện từ mốc 10%, 20%, 50% hoặc vị trí khác trong video.
 - **Tag và album:** tag cha/con, tìm theo nhiều tag, album thủ công và album thông minh theo quy tắc.
 - **Tập tin mạng và SSH:** SMB, FTP, SFTP, WebDAV, hồ sơ SSH, khóa và terminal.
@@ -28,18 +30,23 @@ CB File Hub là ứng dụng quản lý tập tin đa nền tảng dành cho th�
 - **Tăng tốc bằng Rust:** quét ổ đĩa, tìm kiếm, tạo ảnh thu nhỏ, tính hash và xử lý file nén trên luồng native. Xem [số đo hiệu năng](#hiệu-năng-với-rust).
 - **Sao lưu và cá nhân hóa:** sao lưu cài đặt/tag, các tích hợp đám mây khả dụng, giao diện sáng/tối và màu nhấn.
 
-## Phụ đề AI chạy local trên desktop
+## Dịch video theo thời gian thực trên desktop
 
-**Tạo và dịch phụ đề khi xem video, với cả nhận diện lẫn dịch chạy ngay trên máy tính của bạn.** Chọn ngôn ngữ muốn đọc hoặc mặc định theo ngôn ngữ app; có tiếng Nhật, Việt, Anh và các ngôn ngữ được model hỗ trợ.
+**Xem video bằng một ngôn ngữ, đọc phụ đề dịch theo thời gian thực bằng ngôn ngữ khác.** CB File Hub nghe âm thanh khi bạn phát, chép lời (tiếng Nhật, Anh, Hàn, Trung và nhiều thứ tiếng khác) rồi dịch, tạo sẵn trước vị trí đang phát một đoạn ngắn; cả nhận diện lẫn dịch chạy ngay trên máy tính của bạn. Chọn ngôn ngữ muốn đọc hoặc mặc định theo ngôn ngữ app.
 
 ![CB File Hub tạo phụ đề local, với phụ đề Nhật và Việt mẫu cùng tiến độ AI trên một thanh seek](screenshots/promo/vi/desktop/13_phu_de_ai_local.png)
 
+![Cài đặt phụ đề: model giọng nói, model dịch, ngôn ngữ âm thanh và ngôn ngữ phụ đề](screenshots/promo/vi/desktop/14_model_phu_de.png)
+
+- **Đa ngôn ngữ, theo thời gian thực:** phụ đề xuất hiện trước điểm đang phát khi bạn xem, có thể hiện song ngữ gồm bản gốc và bản dịch. Nhật sang Anh hoặc Việt chỉ là một trong nhiều cặp ngôn ngữ.
+- **38 ngôn ngữ đích:** Ả Rập, Bengal, Miến Điện, Quảng Đông, Trung (giản thể và phồn thể), Séc, Hà Lan, Anh, Filipino (Tagalog), Pháp, Đức, Gujarati, Do Thái, Hindi, Indonesia, Ý, Nhật, Kazakh, Khmer, Hàn, Mã Lai, Marathi, Mông Cổ, Ba Tư, Ba Lan, Bồ Đào Nha, Nga, Tây Ban Nha, Tamil, Telugu, Thái, Tây Tạng, Thổ Nhĩ Kỳ, Ukraina, Urdu, Uyghur và Việt.
+- **Nhận diện khoảng 100 ngôn ngữ nói:** Whisper tự phát hiện ngôn ngữ âm thanh; model giọng nói bạn chọn quyết định danh sách (model chỉ một ngôn ngữ chỉ nhận ngôn ngữ đó).
 - **Xử lý tại máy:** tải Whisper và model dịch một lần; sau đó có thể tạo phụ đề cho video cục bộ khi offline. Không gửi audio hay bản chép lời đến dịch vụ AI đám mây.
 - **Ngay trong controls:** một thanh seek hiển thị tiến độ phát và AI. Nút **CC** chứa trạng thái, cài đặt, thử lại và **Xóa và tạo lại**.
 - **Quản lý model chung:** model nhận diện, dịch và CB Agent ở **Cài đặt → Model AI · CB Agent & phụ đề**, có tải, hủy, xóa và chuyển nơi lưu.
 - **Lưu cho lần sau:** phụ đề hoàn tất được cache trong SQLite, dùng lại khi mở hoặc tua video; có thể chủ động xóa cache từng video hoặc toàn bộ.
 
-**Bản xem trước desktop:** cần bản desktop có tính năng này và model đã tải. Các bản phát hành cũ có thể chưa có. Hỗ trợ video cục bộ và VOD mạng có timeline tua được; chưa hỗ trợ live stream không tua được. Tốc độ phụ thuộc phần cứng và model. Xem [hướng dẫn model và cache](docs/features/12-local-ai-subtitles.md).
+**Bản xem trước desktop:** cần bản desktop có tính năng này và model đã tải. Các bản phát hành cũ có thể chưa có. Hỗ trợ video cục bộ và VOD mạng có timeline tua được; chưa hỗ trợ live stream không tua được. Tốc độ thời gian thực phụ thuộc phần cứng và model đã chọn; máy chậm có thể cần một lúc để bắt kịp video. Xem [hướng dẫn model và cache](docs/features/12-local-ai-subtitles.md).
 
 <details><summary>Model, ngôn ngữ và cache phụ đề</summary>
 
@@ -76,12 +83,24 @@ CB File Hub dùng các luồng Rust để quét ổ đĩa, liệt kê và tính 
 
 <table>
   <tr>
-    <td width="50%"><img src="screenshots/promo/vi/desktop/01_duyet_tap_tin.png" alt="Duyệt tập tin CB File Hub" /><p>Duyệt tập tin với tab và hình thu nhỏ.</p></td>
-    <td width="50%"><img src="screenshots/promo/vi/desktop/04_tim_kiem_ai.png" alt="CB Agent tìm tập tin" /><p>CB Agent hỗ trợ tìm kiếm cạnh trình duyệt tập tin.</p></td>
+    <td width="50%"><img src="screenshots/promo/vi/desktop/13_phu_de_ai_local.png" alt="Phụ đề song ngữ theo thời gian thực" /></td>
+    <td width="50%"><img src="screenshots/promo/vi/desktop/14_model_phu_de.png" alt="Ngôn ngữ và model phụ đề" /></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="screenshots/promo/vi/desktop/02_thu_vien_anh.png" alt="Thư viện ảnh và video" /></td>
+    <td width="50%"><img src="screenshots/promo/vi/desktop/03_chi_tiet_album.png" alt="Chi tiết album" /></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="screenshots/promo/vi/desktop/07_quan_ly_tag.png" alt="Quản lý tag" /></td>
+    <td width="50%"><img src="screenshots/promo/vi/desktop/08_tap_tin_theo_tag.png" alt="Tập tin theo tag" /></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="screenshots/promo/vi/desktop/04_tim_kiem_ai.png" alt="CB Agent tìm tập tin" /></td>
+    <td width="50%"><img src="screenshots/promo/vi/desktop/05_duyet_thao_tac_ai.png" alt="CB Agent hỏi xác nhận trước khi thay đổi" /></td>
   </tr>
   <tr>
     <td width="50%"><img src="screenshots/auto/desktop/ssh_workspace.png" alt="Không gian làm việc SSH" /><p>Máy chủ, khóa và kết nối SSH.</p></td>
-    <td width="50%"><img src="screenshots/promo/vi/desktop/10_don_dep_o_dia.png" alt="Disk Cleaner (Windows, macOS, Android)" /><p>Xem kết quả quét và đánh giá trước khi dọn dẹp.</p></td>
+    <td width="50%"><img src="screenshots/promo/vi/desktop/10_don_dep_o_dia.png" alt="Disk Cleaner" /><p>Xem kết quả quét và đánh giá trước khi dọn dẹp.</p></td>
   </tr>
 </table>
 

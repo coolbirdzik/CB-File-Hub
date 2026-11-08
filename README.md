@@ -1,6 +1,6 @@
 # CB File Hub: All-in-One File Manager for Windows, macOS, Linux and Android
 
-**One app for your files, servers and storage — now with local AI video subtitles.** CB File Hub combines a tabbed file manager, an SSH client with SFTP, network shares (SMB, FTP, WebDAV), an AI file assistant, a disk cleaner, a photo and video library, file tags and a torrent library, so you do not need a separate tool for each job.
+**The all-in-one tool for your files and media.** CB File Hub is a tabbed file manager, a photo and video gallery and a **real-time video translator** in one app: watch video in one language and read live subtitles in 38 others, all on your own computer. It also brings an SSH client with SFTP, network shares (SMB, FTP, WebDAV), an AI file assistant, a disk cleaner, file tags and a torrent library, so you do not need a separate tool for each job.
 
 [![Build and Test](https://github.com/coolbirdzik/cb-file-hub/actions/workflows/build-test.yml/badge.svg)](https://github.com/coolbirdzik/cb-file-hub/actions/workflows/build-test.yml)
 [![Build and Release](https://github.com/coolbirdzik/CB-File-Hub/actions/workflows/release.yml/badge.svg)](https://github.com/coolbirdzik/CB-File-Hub/actions/workflows/release.yml)
@@ -18,18 +18,25 @@
   <a href="README.vi.md">Tiếng Việt</a>
 </p>
 
-## Local AI subtitles on your desktop
+<p align="center"><img src="screenshots/promo/desktop/01_file_browser.png" alt="CB File Hub desktop file manager with tabs, tags and file preview" /></p>
 
-**Turn video speech into subtitles and translate them while you watch, with recognition and translation running on your own computer.** Choose your subtitle language, or follow the app language by default. Japanese, English, Vietnamese and other model-supported languages are available.
+## Real-time video translation, on your desktop
+
+**Watch video in one language and read real-time subtitles in another.** CB File Hub listens to the audio as you play, transcribes it (Japanese, English, Korean, Chinese and many more) and translates it a moment ahead of playback, with recognition and translation running on your own computer. Choose your subtitle language, or follow the app language by default.
 
 <p align="center"><img src="screenshots/promo/desktop/13_local_ai_subtitles.png" alt="CB File Hub desktop player with bilingual Japanese and English demo subtitles and AI progress on one seek track" /></p>
 
+<p align="center"><img src="screenshots/promo/desktop/14_subtitle_models.png" alt="Subtitle settings: speech model, translation model, audio language and subtitle language" /></p>
+
+- **Multilingual, in real time:** subtitles appear ahead of the playhead while you watch, and you can show the original and the translation together as bilingual subtitles. Japanese to English or Vietnamese is just one of many pairs.
+- **38 target languages:** Arabic, Bengali, Burmese, Cantonese, Chinese (Simplified and Traditional), Czech, Dutch, English, Filipino (Tagalog), French, German, Gujarati, Hebrew, Hindi, Indonesian, Italian, Japanese, Kazakh, Khmer, Korean, Malay, Marathi, Mongolian, Persian, Polish, Portuguese, Russian, Spanish, Tamil, Telugu, Thai, Tibetan, Turkish, Ukrainian, Urdu, Uyghur and Vietnamese.
+- **100 spoken languages recognized:** Whisper can detect the audio language itself; the speech model you pick limits the list (single-language models accept only their own).
 - **Local processing:** download Whisper and the translation model once; local videos can then be subtitled offline. No audio or transcript is sent to a cloud AI service.
 - **Built into playback:** one seek track shows playback and AI progress. The small **CC** menu holds status, settings, retry and **Clear and regenerate**.
 - **Models in one place:** manage speech, translation and CB Agent downloads together in **Settings → AI models · CB Agent & subtitles**.
 - **Ready next time:** completed subtitles are cached in the app's SQLite database and reused when you reopen or seek. Clear a video version or all subtitle cache whenever needed.
 
-**Desktop preview:** requires a desktop build containing this feature and downloaded models. Older releases may not include it. Supports seekable local videos and suitable network VOD; non-seekable live streams are not supported. Startup and processing speed depend on hardware and models. See [setup, models and cache](docs/features/12-local-ai-subtitles.md).
+**Desktop preview:** requires a desktop build containing this feature and downloaded models. Older releases may not include it. Supports seekable local videos and suitable network VOD; non-seekable live streams are not supported. Real-time speed depends on your hardware and the models you choose; a slower machine may need a moment to get ahead of playback. See [setup, models and cache](docs/features/12-local-ai-subtitles.md).
 
 <details><summary>Models, language choices and saved subtitle cache</summary>
 <p align="center"><img src="screenshots/features/local_subtitles/en/models.png" alt="Local AI subtitle settings with Whisper Small, Hy-MT2, Japanese audio, English subtitle output and subtitle cache" /></p>
@@ -39,10 +46,18 @@ The screenshots render the app's production widgets with an original demo illust
 
 ## Features
 
+### Media gallery: photos, videos and tags
+Gallery and video library, built-in player with picture-in-picture, image editor, albums and rule-based smart albums, and hierarchical tags you can search across every folder.
+
+<table>
+  <tr>
+    <td width="50%"><img src="screenshots/promo/desktop/02_gallery_hub.png" alt="Photo and video gallery hub" /></td>
+    <td width="50%"><img src="screenshots/promo/desktop/03_album_detail.png" alt="Album detail view with photos and videos" /></td>
+  </tr>
+</table>
+
 ### File manager
 Tabs and tear-off windows, split panes, grid and list views with previews, pinned locations, keyboard shortcuts and a fast recursive search.
-
-<p align="center"><img src="screenshots/promo/desktop/01_file_browser.png" alt="CB File Hub desktop file manager with tabs, tags and file preview" /></p>
 
 Open archives like folders and extract selected items or everything. ZIP, 7z, TAR (including .tar.gz, .tar.bz2 and .tar.xz), GZip and BZip2 work on Windows, macOS, Linux and Android without extra tools. RAR needs 7-Zip installed, so it works on Windows only. Settings and tags can be exported to a ZIP backup.
 
@@ -84,9 +99,6 @@ Results appear as soon as the data folders are measured; the size of each app it
   </tr>
 </table>
 
-### Photos, videos and tags
-Gallery and video library, built-in player with picture-in-picture, image editor, albums and rule-based smart albums, and hierarchical tags you can search across every folder.
-
 ### Choose which moment appears in video thumbnails
 
 **You choose which point in a video becomes its thumbnail:** 10%, 20%, 50%, or another percentage of its duration. For example, choosing 20% for a ten-minute video uses a frame around the two-minute mark.
@@ -104,15 +116,23 @@ Heavy work (disk scans, search, thumbnails, hashing, archives) runs on Rust work
 
 <table>
   <tr>
+    <td width="50%"><img src="screenshots/promo/desktop/13_local_ai_subtitles.png" alt="Real-time bilingual video subtitles" /></td>
+    <td width="50%"><img src="screenshots/promo/desktop/14_subtitle_models.png" alt="Subtitle languages and models" /></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="screenshots/promo/desktop/02_gallery_hub.png" alt="Photo and video gallery hub" /></td>
+    <td width="50%"><img src="screenshots/promo/desktop/03_album_detail.png" alt="Album detail view" /></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="screenshots/promo/desktop/07_tag_management.png" alt="Hierarchical file tags and tag management" /></td>
+    <td width="50%"><img src="screenshots/promo/desktop/08_tagged_files.png" alt="Files grouped by tag" /></td>
+  </tr>
+  <tr>
     <td width="50%"><img src="screenshots/promo/desktop/04_ai_search.png" alt="AI file search in the CB Agent side panel" /></td>
     <td width="50%"><img src="screenshots/promo/desktop/05_ai_approval.png" alt="CB Agent asks for approval before changing files" /></td>
   </tr>
   <tr>
     <td width="50%"><img src="screenshots/promo/desktop/10_disk_cleaner.png" alt="Disk cleaner scan results with category review" /></td>
-    <td width="50%"><img src="screenshots/promo/desktop/07_tag_management.png" alt="Hierarchical file tags and tag management" /></td>
-  </tr>
-  <tr>
-    <td width="50%"><img src="screenshots/promo/desktop/02_gallery_hub.png" alt="Photo and video gallery hub" /></td>
     <td width="50%"><img src="screenshots/promo/desktop/11_torrent_library.png" alt="Torrent library with qBittorrent import" /></td>
   </tr>
 </table>
