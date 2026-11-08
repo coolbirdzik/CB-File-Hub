@@ -883,6 +883,37 @@ build_android_aab() {
     cd ..
 }
 
+# media_kit_libs_linux downloads mimalloc inside CMake with no retry and fails
+# the whole build with "Integrity check failed" when GitHub returns a partial
+# or error response. Pre-download it with retries so CMake finds a valid file.
+prefetch_mimalloc_linux() {
+    local url="https://github.com/microsoft/mimalloc/archive/refs/tags/v2.1.2.tar.gz"
+    local md5="5179c8f5cf1237d2300e2d8559a7bc55"
+    local arch
+    case "$(uname -m)" in
+        aarch64 | arm64) arch=arm64 ;;
+        *) arch=x64 ;;
+    esac
+    local dir="$BUILD_DIR/linux/$arch/release"
+    local dest="$dir/mimalloc-2.1.2.tar.gz"
+    mkdir -p "$dir"
+    if [ -f "$dest" ] && [ "$(md5sum "$dest" | cut -d' ' -f1)" = "$md5" ]; then
+        return 0
+    fi
+    local i
+    for i in 1 2 3 4 5; do
+        rm -f "$dest"
+        if curl -fsSL --retry 3 --retry-delay 3 -o "$dest" "$url"             && [ "$(md5sum "$dest" | cut -d' ' -f1)" = "$md5" ]; then
+            print_info "mimalloc prefetched (attempt $i)"
+            return 0
+        fi
+        sleep $((i * 5))
+    done
+    rm -f "$dest"
+    print_warning "mimalloc prefetch failed; CMake will try to download it"
+    return 0
+}
+
 # Build Linux: portable tar.gz, plus a .deb when dpkg-deb is available.
 # Outputs build/linux/portable/CBFileHub-<version>-linux-<arch>.tar.gz and
 # CBFileHub-<version>-linux-<debarch>.deb. Set LINUX_ARTIFACT_SUFFIX (for
@@ -897,7 +928,19 @@ build_linux() {
     local VERSION_CODE
     VERSION_NAME=$(get_version_name)
     VERSION_CODE=$(get_version_code)
-    if ! (cd "$PROJECT_DIR" && flutter build linux --release         --build-name "$VERSION_NAME" --build-number "$VERSION_CODE"         "${CLOUD_DEFINES[@]}"); then
+    prefetch_mimalloc_linux
+
+    local linux_ok=0 attempt
+    for attempt in 1 2 3; do
+        if (cd "$PROJECT_DIR" && flutter build linux --release         --build-name "$VERSION_NAME" --build-number "$VERSION_CODE"         "${CLOUD_DEFINES[@]}"); then
+            linux_ok=1
+            break
+        fi
+        print_warning "Linux build attempt $attempt failed; retrying with a fresh mimalloc download..."
+        rm -f "$BUILD_DIR"/linux/*/release/mimalloc-*.tar.gz
+        prefetch_mimalloc_linux
+    done
+    if [ "$linux_ok" -ne 1 ]; then
         print_error "Linux build failed!"
         return 1
     fi
