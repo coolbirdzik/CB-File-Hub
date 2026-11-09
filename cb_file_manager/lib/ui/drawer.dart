@@ -1042,9 +1042,7 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
 
     return _fluentNavigationItem(
       context,
-      icon: storage.path.startsWith('C:')
-          ? PhosphorIconsLight.desktop
-          : PhosphorIconsLight.hardDrives,
+      icon: storageLocationIcon(storage),
       title: displayName,
       semanticLabel: semanticLabel,
       selected: _isFluentPathSelected(activePath, storage.path),
@@ -1154,6 +1152,9 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
   }
 
   String _fluentStorageName(Directory storage) {
+    final volumeLabel = storage.volumeLabel;
+    if (volumeLabel != null) return volumeLabel;
+
     var path = storage.path;
     if (path.length > 1 && path.endsWith(Platform.pathSeparator)) {
       path = path.substring(0, path.length - 1);

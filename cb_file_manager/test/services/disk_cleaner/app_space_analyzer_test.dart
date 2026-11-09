@@ -181,7 +181,9 @@ void main() {
         );
     });
 
-    Future<(AppSpaceReport, List<AppSpaceReport>)> analyze() async {
+    Future<(AppSpaceReport, List<AppSpaceReport>)> analyze({
+      List<String> alsoRunning = const [],
+    }) async {
       final partials = <AppSpaceReport>[];
       final report =
           await AppSpaceAnalyzer(
@@ -192,7 +194,10 @@ void main() {
             apps: apps,
             processes: RunningProcesses(
               operatingSystem: 'macos',
-              executables: ['$runnerBundle/Contents/MacOS/Runner'],
+              executables: [
+                '$runnerBundle/Contents/MacOS/Runner',
+                ...alsoRunning,
+              ],
             ),
             sizer: dartEditorRootSizes,
             now: () => now,
@@ -253,6 +258,34 @@ void main() {
       expect(alpha.items.single.tier, AppSpaceTier.review);
     });
 
+    test('a whole cache folder is offered entry by entry', () async {
+      final cache = p.join(library, 'Caches', 'com.chatter.app');
+      write(p.join(cache, 'images', 'a'), 2);
+      final (report, _) = await analyze();
+      final group = AppCleanGroup.of(entryOf(report, 'chatter')).singleWhere(
+        (g) => g.kind == AppCleanKind.cache && g.tier == AppSpaceTier.optional,
+      );
+      expect(
+        {for (final t in group.targets) t.path: t.label},
+        {
+          p.join(cache, 'f'): 'com.chatter.app/f',
+          p.join(cache, 'images'): 'com.chatter.app/images',
+        },
+      );
+    });
+
+    test('a cache folder with very many entries stays one row', () async {
+      final cache = p.join(library, 'Caches', 'com.chatter.app');
+      for (var i = 0; i < 201; i++) {
+        write(p.join(cache, 'blob$i'), 1);
+      }
+      final (report, _) = await analyze();
+      final group = AppCleanGroup.of(entryOf(report, 'chatter')).singleWhere(
+        (g) => g.kind == AppCleanKind.cache && g.tier == AppSpaceTier.optional,
+      );
+      expect(group.targets.single.path, cache);
+    });
+
     test('a running app offers nothing that it may hold', () async {
       final (report, _) = await analyze();
       final runner = entryOf(report, 'runner');
@@ -271,6 +304,167 @@ void main() {
         code.totalBytes,
         greaterThanOrEqualTo(15 + code.editor!.extensionInstallBytes),
       );
+    });
+
+    group('Xcode', () {
+      late String xcodeBundle;
+      late String developer;
+      late String derived;
+      late String deviceSupport;
+
+      setUp(() {
+        xcodeBundle = p.join(home.path, 'Applications', 'Xcode.app');
+        write(p.join(xcodeBundle, 'Contents', 'MacOS', 'Xcode'), 1);
+        apps.add(
+          app('xcode', 'Xcode', 'com.apple.dt.Xcode', bundle: xcodeBundle),
+        );
+
+        developer = p.join(library, 'Developer');
+        derived = p.join(developer, 'Xcode', 'DerivedData');
+        final project = p.join(derived, 'Runner-abc');
+        write(p.join(project, 'Build', 'Products', 'Debug', 'app'), 100);
+        write(p.join(project, 'Build', 'Intermediates.noindex', 'x'), 50);
+        write(p.join(project, 'Index.noindex', 'i'), 25);
+        write(p.join(project, 'SourcePackages', 'checkouts', 'pkg', 's'), 13);
+        write(p.join(project, 'Logs', 'l'), 2);
+        write(p.join(derived, 'ModuleCache.noindex', 'm'), 7);
+
+        deviceSupport = p.join(developer, 'Xcode', 'iOS DeviceSupport');
+        write(p.join(deviceSupport, 'iPhone 1.0', 'Symbols', 'a'), 300);
+        write(
+          p.join(deviceSupport, 'iPhone 2.0', 'Symbols', 'b'),
+          200,
+          modified: now,
+        );
+
+        write(
+          p.join(
+            developer,
+            'Xcode',
+            'Archives',
+            '2026-01-01',
+            'App.xcarchive',
+            'x',
+          ),
+          40,
+        );
+        write(p.join(developer, 'Xcode', 'DocumentationCache', 'v1', 'd'), 6);
+        write(p.join(developer, 'Xcode', 'DeviceLogs', 'phone', 'l'), 8);
+        write(p.join(developer, 'Xcode', 'UserData', 'keep'), 5);
+        write(
+          p.join(developer, 'Shared', 'Documentation', 'DocSets', 'old', 'x'),
+          12,
+        );
+        write(p.join(developer, 'CoreSimulator', 'Devices', 'd', 'data'), 60);
+        write(p.join(developer, 'CoreSimulator', 'Caches', 'c'), 9);
+        write(p.join(developer, 'XCTestDevices', 'x'), 3);
+        write(p.join(library, 'Caches', 'com.apple.dt.Xcode', 'c'), 11);
+        write(p.join(library, 'Logs', 'CoreSimulator', 'l'), 4);
+        write(p.join(library, 'Caches', 'com.apple.Safari', 'x'), 5);
+      });
+
+      Map<AppCleanKind, int> rows(AppSpaceEntry xcode) => {
+        for (final group in AppCleanGroup.of(xcode)) group.kind: group.bytes,
+      };
+
+      test('offers the rows of macOS Developer storage', () async {
+        final (report, _) = await analyze();
+        final xcode = entryOf(report, 'xcode');
+        expect(rows(xcode), {
+          AppCleanKind.cache: 9 + 11,
+          AppCleanKind.logs: 4,
+          AppCleanKind.xcodeDeviceSupport: 300 + 200,
+          AppCleanKind.xcodeArchives: 40,
+          AppCleanKind.xcodeDerivedData: 100 + 50 + 25 + 13 + 2 + 7,
+          AppCleanKind.xcodeDocumentationCache: 6,
+          AppCleanKind.xcodeOldLogs: 8,
+          AppCleanKind.xcodeOldDocumentationDownloads: 12,
+        });
+        // Nothing is ticked for you; simulators and settings are only shown.
+        expect(
+          AppCleanGroup.of(xcode).any((group) => group.selectedByDefault),
+          isFalse,
+        );
+        expect(
+          bytes(xcode, AppSpaceKind.userData, AppSpaceTier.review),
+          60 + 5 + 3,
+        );
+        expect(bytes(xcode, AppSpaceKind.install, AppSpaceTier.review), 1);
+        expect(
+          AppCleanGroup.of(
+            xcode,
+          ).expand((group) => group.targets).map((target) => target.path),
+          containsAll([
+            p.join(derived, 'Runner-abc'),
+            p.join(deviceSupport, 'iPhone 2.0'),
+          ]),
+        );
+
+        // Other Apple folders stay with macOS.
+        expect(
+          report.entries.expand((e) => e.items).map((i) => i.path),
+          isNot(contains(p.join(library, 'Caches', 'com.apple.Safari'))),
+        );
+      });
+
+      test('names each Derived Data project and archive', () async {
+        const runner = 'Runner-cojxdkvgvwylomdtsymbrzsfsfjl';
+        File(p.join(derived, runner, 'info.plist'))
+          ..createSync(recursive: true)
+          ..writeAsStringSync('''
+<dict>
+  <key>WorkspacePath</key>
+  <string>${home.path}/Code/app/ios/Runner.xcworkspace</string>
+</dict>''');
+        final hashed = p.join(derived, 'Other-gbnlvvootdekcsaxzyvzymzkaeaf');
+        write(p.join(hashed, 'Build', 'x'), 1);
+        final archive = p.join(
+          developer,
+          'Xcode',
+          'Archives',
+          '2026-01-02',
+          'App 2-1-2026, 10.00.xcarchive',
+        );
+        write(p.join(archive, 'x'), 2);
+
+        final (report, _) = await analyze();
+        final labels = {
+          for (final group in AppCleanGroup.of(entryOf(report, 'xcode')))
+            for (final target in group.targets) target.path: target.label,
+        };
+        expect(labels[p.join(derived, runner)], 'Runner · ~/Code/app/ios');
+        // No workspace to name it: the hash still tells it apart.
+        expect(labels[hashed], 'Other-gbnlvvootdekcsaxzyvzymzkaeaf');
+        expect(
+          labels[p.join(derived, 'ModuleCache.noindex')],
+          'ModuleCache.noindex',
+        );
+        expect(labels[archive], 'App 2-1-2026, 10.00');
+      });
+
+      test('every Xcode target reaches the Trash', () async {
+        final (report, _) = await analyze();
+        await expectReachesTrash(
+          AppSpaceReport(
+            entries: [entryOf(report, 'xcode')],
+            generatedAt: report.generatedAt,
+          ),
+        );
+      });
+
+      test('stays cleanable while Xcode and its helpers run', () async {
+        final (closed, _) = await analyze();
+        final (open, _) = await analyze(
+          alsoRunning: [
+            '$xcodeBundle/Contents/MacOS/Xcode',
+            '$xcodeBundle/Contents/Developer/usr/bin/make',
+            '$xcodeBundle/Contents/SharedFrameworks/SWBBuildService',
+          ],
+        );
+        final xcode = entryOf(open, 'xcode');
+        expect(xcode.isRunning, isFalse);
+        expect(rows(xcode), rows(entryOf(closed, 'xcode')));
+      });
     });
 
     test('data folders arrive before app bundles', () async {

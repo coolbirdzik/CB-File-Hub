@@ -2,6 +2,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:ffi';
+import 'package:cb_file_manager/services/drive/macos_volumes.dart';
 
 // packages
 import 'package:cb_native/cb_native.dart';
@@ -531,6 +532,14 @@ Future<List<Directory>> getAllStorageLocations() async {
       } catch (e) {
         debugPrint('Error getting additional Android paths: $e');
       }
+    } else if (Platform.isMacOS) {
+      // Unique already, and resolving links would wait on an offline share.
+      return [
+        for (final volume in await MacosVolumes.list())
+          Directory(volume.path)
+            ..setProperty('volumeLabel', volume.displayName)
+            ..setProperty('volumeKind', volume.kind),
+      ];
     } else {
       // For other platforms, fallback to application documents directory
       Directory appDocDir = await getApplicationDocumentsDirectory();

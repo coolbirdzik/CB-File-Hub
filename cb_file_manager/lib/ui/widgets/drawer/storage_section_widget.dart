@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:cb_file_manager/services/drive/drive_info.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -92,6 +93,18 @@ void showStorageAdminAccessDialog(
       ],
     ),
   );
+}
+
+/// The icon of a drive in the sidebar and the file pickers.
+IconData storageLocationIcon(Directory drive) {
+  if (Platform.isWindows && drive.path.startsWith('C:')) {
+    return PhosphorIconsLight.desktop;
+  }
+  return switch (drive.volumeKind) {
+    DriveKind.removable => PhosphorIconsLight.usb,
+    DriveKind.network => PhosphorIconsLight.cloud,
+    _ => PhosphorIconsLight.hardDrives,
+  };
 }
 
 bool get _isFluentDesktopShellActive =>
@@ -194,7 +207,7 @@ class _StorageSectionWidgetState extends State<StorageSectionWidget> {
   Widget _buildStorageItem(BuildContext context, Directory storage) {
     final theme = Theme.of(context);
     String displayName = _getStorageDisplayName(storage);
-    IconData icon = _getStorageIcon(storage);
+    IconData icon = storageLocationIcon(storage);
     bool requiresAdmin = storage.requiresAdmin;
 
     return _buildItem(
@@ -260,6 +273,9 @@ class _StorageSectionWidgetState extends State<StorageSectionWidget> {
 
   // Helper methods from original file
   String _getStorageDisplayName(Directory storage) {
+    final volumeLabel = storage.volumeLabel;
+    if (volumeLabel != null) return volumeLabel;
+
     String path = storage.path;
     if (path.length > 1 && path.endsWith(Platform.pathSeparator)) {
       path = path.substring(0, path.length - 1);
@@ -284,12 +300,5 @@ class _StorageSectionWidgetState extends State<StorageSectionWidget> {
       return 'System';
     }
     return 'Drive';
-  }
-
-  IconData _getStorageIcon(Directory drive) {
-    if (Platform.isWindows && drive.path.startsWith('C:')) {
-      return PhosphorIconsLight.desktop;
-    }
-    return PhosphorIconsLight.hardDrives;
   }
 }

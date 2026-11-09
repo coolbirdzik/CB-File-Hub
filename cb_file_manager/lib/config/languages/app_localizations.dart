@@ -3082,6 +3082,18 @@ abstract class AppLocalizations {
   String get cleanerAppStorageKindInstall;
   String get cleanerAppStorageKindUserData;
   String get cleanerAppStorageKindShared;
+  String get cleanerXcodeDeviceSupport;
+  String get cleanerXcodeDeviceSupportHint;
+  String get cleanerXcodeArchives;
+  String get cleanerXcodeArchivesHint;
+  String get cleanerXcodeDerivedData;
+  String get cleanerXcodeDerivedDataHint;
+  String get cleanerXcodeDocumentationCache;
+  String get cleanerXcodeDocumentationCacheHint;
+  String get cleanerXcodeOldLogs;
+  String get cleanerXcodeOldLogsHint;
+  String get cleanerXcodeOldDocumentationDownloads;
+  String get cleanerXcodeOldDocumentationDownloadsHint;
   String get cleanerAppStorageCacheOptionalHint;
   String get cleanerAppStorageLogsOptionalHint;
   String get cleanerAppStorageLeftoversHint;

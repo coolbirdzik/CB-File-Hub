@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'macos_volumes.dart';
 
 import 'package:flutter/foundation.dart';
 import 'package:win32/win32.dart' as win32;
@@ -42,6 +43,8 @@ class DriveInventoryService {
       entries = await _loadWindows();
     } else if (Platform.isAndroid) {
       entries = await _loadAndroid();
+    } else if (Platform.isMacOS) {
+      entries = [for (final v in await MacosVolumes.list()) v.toDrive()];
     } else {
       entries = await _loadFallback();
     }

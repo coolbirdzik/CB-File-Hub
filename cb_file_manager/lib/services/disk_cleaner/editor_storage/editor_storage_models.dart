@@ -114,7 +114,10 @@ class EditorCleanTarget {
   final String path;
   final int bytes;
 
-  const EditorCleanTarget(this.path, this.bytes);
+  /// What to call it when the path says little (`Runner-cojxdkvg…`).
+  final String? label;
+
+  const EditorCleanTarget(this.path, this.bytes, {this.label});
 }
 
 enum EditorExtensionStatus {

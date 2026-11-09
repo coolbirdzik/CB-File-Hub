@@ -62,6 +62,7 @@ class CleanerAppStorageCubit extends Cubit<CleanerAppStorageState> {
                 : CleanerAppStorageStatus.ready,
             report: state.report,
             selectedGroups: state.selectedGroups,
+            excludedTargets: state.excludedTargets,
             knownGroups: state.knownGroups,
             pendingPaths: state.pendingPaths,
             focusedAppId: state.focusedAppId,
@@ -125,6 +126,7 @@ class CleanerAppStorageCubit extends Cubit<CleanerAppStorageState> {
             : CleanerAppStorageStatus.ready,
         report: state.report,
         selectedGroups: state.selectedGroups,
+        excludedTargets: state.excludedTargets,
         knownGroups: state.knownGroups,
         pendingPaths: state.pendingPaths,
         focusedAppId: state.focusedAppId,
@@ -153,13 +155,38 @@ class CleanerAppStorageCubit extends Cubit<CleanerAppStorageState> {
     );
   }
 
+  /// A row that is only partly checked becomes fully checked.
   void toggleDocker(DockerCleanKind kind) {
     final selected = {...state.dockerSelected};
-    if (!selected.remove(kind)) selected.add(kind);
-    emit(state.copyWith(dockerSelected: selected));
+    if (state.dockerSelection(kind) == true) {
+      selected.remove(kind);
+    } else {
+      selected.add(kind);
+    }
+    final excluded = {...state.dockerExcluded}
+      ..removeWhere((key) => key.startsWith('${kind.name}/'));
+    emit(state.copyWith(dockerSelected: selected, dockerExcluded: excluded));
   }
 
-  /// Runs the checked Docker prunes, then reads Docker again. Permanent:
+  void toggleDockerItem(DockerCleanKind kind, DockerItem item) {
+    final docker = state.report?.docker;
+    if (docker == null) return;
+    final selected = {...state.dockerSelected};
+    final excluded = {...state.dockerExcluded};
+    final key = DockerReport.excludedKey(kind, item);
+    if (selected.add(kind)) {
+      // Nothing was checked: this item alone becomes checked.
+      excluded.addAll(
+        docker.itemsOf(kind).map((i) => DockerReport.excludedKey(kind, i)),
+      );
+      excluded.remove(key);
+    } else if (!excluded.remove(key)) {
+      excluded.add(key);
+    }
+    emit(state.copyWith(dockerSelected: selected, dockerExcluded: excluded));
+  }
+
+  /// Runs the checked Docker prunes and removals, then reads Docker again. Permanent:
   /// the view confirms first.
   Future<void> cleanDocker() async {
     final docker = state.report?.docker;
@@ -169,14 +196,11 @@ class CleanerAppStorageCubit extends Cubit<CleanerAppStorageState> {
         !docker.isReady) {
       return;
     }
-    final kinds = {
-      for (final kind in state.dockerSelected)
-        if (docker.countOf(kind) > 0) kind,
-    };
-    if (kinds.isEmpty) return;
+    final plan = state.dockerPlan;
+    if (plan.isEmpty) return;
     emit(
       state.copyWith(
-        dockerStep: DockerCleanKind.values.firstWhere(kinds.contains),
+        dockerStep: plan.firstStep,
         dockerFreed: null,
         dockerError: null,
       ),
@@ -184,8 +208,8 @@ class CleanerAppStorageCubit extends Cubit<CleanerAppStorageState> {
     int? freed;
     String? error;
     try {
-      final byKind = await _docker.prune(
-        kinds,
+      final byKind = await _docker.apply(
+        plan,
         onStep: (kind) {
           if (!isClosed) emit(state.copyWith(dockerStep: kind));
         },
@@ -214,10 +238,34 @@ class CleanerAppStorageCubit extends Cubit<CleanerAppStorageState> {
   /// Lists only [appId], opened; null lists every app again.
   void focusApp(String? appId) => emit(state.copyWith(focusedAppId: appId));
 
+  /// A group that is only partly checked becomes fully checked.
   void toggleGroup(String id) {
+    final group = state.groups.where((g) => g.id == id).firstOrNull;
     final selected = {...state.selectedGroups};
-    if (!selected.remove(id)) selected.add(id);
-    emit(state.copyWith(selectedGroups: selected));
+    final excluded = {...state.excludedTargets};
+    final allChecked = group == null
+        ? selected.contains(id)
+        : state.groupSelection(group) == true;
+    if (allChecked) {
+      selected.remove(id);
+    } else {
+      selected.add(id);
+    }
+    if (group != null) excluded.removeAll(group.targets.map((t) => t.path));
+    emit(state.copyWith(selectedGroups: selected, excludedTargets: excluded));
+  }
+
+  void toggleTarget(AppCleanGroup group, String path) {
+    final selected = {...state.selectedGroups};
+    final excluded = {...state.excludedTargets};
+    if (selected.add(group.id)) {
+      // Nothing was checked: this target alone becomes checked.
+      excluded.addAll(group.targets.map((t) => t.path));
+      excluded.remove(path);
+    } else if (!excluded.remove(path)) {
+      excluded.add(path);
+    }
+    emit(state.copyWith(selectedGroups: selected, excludedTargets: excluded));
   }
 
   void markPending(Iterable<String> paths) =>

@@ -53,11 +53,20 @@ class AppSpaceItem {
   final AppSpaceTier tier;
   final int bytes;
 
+  /// The cleanup row of its own, when [kind] would mix things a person wants
+  /// to choose between (Xcode's Device Support and Derived Data are caches).
+  final AppCleanKind? cleanGroup;
+
+  /// Shown in place of the path in its cleanup row.
+  final String? label;
+
   const AppSpaceItem({
     required this.path,
     required this.kind,
     required this.tier,
     required this.bytes,
+    this.cleanGroup,
+    this.label,
   });
 
   bool get isCleanable => tier != AppSpaceTier.review;
@@ -143,6 +152,22 @@ class AppSpaceReport {
     docker: docker,
   );
 
+  /// The installed app that Docker's images and containers belong to: they
+  /// are shown inside its row. Docker without an app (Colima, a plain dockerd)
+  /// has no such entry and keeps a row of its own.
+  AppSpaceEntry? get dockerApp {
+    final status = docker?.status;
+    if (status == null || status == DockerStatus.notInstalled) return null;
+    return entries.where((entry) {
+      final app = entry.app;
+      if (app.source == InstalledAppSource.executable) return false;
+      final name = app.displayName.toLowerCase();
+      return app.packageFamilyName?.toLowerCase() == 'com.docker.docker' ||
+          name == 'docker' ||
+          name == 'docker desktop';
+    }).firstOrNull;
+  }
+
   int get totalBytes => entries.fold<int>(0, (sum, e) => sum + e.totalBytes);
 
   int get safeBytes => entries.fold<int>(0, (sum, e) => sum + e.safeBytes);
@@ -167,6 +192,12 @@ enum AppCleanKind {
   logs,
   crashReports,
   missingWorkspaces,
+  xcodeDeviceSupport,
+  xcodeArchives,
+  xcodeDerivedData,
+  xcodeDocumentationCache,
+  xcodeOldLogs,
+  xcodeOldDocumentationDownloads,
 }
 
 /// Targets of one kind and tier in one app, checked together.
@@ -248,10 +279,19 @@ class AppCleanGroup {
       ]) {
         add(clean, tier, [
           for (final item in entry.items)
-            if (item.kind == kind && item.tier == tier)
-              EditorCleanTarget(item.path, item.bytes),
+            if (item.cleanGroup == null &&
+                item.kind == kind &&
+                item.tier == tier)
+              EditorCleanTarget(item.path, item.bytes, label: item.label),
         ]);
       }
+    }
+    for (final clean in AppCleanKind.values) {
+      add(clean, AppSpaceTier.optional, [
+        for (final item in entry.items)
+          if (item.cleanGroup == clean && item.isCleanable)
+            EditorCleanTarget(item.path, item.bytes, label: item.label),
+      ]);
     }
     return groups;
   }

@@ -19,6 +19,9 @@ class CleanerAppStorageState extends Equatable {
   /// [AppCleanGroup.id]s that are checked.
   final Set<String> selectedGroups;
 
+  /// Targets unchecked inside a checked group.
+  final Set<String> excludedTargets;
+
   /// Group ids the user has seen, so a later report keeps their choices and
   /// only checks groups that are new.
   final Set<String> knownGroups;
@@ -33,6 +36,9 @@ class CleanerAppStorageState extends Equatable {
   /// Docker prunes that are checked.
   final Set<DockerCleanKind> dockerSelected;
 
+  /// [DockerReport.excludedKey]s: items unchecked inside a checked prune.
+  final Set<String> dockerExcluded;
+
   /// The prune running now, while Docker is cleaned.
   final DockerCleanKind? dockerStep;
 
@@ -46,11 +52,13 @@ class CleanerAppStorageState extends Equatable {
     this.done = 0,
     this.total = 0,
     this.selectedGroups = const {},
+    this.excludedTargets = const {},
     this.knownGroups = const {},
     this.pendingPaths = const {},
     this.errorMessage,
     this.focusedAppId,
     this.dockerSelected = const {},
+    this.dockerExcluded = const {},
     this.dockerStep,
     this.dockerFreed,
     this.dockerError,
@@ -58,16 +66,33 @@ class CleanerAppStorageState extends Equatable {
 
   bool get isCleaningDocker => dockerStep != null;
 
-  /// What the checked Docker prunes free, by Docker's estimate. Unused
-  /// images include the untagged ones.
+  DockerCleanPlan get dockerPlan =>
+      report?.docker?.plan(dockerSelected, dockerExcluded) ??
+      const DockerCleanPlan();
+
+  bool isDockerItemSelected(DockerCleanKind kind, DockerItem item) =>
+      dockerSelected.contains(kind) &&
+      !dockerExcluded.contains(DockerReport.excludedKey(kind, item));
+
+  /// True when all of [kind] is checked, false when none, null when some.
+  bool? dockerSelection(DockerCleanKind kind) {
+    final items = report?.docker?.itemsOf(kind) ?? const <DockerItem>[];
+    if (items.isEmpty) return dockerSelected.contains(kind);
+    final checked = items.where((i) => isDockerItemSelected(kind, i)).length;
+    if (checked == 0) return false;
+    return checked == items.length ? true : null;
+  }
+
+  /// What the checked Docker items free, by Docker's estimate for whole
+  /// prunes. Unused images include the untagged ones.
   int get dockerSelectedBytes {
     final docker = report?.docker;
     if (docker == null || !docker.isReady) return 0;
+    final plan = dockerPlan;
     return [
-      for (final kind in dockerSelected)
-        if (!(kind == DockerCleanKind.danglingImages &&
-            dockerSelected.contains(DockerCleanKind.unusedImages)))
-          docker.bytesOf(kind),
+      for (final kind in plan.prunes) docker.bytesOf(kind),
+      for (final items in plan.removals.values)
+        for (final item in items) item.bytes,
     ].fold(0, (sum, bytes) => sum + bytes);
   }
 
@@ -80,14 +105,26 @@ class CleanerAppStorageState extends Equatable {
       ...AppCleanGroup.of(entry),
   ];
 
-  bool isSelected(AppCleanGroup group) => selectedGroups.contains(group.id);
+  bool isTargetSelected(AppCleanGroup group, EditorCleanTarget target) =>
+      selectedGroups.contains(group.id) &&
+      !excludedTargets.contains(target.path);
+
+  /// True when all of [group] is checked, false when none, null when some.
+  bool? groupSelection(AppCleanGroup group) {
+    final checked = group.targets
+        .where((target) => isTargetSelected(group, target))
+        .length;
+    if (checked == 0) return false;
+    return checked == group.targets.length ? true : null;
+  }
 
   /// Checked targets not already being cleaned.
   List<EditorCleanTarget> get selectedTargets => [
     for (final group in groups)
-      if (isSelected(group))
-        for (final target in group.targets)
-          if (!pendingPaths.contains(target.path)) target,
+      for (final target in group.targets)
+        if (isTargetSelected(group, target) &&
+            !pendingPaths.contains(target.path))
+          target,
   ];
 
   int get selectedBytes =>
@@ -99,11 +136,13 @@ class CleanerAppStorageState extends Equatable {
     int? done,
     int? total,
     Set<String>? selectedGroups,
+    Set<String>? excludedTargets,
     Set<String>? knownGroups,
     Set<String>? pendingPaths,
     String? errorMessage,
     Object? focusedAppId = _keep,
     Set<DockerCleanKind>? dockerSelected,
+    Set<String>? dockerExcluded,
     Object? dockerStep = _keep,
     Object? dockerFreed = _keep,
     Object? dockerError = _keep,
@@ -113,6 +152,7 @@ class CleanerAppStorageState extends Equatable {
     done: done ?? this.done,
     total: total ?? this.total,
     selectedGroups: selectedGroups ?? this.selectedGroups,
+    excludedTargets: excludedTargets ?? this.excludedTargets,
     knownGroups: knownGroups ?? this.knownGroups,
     pendingPaths: pendingPaths ?? this.pendingPaths,
     errorMessage: errorMessage ?? this.errorMessage,
@@ -120,6 +160,7 @@ class CleanerAppStorageState extends Equatable {
         ? this.focusedAppId
         : focusedAppId as String?,
     dockerSelected: dockerSelected ?? this.dockerSelected,
+    dockerExcluded: dockerExcluded ?? this.dockerExcluded,
     dockerStep: identical(dockerStep, _keep)
         ? this.dockerStep
         : dockerStep as DockerCleanKind?,
@@ -138,11 +179,13 @@ class CleanerAppStorageState extends Equatable {
     done,
     total,
     selectedGroups,
+    excludedTargets,
     knownGroups,
     pendingPaths,
     errorMessage,
     focusedAppId,
     dockerSelected,
+    dockerExcluded,
     dockerStep,
     dockerFreed,
     dockerError,

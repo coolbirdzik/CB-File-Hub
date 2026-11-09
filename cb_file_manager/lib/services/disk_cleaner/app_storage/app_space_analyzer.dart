@@ -4,6 +4,7 @@ import 'package:path/path.dart' as p;
 
 import '../../app_insights/app_insights_models.dart';
 import '../../app_insights/app_leftover_finder.dart';
+import '../../app_insights/posix_app_inventory.dart';
 import '../../app_insights/posix_app_leftover_finder.dart';
 import '../editor_storage/editor_root_sizes.dart';
 import '../editor_storage/editor_storage_analyzer.dart';
@@ -11,6 +12,7 @@ import '../editor_storage/editor_storage_models.dart';
 import 'app_space_models.dart';
 import 'chromium_layout.dart';
 import 'running_processes.dart';
+import '../cleaner_xcode_cache.dart';
 import '../storage_path_context.dart';
 
 /// Where the current user's per-app folders are.
@@ -99,11 +101,20 @@ enum _Base {
 /// storage and shared vendor data are only shown. Nothing is offered for an
 /// app that is running.
 ///
+/// Xcode is the one app with its own layout: it keeps its data under
+/// `~/Library/Developer` and in `com.apple.dt.*` folders, which the name rules
+/// treat as macOS itself ([_planXcodeDeveloper]). Like the Developer section
+/// of macOS Storage settings, its data can be cleaned while it is open, so it
+/// never counts as running.
+///
 /// Only reads. Every folder is sized in one [EditorRootSizer] walk, in
 /// chunks so [analyze] can report progress.
 class AppSpaceAnalyzer {
   /// Logs, crash dumps and downloads younger than this may be in use.
   static const minAge = Duration(days: 1);
+
+  /// Beyond this many entries a cache or logs folder is offered whole.
+  static const _maxContentRows = 200;
 
   /// Windows folders shared by many apps or by Windows itself.
   static const _windowsShared = {
@@ -146,6 +157,17 @@ class AppSpaceAnalyzer {
 
   p.Context get _path => environment.path;
 
+  /// Every installed copy (`Xcode.app`, `Xcode-beta.app`): they share one set
+  /// of data folders, which the first copy shows.
+  late final List<InstalledAppInfo> _xcodes =
+      environment.operatingSystem == 'macos'
+      ? [
+          for (final app in apps)
+            if (app.packageFamilyName?.toLowerCase() == 'com.apple.dt.xcode')
+              app,
+        ]
+      : const [];
+
   /// [onPartial] receives the report once the data folders are sized and
   /// before the app bundles are (those hold the most files: Xcode alone has
   /// hundreds of thousands), so the list can show while they are measured.
@@ -171,7 +193,8 @@ class AppSpaceAnalyzer {
       app.id,
       () => _AppPlan(
         app,
-        processes.runs(app, installExecutables: _installExecutables(app)),
+        !_xcodes.contains(app) &&
+            processes.runs(app, installExecutables: _installExecutables(app)),
       ),
     );
     void add(
@@ -179,9 +202,13 @@ class AppSpaceAnalyzer {
       String path,
       AppSpaceKind kind, {
       AppSpaceTier tier = AppSpaceTier.review,
+      AppCleanKind? cleanGroup,
+      String? label,
     }) {
       roots.add(path);
-      plan.items.add(_Item(path, kind, tier, roots.length - 1));
+      plan.items.add(
+        _Item(path, kind, tier, roots.length - 1, cleanGroup, label),
+      );
     }
 
     final ownership = PosixAppOwnership(apps);
@@ -209,6 +236,8 @@ class AppSpaceAnalyzer {
         _planFolder(plan, base, child, add);
       }
     }
+
+    if (_xcodes.isNotEmpty) _planXcodeDeveloper(planFor(_xcodes.first), add);
 
     // Editors whose data folder belongs to no listed app still show.
     for (final editor in editors) {
@@ -333,6 +362,9 @@ class AppSpaceAnalyzer {
         ? AppFolderOwner.none
         : AppFolderOwner(AppFolderOwnerKind.app, match);
 
+    if (_xcodes.isNotEmpty && _isXcodeFolder(base, name)) {
+      return app(_xcodes.first);
+    }
     switch (base) {
       case _Base.appSupport:
       case _Base.logs:
@@ -369,18 +401,140 @@ class AppSpaceAnalyzer {
     }
   }
 
-  void _planFolder(
-    _AppPlan plan,
-    _Base base,
-    _Entry folder,
-    void Function(
-      _AppPlan plan,
-      String path,
-      AppSpaceKind kind, {
-      AppSpaceTier tier,
-    })
-    add,
-  ) {
+  /// Apple's developer tools, which [PosixAppOwnership] reports as macOS.
+  static bool _isXcodeFolder(_Base base, String name) => switch (base) {
+    _Base.logs =>
+      name == 'CoreSimulator' || name.toLowerCase().startsWith('com.apple.dt.'),
+    _Base.appSupport ||
+    _Base.caches ||
+    _Base.webData ||
+    _Base.savedState ||
+    _Base.containers => name.toLowerCase().startsWith('com.apple.dt.'),
+    _ => false,
+  };
+
+  /// `~/Library/Developer`: the rows of the Developer section in macOS Storage
+  /// settings, each its own opt-in group. Simulators and everything else are
+  /// only shown.
+  void _planXcodeDeveloper(_AppPlan plan, _AddItem add) {
+    final path = _path;
+    final developer = path.join(environment.home, 'Library', 'Developer');
+    final xcode = path.join(developer, 'Xcode');
+    Iterable<_Entry> visible(String parent) =>
+        _list(parent).where((entry) => !entry.name.startsWith('.'));
+    Iterable<_Entry> folders(String parent) =>
+        visible(parent).where((entry) => entry.isDirectory);
+
+    void offer(
+      _Entry entry,
+      AppSpaceKind kind,
+      AppCleanKind group, {
+      String? label,
+    }) => add(
+      plan,
+      entry.path,
+      kind,
+      tier: AppSpaceTier.optional,
+      cleanGroup: group,
+      label: label ?? entry.name,
+    );
+
+    final rows = <String, (AppSpaceKind, AppCleanKind)>{
+      for (final platform in CleanerXcodeCache.deviceSupportPlatforms)
+        '$platform DeviceSupport': (
+          AppSpaceKind.cache,
+          AppCleanKind.xcodeDeviceSupport,
+        ),
+      'DerivedData': (AppSpaceKind.cache, AppCleanKind.xcodeDerivedData),
+      'DocumentationCache': (
+        AppSpaceKind.cache,
+        AppCleanKind.xcodeDocumentationCache,
+      ),
+      'DeviceLogs': (AppSpaceKind.logs, AppCleanKind.xcodeOldLogs),
+      for (final platform in CleanerXcodeCache.deviceSupportPlatforms)
+        '$platform Device Logs': (AppSpaceKind.logs, AppCleanKind.xcodeOldLogs),
+    };
+    for (final child in folders(xcode)) {
+      if (child.name == 'Archives') {
+        // `Archives/<date>/<name>.xcarchive`: one row per archive.
+        for (final day in folders(child.path)) {
+          for (final archive in folders(day.path)) {
+            offer(
+              archive,
+              AppSpaceKind.userData,
+              AppCleanKind.xcodeArchives,
+              label: path.basenameWithoutExtension(archive.name),
+            );
+          }
+        }
+      } else if (rows[child.name] case (final kind, final group)) {
+        for (final entry in visible(child.path)) {
+          offer(
+            entry,
+            kind,
+            group,
+            label: group == AppCleanKind.xcodeDerivedData
+                ? _derivedDataLabel(entry)
+                : null,
+          );
+        }
+      } else {
+        add(plan, child.path, AppSpaceKind.userData);
+      }
+    }
+
+    final simulator = path.join(developer, 'CoreSimulator');
+    for (final child in folders(simulator)) {
+      add(
+        plan,
+        child.path,
+        child.name == 'Caches' ? AppSpaceKind.cache : AppSpaceKind.userData,
+        tier: child.name == 'Caches'
+            ? AppSpaceTier.optional
+            : AppSpaceTier.review,
+      );
+    }
+
+    final docSets = path.join(developer, 'Shared', 'Documentation', 'DocSets');
+    for (final entry in visible(docSets)) {
+      offer(
+        entry,
+        AppSpaceKind.cache,
+        AppCleanKind.xcodeOldDocumentationDownloads,
+      );
+    }
+    for (final tool in folders(developer)) {
+      if (!const {'Xcode', 'CoreSimulator', 'Shared'}.contains(tool.name)) {
+        add(plan, tool.path, AppSpaceKind.userData);
+      }
+    }
+  }
+
+  /// `Runner · ~/Code/app/ios` from the folder's `info.plist`: most Flutter
+  /// projects are called Runner, and the folder name ends in a hash.
+  String _derivedDataLabel(_Entry entry) {
+    final path = _path;
+    String? workspace;
+    try {
+      workspace = parseXmlPlistStrings(
+        File(path.join(entry.path, 'info.plist')).readAsStringSync(),
+      )['WorkspacePath'];
+    } on FileSystemException {
+      // Shared caches have none.
+    } on FormatException {
+      // A binary property list.
+    }
+    // Without a workspace the hash is all that tells two Runners apart.
+    if (workspace == null || workspace.isEmpty) return entry.name;
+    final name = entry.name.replaceFirst(RegExp(r'-[a-z]{20,}$'), '');
+    final folder = path.dirname(workspace);
+    final shown = path.isWithin(environment.home, folder)
+        ? '~/${path.relative(folder, from: environment.home)}'
+        : folder;
+    return '$name · $shown';
+  }
+
+  void _planFolder(_AppPlan plan, _Base base, _Entry folder, _AddItem add) {
     // While the app runs it may hold or rewrite any of this.
     final cacheTier = plan.running
         ? AppSpaceTier.review
@@ -388,9 +542,9 @@ class AppSpaceAnalyzer {
     switch (base) {
       case _Base.caches:
       case _Base.cache:
-        add(plan, folder.path, AppSpaceKind.cache, tier: cacheTier);
+        _addContents(plan, folder, AppSpaceKind.cache, cacheTier, add);
       case _Base.logs:
-        add(plan, folder.path, AppSpaceKind.logs, tier: cacheTier);
+        _addContents(plan, folder, AppSpaceKind.logs, cacheTier, add);
       case _Base.webData:
         add(plan, folder.path, AppSpaceKind.webStorage);
       case _Base.savedState:
@@ -447,6 +601,31 @@ class AppSpaceAnalyzer {
     }
   }
 
+  /// One row per entry of a cache or logs folder, so each can be picked. A
+  /// folder holding a great many keeps one row.
+  void _addContents(
+    _AppPlan plan,
+    _Entry folder,
+    AppSpaceKind kind,
+    AppSpaceTier tier,
+    _AddItem add,
+  ) {
+    final children = _list(folder.path).toList();
+    if (children.isEmpty || children.length > _maxContentRows) {
+      add(plan, folder.path, kind, tier: tier);
+      return;
+    }
+    for (final child in children) {
+      add(
+        plan,
+        child.path,
+        kind,
+        tier: tier,
+        label: '${folder.name}/${child.name}',
+      );
+    }
+  }
+
   static bool _isCacheName(String name) {
     final lower = name.toLowerCase();
     return lower == 'cache' || lower == 'caches';
@@ -458,13 +637,7 @@ class AppSpaceAnalyzer {
     _AppPlan plan,
     String container,
     AppSpaceTier cacheTier,
-    void Function(
-      _AppPlan plan,
-      String path,
-      AppSpaceKind kind, {
-      AppSpaceTier tier,
-    })
-    add,
+    _AddItem add,
   ) {
     final path = _path;
     final library = path.join(container, 'Data', 'Library');
@@ -482,23 +655,19 @@ class AppSpaceAnalyzer {
     for (final child in _list(library)) {
       if (child.name != 'Caches') add(plan, child.path, AppSpaceKind.userData);
     }
-    add(plan, caches, AppSpaceKind.cache, tier: cacheTier);
+    _addContents(
+      plan,
+      _Entry(caches, path.basename(caches), true),
+      AppSpaceKind.cache,
+      cacheTier,
+      add,
+    );
   }
 
   /// The same rules as the editors' data folder: caches go when the app is
   /// closed; logs except the newest session, crash dumps and VSIX downloads
   /// once a day old; web storage and everything else stays.
-  void _planChromium(
-    _AppPlan plan,
-    List<_Entry> children,
-    void Function(
-      _AppPlan plan,
-      String path,
-      AppSpaceKind kind, {
-      AppSpaceTier tier,
-    })
-    add,
-  ) {
+  void _planChromium(_AppPlan plan, List<_Entry> children, _AddItem add) {
     final cutoff = now().subtract(minAge);
     bool old(_Entry entry) {
       final modified = entry.modified();
@@ -604,6 +773,16 @@ class AppSpaceAnalyzer {
   }
 }
 
+typedef _AddItem =
+    void Function(
+      _AppPlan plan,
+      String path,
+      AppSpaceKind kind, {
+      AppSpaceTier tier,
+      AppCleanKind? cleanGroup,
+      String? label,
+    });
+
 class _Entry {
   final String path;
   final String name;
@@ -625,8 +804,17 @@ class _Item {
   final AppSpaceKind kind;
   final AppSpaceTier tier;
   final int root;
+  final AppCleanKind? cleanGroup;
+  final String? label;
 
-  const _Item(this.path, this.kind, this.tier, this.root);
+  const _Item(
+    this.path,
+    this.kind,
+    this.tier,
+    this.root,
+    this.cleanGroup,
+    this.label,
+  );
 }
 
 class _AppPlan {
@@ -648,6 +836,8 @@ class _AppPlan {
             kind: item.kind,
             tier: item.tier,
             bytes: sizes[item.root].bytes,
+            cleanGroup: item.cleanGroup,
+            label: item.label,
           ),
     ]..sort((a, b) => b.bytes.compareTo(a.bytes)),
     editor: editor,
