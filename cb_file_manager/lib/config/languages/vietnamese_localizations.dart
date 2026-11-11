@@ -151,6 +151,10 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get sshProxies => 'Proxy';
   @override
+  String get sshTestConnection => 'Kiểm tra kết nối';
+  @override
+  String get sshTestSuccess => 'Kết nối thành công';
+  @override
   String get sshAddProxy => 'Thêm proxy';
   @override
   String get sshEditProxy => 'Sửa proxy';
@@ -777,6 +781,16 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get sshTransferCaseConflict =>
       'Trùng tên với một mục khác, chỉ khác chữ hoa/thường';
+  @override
+  String get sshTransferExists => 'Thư mục đích đã có mục cùng tên';
+  @override
+  String get sshPasteInvalidTarget => 'Hãy mở một thư mục đích khác rồi dán';
+  @override
+  String sshClipboardHint(int count) =>
+      'Đã chọn $count mục. Mở thư mục đích rồi chọn Dán.';
+  @override
+  String sshRemoteDeleteConfirm(int count) =>
+      'Xóa vĩnh viễn $count mục trên máy chủ? Không thể hoàn tác.';
   @override
   String get sshInvalidFolderName => 'Nhập tên thư mục hợp lệ';
   @override

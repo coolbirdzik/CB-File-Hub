@@ -68,6 +68,8 @@ abstract class AppLocalizations {
 
   String get sshProxy;
   String get sshProxies;
+  String get sshTestConnection;
+  String get sshTestSuccess;
   String get sshAddProxy;
   String get sshEditProxy;
   String get sshProxyType;
@@ -252,6 +254,10 @@ abstract class AppLocalizations {
   String get sshTransferLinkSkipped;
   String get sshTransferTypeConflict;
   String get sshTransferCaseConflict;
+  String get sshTransferExists;
+  String get sshPasteInvalidTarget;
+  String sshClipboardHint(int count);
+  String sshRemoteDeleteConfirm(int count);
   String get sshInvalidFolderName;
   String sshTransferProgress(int done, int total);
   String sshTransferComplete(int count);

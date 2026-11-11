@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:dartssh2/dartssh2.dart' show SSHClient;
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:uuid/uuid.dart';
@@ -116,7 +119,12 @@ class _SshHostDialogState extends State<SshHostDialog> {
   LocalSshHost? _selectedHost;
   bool _scanning = true;
 
-  bool _keyAuth = false, _busy = false, _loaded = false, _save = true;
+  bool _keyAuth = false,
+      _busy = false,
+      _loaded = false,
+      _save = true,
+      _testing = false,
+      _testOk = false;
   String? _keyId, _proxyId, _error;
   @override
   void initState() {
@@ -172,10 +180,8 @@ class _SshHostDialogState extends State<SshHostDialog> {
           );
           final suggestion =
               widget.localHost ??
-              (matches.isNotEmpty
+              (_host.text.isNotEmpty && matches.isNotEmpty
                   ? matches.first
-                  : local.hosts.length == 1 && _host.text.isEmpty
-                  ? local.hosts.single
                   : null);
           if (suggestion != null) _applyHost(suggestion);
         }
@@ -229,31 +235,92 @@ class _SshHostDialogState extends State<SshHostDialog> {
     super.dispose();
   }
 
+  /// Makes sure the selected key lives in the vault. A key picked from
+  /// ~/.ssh is imported silently; the import dialog only appears when that
+  /// fails (e.g. the key has a passphrase).
+  Future<bool> _resolveKey() async {
+    if (!_keyAuth) return true;
+    final local = _localKey;
+    if (local != null) {
+      try {
+        final file = File(local.path);
+        if (await file.length() <= 1024 * 1024) {
+          final saved = await _store.importKey(
+            SshStoredKey.import(local.name, await file.readAsString(), null),
+          );
+          if (!mounted) return false;
+          setState(() {
+            _keyId = saved.id;
+            _localKey = null;
+          });
+        }
+      } catch (_) {}
+      if (_localKey != null) {
+        await _addKey(localKey: _localKey);
+        if (!mounted) return false;
+      }
+    }
+    if (_keyId == null) {
+      setState(() => _error = context.tr.sshNoKeys);
+      return false;
+    }
+    return true;
+  }
+
+  SshProfile _profile() => SshProfile(
+    id: widget.profile?.id ?? const Uuid().v4(),
+    name: _name.text.trim().isEmpty ? _host.text.trim() : _name.text.trim(),
+    host: _host.text.trim(),
+    username: _user.text.trim(),
+    port: int.parse(_port.text),
+    password: _keyAuth ? '' : _password.text,
+    keyId: _keyAuth ? _keyId : null,
+    group: _group.text.trim(),
+    proxyId: _proxyId,
+  );
+
+  Future<void> _test() async {
+    if (!_form.currentState!.validate()) return;
+    setState(() {
+      _error = null;
+      _testOk = false;
+    });
+    if (!await _resolveKey() || !mounted) return;
+    setState(() {
+      _busy = true;
+      _testing = true;
+    });
+    final p = _profile();
+    SSHClient? client;
+    try {
+      client = await SshConnector(_store).connect(
+        p,
+        trustPrompt: (h, port, type, fp, old) =>
+            promptSshHostTrust(context, h, port, type, fp, old),
+      );
+      if (mounted) setState(() => _testOk = true);
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString());
+    } finally {
+      client?.close();
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _testing = false;
+        });
+      }
+    }
+  }
+
   Future<void> _submit() async {
     if (!_form.currentState!.validate()) return;
-    if (_keyAuth && _localKey != null) {
-      await _addKey(localKey: _localKey);
-      if (!mounted || _localKey != null) return;
-    }
-    if (_keyAuth && _keyId == null) {
-      setState(() => _error = context.tr.sshNoKeys);
-      return;
-    }
+    if (!await _resolveKey() || !mounted) return;
     setState(() {
       _busy = true;
       _error = null;
+      _testOk = false;
     });
-    final p = SshProfile(
-      id: widget.profile?.id ?? const Uuid().v4(),
-      name: _name.text.trim().isEmpty ? _host.text.trim() : _name.text.trim(),
-      host: _host.text.trim(),
-      username: _user.text.trim(),
-      port: int.parse(_port.text),
-      password: _keyAuth ? '' : _password.text,
-      keyId: _keyAuth ? _keyId : null,
-      group: _group.text.trim(),
-      proxyId: _proxyId,
-    );
+    final p = _profile();
     try {
       if (widget.connectSftp) {
         final result = await NetworkServiceRegistry().connect(
@@ -577,6 +644,14 @@ class _SshHostDialogState extends State<SshHostDialog> {
                   color: context.cbColors.textSecondary,
                 ),
               ),
+              if (_testOk)
+                Padding(
+                  padding: const EdgeInsets.only(top: CbSpacing.lg),
+                  child: Text(
+                    tr.sshTestSuccess,
+                    style: TextStyle(color: context.cbColors.status.success),
+                  ),
+                ),
               if (_error != null)
                 Padding(
                   padding: const EdgeInsets.only(top: CbSpacing.lg),
@@ -593,6 +668,12 @@ class _SshHostDialogState extends State<SshHostDialog> {
         CbButton(
           onPressed: _busy ? null : () => Navigator.pop(context),
           label: tr.cancel,
+        ),
+        CbButton(
+          icon: PhosphorIconsLight.plugsConnected,
+          onPressed: _busy || !_loaded || _scanning ? null : _test,
+          loading: _testing,
+          label: tr.sshTestConnection,
         ),
         CbButton(
           variant: CbButtonVariant.primary,

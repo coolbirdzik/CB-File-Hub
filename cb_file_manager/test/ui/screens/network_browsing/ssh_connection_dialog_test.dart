@@ -89,6 +89,7 @@ void main() {
                 child: SshHostDialog(
                   store: store,
                   discovery: FixtureSshDiscovery(Future.value(snapshot)),
+                  localHost: snapshot.hosts.single,
                 ),
               ),
               vietnamese: vi,
@@ -210,8 +211,16 @@ void main() {
             child: FilledButton(
               onPressed: () => showDialog(
                 context: context,
-                builder: (_) =>
-                    SshHostDialog(store: store, discovery: discovery),
+                builder: (_) => SshHostDialog(
+                  store: store,
+                  discovery: discovery,
+                  localHost: LocalSshHost(
+                    alias: 'dev',
+                    host: 'dev.example.test',
+                    username: 'developer',
+                    identityFiles: [file.path],
+                  ),
+                ),
               ),
               child: const Text('Open connection'),
             ),
@@ -223,6 +232,18 @@ void main() {
     await tester.tap(find.text('Open connection'));
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(CbButton, 'Save'));
+    // The silent import of the encrypted key reads the file, then falls back
+    // to the import dialog.
+    for (
+      var attempt = 0;
+      attempt < 50 && find.text(file.path).evaluate().isEmpty;
+      attempt++
+    ) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 20)),
+      );
+      await tester.pump(const Duration(milliseconds: 50));
+    }
     await tester.pumpAndSettle();
     expect(find.text(file.path), findsOneWidget);
     final passphrase = find.byWidgetPredicate(

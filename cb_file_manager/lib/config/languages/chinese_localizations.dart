@@ -142,6 +142,10 @@ class ChineseLocalizations implements AppLocalizations {
   @override
   String get sshProxies => '代理';
   @override
+  String get sshTestConnection => '测试连接';
+  @override
+  String get sshTestSuccess => '连接成功';
+  @override
   String get sshAddProxy => '添加代理';
   @override
   String get sshEditProxy => '编辑代理';
@@ -714,6 +718,14 @@ class ChineseLocalizations implements AppLocalizations {
   String get sshTransferTypeConflict => '文件与文件夹同名';
   @override
   String get sshTransferCaseConflict => '另一个项目的名称仅大小写不同';
+  @override
+  String get sshTransferExists => '目标文件夹中已有同名项目';
+  @override
+  String get sshPasteInvalidTarget => '请打开其他目标文件夹后再粘贴';
+  @override
+  String sshClipboardHint(int count) => '已选择 $count 个项目。打开目标文件夹后选择“粘贴”。';
+  @override
+  String sshRemoteDeleteConfirm(int count) => '永久删除服务器上的 $count 个项目？此操作无法撤销。';
   @override
   String get sshInvalidFolderName => '请输入有效的文件夹名称';
   @override

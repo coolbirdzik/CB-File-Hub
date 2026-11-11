@@ -152,6 +152,10 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get sshProxies => 'Proxies';
   @override
+  String get sshTestConnection => 'Test connection';
+  @override
+  String get sshTestSuccess => 'Connection successful';
+  @override
   String get sshAddProxy => 'Add proxy';
   @override
   String get sshEditProxy => 'Edit proxy';
@@ -781,6 +785,20 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get sshTransferCaseConflict =>
       'Another item has the same name in different letter case';
+  @override
+  String get sshTransferExists =>
+      'An item with this name already exists in the destination';
+  @override
+  String get sshPasteInvalidTarget =>
+      'Open a different destination folder, then paste';
+  @override
+  String sshClipboardHint(int count) => count == 1
+      ? '1 item ready. Open the destination folder, then choose Paste.'
+      : '$count items ready. Open the destination folder, then choose Paste.';
+  @override
+  String sshRemoteDeleteConfirm(int count) => count == 1
+      ? 'Permanently delete 1 item on the server? This cannot be undone.'
+      : 'Permanently delete $count items on the server? This cannot be undone.';
   @override
   String get sshInvalidFolderName => 'Enter a valid folder name';
   @override

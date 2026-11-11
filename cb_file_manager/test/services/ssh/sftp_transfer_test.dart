@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:cb_file_manager/services/ssh/sftp_transfer.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -23,6 +24,7 @@ void main() {
     TransferConflictPolicy? policy,
     void Function(TransferProgress)? onProgress,
     void Function(SftpTransferTask)? onTask,
+    int segmentSize = 8 * 1024 * 1024,
   }) {
     late SftpTransferTask task;
     task = SftpTransferTask(
@@ -32,6 +34,7 @@ void main() {
       destination: destination,
       resolveConflicts: (_) async => policy,
       progressInterval: Duration.zero,
+      segmentSize: segmentSize,
       onProgress: (progress) {
         onProgress?.call(progress);
         onTask?.call(task);
@@ -258,4 +261,164 @@ void main() {
       ('D:', r'D:\'),
     ]);
   });
+
+  test(
+    'delete removes folders with their contents but not link targets',
+    () async {
+      final fs = MemoryTransferFileSystem()
+        ..addFile('/site/index.html', 'hi')
+        ..addFile('/site/css/app.css', 'body')
+        ..addFile('/shared/keep.txt', 'keep')
+        ..mkdirs('/site/current')
+        ..links.add('/site/current');
+      final failures = await deleteTransferEntries(
+        fs,
+        (await fs.list('/')).where((e) => e.name == 'site').toList(),
+      );
+      expect(failures, isEmpty);
+      expect(fs.dirs, {'/', '/shared'});
+      expect(fs.files.keys, ['/shared/keep.txt']);
+    },
+  );
+
+  test('move renames into the folder and never replaces', () async {
+    final fs = MemoryTransferFileSystem()
+      ..addFile('/a/one.txt', '1')
+      ..addFile('/a/two.txt', '2')
+      ..addFile('/a/docs/readme.md', 'r')
+      ..addFile('/b/two.txt', 'old');
+    final failures = await moveTransferEntries(fs, await fs.list('/a'), '/b');
+    expect(failures.single.path, '/a/two.txt');
+    expect(failures.single.kind, TransferFailureKind.exists);
+    expect(fs.text('/b/one.txt'), '1');
+    expect(fs.text('/b/docs/readme.md'), 'r');
+    expect(fs.text('/b/two.txt'), 'old');
+    expect(fs.text('/a/two.txt'), '2');
+    expect(fs.text('/a/one.txt'), isNull);
+  });
+
+  group('several streams', () {
+    final content = String.fromCharCodes([
+      for (var i = 0; i < 203; i++) 33 + i % 90,
+    ]);
+
+    test('share one large file as segments and report speed', () async {
+      final source = MemoryTransferFileSystem(streams: 4)
+        ..addFile('/src/big.bin', content);
+      final target = MemoryTransferFileSystem();
+      final seen = <TransferProgress>[];
+      final report = await copy(
+        source,
+        await source.list('/src'),
+        target,
+        '/',
+        segmentSize: 16,
+        onProgress: seen.add,
+      );
+      expect(report.transferred, 1);
+      expect(report.failures, isEmpty);
+      expect(target.text('/big.bin'), content);
+      expect(source.peakReads, 4);
+      expect(seen.last.bytesDone, content.length);
+      expect(seen.last.filesDone, 1);
+      expect(
+        seen.map((p) => p.bytesPerSecond),
+        everyElement(greaterThanOrEqualTo(0)),
+      );
+      expect(seen.any((p) => p.bytesPerSecond > 0), isTrue);
+      for (var i = 1; i < seen.length; i++) {
+        expect(seen[i].bytesDone, greaterThanOrEqualTo(seen[i - 1].bytesDone));
+      }
+    });
+
+    test('write a real file out of order', () async {
+      final source = MemoryTransferFileSystem(streams: 3)
+        ..addFile('/src/big.bin', content);
+      final report = await copy(
+        source,
+        await source.list('/src'),
+        LocalTransferFileSystem(),
+        temp.path,
+        segmentSize: 20,
+      );
+      expect(report.transferred, 1);
+      expect(await File(p.join(temp.path, 'big.bin')).readAsString(), content);
+    });
+
+    test('move small files side by side', () async {
+      final source = MemoryTransferFileSystem(streams: 3);
+      for (var i = 0; i < 7; i++) {
+        source.addFile('/src/dir/f$i.txt', 'file $i ${'.' * i}');
+      }
+      final target = MemoryTransferFileSystem();
+      final report = await copy(source, await source.list('/src'), target, '/');
+      expect(report.transferred, 7);
+      expect(source.peakReads, 3);
+      for (var i = 0; i < 7; i++) {
+        expect(target.text('/dir/f$i.txt'), 'file $i ${'.' * i}');
+      }
+    });
+
+    test('one stream keeps files whole and in order', () async {
+      final source = MemoryTransferFileSystem()
+        ..addFile('/src/big.bin', content);
+      final target = MemoryTransferFileSystem();
+      await copy(
+        source,
+        await source.list('/src'),
+        target,
+        '/',
+        segmentSize: 16,
+      );
+      expect(target.text('/big.bin'), content);
+      expect(source.peakReads, 1);
+    });
+
+    test('cancel removes a half written segmented file', () async {
+      final source = MemoryTransferFileSystem(streams: 4)
+        ..addFile('/src/big.bin', content)
+        ..addFile('/src/small.txt', 'tiny');
+      final target = MemoryTransferFileSystem();
+      var calls = 0;
+      final report = await copy(
+        source,
+        await source.list('/src'),
+        target,
+        '/',
+        segmentSize: 16,
+        onTask: (task) {
+          if (++calls == 12) task.cancel();
+        },
+      );
+      expect(report.cancelled, isTrue);
+      expect(target.files.keys, isNot(contains('/big.bin')));
+      expect(source.activeReads, 0);
+    });
+
+    test('a failing segment fails the file and removes it', () async {
+      final source = _ShortReads(streams: 4)..addFile('/src/big.bin', content);
+      final target = MemoryTransferFileSystem();
+      final report = await copy(
+        source,
+        await source.list('/src'),
+        target,
+        '/',
+        segmentSize: 16,
+      );
+      expect(report.transferred, 0);
+      expect(report.failures.single.path, '/src/big.bin');
+      expect(target.files, isEmpty);
+    });
+  });
+}
+
+/// Fails every read that starts past the first 64 bytes.
+class _ShortReads extends MemoryTransferFileSystem {
+  _ShortReads({super.streams});
+
+  @override
+  Stream<Uint8List> read(String path, {int offset = 0, int? length}) =>
+      offset >= 64
+      ? Stream.error(StateError('Connection lost'))
+      : super.read(path, offset: offset, length: length);
 }

@@ -3,7 +3,9 @@ import 'dart:async';
 import 'package:cb_file_manager/services/ssh/ssh_profile_store.dart';
 import 'package:cb_file_manager/ui/screens/ssh/sftp_transfer_screen.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -49,7 +51,8 @@ void main() {
       ..addFile('/home/me/notes.txt', 'remember')
       ..mkdirs('/home/me/photos');
     final remote = MemoryTransferFileSystem(homePath: '/home/developer')
-      ..addFile('/home/developer/server.log', 'started');
+      ..addFile('/home/developer/server.log', 'started')
+      ..mkdirs('/home/developer/backup');
     final opened = <String>[];
     final tabs = TabManagerBloc();
     addTearDown(tabs.close);
@@ -65,6 +68,7 @@ void main() {
             profileId: profileId,
             store: store,
             localFileSystem: local,
+            directoryPicker: () async => '/home/me/photos',
             openSession: (profile, _) async {
               opened.add(profile.id);
               return SftpTransferSession(
@@ -137,18 +141,19 @@ void main() {
     await tester.tap(find.text('photos'));
     await tester.pumpAndSettle();
     expect(find.text('notes.txt'), findsNothing);
+    final localPath = find.byKey(const ValueKey('sftp-transfer-path-local'));
     expect(
-      tester
-          .widget<EditableText>(
-            find.descendant(
-              of: find.byKey(const ValueKey('sftp-transfer-path-local')),
-              matching: find.byType(EditableText),
-            ),
-          )
-          .controller
-          .text,
-      '/home/me/photos',
+      find.descendant(of: localPath, matching: find.text('photos')),
+      findsOneWidget,
     );
+    // A crumb goes back up the chain.
+    await tester.tap(find.descendant(of: localPath, matching: find.text('me')));
+    await tester.pumpAndSettle();
+    expect(find.text('notes.txt'), findsOneWidget);
+    await tester.tap(find.text('photos'));
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.tap(find.text('photos'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('server.log'));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('sftp-transfer-send-remote')));
@@ -156,6 +161,124 @@ void main() {
     expect(fixture.local.text('/home/me/photos/server.log'), 'started');
     await tester.pump(const Duration(seconds: 3));
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the local address bar browses for the save folder', (
+    tester,
+  ) async {
+    final fixture = await pumpScreen(tester, width: 1200);
+    await tester.tap(find.byKey(const ValueKey('sftp-transfer-browse-local')));
+    await tester.pumpAndSettle();
+    expect(find.text('notes.txt'), findsNothing);
+    await tester.tap(find.text('server.log'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('sftp-transfer-send-remote')));
+    await tester.pumpAndSettle();
+    expect(fixture.local.text('/home/me/photos/server.log'), 'started');
+    await tester.pump(const Duration(seconds: 3));
+    expect(tester.takeException(), isNull);
+  });
+
+  Future<void> chord(WidgetTester tester, LogicalKeyboardKey key) async {
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.control);
+    await tester.sendKeyEvent(key);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.control);
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> openBackup(WidgetTester tester) async {
+    await tester.tap(find.text('backup'));
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.tap(find.text('backup'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Empty folder'));
+    await tester.pumpAndSettle();
+  }
+
+  for (final cut in [false, true]) {
+    testWidgets('remote files are ${cut ? 'moved' : 'copied'} by paste', (
+      tester,
+    ) async {
+      final fixture = await pumpScreen(tester, width: 1200);
+      await tester.tap(find.text('server.log'));
+      await tester.pumpAndSettle();
+      await chord(
+        tester,
+        cut ? LogicalKeyboardKey.keyX : LogicalKeyboardKey.keyC,
+      );
+      // Pasting next to the original is refused.
+      await chord(tester, LogicalKeyboardKey.keyV);
+      expect(fixture.remote.files.keys, ['/home/developer/server.log']);
+      await openBackup(tester);
+      await chord(tester, LogicalKeyboardKey.keyV);
+      expect(
+        fixture.remote.text('/home/developer/backup/server.log'),
+        'started',
+      );
+      expect(
+        fixture.remote.text('/home/developer/server.log'),
+        cut ? isNull : 'started',
+      );
+      expect(find.text('server.log'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 6));
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('remote items are renamed from the menu and deleted by key', (
+    tester,
+  ) async {
+    final fixture = await pumpScreen(tester, width: 1200);
+    fixture.remote.addFile('/home/developer/backup/old.txt', 'old');
+    await tester.tap(find.text('server.log'), buttons: kSecondaryMouseButton);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Rename'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('sftp-transfer-name')),
+      'app.log',
+    );
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+    expect(fixture.remote.text('/home/developer/app.log'), 'started');
+    expect(fixture.remote.text('/home/developer/server.log'), isNull);
+    expect(find.text('app.log'), findsOneWidget);
+
+    await tester.tap(find.text('backup'));
+    await tester.pumpAndSettle();
+    await tester.sendKeyEvent(LogicalKeyboardKey.delete);
+    await tester.pumpAndSettle();
+    expect(fixture.remote.dirs, contains('/home/developer/backup'));
+    await tester.tap(
+      find.byKey(const ValueKey('sftp-transfer-confirm-delete')),
+    );
+    await tester.pumpAndSettle();
+    expect(fixture.remote.dirs, isNot(contains('/home/developer/backup')));
+    expect(fixture.remote.files.keys, ['/home/developer/app.log']);
+    expect(find.text('backup'), findsNothing);
+    await tester.pump(const Duration(seconds: 6));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the local pane offers no file operations', (tester) async {
+    final fixture = await pumpScreen(tester, width: 1200);
+    await tester.tap(find.text('notes.txt'));
+    await tester.pumpAndSettle();
+    await tester.sendKeyEvent(LogicalKeyboardKey.delete);
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('sftp-transfer-confirm-delete')),
+      findsNothing,
+    );
+    expect(fixture.local.text('/home/me/notes.txt'), 'remember');
+    expect(
+      find.byKey(const ValueKey('sftp-transfer-more-local')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('sftp-transfer-more-remote')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('without a host the remote pane asks for one', (tester) async {

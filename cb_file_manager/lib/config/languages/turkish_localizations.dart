@@ -149,6 +149,10 @@ class TurkishLocalizations implements AppLocalizations {
   @override
   String get sshProxies => 'Vekil sunucular';
   @override
+  String get sshTestConnection => 'Bağlantıyı test et';
+  @override
+  String get sshTestSuccess => 'Bağlantı başarılı';
+  @override
   String get sshAddProxy => 'Vekil sunucu ekle';
   @override
   String get sshEditProxy => 'Vekil sunucuyu düzenle';
@@ -786,6 +790,16 @@ class TurkishLocalizations implements AppLocalizations {
   @override
   String get sshTransferCaseConflict =>
       'Başka bir öğe yalnızca harf büyüklüğüyle farklı aynı adı taşıyor';
+  @override
+  String get sshTransferExists => 'Hedefte aynı ada sahip bir öğe zaten var';
+  @override
+  String get sshPasteInvalidTarget => 'Başka bir hedef klasör açıp yapıştırın';
+  @override
+  String sshClipboardHint(int count) =>
+      '$count öğe hazır. Hedef klasörü açıp Yapıştır\'ı seçin.';
+  @override
+  String sshRemoteDeleteConfirm(int count) =>
+      'Sunucudaki $count öğe kalıcı olarak silinsin mi? Bu işlem geri alınamaz.';
   @override
   String get sshInvalidFolderName => 'Geçerli bir klasör adı girin';
   @override

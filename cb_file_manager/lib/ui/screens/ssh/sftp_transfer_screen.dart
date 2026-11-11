@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:dartssh2/dartssh2.dart' show SSHClient, SftpClient;
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -13,8 +15,10 @@ import '../../../helpers/core/text_utils.dart';
 import '../../../services/ssh/sftp_transfer.dart';
 import '../../../services/ssh/ssh_profile_store.dart';
 import '../../components/common/app_toast.dart';
+import '../../components/common/breadcrumb_address_bar.dart';
 import '../../components/common/optimized_interaction_handler.dart';
 import '../../components/common/screen_scaffold.dart';
+import '../../components/common/shared_file_context_menu.dart';
 import '../../tab_manager/core/tab_manager.dart';
 import '../../utils/format_utils.dart';
 import '../../utils/item_interaction_style.dart';
@@ -58,6 +62,9 @@ class SftpTransferScreen extends StatefulWidget {
   final SshProfileStore? store;
   final TransferFileSystem? localFileSystem;
   final SftpSessionOpener? openSession;
+
+  /// Overrides the native folder dialog, for tests.
+  final Future<String?> Function()? directoryPicker;
   const SftpTransferScreen({
     super.key,
     required this.tabId,
@@ -65,6 +72,7 @@ class SftpTransferScreen extends StatefulWidget {
     this.store,
     this.localFileSystem,
     this.openSession,
+    this.directoryPicker,
   });
 
   @override
@@ -84,6 +92,12 @@ class _SftpTransferScreenState extends State<SftpTransferScreen> {
   String? _connectError;
   int _generation = 0;
   SftpTransferTask? _task;
+
+  /// Remote entries waiting for Paste, and whether Paste moves them.
+  ({List<TransferEntry> entries, bool cut})? _clip;
+
+  /// A remote move, rename or delete is running.
+  bool _working = false;
 
   @override
   void initState() {
@@ -122,23 +136,46 @@ class _SftpTransferScreenState extends State<SftpTransferScreen> {
     SshProfile profile,
     SshTrustPrompt trustPrompt,
   ) async {
-    final client = await SshConnector(
-      _store,
-    ).connect(profile, trustPrompt: trustPrompt);
+    final connector = SshConnector(_store);
+    // The subsystem closes first; a client closed under it aborts the
+    // socket mid-write. A dead transport must not hold the client open.
+    void shut(SftpClient sftp, SSHClient client) => unawaited(
+      Future.sync(sftp.close)
+          .timeout(const Duration(seconds: 2))
+          .catchError((_) {})
+          .whenComplete(client.close),
+    );
+    final client = await connector.connect(profile, trustPrompt: trustPrompt);
     try {
       final sftp = await client.sftp();
+      final fileSystem = SftpTransferFileSystem(
+        sftp,
+        // More connections to the same host, opened while a transfer runs.
+        openLane: () async {
+          final extra = await connector.connect(
+            profile,
+            trustPrompt: trustPrompt,
+          );
+          try {
+            final lane = await extra.sftp();
+            return SftpLane(
+              client: lane,
+              done: extra.done,
+              close: () => shut(lane, extra),
+            );
+          } catch (_) {
+            extra.close();
+            rethrow;
+          }
+        },
+      );
       return SftpTransferSession(
-        fileSystem: SftpTransferFileSystem(sftp),
+        fileSystem: fileSystem,
         done: client.done,
-        // The subsystem closes first; a client closed under it aborts the
-        // socket mid-write. A dead transport must not hold the client open.
-        close: () => unawaited(
-          sftp
-              .close()
-              .timeout(const Duration(seconds: 2))
-              .catchError((_) {})
-              .whenComplete(client.close),
-        ),
+        close: () {
+          fileSystem.closeLanes();
+          shut(sftp, client);
+        },
       );
     } catch (_) {
       client.close();
@@ -151,6 +188,7 @@ class _SftpTransferScreenState extends State<SftpTransferScreen> {
     _task?.cancel();
     _session?.close();
     _session = null;
+    _clip = null;
     _remote.detach();
   }
 
@@ -215,16 +253,30 @@ class _SftpTransferScreenState extends State<SftpTransferScreen> {
 
   // ─── Transfers ───────────────────────────────────────────────────────────
 
-  Future<void> _transfer({
-    required bool upload,
-    List<TransferEntry>? entries,
+  Future<void> _transfer({required bool upload, List<TransferEntry>? entries}) {
+    final source = upload ? _local : _remote;
+    return _copyInto(
+      from: source.fileSystem,
+      target: upload ? _remote : _local,
+      items: entries ?? source.selectedEntries,
+    );
+  }
+
+  /// Copies [items] of [from] into the folder [target] shows.
+  Future<void> _copyInto({
+    required TransferFileSystem? from,
+    required _PaneController target,
+    required List<TransferEntry> items,
   }) async {
     final tr = context.tr;
-    final source = upload ? _local : _remote;
-    final target = upload ? _remote : _local;
-    final from = source.fileSystem, to = target.fileSystem;
-    final items = entries ?? source.selectedEntries;
-    if (_task != null || from == null || to == null || items.isEmpty) return;
+    final to = target.fileSystem;
+    if (_task != null ||
+        _working ||
+        from == null ||
+        to == null ||
+        items.isEmpty) {
+      return;
+    }
     // The Windows drive list is not a folder.
     if (target.path.isEmpty) {
       AppToast.warning(context, tr.sshTransferPickFolder);
@@ -246,6 +298,8 @@ class _SftpTransferScreenState extends State<SftpTransferScreen> {
     } catch (e) {
       error = e;
     }
+    from.releaseStreams();
+    to.releaseStreams();
     if (!mounted) return;
     setState(() => _task = null);
     _progress.value = null;
@@ -255,7 +309,7 @@ class _SftpTransferScreenState extends State<SftpTransferScreen> {
     } else if (report!.cancelled) {
       AppToast.info(context, tr.sshTransferCancelled);
     } else if (report.failures.isNotEmpty) {
-      await _showFailures(report.failures, source.fileSystem!);
+      await _showFailures(report.failures, from);
     } else {
       AppToast.success(context, tr.sshTransferComplete(report.transferred));
     }
@@ -305,6 +359,7 @@ class _SftpTransferScreenState extends State<SftpTransferScreen> {
       TransferFailureKind.link => tr.sshTransferLinkSkipped,
       TransferFailureKind.typeConflict => tr.sshTransferTypeConflict,
       TransferFailureKind.caseConflict => tr.sshTransferCaseConflict,
+      TransferFailureKind.exists => tr.sshTransferExists,
       TransferFailureKind.error => '${f.error}',
     };
     return RouteUtils.showAcrylicDialog<void>(
@@ -354,42 +409,60 @@ class _SftpTransferScreenState extends State<SftpTransferScreen> {
     );
   }
 
+  /// Opens a folder picked in the native dialog in the local pane.
+  Future<void> _browseLocal() async {
+    final current = _local.path;
+    String? picked;
+    try {
+      picked =
+          await (widget.directoryPicker?.call() ??
+              FilePicker.getDirectoryPath(
+                dialogTitle: context.tr.selectFolder,
+                initialDirectory: current.isEmpty ? null : current,
+              ));
+    } catch (e) {
+      if (mounted) AppToast.error(context, e.toString());
+      return;
+    }
+    if (!mounted || picked == null || picked.isEmpty) return;
+    await _local.navigate(picked);
+  }
+
+  Future<String?> _askName({
+    required String title,
+    required IconData icon,
+    required String action,
+    required String placeholder,
+    String initial = '',
+  }) => RouteUtils.showAcrylicDialog<String>(
+    context: context,
+    builder: (context) => _NameDialog(
+      title: title,
+      icon: icon,
+      action: action,
+      placeholder: placeholder,
+      initial: initial,
+    ),
+  );
+
+  bool _validName(TransferFileSystem fs, String name) =>
+      name != '.' &&
+      name != '..' &&
+      !name.contains('/') &&
+      !name.contains(fs.paths.separator);
+
   Future<void> _newFolder(_PaneController pane) async {
     final fs = pane.fileSystem;
     if (fs == null || pane.path.isEmpty) return;
     final tr = context.tr;
-    final controller = TextEditingController();
-    final name = await RouteUtils.showAcrylicDialog<String>(
-      context: context,
-      builder: (context) {
-        void submit() => Navigator.pop(context, controller.text.trim());
-        return CbDialog(
-          title: tr.newFolder,
-          icon: PhosphorIconsLight.folderPlus,
-          width: 420,
-          content: CbTextField(
-            controller: controller,
-            placeholder: tr.folderName,
-            autofocus: true,
-            onSubmitted: (_) => submit(),
-          ),
-          actions: [
-            CbButton(label: tr.cancel, onPressed: () => Navigator.pop(context)),
-            CbButton(
-              label: tr.create,
-              variant: CbButtonVariant.primary,
-              onPressed: submit,
-            ),
-          ],
-        );
-      },
+    final name = await _askName(
+      title: tr.newFolder,
+      icon: PhosphorIconsLight.folderPlus,
+      action: tr.create,
+      placeholder: tr.folderName,
     );
-    controller.dispose();
     if (!mounted || name == null || name.isEmpty) return;
-    if (name == '.' ||
-        name == '..' ||
-        name.contains('/') ||
-        name.contains(fs.paths.separator)) {
+    if (!_validName(fs, name)) {
       AppToast.error(context, tr.sshInvalidFolderName);
       return;
     }
@@ -400,6 +473,127 @@ class _SftpTransferScreenState extends State<SftpTransferScreen> {
     } catch (e) {
       if (mounted) AppToast.error(context, e.toString());
     }
+  }
+
+  // ─── Remote file operations ──────────────────────────────────────────────
+
+  void _hold(List<TransferEntry> entries, {required bool cut}) {
+    if (entries.isEmpty) return;
+    setState(() => _clip = (entries: entries, cut: cut));
+    AppToast.info(context, context.tr.sshClipboardHint(entries.length));
+  }
+
+  /// Runs a remote change with the panes locked, then lists the folder again.
+  Future<void> _remoteWork(
+    Future<List<TransferFailure>> Function(TransferFileSystem fs) work,
+  ) async {
+    final fs = _remote.fileSystem;
+    if (fs == null || _task != null || _working) return;
+    setState(() => _working = true);
+    var failures = const <TransferFailure>[];
+    Object? error;
+    try {
+      failures = await work(fs);
+    } catch (e) {
+      error = e;
+    }
+    if (!mounted) return;
+    setState(() => _working = false);
+    if (fs != _remote.fileSystem) return;
+    unawaited(_remote.refresh());
+    if (error != null) {
+      AppToast.error(context, error.toString());
+    } else if (failures.isNotEmpty) {
+      await _showFailures(failures, fs);
+    }
+  }
+
+  Future<void> _paste() async {
+    final clip = _clip;
+    final fs = _remote.fileSystem;
+    final destination = _remote.path;
+    if (clip == null || fs == null) return;
+    // Pasting where the items already are would overwrite them with
+    // themselves; a folder cannot go inside itself either.
+    final invalid = clip.entries.any(
+      (e) =>
+          fs.paths.equals(fs.paths.dirname(e.path), destination) ||
+          (e.isDirectory &&
+              (fs.paths.equals(e.path, destination) ||
+                  fs.paths.isWithin(e.path, destination))),
+    );
+    if (invalid) {
+      AppToast.warning(context, context.tr.sshPasteInvalidTarget);
+      return;
+    }
+    if (!clip.cut) {
+      return _copyInto(from: fs, target: _remote, items: clip.entries);
+    }
+    setState(() => _clip = null);
+    await _remoteWork(
+      (fs) => moveTransferEntries(fs, clip.entries, destination),
+    );
+  }
+
+  Future<void> _renameEntry(TransferEntry entry) async {
+    final fs = _remote.fileSystem;
+    if (fs == null || _task != null || _working) return;
+    final tr = context.tr;
+    final name = await _askName(
+      title: tr.rename,
+      icon: PhosphorIconsLight.pencilSimple,
+      action: tr.rename,
+      placeholder: tr.newNameLabel,
+      initial: entry.name,
+    );
+    if (!mounted || name == null || name.isEmpty || name == entry.name) return;
+    if (!_validName(fs, name)) {
+      AppToast.error(context, tr.sshTransferInvalidName);
+      return;
+    }
+    final target = fs.paths.join(fs.paths.dirname(entry.path), name);
+    setState(() => _clip = null);
+    await _remoteWork((fs) async {
+      if (await fs.kind(target) != null) {
+        return [TransferFailure(entry.path, TransferFailureKind.exists)];
+      }
+      await fs.rename(entry.path, target);
+      return const [];
+    });
+  }
+
+  Future<void> _delete(List<TransferEntry> entries) async {
+    if (entries.isEmpty || _task != null || _working) return;
+    final tr = context.tr;
+    const shown = 6;
+    final listed = entries.take(shown).map((e) => e.name).join('\n');
+    final confirmed = await RouteUtils.showAcrylicDialog<bool>(
+      context: context,
+      builder: (context) => CbDialog(
+        title: tr.sshRemoteDeleteConfirm(entries.length),
+        subtitle: entries.length > shown
+            ? '$listed\n+${entries.length - shown}'
+            : listed,
+        icon: PhosphorIconsLight.trash,
+        width: 460,
+        actions: [
+          CbButton(
+            label: tr.cancel,
+            autofocus: true,
+            onPressed: () => Navigator.pop(context),
+          ),
+          CbButton(
+            key: const ValueKey('sftp-transfer-confirm-delete'),
+            label: tr.delete,
+            variant: CbButtonVariant.danger,
+            onPressed: () => Navigator.pop(context, true),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _clip = null);
+    await _remoteWork((fs) => deleteTransferEntries(fs, entries));
   }
 
   // ─── Layout ──────────────────────────────────────────────────────────────
@@ -481,14 +675,18 @@ class _SftpTransferScreenState extends State<SftpTransferScreen> {
                 },
               ),
             ),
-            if (_task != null) _progressBar(context),
+            if (_task != null)
+              _progressBar(context)
+            else if (_working)
+              const LinearProgressIndicator(minHeight: 3),
           ],
         ),
       ),
     );
   }
 
-  bool get _canTransfer => _task == null && _remote.fileSystem != null;
+  bool get _canTransfer =>
+      _task == null && !_working && _remote.fileSystem != null;
 
   Widget _localPane(BuildContext context) {
     final tr = context.tr;
@@ -503,6 +701,7 @@ class _SftpTransferScreenState extends State<SftpTransferScreen> {
       onTransfer: (entries) => _transfer(upload: true, entries: entries),
       onDrop: (entries) => _transfer(upload: false, entries: entries),
       onNewFolder: () => _newFolder(_local),
+      onBrowse: _browseLocal,
     );
   }
 
@@ -577,6 +776,13 @@ class _SftpTransferScreenState extends State<SftpTransferScreen> {
       onTransfer: (entries) => _transfer(upload: false, entries: entries),
       onDrop: (entries) => _transfer(upload: true, entries: entries),
       onNewFolder: () => _newFolder(_remote),
+      actions: _PaneActions(
+        onCopy: (entries) => _hold(entries, cut: false),
+        onCut: (entries) => _hold(entries, cut: true),
+        onPaste: _clip == null ? null : _paste,
+        onRename: _renameEntry,
+        onDelete: _delete,
+      ),
     );
   }
 
@@ -669,6 +875,9 @@ class _SftpTransferScreenState extends State<SftpTransferScreen> {
                 ? ''
                 : ' · ${FormatUtils.formatFileSize(progress.bytesDone)}'
                       ' / ${FormatUtils.formatFileSize(progress.bytesTotal)}';
+            final speed = progress == null || progress.bytesPerSecond < 1
+                ? ''
+                : ' · ${FormatUtils.formatFileSize(progress.bytesPerSecond.round())}/s';
             return Row(
               children: [
                 Expanded(
@@ -680,7 +889,7 @@ class _SftpTransferScreenState extends State<SftpTransferScreen> {
                         progress == null
                             ? tr.sshConnecting
                             : '${tr.sshTransferProgress(progress.filesDone, progress.filesTotal)}'
-                                  '$sizes · ${progress.current}',
+                                  '$sizes$speed · ${progress.current}',
                         style: CbTypography.bodySm.copyWith(
                           color: c.textSecondary,
                         ),
@@ -710,6 +919,66 @@ class _SftpTransferScreenState extends State<SftpTransferScreen> {
       ),
     );
   }
+}
+
+/// Asks for a file or folder name and pops it trimmed.
+class _NameDialog extends StatefulWidget {
+  const _NameDialog({
+    required this.title,
+    required this.icon,
+    required this.action,
+    required this.placeholder,
+    required this.initial,
+  });
+  final String title, action, placeholder, initial;
+  final IconData icon;
+
+  @override
+  State<_NameDialog> createState() => _NameDialogState();
+}
+
+class _NameDialogState extends State<_NameDialog> {
+  // The extension stays out of the selection, so typing replaces the name.
+  late final _controller = TextEditingController(text: widget.initial)
+    ..selection = TextSelection(
+      baseOffset: 0,
+      extentOffset: widget.initial.lastIndexOf('.') > 0
+          ? widget.initial.lastIndexOf('.')
+          : widget.initial.length,
+    );
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() => Navigator.pop(context, _controller.text.trim());
+
+  @override
+  Widget build(BuildContext context) => CbDialog(
+    title: widget.title,
+    icon: widget.icon,
+    width: 420,
+    content: CbTextField(
+      key: const ValueKey('sftp-transfer-name'),
+      controller: _controller,
+      placeholder: widget.placeholder,
+      autofocus: true,
+      onSubmitted: (_) => _submit(),
+    ),
+    actions: [
+      CbButton(
+        label: context.tr.cancel,
+        onPressed: () => Navigator.pop(context),
+      ),
+      CbButton(
+        label: widget.action,
+        variant: CbButtonVariant.primary,
+        onPressed: _submit,
+      ),
+    ],
+  );
 }
 
 enum _PaneSide { local, remote }
@@ -885,6 +1154,22 @@ class _PaneTitle extends StatelessWidget {
   }
 }
 
+/// File operations inside one pane's own file system.
+class _PaneActions {
+  const _PaneActions({
+    required this.onCopy,
+    required this.onCut,
+    required this.onPaste,
+    required this.onRename,
+    required this.onDelete,
+  });
+  final void Function(List<TransferEntry> entries) onCopy, onCut, onDelete;
+  final void Function(TransferEntry entry) onRename;
+
+  /// Null while nothing waits to be pasted.
+  final VoidCallback? onPaste;
+}
+
 class _TransferPane extends StatefulWidget {
   const _TransferPane({
     super.key,
@@ -897,6 +1182,8 @@ class _TransferPane extends StatefulWidget {
     required this.onTransfer,
     required this.onDrop,
     required this.onNewFolder,
+    this.onBrowse,
+    this.actions,
     this.placeholder,
   });
 
@@ -916,6 +1203,12 @@ class _TransferPane extends StatefulWidget {
   /// Receives entries dragged from the other pane.
   final void Function(List<TransferEntry> entries) onDrop;
   final VoidCallback onNewFolder;
+
+  /// Picks this pane's folder in a native dialog; null where there is none.
+  final VoidCallback? onBrowse;
+
+  /// Copy, move, rename and delete inside this pane; null where unsupported.
+  final _PaneActions? actions;
 
   @override
   State<_TransferPane> createState() => _TransferPaneState();
@@ -985,6 +1278,85 @@ class _TransferPaneState extends State<_TransferPane> {
     }
   }
 
+  /// Whether [_TransferPane.actions] may run now.
+  bool get _canAct =>
+      widget.actions != null &&
+      widget.canTransfer &&
+      widget.placeholder == null &&
+      _pane.fileSystem != null;
+
+  /// The file menu for the current selection, opened at [position].
+  void _showMenu(Offset position) {
+    final actions = widget.actions;
+    if (actions == null || !_canAct) return;
+    final tr = context.tr;
+    final selected = _pane.selectedEntries;
+    unawaited(
+      showContextMenuPopup(
+        context: context,
+        globalPosition: position,
+        sections: [
+          ContextMenuSection(
+            actions: [
+              if (selected.isNotEmpty) ...[
+                ContextMenuAction(
+                  id: 'cut',
+                  label: tr.cut,
+                  icon: PhosphorIconsLight.scissors,
+                  onSelected: (_) => actions.onCut(selected),
+                ),
+                ContextMenuAction(
+                  id: 'copy',
+                  label: tr.copy,
+                  icon: PhosphorIconsLight.copy,
+                  onSelected: (_) => actions.onCopy(selected),
+                ),
+              ],
+              if (actions.onPaste != null)
+                ContextMenuAction(
+                  id: 'paste',
+                  label: tr.pasteHere,
+                  icon: PhosphorIconsLight.clipboardText,
+                  onSelected: (_) => actions.onPaste!(),
+                ),
+              if (selected.isNotEmpty)
+                ContextMenuAction(
+                  id: 'delete',
+                  label: tr.delete,
+                  icon: PhosphorIconsLight.trash,
+                  isDestructive: true,
+                  onSelected: (_) => actions.onDelete(selected),
+                ),
+              if (selected.length == 1)
+                ContextMenuAction(
+                  id: 'rename',
+                  label: tr.rename,
+                  icon: PhosphorIconsLight.pencilSimple,
+                  onSelected: (_) => actions.onRename(selected.single),
+                ),
+            ],
+          ),
+          ContextMenuSection(
+            actions: [
+              ContextMenuAction(
+                id: 'new_folder',
+                label: tr.newFolder,
+                icon: PhosphorIconsLight.folderPlus,
+                onSelected: (_) => widget.onNewFolder(),
+              ),
+              ContextMenuAction(
+                id: 'refresh',
+                label: tr.refresh,
+                icon: PhosphorIconsLight.arrowClockwise,
+                onSelected: (_) => unawaited(_pane.refresh()),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   KeyEventResult _onKey(FocusNode _, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
       return KeyEventResult.ignored;
@@ -1006,6 +1378,30 @@ class _TransferPaneState extends State<_TransferPane> {
         widget.onTransfer(selected);
       }
       return KeyEventResult.handled;
+    }
+    final actions = _canAct ? widget.actions : null;
+    if (actions != null) {
+      final selected = _pane.selectedEntries;
+      if (key == LogicalKeyboardKey.f2 && selected.length == 1) {
+        actions.onRename(selected.single);
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.delete && selected.isNotEmpty) {
+        actions.onDelete(selected);
+        return KeyEventResult.handled;
+      }
+      if (ctrl && key == LogicalKeyboardKey.keyC && selected.isNotEmpty) {
+        actions.onCopy(selected);
+        return KeyEventResult.handled;
+      }
+      if (ctrl && key == LogicalKeyboardKey.keyX && selected.isNotEmpty) {
+        actions.onCut(selected);
+        return KeyEventResult.handled;
+      }
+      if (ctrl && key == LogicalKeyboardKey.keyV && actions.onPaste != null) {
+        actions.onPaste!();
+        return KeyEventResult.handled;
+      }
     }
     if (ctrl && key == LogicalKeyboardKey.keyA) {
       _pane.selectAll();
@@ -1092,6 +1488,9 @@ class _TransferPaneState extends State<_TransferPane> {
                           ? () => _pane.up()
                           : null,
                     ),
+                    const SizedBox(width: CbSpacing.xs),
+                    Expanded(child: _addressBar(context, active)),
+                    const SizedBox(width: CbSpacing.xs),
                     CbButton.icon(
                       icon: PhosphorIconsLight.arrowClockwise,
                       tooltip: tr.refresh,
@@ -1106,22 +1505,28 @@ class _TransferPaneState extends State<_TransferPane> {
                           ? widget.onNewFolder
                           : null,
                     ),
-                    const SizedBox(width: CbSpacing.xs),
-                    Expanded(
-                      child: CbTextField(
-                        key: ValueKey('sftp-transfer-path-${widget.side.name}'),
-                        controller: _path,
-                        enabled: active,
-                        mono: true,
-                        textInputAction: TextInputAction.go,
-                        onSubmitted: (value) {
-                          final target = value.trim();
-                          unawaited(
-                            _pane.navigate(target == tr.thisPC ? '' : target),
-                          );
-                        },
+                    if (widget.actions != null)
+                      Builder(
+                        builder: (context) => CbButton.icon(
+                          key: ValueKey(
+                            'sftp-transfer-more-${widget.side.name}',
+                          ),
+                          icon: PhosphorIconsLight.dotsThree,
+                          tooltip: tr.moreOptions,
+                          size: CbButtonSize.sm,
+                          onPressed: !_canAct
+                              ? null
+                              : () {
+                                  final box =
+                                      context.findRenderObject()! as RenderBox;
+                                  _showMenu(
+                                    box.localToGlobal(
+                                      box.size.bottomLeft(Offset.zero),
+                                    ),
+                                  );
+                                },
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ),
@@ -1200,6 +1605,91 @@ class _TransferPaneState extends State<_TransferPane> {
     );
   }
 
+  /// The folder chain as clickable crumbs; a click on the rest of the bar
+  /// switches to typing a path, and the trailing button browses for one.
+  Widget _addressBar(BuildContext context, bool active) {
+    final tr = context.tr;
+    final c = context.cbColors;
+    final fs = _pane.fileSystem;
+    final chain = <String>[];
+    if (active && fs != null) {
+      for (
+        String? path = _pane.path;
+        path != null && chain.length < 64;
+        path = fs.parent(path)
+      ) {
+        chain.insert(0, path);
+      }
+    }
+    String label(String path) {
+      if (path.isEmpty) return tr.thisPC;
+      final name = fs!.paths.basename(path);
+      return name.length > 1 ? name.replaceAll(RegExp(r'[\\/]+$'), '') : name;
+    }
+
+    return Container(
+      height: CbSizes.controlMd,
+      decoration: BoxDecoration(
+        color: active ? c.surfaceSunken : c.fillSubtle,
+        borderRadius: CbRadii.mdAll,
+        border: Border.all(color: c.strokeSubtle),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Row(
+        children: [
+          Expanded(
+            child: !active
+                ? const SizedBox.shrink()
+                : Focus(
+                    canRequestFocus: false,
+                    skipTraversal: true,
+                    // Abandoned typing must not show up on the next edit.
+                    onFocusChange: (focused) {
+                      if (!focused) _path.text = _shownPath ?? '';
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: CbSpacing.xxs),
+                      child: BreadcrumbAddressBar(
+                        key: ValueKey('sftp-transfer-path-${widget.side.name}'),
+                        segments: [
+                          for (final (index, path) in chain.indexed)
+                            BreadcrumbSegment(
+                              label: label(path),
+                              icon: index > 0
+                                  ? null
+                                  : path.isEmpty
+                                  ? PhosphorIconsLight.desktop
+                                  : PhosphorIconsLight.hardDrive,
+                              onTap: index == chain.length - 1
+                                  ? null
+                                  : () => unawaited(_pane.navigate(path)),
+                            ),
+                        ],
+                        editController: _path,
+                        onPathSubmitted: (value) {
+                          final target = value.trim();
+                          unawaited(
+                            _pane.navigate(target == tr.thisPC ? '' : target),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+          ),
+          if (widget.onBrowse != null)
+            CbButton.icon(
+              key: ValueKey('sftp-transfer-browse-${widget.side.name}'),
+              icon: PhosphorIconsLight.folderOpen,
+              tooltip: tr.selectFolder,
+              size: CbButtonSize.sm,
+              onPressed: active ? widget.onBrowse : null,
+            ),
+          if (widget.onBrowse != null) const SizedBox(width: CbSpacing.xxs),
+        ],
+      ),
+    );
+  }
+
   Widget _error(BuildContext context) {
     final c = context.cbColors;
     return Container(
@@ -1229,14 +1719,6 @@ class _TransferPaneState extends State<_TransferPane> {
   Widget _list(BuildContext context, bool active) {
     final c = context.cbColors;
     if (!active) return const SizedBox.shrink();
-    if (_pane.entries.isEmpty) {
-      return Center(
-        child: Text(
-          _pane.loading ? '' : context.tr.emptyFolder,
-          style: CbTypography.body.copyWith(color: c.textTertiary),
-        ),
-      );
-    }
     return Focus(
       focusNode: _focus,
       onKeyEvent: _onKey,
@@ -1246,24 +1728,104 @@ class _TransferPaneState extends State<_TransferPane> {
           _focus.requestFocus();
           _pane.clearSelection();
         },
+        onSecondaryTapUp: (details) {
+          _focus.requestFocus();
+          _pane.clearSelection();
+          _showMenu(details.globalPosition);
+        },
         child: LayoutBuilder(
           builder: (context, constraints) {
+            if (_pane.entries.isEmpty) {
+              if (_pane.loading) return const SizedBox.shrink();
+              return Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      PhosphorIconsLight.folderOpen,
+                      size: CbSizes.iconXl,
+                      color: c.iconSubtle,
+                    ),
+                    const SizedBox(height: CbSpacing.sm),
+                    Text(
+                      context.tr.emptyFolder,
+                      style: CbTypography.body.copyWith(color: c.textTertiary),
+                    ),
+                  ],
+                ),
+              );
+            }
             final showModified = constraints.maxWidth >= 440;
             final showSize = constraints.maxWidth >= 280;
-            return Scrollbar(
-              controller: _scroll,
-              child: ListView.builder(
-                controller: _scroll,
-                padding: const EdgeInsets.symmetric(vertical: _listPadding),
-                itemExtent: _rowExtent,
-                itemCount: _pane.entries.length,
-                itemBuilder: (context, index) => _row(
-                  context,
-                  _pane.entries[index],
-                  showSize: showSize,
-                  showModified: showModified,
+            final tr = context.tr;
+            final heading = CbTypography.caption.copyWith(
+              color: c.textTertiary,
+            );
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(
+                  height: CbSizes.controlXs,
+                  padding: const EdgeInsets.symmetric(horizontal: CbSpacing.md),
+                  decoration: BoxDecoration(
+                    border: Border(bottom: BorderSide(color: c.strokeSubtle)),
+                  ),
+                  child: Row(
+                    children: [
+                      const SizedBox(width: CbSizes.iconMd + CbSpacing.sm),
+                      Expanded(
+                        child: Text(
+                          tr.columnName,
+                          style: heading,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (showSize)
+                        SizedBox(
+                          width: 72,
+                          child: Text(
+                            tr.columnSize,
+                            style: heading,
+                            textAlign: TextAlign.right,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      if (showModified)
+                        SizedBox(
+                          width: 112,
+                          child: Text(
+                            tr.columnDateModified,
+                            style: heading,
+                            textAlign: TextAlign.right,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
-              ),
+                Expanded(
+                  child: Scrollbar(
+                    controller: _scroll,
+                    child: ListView.builder(
+                      controller: _scroll,
+                      padding: const EdgeInsets.symmetric(
+                        vertical: _listPadding,
+                      ),
+                      itemExtent: _rowExtent,
+                      itemCount: _pane.entries.length,
+                      itemBuilder: (context, index) => _row(
+                        context,
+                        _pane.entries[index],
+                        showSize: showSize,
+                        showModified: showModified,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             );
           },
         ),
@@ -1299,7 +1861,7 @@ class _TransferPaneState extends State<_TransferPane> {
               entry.isLink
                   ? PhosphorIconsLight.link
                   : entry.isDirectory
-                  ? PhosphorIconsLight.folder
+                  ? PhosphorIconsFill.folder
                   : PhosphorIconsLight.file,
               size: CbSizes.iconMd,
               color: entry.isDirectory ? c.accent.text : c.iconSubtle,
@@ -1353,6 +1915,11 @@ class _TransferPaneState extends State<_TransferPane> {
         );
       },
       onDoubleTap: () => _open(entry),
+      onSecondaryTapUp: (details) {
+        _focus.requestFocus();
+        if (!selected) _pane.select(entry);
+        _showMenu(details.globalPosition);
+      },
       child: row,
     );
     final dragged = selected ? _pane.selectedEntries : [entry];

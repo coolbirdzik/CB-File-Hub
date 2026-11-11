@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:dartssh2/dartssh2.dart';
@@ -41,7 +43,15 @@ abstract class TransferFileSystem {
   /// Null when nothing exists at [path], otherwise whether it is a directory.
   Future<bool?> kind(String path);
   Future<void> createDirectory(String path);
-  Stream<Uint8List> read(String path);
+
+  /// Reads [length] bytes of [path] from [offset]; to the end when null.
+  Stream<Uint8List> read(String path, {int offset = 0, int? length});
+
+  /// How many reads and writes are worth running at once.
+  int get streams;
+
+  /// Lets go of whatever idle [streams] hold open, once a transfer ends.
+  void releaseStreams();
 
   /// Writes [data] to [path], replacing it. [onProgress] receives the bytes
   /// written to this file so far.
@@ -51,10 +61,50 @@ abstract class TransferFileSystem {
     void Function(int written) onProgress,
   );
   Future<void> deleteFile(String path);
+
+  /// Removes an empty folder.
+  Future<void> deleteDirectory(String path);
+
+  /// Moves or renames [from] to [to], which must not exist yet.
+  Future<void> rename(String from, String to);
+}
+
+/// Writes one file out of order, so several streams can fill it at once.
+abstract class TransferFileWriter {
+  Future<void> writeAt(int position, Uint8List data);
+  Future<void> close();
+}
+
+/// A [TransferFileSystem] whose files can be written out of order.
+abstract class RandomAccessTransferTarget {
+  /// Creates or replaces [path] with room for [size] bytes.
+  Future<TransferFileWriter> openWriter(String path, int size);
+}
+
+class _LocalFileWriter implements TransferFileWriter {
+  _LocalFileWriter(this._file);
+  final RandomAccessFile _file;
+
+  /// A RandomAccessFile runs one operation at a time.
+  Future<void> _tail = Future.value();
+
+  @override
+  Future<void> writeAt(int position, Uint8List data) {
+    final done = _tail.then((_) async {
+      await _file.setPosition(position);
+      await _file.writeFrom(data);
+    });
+    _tail = done.then((_) {}, onError: (_) {});
+    return done;
+  }
+
+  @override
+  Future<void> close() => _tail.then((_) => _file.close());
 }
 
 /// This computer. On Windows the empty path lists the drives.
-class LocalTransferFileSystem implements TransferFileSystem {
+class LocalTransferFileSystem
+    implements TransferFileSystem, RandomAccessTransferTarget {
   LocalTransferFileSystem({p.Context? paths, this.listDrives})
     : paths = paths ?? p.context;
 
@@ -143,9 +193,30 @@ class LocalTransferFileSystem implements TransferFileSystem {
   Future<void> createDirectory(String path) => Directory(path).create();
 
   @override
-  Stream<Uint8List> read(String path) => File(path).openRead().map(
-    (chunk) => chunk is Uint8List ? chunk : Uint8List.fromList(chunk),
-  );
+  Stream<Uint8List> read(String path, {int offset = 0, int? length}) =>
+      File(path)
+          .openRead(offset, length == null ? null : offset + length)
+          .map(
+            (chunk) => chunk is Uint8List ? chunk : Uint8List.fromList(chunk),
+          );
+
+  @override
+  int get streams => 1;
+
+  @override
+  void releaseStreams() {}
+
+  @override
+  Future<TransferFileWriter> openWriter(String path, int size) async {
+    final file = await File(path).open(mode: FileMode.write);
+    try {
+      await file.truncate(size);
+    } catch (_) {
+      await file.close();
+      rethrow;
+    }
+    return _LocalFileWriter(file);
+  }
 
   @override
   Future<void> write(
@@ -171,12 +242,106 @@ class LocalTransferFileSystem implements TransferFileSystem {
 
   @override
   Future<void> deleteFile(String path) => File(path).delete();
+
+  @override
+  Future<void> deleteDirectory(String path) => Directory(path).delete();
+
+  @override
+  Future<void> rename(String from, String to) async =>
+      switch (await FileSystemEntity.type(from, followLinks: false)) {
+        FileSystemEntityType.directory => Directory(from).rename(to),
+        FileSystemEntityType.link => Link(from).rename(to),
+        _ => File(from).rename(to),
+      };
+}
+
+/// One more SSH connection to the same host, carrying its own SFTP channel.
+class SftpLane {
+  const SftpLane({
+    required this.client,
+    required this.done,
+    required this.close,
+  });
+  final SftpClient client;
+
+  /// Completes when the connection ends.
+  final Future<void> done;
+  final void Function() close;
+}
+
+class _Lane {
+  _Lane(this.client, [this.close]);
+  final SftpClient client;
+  final void Function()? close;
+  int active = 0;
 }
 
 /// The remote side, over an SFTP subsystem the caller owns.
+///
+/// One SSH connection is one TCP stream, so with [openLane] every further
+/// concurrent read or write gets a connection of its own, up to [maxStreams].
+/// A server that refuses more connections leaves everything on [client].
 class SftpTransferFileSystem implements TransferFileSystem {
-  SftpTransferFileSystem(this.client);
+  SftpTransferFileSystem(this.client, {this.openLane, this.maxStreams = 4});
   final SftpClient client;
+  final Future<SftpLane> Function()? openLane;
+  final int maxStreams;
+
+  late final _primary = _Lane(client);
+  final _lanes = <_Lane>[];
+  int _opening = 0;
+  bool _refused = false;
+
+  @override
+  int get streams => openLane == null ? 1 : maxStreams;
+
+  Future<_Lane> _acquire() async {
+    _Lane idlest() =>
+        [_primary, ..._lanes].reduce((a, b) => b.active < a.active ? b : a);
+    var lane = idlest();
+    final open = openLane;
+    if (lane.active > 0 &&
+        open != null &&
+        !_refused &&
+        1 + _lanes.length + _opening < maxStreams) {
+      _opening++;
+      try {
+        final opened = await open();
+        final extra = _Lane(opened.client, opened.close);
+        _lanes.add(extra);
+        unawaited(
+          opened.done
+              .then((_) {}, onError: (_) {})
+              .whenComplete(() => _lanes.remove(extra)),
+        );
+        lane = extra;
+      } catch (_) {
+        _refused = true;
+        lane = idlest();
+      } finally {
+        _opening--;
+      }
+    }
+    lane.active++;
+    return lane;
+  }
+
+  @override
+  void releaseStreams() {
+    _refused = false;
+    for (final lane in _lanes.where((lane) => lane.active == 0).toList()) {
+      _lanes.remove(lane);
+      lane.close?.call();
+    }
+  }
+
+  /// Closes every extra connection, used or not.
+  void closeLanes() {
+    for (final lane in _lanes.toList()) {
+      lane.close?.call();
+    }
+    _lanes.clear();
+  }
 
   @override
   p.Context get paths => p.posix;
@@ -241,12 +406,21 @@ class SftpTransferFileSystem implements TransferFileSystem {
   Future<void> createDirectory(String path) => client.mkdir(path);
 
   @override
-  Stream<Uint8List> read(String path) async* {
-    final file = await client.open(path);
+  Stream<Uint8List> read(String path, {int offset = 0, int? length}) async* {
+    final lane = await _acquire();
     try {
-      yield* file.read();
+      final file = await lane.client.open(path);
+      try {
+        // Without a range the library sizes the read itself, which also
+        // covers files that report no size.
+        yield* offset == 0 && length == null
+            ? file.read()
+            : file.read(offset: offset, length: length);
+      } finally {
+        await file.close();
+      }
     } finally {
-      await file.close();
+      lane.active--;
     }
   }
 
@@ -256,22 +430,33 @@ class SftpTransferFileSystem implements TransferFileSystem {
     Stream<Uint8List> data,
     void Function(int written) onProgress,
   ) async {
-    final file = await client.open(
-      path,
-      mode:
-          SftpFileOpenMode.create |
-          SftpFileOpenMode.write |
-          SftpFileOpenMode.truncate,
-    );
+    final lane = await _acquire();
     try {
-      await file.write(data, onProgress: onProgress).done;
+      final file = await lane.client.open(
+        path,
+        mode:
+            SftpFileOpenMode.create |
+            SftpFileOpenMode.write |
+            SftpFileOpenMode.truncate,
+      );
+      try {
+        await file.write(data, onProgress: onProgress).done;
+      } finally {
+        await file.close();
+      }
     } finally {
-      await file.close();
+      lane.active--;
     }
   }
 
   @override
   Future<void> deleteFile(String path) => client.remove(path);
+
+  @override
+  Future<void> deleteDirectory(String path) => client.rmdir(path);
+
+  @override
+  Future<void> rename(String from, String to) => client.rename(from, to);
 }
 
 enum TransferConflictPolicy { replace, skip }
@@ -293,6 +478,9 @@ enum TransferFailureKind {
   /// Another item of the batch differs only by letter case, which a Windows
   /// destination would merge into one.
   caseConflict,
+
+  /// A move found an item of the same name in the destination.
+  exists,
 }
 
 class TransferFailure {
@@ -302,15 +490,67 @@ class TransferFailure {
   const TransferFailure(this.path, this.kind, [this.error]);
 }
 
+/// Deletes [entries] and everything below them on [fs]. A link is removed
+/// itself, never followed.
+Future<List<TransferFailure>> deleteTransferEntries(
+  TransferFileSystem fs,
+  List<TransferEntry> entries,
+) async {
+  Future<void> remove(TransferEntry entry) async {
+    if (!entry.isDirectory || entry.isLink) return fs.deleteFile(entry.path);
+    for (final child in await fs.list(entry.path)) {
+      await remove(child);
+    }
+    await fs.deleteDirectory(entry.path);
+  }
+
+  final failures = <TransferFailure>[];
+  for (final entry in entries) {
+    try {
+      await remove(entry);
+    } catch (e) {
+      failures.add(TransferFailure(entry.path, TransferFailureKind.error, e));
+    }
+  }
+  return failures;
+}
+
+/// Moves [entries] into the folder [destination] of the same [fs]. Nothing
+/// is replaced: a name that already exists there is reported instead.
+Future<List<TransferFailure>> moveTransferEntries(
+  TransferFileSystem fs,
+  List<TransferEntry> entries,
+  String destination,
+) async {
+  final failures = <TransferFailure>[];
+  for (final entry in entries) {
+    final target = fs.paths.join(destination, entry.name);
+    try {
+      if (await fs.kind(target) != null) {
+        failures.add(TransferFailure(entry.path, TransferFailureKind.exists));
+      } else {
+        await fs.rename(entry.path, target);
+      }
+    } catch (e) {
+      failures.add(TransferFailure(entry.path, TransferFailureKind.error, e));
+    }
+  }
+  return failures;
+}
+
 class TransferProgress {
   final int filesDone, filesTotal, bytesDone, bytesTotal;
   final String current;
+
+  /// Throughput over the last few seconds.
+  final double bytesPerSecond;
   const TransferProgress({
     required this.filesDone,
     required this.filesTotal,
     required this.bytesDone,
     required this.bytesTotal,
     required this.current,
+    this.bytesPerSecond = 0,
   });
   double? get fraction => bytesTotal > 0
       ? (bytesDone / bytesTotal).clamp(0.0, 1.0)
@@ -342,11 +582,33 @@ class _Step {
   const _Step(this.source, this.target, this.isDirectory, this.size);
 }
 
+/// A large file several streams fill together.
+class _Split {
+  _Split(this.step, this.writer);
+  final _Step step;
+  final TransferFileWriter writer;
+
+  /// Segments not finished yet.
+  int pieces = 0;
+  int written = 0;
+  Object? error;
+}
+
+class _Piece {
+  const _Piece(this.split, this.offset, this.length);
+  final _Split split;
+  final int offset, length;
+}
+
 /// Copies entries from one [TransferFileSystem] into a folder of another.
 ///
 /// Folders are copied recursively and merged into existing folders. Existing
 /// files follow the policy [resolveConflicts] returns for the top-level names
 /// that already exist; returning null cancels before anything is written.
+///
+/// As many files move at once as the two sides have [TransferFileSystem.streams].
+/// A file of two [segmentSize]s or more is cut into segments those streams
+/// share, when the destination can be written out of order.
 class SftpTransferTask {
   SftpTransferTask({
     required this.from,
@@ -356,6 +618,7 @@ class SftpTransferTask {
     this.resolveConflicts,
     this.onProgress,
     this.progressInterval = const Duration(milliseconds: 100),
+    this.segmentSize = 8 * 1024 * 1024,
   });
 
   final TransferFileSystem from, to;
@@ -365,6 +628,10 @@ class SftpTransferTask {
   resolveConflicts;
   final void Function(TransferProgress progress)? onProgress;
   final Duration progressInterval;
+  final int segmentSize;
+
+  /// The span [TransferProgress.bytesPerSecond] averages over.
+  static const _speedWindow = Duration(seconds: 3);
 
   bool _cancelled = false;
   bool get isCancelled => _cancelled;
@@ -448,26 +715,49 @@ class SftpTransferTask {
         await plan(entry, destination);
       }
 
-      final files = steps.where((s) => !s.isDirectory).length;
+      final files = [
+        for (final step in steps)
+          if (!step.isDirectory) step,
+      ];
       final bytesTotal = steps.fold<int>(0, (sum, s) => sum + s.size);
-      var filesDone = 0, bytesDone = 0;
+      // [settled] counts finished files in full, [live] what the running
+      // ones wrote so far, and [moved] only bytes that really travelled.
+      var filesDone = 0, settled = 0, live = 0, moved = 0;
+      var current = '';
       final clock = Stopwatch()..start();
       var lastReport = -progressInterval.inMicroseconds;
-      void report(String current, int bytes, {bool force = false}) {
+      final samples = Queue<(int, int)>()..add((0, 0));
+      void report({bool force = false}) {
         final now = clock.elapsedMicroseconds;
         if (!force && now - lastReport < progressInterval.inMicroseconds) {
           return;
         }
         lastReport = now;
+        samples.add((now, moved));
+        while (samples.length > 2 &&
+            now - samples.first.$1 > _speedWindow.inMicroseconds) {
+          samples.removeFirst();
+        }
+        final span = now - samples.first.$1;
         onProgress?.call(
           TransferProgress(
             filesDone: filesDone,
-            filesTotal: files,
-            bytesDone: bytes,
+            filesTotal: files.length,
+            bytesDone: settled + live,
             bytesTotal: bytesTotal,
             current: current,
+            bytesPerSecond: span > 0
+                ? (moved - samples.first.$2) * 1e6 / span
+                : 0,
           ),
         );
+      }
+
+      void settle(_Step step, int written) {
+        live -= written;
+        settled += step.size;
+        filesDone++;
+        report(force: true);
       }
 
       Stream<Uint8List> guarded(Stream<Uint8List> data) async* {
@@ -479,69 +769,216 @@ class SftpTransferTask {
 
       // Folders that could not be created; their contents are not attempted.
       final blocked = <String>[];
-      for (final step in steps) {
+      bool isBlocked(_Step step) =>
+          blocked.any((dir) => to.paths.isWithin(dir, step.target));
+
+      for (final step in steps.where((s) => s.isDirectory)) {
         if (_cancelled) throw const TransferCancelled();
-        final name = from.paths.basename(step.source);
-        if (blocked.any((dir) => to.paths.isWithin(dir, step.target))) {
-          if (!step.isDirectory) {
-            filesDone++;
-            bytesDone += step.size;
-          }
-          continue;
-        }
-        report(name, bytesDone, force: true);
+        if (isBlocked(step)) continue;
+        current = from.paths.basename(step.source);
+        report(force: true);
         // Without a conflict nothing below the destination existed, so only
         // a merge needs to look before writing.
         final existing = policy == null ? null : await to.kind(step.target);
-        if (step.isDirectory) {
-          if (existing == false) {
-            failures.add(
-              TransferFailure(step.source, TransferFailureKind.typeConflict),
-            );
-            blocked.add(step.target);
-          } else if (existing == null) {
-            try {
-              await to.createDirectory(step.target);
-            } catch (e) {
-              failures.add(
-                TransferFailure(step.source, TransferFailureKind.error, e),
-              );
-              blocked.add(step.target);
-            }
-          }
-          continue;
-        }
-        if (existing == true) {
+        if (existing == false) {
           failures.add(
             TransferFailure(step.source, TransferFailureKind.typeConflict),
           );
-        } else if (existing == false && policy == TransferConflictPolicy.skip) {
-          skipped++;
-        } else {
-          final base = bytesDone;
-          var started = false;
+          blocked.add(step.target);
+        } else if (existing == null) {
           try {
-            await to.write(step.target, guarded(from.read(step.source)), (
-              written,
-            ) {
-              started = true;
-              report(name, base + written.clamp(0, step.size));
-            });
-            transferred++;
-          } on TransferCancelled {
-            await _discard(step.target, started || existing == null);
-            rethrow;
+            await to.createDirectory(step.target);
           } catch (e) {
             failures.add(
               TransferFailure(step.source, TransferFailureKind.error, e),
             );
-            await _discard(step.target, started || existing == null);
+            blocked.add(step.target);
           }
         }
-        filesDone++;
-        bytesDone += step.size;
-        report(name, bytesDone, force: true);
       }
+
+      final target = to;
+      final parallel = math.max(1, math.max(from.streams, to.streams));
+      final pieces = Queue<_Piece>();
+      final open = <_Split>{};
+
+      Future<void> whole(_Step step, bool? existing) async {
+        var written = 0, total = 0;
+        var started = false;
+        try {
+          await to.write(step.target, guarded(from.read(step.source)), (sent) {
+            started = true;
+            moved += sent - total;
+            total = sent;
+            final shown = sent.clamp(0, step.size);
+            live += shown - written;
+            written = shown;
+            report();
+          });
+          transferred++;
+        } on TransferCancelled {
+          await _discard(step.target, started || existing == null);
+          rethrow;
+        } catch (e) {
+          failures.add(
+            TransferFailure(step.source, TransferFailureKind.error, e),
+          );
+          await _discard(step.target, started || existing == null);
+        }
+        settle(step, written);
+      }
+
+      Future<void> finish(_Split split) async {
+        open.remove(split);
+        try {
+          await split.writer.close();
+        } catch (e) {
+          split.error ??= e;
+        }
+        if (_cancelled) {
+          await _discard(split.step.target, true);
+          return;
+        }
+        if (split.error != null) {
+          failures.add(
+            TransferFailure(
+              split.step.source,
+              TransferFailureKind.error,
+              split.error,
+            ),
+          );
+          await _discard(split.step.target, true);
+        } else {
+          transferred++;
+        }
+        settle(split.step, split.written);
+      }
+
+      Future<void> split(_Step step, bool? existing) async {
+        final TransferFileWriter writer;
+        try {
+          writer = await (target as RandomAccessTransferTarget).openWriter(
+            step.target,
+            step.size,
+          );
+        } catch (e) {
+          failures.add(
+            TransferFailure(step.source, TransferFailureKind.error, e),
+          );
+          await _discard(step.target, existing == null);
+          settle(step, 0);
+          return;
+        }
+        final job = _Split(step, writer);
+        open.add(job);
+        for (var offset = 0; offset < step.size; offset += segmentSize) {
+          job.pieces++;
+          pieces.add(
+            _Piece(job, offset, math.min(segmentSize, step.size - offset)),
+          );
+        }
+      }
+
+      Future<void> piece(_Piece piece) async {
+        final job = piece.split;
+        try {
+          if (job.error != null) return;
+          var position = piece.offset;
+          await for (final chunk in guarded(
+            from.read(
+              job.step.source,
+              offset: piece.offset,
+              length: piece.length,
+            ),
+          )) {
+            if (job.error != null) return;
+            await job.writer.writeAt(position, chunk);
+            position += chunk.length;
+            job.written += chunk.length;
+            live += chunk.length;
+            moved += chunk.length;
+            report();
+          }
+          if (position != piece.offset + piece.length) {
+            // The file shrank after it was listed.
+            job.error ??= const FileSystemException('Unexpected end of file');
+          }
+        } on TransferCancelled {
+          rethrow;
+        } catch (e) {
+          job.error ??= e;
+        } finally {
+          if (--job.pieces == 0) await finish(job);
+        }
+      }
+
+      Future<void> file(_Step step) async {
+        if (isBlocked(step)) {
+          settled += step.size;
+          filesDone++;
+          return;
+        }
+        current = from.paths.basename(step.source);
+        report(force: true);
+        final existing = policy == null ? null : await to.kind(step.target);
+        if (existing == true) {
+          failures.add(
+            TransferFailure(step.source, TransferFailureKind.typeConflict),
+          );
+          settle(step, 0);
+        } else if (existing == false && policy == TransferConflictPolicy.skip) {
+          skipped++;
+          settle(step, 0);
+        } else if (parallel > 1 &&
+            target is RandomAccessTransferTarget &&
+            step.size >= segmentSize * 2) {
+          await split(step, existing);
+        } else {
+          await whole(step, existing);
+        }
+      }
+
+      var next = 0, preparing = 0;
+      Completer<void>? wake;
+      Future<void> worker() async {
+        try {
+          while (!_cancelled) {
+            // Segments of a file under way go first, so free streams join it.
+            if (pieces.isNotEmpty) {
+              await piece(pieces.removeFirst());
+            } else if (next < files.length) {
+              final step = files[next++];
+              preparing++;
+              try {
+                await file(step);
+              } finally {
+                preparing--;
+                wake?.complete();
+                wake = null;
+              }
+            } else if (preparing == 0) {
+              return;
+            } else {
+              // A file being opened may still hand out segments.
+              await (wake ??= Completer<void>()).future;
+            }
+          }
+        } on TransferCancelled {
+          // Reported once every stream has stopped.
+        }
+      }
+
+      try {
+        await Future.wait([for (var i = 0; i < parallel; i++) worker()]);
+      } finally {
+        for (final job in open.toList()) {
+          try {
+            await job.writer.close();
+          } catch (_) {}
+          await _discard(job.step.target, true);
+        }
+      }
+      if (_cancelled) throw const TransferCancelled();
       return TransferReport(
         transferred: transferred,
         skipped: skipped,
