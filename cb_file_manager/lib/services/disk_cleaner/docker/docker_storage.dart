@@ -45,6 +45,12 @@ class DockerImage {
 
   bool get isUnused => containers == 0;
 
+  /// What `docker image rm` is given: the tag, so another tag of the same
+  /// image survives, or the id when the image has none.
+  String get reference => repository == '<none>' || tag == '<none>'
+      ? id.replaceFirst('sha256:', '')
+      : '$repository:$tag';
+
   String get name => isDangling
       ? id.replaceFirst('sha256:', '').substring(0, 12)
       : '$repository:$tag';
@@ -101,6 +107,45 @@ class DockerBuildCacheEntry {
     required this.inUse,
     this.lastUsed,
   });
+}
+
+/// One image, stopped container or volume a person can pick.
+class DockerItem {
+  /// `image`, `container` or `volume`: the CLI's object name.
+  final String type;
+
+  /// The argument of `docker <type> rm`.
+  final String reference;
+  final String label;
+  final int bytes;
+
+  const DockerItem({
+    required this.type,
+    required this.reference,
+    required this.label,
+    required this.bytes,
+  });
+
+  /// The same for an image listed under both image rows.
+  String get key => '$type:$reference';
+}
+
+/// What a clean does: whole prunes, and single removals where only part of a
+/// row is checked.
+class DockerCleanPlan {
+  final Set<DockerCleanKind> prunes;
+  final Map<DockerCleanKind, List<DockerItem>> removals;
+
+  const DockerCleanPlan({this.prunes = const {}, this.removals = const {}});
+
+  bool get isEmpty => prunes.isEmpty && removals.isEmpty;
+
+  DockerCleanKind? get firstStep {
+    for (final kind in DockerCleanKind.values) {
+      if (prunes.contains(kind) || removals.containsKey(kind)) return kind;
+    }
+    return null;
+  }
 }
 
 /// What one prune removes. Applied in this order: containers first, so the
@@ -216,6 +261,91 @@ class DockerReport {
     DockerCleanKind.buildCache => buildCache.where((b) => !b.inUse).length,
     DockerCleanKind.unusedVolumes => volumes.where((v) => v.isUnused).length,
   };
+
+  /// What [kind] would remove, largest first. Empty for the build cache,
+  /// which Docker only clears as a whole.
+  List<DockerItem> itemsOf(DockerCleanKind kind) {
+    DockerItem image(DockerImage image) => DockerItem(
+      type: 'image',
+      reference: image.reference,
+      label: image.name,
+      bytes: image.uniqueSize,
+    );
+    final items = switch (kind) {
+      DockerCleanKind.stoppedContainers => [
+        for (final container in containers)
+          if (!container.isRunning)
+            DockerItem(
+              type: 'container',
+              reference: container.id,
+              label: '${container.name} · ${container.state}',
+              bytes: container.size,
+            ),
+      ],
+      DockerCleanKind.danglingImages => [
+        for (final i in images)
+          if (i.isDangling && i.isUnused) image(i),
+      ],
+      DockerCleanKind.unusedImages => [
+        for (final i in images)
+          if (i.isUnused) image(i),
+      ],
+      DockerCleanKind.buildCache => <DockerItem>[],
+      DockerCleanKind.unusedVolumes => [
+        for (final volume in volumes)
+          if (volume.isUnused)
+            DockerItem(
+              type: 'volume',
+              reference: volume.name,
+              label: volume.name,
+              bytes: volume.size,
+            ),
+      ],
+    };
+    return items..sort((a, b) => b.bytes.compareTo(a.bytes));
+  }
+
+  /// An item left unchecked in [kind].
+  static String excludedKey(DockerCleanKind kind, DockerItem item) =>
+      '${kind.name}/${item.key}';
+
+  /// A fully checked row is pruned, so Docker decides from its current state.
+  /// A partly checked one removes just those items, one by one. An image
+  /// listed under both image rows is removed once.
+  DockerCleanPlan plan(Set<DockerCleanKind> selected, Set<String> excluded) {
+    List<DockerItem> chosen(DockerCleanKind kind) => [
+      for (final item in itemsOf(kind))
+        if (!excluded.contains(excludedKey(kind, item))) item,
+    ];
+    bool whole(DockerCleanKind kind) =>
+        selected.contains(kind) &&
+        countOf(kind) > 0 &&
+        chosen(kind).length == itemsOf(kind).length;
+
+    final prunes = <DockerCleanKind>{};
+    final removals = <DockerCleanKind, List<DockerItem>>{};
+    final covered = <String>{};
+    for (final kind in DockerCleanKind.values) {
+      if (!selected.contains(kind) || countOf(kind) == 0) continue;
+      // An unused-images prune covers the dangling ones.
+      if (kind == DockerCleanKind.danglingImages &&
+          whole(DockerCleanKind.unusedImages)) {
+        continue;
+      }
+      final items = chosen(kind);
+      if (whole(kind)) {
+        prunes.add(kind);
+        covered.addAll(items.map((item) => item.key));
+        continue;
+      }
+      final rest = [
+        for (final item in items)
+          if (covered.add(item.key)) item,
+      ];
+      if (rest.isNotEmpty) removals[kind] = rest;
+    }
+    return DockerCleanPlan(prunes: prunes, removals: removals);
+  }
 
   /// Prunes with something to remove.
   List<DockerCleanKind> get cleanable => [
@@ -335,6 +465,46 @@ class DockerTool {
       }
       freed[kind] = reclaimedBytes('${result.stdout}');
     }
+    return freed;
+  }
+
+  /// Runs [plan] in [DockerCleanKind] order and returns the space freed.
+  /// Single removals never force, so anything put in use since the scan stays;
+  /// one that fails does not stop the others, and they are reported together
+  /// at the end.
+  Future<Map<DockerCleanKind, int>> apply(
+    DockerCleanPlan plan, {
+    void Function(DockerCleanKind kind)? onStep,
+  }) async {
+    final docker = locate();
+    if (docker == null) throw StateError('Docker is not installed');
+    final freed = <DockerCleanKind, int>{};
+    final failures = <String>[];
+    for (final kind in DockerCleanKind.values) {
+      if (plan.prunes.contains(kind)) {
+        onStep?.call(kind);
+        final result = await run(docker, kind.pruneArgs);
+        if (result.exitCode != 0) {
+          failures.add(
+            '${kind.pruneArgs.take(2).join(' ')}: ${'${result.stderr}'.trim()}',
+          );
+          continue;
+        }
+        freed[kind] = reclaimedBytes('${result.stdout}');
+      }
+      final items = plan.removals[kind];
+      if (items == null) continue;
+      onStep?.call(kind);
+      for (final item in items) {
+        final result = await run(docker, [item.type, 'rm', item.reference]);
+        if (result.exitCode != 0) {
+          failures.add('${item.label}: ${'${result.stderr}'.trim()}');
+          continue;
+        }
+        freed[kind] = (freed[kind] ?? 0) + item.bytes;
+      }
+    }
+    if (failures.isNotEmpty) throw StateError(failures.join('\n'));
     return freed;
   }
 

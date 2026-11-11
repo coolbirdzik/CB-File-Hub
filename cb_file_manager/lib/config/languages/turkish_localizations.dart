@@ -7293,6 +7293,36 @@ class TurkishLocalizations implements AppLocalizations {
   String get cleanerAppStorageKindShared =>
       'Aynı geliştiricinin uygulamalarıyla paylaşılan';
   @override
+  String get cleanerXcodeDeviceSupport => 'Device Support';
+  @override
+  String get cleanerXcodeDeviceSupportHint =>
+      'Cihazlarınızdan kopyalanan hata ayıklama sembolleri. Xcode, o cihazda bir sonraki hata ayıklamada bunları yeniden kopyalar.';
+  @override
+  String get cleanerXcodeArchives => 'Archives';
+  @override
+  String get cleanerXcodeArchivesHint =>
+      'Arşivlenmiş derlemeler ve hata ayıklama sembolleri; yayımlanan sürümlerin hata raporlarını okumak için gerekir. Xcode bunları yeniden oluşturamaz.';
+  @override
+  String get cleanerXcodeDerivedData => 'Derived Data';
+  @override
+  String get cleanerXcodeDerivedDataHint =>
+      'Derleme çıktıları, dizinler ve paket kopyaları. Sonraki derleme daha uzun sürer.';
+  @override
+  String get cleanerXcodeDocumentationCache => 'Belge önbelleği';
+  @override
+  String get cleanerXcodeDocumentationCacheHint =>
+      'İndirilen belge sayfaları. Xcode gerektiğinde yeniden indirir.';
+  @override
+  String get cleanerXcodeOldLogs => 'Eski günlükler';
+  @override
+  String get cleanerXcodeOldLogsHint =>
+      'Cihazlarınızdan kopyalanan günlükler ve hata raporları.';
+  @override
+  String get cleanerXcodeOldDocumentationDownloads => 'Eski belge indirmeleri';
+  @override
+  String get cleanerXcodeOldDocumentationDownloadsHint =>
+      'Eski Xcode sürümlerinin indirdiği belge setleri.';
+  @override
   String get cleanerAppStorageCacheOptionalHint =>
       'Önbellek klasörünün tamamı. Uygulama yeniden oluşturur veya indirir, bu yüzden daha yavaş açılabilir.';
   @override

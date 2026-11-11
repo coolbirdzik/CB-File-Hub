@@ -6778,6 +6778,32 @@ class ChineseLocalizations implements AppLocalizations {
   @override
   String get cleanerAppStorageKindShared => '与同一开发商的应用共享';
   @override
+  String get cleanerXcodeDeviceSupport => 'Device Support';
+  @override
+  String get cleanerXcodeDeviceSupportHint =>
+      '从设备复制的调试符号。下次在该设备上调试时，Xcode 会重新复制。';
+  @override
+  String get cleanerXcodeArchives => 'Archives';
+  @override
+  String get cleanerXcodeArchivesHint =>
+      '已归档的构建及其调试符号，用于读取已发布版本的崩溃报告。Xcode 无法重新生成。';
+  @override
+  String get cleanerXcodeDerivedData => 'Derived Data';
+  @override
+  String get cleanerXcodeDerivedDataHint => '构建产物、索引和软件包检出内容。下次构建会更久。';
+  @override
+  String get cleanerXcodeDocumentationCache => '文档缓存';
+  @override
+  String get cleanerXcodeDocumentationCacheHint => '已下载的文档页面。Xcode 会在需要时重新获取。';
+  @override
+  String get cleanerXcodeOldLogs => '旧日志';
+  @override
+  String get cleanerXcodeOldLogsHint => '从设备复制的日志和崩溃报告。';
+  @override
+  String get cleanerXcodeOldDocumentationDownloads => '旧文档下载';
+  @override
+  String get cleanerXcodeOldDocumentationDownloadsHint => '旧版 Xcode 下载的文档集。';
+  @override
   String get cleanerAppStorageCacheOptionalHint =>
       '整个缓存文件夹。应用会重建或重新下载，因此启动可能变慢。';
   @override

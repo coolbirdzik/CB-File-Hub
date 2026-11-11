@@ -32,7 +32,6 @@ const int _appsShown = 25;
 const int _extensionsShown = 8;
 
 /// Targets listed under an expanded cleanup row.
-const int _targetsShown = 30;
 
 const double _sizeColumnWidth = 76;
 const double _wideFooterBreakpoint = 560;
@@ -329,7 +328,15 @@ class _CleanerAppStorageViewState extends State<CleanerAppStorageView> {
     final filtered = focused != null
         ? report.entries.where((e) => e.key == focused).toList()
         : _cleanableOnly
-        ? report.entries.where((e) => AppCleanGroup.of(e).isNotEmpty).toList()
+        ? report.entries
+              .where(
+                (e) =>
+                    AppCleanGroup.of(e).isNotEmpty ||
+                    (e == report.dockerApp &&
+                        report.docker!.isReady &&
+                        report.docker!.cleanable.isNotEmpty),
+              )
+              .toList()
         : report.entries;
     final shown = _showAllApps ? filtered : filtered.take(_appsShown).toList();
     final largest = report.entries.fold<int>(
@@ -431,7 +438,9 @@ class _CleanerAppStorageViewState extends State<CleanerAppStorageView> {
         ),
       const SizedBox(height: CbSpacing.md),
       if (report.docker case final docker?
-          when focused == null && docker.status != DockerStatus.notInstalled)
+          when focused == null &&
+              docker.status != DockerStatus.notInstalled &&
+              report.dockerApp == null)
         Padding(
           padding: const EdgeInsets.only(bottom: CbSpacing.sm),
           child: _buildDocker(l, state, docker),
@@ -494,8 +503,11 @@ class _CleanerAppStorageViewState extends State<CleanerAppStorageView> {
     final c = context.cbColors;
     final expanded =
         _expandedApps.contains(entry.key) || state.focusedAppId == entry.key;
-    final safe = entry.safeBytes;
-    final parts = _kindSummary(l, entry);
+    final docker = _dockerOf(state, entry);
+    final safe = entry.safeBytes + _dockerSafeBytes(docker);
+    final parts = docker != null && docker.isReady
+        ? _dockerParts(l, docker)
+        : _kindSummary(l, entry);
     return CbSurface(
       key: ValueKey<String>('cleaner-app-storage-app-${entry.key}'),
       clip: true,
@@ -606,6 +618,22 @@ class _CleanerAppStorageViewState extends State<CleanerAppStorageView> {
     );
   }
 
+  /// Docker's data when [entry] is the app it belongs to.
+  DockerReport? _dockerOf(CleanerAppStorageState state, AppSpaceEntry entry) =>
+      entry == state.report?.dockerApp ? state.report!.docker : null;
+
+  List<String> _dockerParts(AppLocalizations l, DockerReport docker) =>
+      docker.isReady
+      ? [
+          if (docker.imageBytes > 0)
+            '${l.cleanerDockerImages} ${_size(docker.imageBytes)}',
+          if (docker.buildCacheBytes > 0)
+            '${l.cleanerDockerBuildCache} ${_size(docker.buildCacheBytes)}',
+          if (docker.volumeBytes > 0)
+            '${l.cleanerDockerVolumes} ${_size(docker.volumeBytes)}',
+        ]
+      : const [];
+
   /// Docker's images, containers, volumes and build cache, with prunes that
   /// Docker itself runs. Permanent, so its own button and confirmation.
   Widget _buildDocker(
@@ -614,28 +642,8 @@ class _CleanerAppStorageViewState extends State<CleanerAppStorageView> {
     DockerReport docker,
   ) {
     final c = context.cbColors;
-    final cleanable = docker.isReady
-        ? docker.cleanable
-        : const <DockerCleanKind>[];
     final safe = _dockerSafeBytes(docker);
-    final parts = docker.isReady
-        ? [
-            if (docker.imageBytes > 0)
-              '${l.cleanerDockerImages} ${_size(docker.imageBytes)}',
-            if (docker.buildCacheBytes > 0)
-              '${l.cleanerDockerBuildCache} ${_size(docker.buildCacheBytes)}',
-            if (docker.volumeBytes > 0)
-              '${l.cleanerDockerVolumes} ${_size(docker.volumeBytes)}',
-          ]
-        : const <String>[];
-    final largest = cleanable.fold<int>(
-      0,
-      (m, kind) => math.max(m, docker.bytesOf(kind)),
-    );
-    final busy =
-        state.isCleaningDocker ||
-        state.status == CleanerAppStorageStatus.scanning;
-    final selectedBytes = state.dockerSelectedBytes;
+    final parts = _dockerParts(l, docker);
     return CbSurface(
       key: const ValueKey<String>('cleaner-app-storage-docker'),
       clip: true,
@@ -715,107 +723,120 @@ class _CleanerAppStorageViewState extends State<CleanerAppStorageView> {
                 CbSpacing.md,
                 CbSpacing.md,
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (docker.status == DockerStatus.notRunning)
-                    _Note(
-                      icon: PhosphorIconsLight.info,
-                      text: l.cleanerDockerNotRunning,
-                    )
-                  else if (!docker.isReady)
-                    _Note(
-                      icon: PhosphorIconsLight.warningCircle,
-                      text: l.cleanerDockerFailed(docker.message ?? ''),
-                    )
-                  else ...[
-                    const SizedBox(height: CbSpacing.sm),
-                    _Stats(
-                      tiles: [
-                        _StatData(
-                          icon: PhosphorIconsLight.stack,
-                          label:
-                              '${l.cleanerDockerImages} (${docker.images.length})',
-                          value: _size(docker.imageBytes),
-                        ),
-                        _StatData(
-                          icon: PhosphorIconsLight.shippingContainer,
-                          label:
-                              '${l.cleanerDockerContainers} (${docker.containers.length})',
-                          value: _size(docker.containerBytes),
-                        ),
-                        _StatData(
-                          icon: PhosphorIconsLight.hardDrives,
-                          label:
-                              '${l.cleanerDockerVolumes} (${docker.volumes.length})',
-                          value: _size(docker.volumeBytes),
-                        ),
-                        _StatData(
-                          icon: PhosphorIconsLight.hammer,
-                          label: l.cleanerDockerBuildCache,
-                          value: _size(docker.buildCacheBytes),
-                        ),
-                      ],
-                    ),
-                    if (cleanable.isNotEmpty) ...[
-                      _SectionTitle(
-                        icon: PhosphorIconsLight.broom,
-                        text: l.cleanerEditorsCleanableSection,
-                      ),
-                      for (final kind in cleanable)
-                        _buildDockerRow(l, state, docker, kind, largest, busy),
-                      const SizedBox(height: CbSpacing.sm),
-                      if (state.isCleaningDocker)
-                        CleanerScanStrip(
-                          key: const ValueKey<String>(
-                            'cleaner-app-storage-docker-running',
-                          ),
-                          title: l.cleanerDockerRunning(
-                            'docker ${state.dockerStep!.pruneArgs.take(2).join(' ')}',
-                          ),
-                        )
-                      else
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: CbButton(
-                            key: const ValueKey<String>(
-                              'cleaner-app-storage-docker-clean',
-                            ),
-                            variant: CbButtonVariant.danger,
-                            icon: PhosphorIconsLight.trashSimple,
-                            label: l.cleanerDockerClean(_size(selectedBytes)),
-                            onPressed:
-                                busy ||
-                                    !widget.enabled ||
-                                    state.dockerSelected.isEmpty
-                                ? null
-                                : _cleanDocker,
-                          ),
-                        ),
-                    ],
-                  ],
-                  if (state.dockerFreed case final freed?) ...[
-                    const SizedBox(height: CbSpacing.sm),
-                    _Note(
-                      key: const ValueKey<String>(
-                        'cleaner-app-storage-docker-freed',
-                      ),
-                      icon: PhosphorIconsLight.checkCircle,
-                      text: l.cleanerDockerFreed(_size(freed)),
-                    ),
-                  ],
-                  if (state.dockerError case final error?) ...[
-                    const SizedBox(height: CbSpacing.sm),
-                    _Note(
-                      icon: PhosphorIconsLight.warningCircle,
-                      text: l.cleanerDockerFailed(error),
-                    ),
-                  ],
-                ],
-              ),
+              child: _buildDockerDetails(l, state, docker),
             ),
         ],
       ),
+    );
+  }
+
+  /// What Docker holds and the prunes it runs. Inside the Docker app's row
+  /// ([embedded]) the page's own "cleanable" heading follows for its files.
+  Widget _buildDockerDetails(
+    AppLocalizations l,
+    CleanerAppStorageState state,
+    DockerReport docker, {
+    bool embedded = false,
+  }) {
+    final cleanable = docker.isReady
+        ? docker.cleanable
+        : const <DockerCleanKind>[];
+    final largest = cleanable.fold<int>(
+      0,
+      (m, kind) => math.max(m, docker.bytesOf(kind)),
+    );
+    final busy =
+        state.isCleaningDocker ||
+        state.status == CleanerAppStorageStatus.scanning;
+    final selectedBytes = state.dockerSelectedBytes;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (docker.status == DockerStatus.notRunning)
+          _Note(icon: PhosphorIconsLight.info, text: l.cleanerDockerNotRunning)
+        else if (!docker.isReady)
+          _Note(
+            icon: PhosphorIconsLight.warningCircle,
+            text: l.cleanerDockerFailed(docker.message ?? ''),
+          )
+        else ...[
+          const SizedBox(height: CbSpacing.sm),
+          _Stats(
+            tiles: [
+              _StatData(
+                icon: PhosphorIconsLight.stack,
+                label: '${l.cleanerDockerImages} (${docker.images.length})',
+                value: _size(docker.imageBytes),
+              ),
+              _StatData(
+                icon: PhosphorIconsLight.shippingContainer,
+                label:
+                    '${l.cleanerDockerContainers} (${docker.containers.length})',
+                value: _size(docker.containerBytes),
+              ),
+              _StatData(
+                icon: PhosphorIconsLight.hardDrives,
+                label: '${l.cleanerDockerVolumes} (${docker.volumes.length})',
+                value: _size(docker.volumeBytes),
+              ),
+              _StatData(
+                icon: PhosphorIconsLight.hammer,
+                label: l.cleanerDockerBuildCache,
+                value: _size(docker.buildCacheBytes),
+              ),
+            ],
+          ),
+          if (cleanable.isNotEmpty) ...[
+            if (!embedded)
+              _SectionTitle(
+                icon: PhosphorIconsLight.broom,
+                text: l.cleanerEditorsCleanableSection,
+              ),
+            for (final kind in cleanable)
+              _buildDockerRow(l, state, docker, kind, largest, busy),
+            const SizedBox(height: CbSpacing.sm),
+            if (state.isCleaningDocker)
+              CleanerScanStrip(
+                key: const ValueKey<String>(
+                  'cleaner-app-storage-docker-running',
+                ),
+                title: l.cleanerDockerRunning(
+                  'docker ${state.dockerStep!.pruneArgs.take(2).join(' ')}',
+                ),
+              )
+            else
+              Align(
+                alignment: Alignment.centerRight,
+                child: CbButton(
+                  key: const ValueKey<String>(
+                    'cleaner-app-storage-docker-clean',
+                  ),
+                  variant: CbButtonVariant.danger,
+                  icon: PhosphorIconsLight.trashSimple,
+                  label: l.cleanerDockerClean(_size(selectedBytes)),
+                  onPressed: busy || !widget.enabled || state.dockerPlan.isEmpty
+                      ? null
+                      : _cleanDocker,
+                ),
+              ),
+          ],
+        ],
+        if (state.dockerFreed case final freed?) ...[
+          const SizedBox(height: CbSpacing.sm),
+          _Note(
+            key: const ValueKey<String>('cleaner-app-storage-docker-freed'),
+            icon: PhosphorIconsLight.checkCircle,
+            text: l.cleanerDockerFreed(_size(freed)),
+          ),
+        ],
+        if (state.dockerError case final error?) ...[
+          const SizedBox(height: CbSpacing.sm),
+          _Note(
+            icon: PhosphorIconsLight.warningCircle,
+            text: l.cleanerDockerFailed(error),
+          ),
+        ],
+      ],
     );
   }
 
@@ -857,22 +878,9 @@ class _CleanerAppStorageViewState extends State<CleanerAppStorageView> {
         PhosphorIconsLight.hardDrives,
       ),
     };
-    final items = <(String, int)>[
-      for (final image in docker.images)
-        if ((kind == DockerCleanKind.unusedImages && image.isUnused) ||
-            (kind == DockerCleanKind.danglingImages &&
-                image.isUnused &&
-                image.isDangling))
-          (image.name, image.uniqueSize),
-      if (kind == DockerCleanKind.stoppedContainers)
-        for (final container in docker.containers)
-          if (!container.isRunning)
-            ('${container.name} · ${container.state}', container.size),
-      if (kind == DockerCleanKind.unusedVolumes)
-        for (final volume in docker.volumes)
-          if (volume.isUnused) (volume.name, volume.size),
-    ]..sort((a, b) => b.$2.compareTo(a.$2));
-    final selected = state.dockerSelected.contains(kind);
+    final items = docker.itemsOf(kind);
+    final selection = state.dockerSelection(kind);
+    final selected = selection != false;
     final expanded = _expandedDocker.contains(kind);
     return Column(
       key: ValueKey<String>('cleaner-app-storage-docker-${kind.name}'),
@@ -892,7 +900,8 @@ class _CleanerAppStorageViewState extends State<CleanerAppStorageView> {
                   key: ValueKey<String>(
                     'cleaner-app-storage-docker-check-${kind.name}',
                   ),
-                  value: selected,
+                  value: selection,
+                  tristate: true,
                   onChanged: busy ? null : (_) => _cubit.toggleDocker(kind),
                 ),
               ),
@@ -956,15 +965,26 @@ class _CleanerAppStorageViewState extends State<CleanerAppStorageView> {
         if (expanded)
           Padding(
             padding: const EdgeInsets.only(
-              left: 84,
+              left: 36,
               bottom: CbSpacing.xs + CbSpacing.xxs,
               right: CbSpacing.xs,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                for (final (name, size) in items.take(_targetsShown))
-                  _PathRow(icon: icon, path: name, bytes: size),
+                for (final item in items)
+                  _buildCheckedRow(
+                    key: ValueKey<String>(
+                      'cleaner-app-storage-docker-item-${kind.name}-${item.key}',
+                    ),
+                    value: state.isDockerItemSelected(kind, item),
+                    onChanged: busy
+                        ? null
+                        : () => _cubit.toggleDockerItem(kind, item),
+                    icon: icon,
+                    text: item.label,
+                    bytes: item.bytes,
+                  ),
               ],
             ),
           ),
@@ -1050,6 +1070,7 @@ class _CleanerAppStorageViewState extends State<CleanerAppStorageView> {
   ) {
     final groups = AppCleanGroup.of(entry);
     final editor = entry.editor;
+    final docker = _dockerOf(state, entry);
     final largestGroup = groups.fold<int>(0, (m, g) => math.max(m, g.bytes));
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1060,6 +1081,13 @@ class _CleanerAppStorageViewState extends State<CleanerAppStorageView> {
             icon: PhosphorIconsLight.info,
             text: l.cleanerEditorsRunning(entry.app.displayName),
           ),
+        ],
+        if (docker != null) ...[
+          _SectionTitle(
+            icon: PhosphorIconsLight.cube,
+            text: l.cleanerDockerTitle,
+          ),
+          _buildDockerDetails(l, state, docker, embedded: true),
         ],
         if (groups.isNotEmpty) ...[
           _SectionTitle(
@@ -1165,11 +1193,44 @@ class _CleanerAppStorageViewState extends State<CleanerAppStorageView> {
         l.cleanerEditorsMissingWorkspacesHint,
         PhosphorIconsLight.folderDashed,
       ),
+      AppCleanKind.xcodeDeviceSupport => (
+        l.cleanerXcodeDeviceSupport,
+        l.cleanerXcodeDeviceSupportHint,
+        PhosphorIconsLight.deviceMobile,
+      ),
+      AppCleanKind.xcodeArchives => (
+        l.cleanerXcodeArchives,
+        l.cleanerXcodeArchivesHint,
+        PhosphorIconsLight.archive,
+      ),
+      AppCleanKind.xcodeDerivedData => (
+        l.cleanerXcodeDerivedData,
+        l.cleanerXcodeDerivedDataHint,
+        PhosphorIconsLight.hammer,
+      ),
+      AppCleanKind.xcodeDocumentationCache => (
+        l.cleanerXcodeDocumentationCache,
+        l.cleanerXcodeDocumentationCacheHint,
+        PhosphorIconsLight.bookOpen,
+      ),
+      AppCleanKind.xcodeOldLogs => (
+        l.cleanerXcodeOldLogs,
+        l.cleanerXcodeOldLogsHint,
+        PhosphorIconsLight.scroll,
+      ),
+      AppCleanKind.xcodeOldDocumentationDownloads => (
+        l.cleanerXcodeOldDocumentationDownloads,
+        l.cleanerXcodeOldDocumentationDownloadsHint,
+        PhosphorIconsLight.downloadSimple,
+      ),
     };
     final pending = group.targets.every(
       (t) => state.pendingPaths.contains(t.path),
     );
-    final selected = state.isSelected(group) && !pending;
+    final selection = pending ? false : state.groupSelection(group);
+    final selected = selection != false;
+    final locked =
+        _cleans > 0 || state.status == CleanerAppStorageStatus.scanning;
     final expanded = _expandedGroups.contains(group.id);
     return Column(
       key: ValueKey<String>('cleaner-app-storage-group-${group.id}'),
@@ -1189,11 +1250,9 @@ class _CleanerAppStorageViewState extends State<CleanerAppStorageView> {
                   key: ValueKey<String>(
                     'cleaner-app-storage-check-${group.id}',
                   ),
-                  value: selected,
-                  onChanged:
-                      pending ||
-                          _cleans > 0 ||
-                          state.status == CleanerAppStorageStatus.scanning
+                  value: selection,
+                  tristate: true,
+                  onChanged: pending || locked
                       ? null
                       : (_) => _cubit.toggleGroup(group.id),
                 ),
@@ -1253,23 +1312,67 @@ class _CleanerAppStorageViewState extends State<CleanerAppStorageView> {
         if (expanded)
           Padding(
             padding: const EdgeInsets.only(
-              left: 84,
+              left: 36,
               bottom: CbSpacing.xs + CbSpacing.xxs,
               right: CbSpacing.xs,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                for (final target in group.targets.take(_targetsShown))
-                  _PathRow(
-                    icon: PhosphorIconsLight.file,
-                    path: target.path,
-                    bytes: target.bytes,
-                    onOpen: _openAction(target.path),
-                  ),
+                for (final target in group.targets)
+                  _buildTarget(state, group, target, locked),
               ],
             ),
           ),
+      ],
+    );
+  }
+
+  Widget _buildTarget(
+    CleanerAppStorageState state,
+    AppCleanGroup group,
+    EditorCleanTarget target,
+    bool locked,
+  ) {
+    final pending = state.pendingPaths.contains(target.path);
+    return _buildCheckedRow(
+      key: ValueKey<String>('cleaner-app-storage-target-${target.path}'),
+      value: !pending && state.isTargetSelected(group, target),
+      onChanged: pending || locked
+          ? null
+          : () => _cubit.toggleTarget(group, target.path),
+      icon: PhosphorIconsLight.file,
+      text: target.label ?? target.path,
+      bytes: target.bytes,
+      onOpen: _openAction(target.path),
+    );
+  }
+
+  Widget _buildCheckedRow({
+    required Key key,
+    required bool value,
+    required VoidCallback? onChanged,
+    required IconData icon,
+    required String text,
+    required int bytes,
+    VoidCallback? onOpen,
+  }) {
+    return Row(
+      children: [
+        SizedBox(
+          width: 36,
+          child: Checkbox(
+            key: key,
+            value: value,
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            visualDensity: VisualDensity.compact,
+            onChanged: onChanged == null ? null : (_) => onChanged(),
+          ),
+        ),
+        const SizedBox(width: CbSpacing.xs),
+        Expanded(
+          child: _PathRow(icon: icon, path: text, bytes: bytes, onOpen: onOpen),
+        ),
       ],
     );
   }

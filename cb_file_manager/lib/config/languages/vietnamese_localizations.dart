@@ -7219,6 +7219,36 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get cleanerAppStorageKindShared => 'Dùng chung với ứng dụng cùng hãng';
   @override
+  String get cleanerXcodeDeviceSupport => 'Device Support';
+  @override
+  String get cleanerXcodeDeviceSupportHint =>
+      'Symbol gỡ lỗi sao chép từ thiết bị. Xcode sẽ sao chép lại khi bạn gỡ lỗi trên thiết bị đó.';
+  @override
+  String get cleanerXcodeArchives => 'Archives';
+  @override
+  String get cleanerXcodeArchivesHint =>
+      'Các bản build đã lưu trữ kèm symbol gỡ lỗi, cần để đọc báo cáo lỗi của bản đã phát hành. Xcode không tạo lại được.';
+  @override
+  String get cleanerXcodeDerivedData => 'Derived Data';
+  @override
+  String get cleanerXcodeDerivedDataHint =>
+      'Kết quả build, chỉ mục và mã nguồn package đã tải. Lần build tiếp theo sẽ lâu hơn.';
+  @override
+  String get cleanerXcodeDocumentationCache => 'Cache tài liệu';
+  @override
+  String get cleanerXcodeDocumentationCacheHint =>
+      'Các trang tài liệu đã tải. Xcode sẽ tải lại khi cần.';
+  @override
+  String get cleanerXcodeOldLogs => 'Log cũ';
+  @override
+  String get cleanerXcodeOldLogsHint =>
+      'Log và báo cáo lỗi sao chép từ thiết bị.';
+  @override
+  String get cleanerXcodeOldDocumentationDownloads => 'Tài liệu cũ đã tải';
+  @override
+  String get cleanerXcodeOldDocumentationDownloadsHint =>
+      'Bộ tài liệu do các phiên bản Xcode cũ tải về.';
+  @override
   String get cleanerAppStorageCacheOptionalHint =>
       'Toàn bộ thư mục cache. Ứng dụng sẽ tạo lại hoặc tải lại nên có thể mở chậm hơn.';
   @override

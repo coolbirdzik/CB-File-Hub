@@ -68,6 +68,33 @@ class MainFlutterWindow: NSWindow {
           }
           DispatchQueue.main.async { result(rows) }
         }
+      case "getMountedVolumes":
+        // What Finder lists: hidden mounts (Recovery, Preboot, simulator
+        // runtimes) stay out and the boot volume is `/` itself.
+        DispatchQueue.global(qos: .utility).async {
+          let keys: [URLResourceKey] = [.volumeNameKey, .volumeTotalCapacityKey,
+            .volumeAvailableCapacityKey, .volumeLocalizedFormatDescriptionKey,
+            .volumeIsRootFileSystemKey, .volumeIsLocalKey, .volumeIsInternalKey,
+            .volumeIsRemovableKey, .volumeIsEjectableKey]
+          let mounted = FileManager.default.mountedVolumeURLs(
+            includingResourceValuesForKeys: keys, options: [.skipHiddenVolumes]) ?? []
+          var seen = Set<String>()
+          let rows: [[String: Any]] = mounted.compactMap { url in
+            let path = url.resolvingSymlinksInPath().standardizedFileURL.path
+            guard seen.insert(path).inserted else { return nil }
+            let values = try? url.resourceValues(forKeys: Set(keys))
+            return ["path": path, "label": values?.volumeName ?? url.lastPathComponent,
+              "filesystem": values?.volumeLocalizedFormatDescription ?? "",
+              "totalBytes": values?.volumeTotalCapacity ?? 0,
+              "freeBytes": values?.volumeAvailableCapacity ?? 0,
+              "isRoot": values?.volumeIsRootFileSystem ?? (path == "/"),
+              "isLocal": values?.volumeIsLocal ?? true,
+              "isInternal": values?.volumeIsInternal ?? false,
+              "isRemovable": values?.volumeIsRemovable ?? false,
+              "isEjectable": values?.volumeIsEjectable ?? false]
+          }
+          DispatchQueue.main.async { result(rows) }
+        }
       case "trashCleanerItems":
         let args = call.arguments as? [String: Any]
         let paths = args?["paths"] as? [String] ?? []

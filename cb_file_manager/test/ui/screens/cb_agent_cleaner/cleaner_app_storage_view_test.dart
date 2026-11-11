@@ -83,6 +83,45 @@ AppSpaceReport _report({bool complete = true}) => AppSpaceReport(
   ],
 );
 
+const String _derived = '/Users/me/Library/Developer/Xcode/DerivedData';
+const String _derivedGroup = 'dev/data/xcodeDerivedData/optional';
+
+AppSpaceReport _projectsReport() => AppSpaceReport(
+  generatedAt: DateTime(2026, 11, 9),
+  entries: [
+    _entry(
+      'dev',
+      'Xcode',
+      items: const [
+        AppSpaceItem(
+          path: '$_derived/Unity-iPhone-abc',
+          kind: AppSpaceKind.cache,
+          tier: AppSpaceTier.optional,
+          bytes: 70 * _mb,
+          cleanGroup: AppCleanKind.xcodeDerivedData,
+          label: 'Unity-iPhone · ~/Code/game',
+        ),
+        AppSpaceItem(
+          path: '$_derived/Runner-abc',
+          kind: AppSpaceKind.cache,
+          tier: AppSpaceTier.optional,
+          bytes: 20 * _mb,
+          cleanGroup: AppCleanKind.xcodeDerivedData,
+          label: 'Runner · ~/Code/app/ios',
+        ),
+        AppSpaceItem(
+          path: '$_derived/ModuleCache.noindex',
+          kind: AppSpaceKind.cache,
+          tier: AppSpaceTier.optional,
+          bytes: 10 * _mb,
+          cleanGroup: AppCleanKind.xcodeDerivedData,
+          label: 'ModuleCache.noindex',
+        ),
+      ],
+    ),
+  ],
+);
+
 /// Hands out reports when the test says so.
 class _Scanner implements AppStorageScanner {
   Completer<AppSpaceReport?>? done;
@@ -138,6 +177,67 @@ void main() {
       cubit.state.report!.entries.first.items.map((i) => i.path),
       isNot(contains('/Users/me/Library/Caches/com.chatter.app')),
     );
+  });
+
+  group('checking single items', () {
+    late CleanerAppStorageCubit cubit;
+    late AppCleanGroup projects;
+
+    setUp(() async {
+      final scanner = _Scanner();
+      cubit = CleanerAppStorageCubit(scanner: scanner);
+      final run = cubit.scan();
+      scanner.done!.complete(_projectsReport());
+      await run;
+      projects = cubit.state.groups.single;
+    });
+    tearDown(() => cubit.close());
+
+    List<String> selected() => [
+      for (final target in cubit.state.selectedTargets) target.path,
+    ];
+
+    test('one item of an unchecked group is checked alone', () {
+      expect(cubit.state.groupSelection(projects), isFalse);
+      cubit.toggleTarget(projects, '$_derived/Runner-abc');
+      expect(selected(), ['$_derived/Runner-abc']);
+      expect(cubit.state.selectedBytes, 20 * _mb);
+      expect(cubit.state.groupSelection(projects), isNull);
+    });
+
+    test('unchecking the last item unchecks the group', () {
+      cubit.toggleTarget(projects, '$_derived/Runner-abc');
+      cubit.toggleTarget(projects, '$_derived/Runner-abc');
+      expect(selected(), isEmpty);
+      expect(cubit.state.groupSelection(projects), isFalse);
+    });
+
+    test('a partly checked group becomes fully checked, then empty', () {
+      cubit.toggleTarget(projects, '$_derived/Runner-abc');
+      cubit.toggleGroup(projects.id);
+      expect(cubit.state.groupSelection(projects), isTrue);
+      expect(selected(), hasLength(3));
+      cubit.toggleGroup(projects.id);
+      expect(cubit.state.groupSelection(projects), isFalse);
+      expect(selected(), isEmpty);
+    });
+
+    test('one item can be left out of a checked group', () {
+      cubit.toggleGroup(projects.id);
+      cubit.toggleTarget(projects, '$_derived/ModuleCache.noindex');
+      expect(
+        selected(),
+        unorderedEquals(['$_derived/Unity-iPhone-abc', '$_derived/Runner-abc']),
+      );
+    });
+
+    test('items left unchecked do not read as checked after a clean', () {
+      cubit.toggleTarget(projects, '$_derived/Runner-abc');
+      cubit.markPending(['$_derived/Runner-abc']);
+      cubit.finishClean(['$_derived/Runner-abc'], ['$_derived/Runner-abc']);
+      expect(selected(), isEmpty);
+      expect(cubit.state.groupSelection(cubit.state.groups.single), isFalse);
+    });
   });
 
   test('cancel keeps a partial report on screen', () async {
@@ -280,6 +380,48 @@ void main() {
       find.byKey(const ValueKey('cleaner-app-storage-clean')),
       findsNothing,
     );
+  });
+
+  testWidgets('cleans only the project that was checked', (tester) async {
+    final (scanner, cubit, cleaned, _) = await pump(tester);
+    await tester.tap(find.byKey(const ValueKey('cleaner-app-storage-scan')));
+    await tester.pump();
+    scanner.done!.complete(_projectsReport());
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('cleaner-app-storage-toggle-dev')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Derived Data'));
+    await tester.pumpAndSettle();
+    expect(find.text('Runner · ~/Code/app/ios'), findsOneWidget);
+
+    await tester.tap(
+      find.byKey(
+        const ValueKey('cleaner-app-storage-target-$_derived/Runner-abc'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('20.0 MB selected'), findsOneWidget);
+    expect(
+      tester
+          .widget<Checkbox>(
+            find.byKey(
+              const ValueKey('cleaner-app-storage-check-$_derivedGroup'),
+            ),
+          )
+          .value,
+      isNull,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('cleaner-app-storage-clean')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('cleaner-app-storage-confirm-clean')),
+    );
+    await tester.pumpAndSettle();
+    expect(cleaned.single.map((i) => i.path), ['$_derived/Runner-abc']);
+    expect(cubit.state.groups.single.targets, hasLength(2));
   });
 
   testWidgets('a cancelled scan says the apps were not measured', (
@@ -446,6 +588,303 @@ void main() {
       );
       expect(cubit.state.report!.docker!.images, isEmpty);
       expect(cubit.state.dockerSelected, isEmpty);
+    });
+
+    Future<CleanerAppStorageCubit> ready(DockerTool docker) async {
+      final scanner = _Scanner();
+      final cubit = CleanerAppStorageCubit(scanner: scanner, docker: docker);
+      addTearDown(cubit.close);
+      final run = cubit.scan();
+      scanner.done!.complete(_report().withDocker(report));
+      await run;
+      return cubit;
+    }
+
+    DockerItem item(
+      CleanerAppStorageCubit cubit,
+      DockerCleanKind kind,
+      String label,
+    ) => cubit.state.report!.docker!
+        .itemsOf(kind)
+        .singleWhere((i) => i.label == label);
+
+    test(
+      'one image is removed by itself; the other rows still prune',
+      () async {
+        final (docker, calls) = fakeDocker();
+        final cubit = await ready(docker);
+        cubit.toggleDockerItem(
+          DockerCleanKind.unusedImages,
+          item(cubit, DockerCleanKind.unusedImages, 'app/web:old'),
+        );
+        expect(
+          cubit.state.dockerSelection(DockerCleanKind.unusedImages),
+          isNull,
+        );
+        expect(cubit.state.dockerSelectedBytes, (150 + 40 + 500) * _mb);
+
+        await cubit.cleanDocker();
+        expect(calls.where((c) => c.contains('prune') || c.contains('rm')), [
+          ['image', 'prune', '--force'],
+          ['image', 'rm', 'app/web:old'],
+          ['builder', 'prune', '--all', '--force'],
+        ]);
+      },
+    );
+
+    test('an image left out is kept even with both image rows on', () {
+      final plan = report.plan(
+        {DockerCleanKind.danglingImages, DockerCleanKind.unusedImages},
+        {
+          DockerReport.excludedKey(
+            DockerCleanKind.unusedImages,
+            report
+                .itemsOf(DockerCleanKind.unusedImages)
+                .singleWhere((i) => i.label == 'app/web:old'),
+          ),
+        },
+      );
+      // The dangling prune covers the rest of the unused row.
+      expect(plan.prunes, {DockerCleanKind.danglingImages});
+      expect(plan.removals, isEmpty);
+    });
+
+    test('a dangling image is left out of a whole unused prune only if '
+        'unused images are partly checked', () {
+      final dangling = report.itemsOf(DockerCleanKind.danglingImages).single;
+      final plan = report.plan(
+        {DockerCleanKind.danglingImages, DockerCleanKind.unusedImages},
+        {DockerReport.excludedKey(DockerCleanKind.danglingImages, dangling)},
+      );
+      // Unused images is fully checked, and it includes that image.
+      expect(plan.prunes, {DockerCleanKind.unusedImages});
+      expect(plan.removals, isEmpty);
+    });
+
+    test('unchecking every item checks nothing', () async {
+      final (docker, _) = fakeDocker();
+      final cubit = await ready(docker);
+      final volume = item(cubit, DockerCleanKind.unusedVolumes, 'old-data');
+      cubit.toggleDockerItem(DockerCleanKind.unusedVolumes, volume);
+      expect(
+        cubit.state.dockerSelection(DockerCleanKind.unusedVolumes),
+        isTrue,
+      );
+      cubit.toggleDockerItem(DockerCleanKind.unusedVolumes, volume);
+      expect(
+        cubit.state.dockerSelection(DockerCleanKind.unusedVolumes),
+        isFalse,
+      );
+      expect(cubit.state.dockerSelected, isNot(isEmpty));
+      expect(
+        cubit.state.dockerPlan.removals.containsKey(
+          DockerCleanKind.unusedVolumes,
+        ),
+        isFalse,
+      );
+      expect(
+        cubit.state.dockerPlan.prunes,
+        isNot(contains(DockerCleanKind.unusedVolumes)),
+      );
+    });
+
+    test('one failed removal does not stop the others', () async {
+      final calls = <List<String>>[];
+      final tool = DockerTool(
+        locate: () => 'docker',
+        run: (_, args) async {
+          calls.add(args);
+          return args.last == 'busy'
+              ? ProcessResult(0, 1, '', 'volume is in use')
+              : ProcessResult(0, 0, '', '');
+        },
+      );
+      const a = DockerItem(
+        type: 'volume',
+        reference: 'busy',
+        label: 'busy',
+        bytes: 1,
+      );
+      const b = DockerItem(
+        type: 'volume',
+        reference: 'free',
+        label: 'free',
+        bytes: 2,
+      );
+      await expectLater(
+        tool.apply(
+          const DockerCleanPlan(
+            removals: {
+              DockerCleanKind.unusedVolumes: [a, b],
+            },
+          ),
+        ),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            contains('busy: volume is in use'),
+          ),
+        ),
+      );
+      expect(calls, [
+        ['volume', 'rm', 'busy'],
+        ['volume', 'rm', 'free'],
+      ]);
+    });
+
+    test('an image with no tag is removed by id', () {
+      const image = DockerImage(
+        id: 'sha256:abcdef0123456789',
+        repository: 'app/web',
+        tag: '<none>',
+        size: 1,
+        uniqueSize: 1,
+        containers: 0,
+      );
+      expect(image.reference, 'abcdef0123456789');
+    });
+
+    testWidgets('a single volume can be ticked and removed', (tester) async {
+      final (docker, calls) = fakeDocker();
+      final (scanner, cubit, _, _) = await pump(tester, docker: docker);
+      await tester.tap(find.byKey(const ValueKey('cleaner-app-storage-scan')));
+      await tester.pump();
+      scanner.done!.complete(_report().withDocker(report));
+      await tester.pumpAndSettle();
+      // Only this volume: the regenerable rows are unticked first.
+      cubit.toggleDocker(DockerCleanKind.danglingImages);
+      cubit.toggleDocker(DockerCleanKind.buildCache);
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('cleaner-app-storage-docker-unusedVolumes')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('old-data'), findsOneWidget);
+      await tester.tap(
+        find.byKey(
+          const ValueKey(
+            'cleaner-app-storage-docker-item-unusedVolumes-volume:old-data',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('cleaner-app-storage-docker-clean')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('cleaner-app-storage-docker-confirm')),
+      );
+      await tester.pumpAndSettle();
+      expect(calls.where((c) => c.contains('rm') || c.contains('prune')), [
+        ['volume', 'prune', '--all', '--force'],
+      ]);
+      expect(tester.takeException(), isNull);
+    });
+
+    AppSpaceReport withDockerEntry(InstalledAppInfo app) => AppSpaceReport(
+      generatedAt: DateTime(2026, 11, 9),
+      docker: report,
+      entries: [
+        AppSpaceEntry(
+          app: app,
+          isRunning: true,
+          items: const [
+            AppSpaceItem(
+              path: '/Users/me/Library/Containers/com.docker.docker',
+              kind: AppSpaceKind.userData,
+              tier: AppSpaceTier.review,
+              bytes: 900 * _mb,
+            ),
+          ],
+        ),
+        ..._report().entries,
+      ],
+    );
+    const dockerApp = InstalledAppInfo(
+      id: 'mac:com.docker.docker',
+      displayName: 'Docker',
+      source: InstalledAppSource.macApp,
+      packageFamilyName: 'com.docker.docker',
+    );
+
+    testWidgets('Docker is one row: the app holds its cleaning', (
+      tester,
+    ) async {
+      final (docker, calls) = fakeDocker();
+      final (scanner, _, cleaned, _) = await pump(tester, docker: docker);
+      await tester.tap(find.byKey(const ValueKey('cleaner-app-storage-scan')));
+      await tester.pump();
+      scanner.done!.complete(withDockerEntry(dockerApp));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('cleaner-app-storage-docker')),
+        findsNothing,
+      );
+      expect(find.text('Docker'), findsOneWidget);
+      expect(find.text('540.0 MB safe'), findsOneWidget);
+      expect(find.text('Unused volumes (1)'), findsNothing);
+
+      await tester.tap(
+        find.byKey(
+          const ValueKey('cleaner-app-storage-toggle-mac:com.docker.docker'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Unused volumes (1)'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      await tester.tap(
+        find.byKey(const ValueKey('cleaner-app-storage-docker-clean')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('cleaner-app-storage-docker-confirm')),
+      );
+      await tester.pumpAndSettle();
+      expect(calls.where((c) => c.contains('prune')).toList(), [
+        ['image', 'prune', '--force'],
+        ['builder', 'prune', '--all', '--force'],
+      ]);
+      expect(cleaned, isEmpty);
+    });
+
+    testWidgets('the cleanable filter keeps the Docker app', (tester) async {
+      final (scanner, _, _, _) = await pump(tester);
+      await tester.tap(find.byKey(const ValueKey('cleaner-app-storage-scan')));
+      await tester.pump();
+      scanner.done!.complete(withDockerEntry(dockerApp));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('cleaner-app-storage-cleanable-only')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Docker'), findsOneWidget);
+      expect(find.text('Busy App'), findsNothing);
+    });
+
+    testWidgets('the docker command alone is not the Docker app', (
+      tester,
+    ) async {
+      final (scanner, _, _, _) = await pump(tester);
+      await tester.tap(find.byKey(const ValueKey('cleaner-app-storage-scan')));
+      await tester.pump();
+      scanner.done!.complete(
+        withDockerEntry(
+          const InstalledAppInfo(
+            id: 'exe:docker',
+            displayName: 'docker',
+            source: InstalledAppSource.executable,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('cleaner-app-storage-docker')),
+        findsOneWidget,
+      );
     });
 
     testWidgets('the Docker card fits a narrow pane', (tester) async {

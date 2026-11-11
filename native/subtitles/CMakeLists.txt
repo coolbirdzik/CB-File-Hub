@@ -81,6 +81,13 @@ if(WIN32)
 else()
   find_package(PkgConfig REQUIRED)
   pkg_check_modules(SUBTITLE_AV REQUIRED IMPORTED_TARGET libavformat libavcodec libavutil libswresample)
+  # CMake de-duplicates link options word by word, so a repeated `-framework`
+  # would leave `-framework A B C` and the linker reads B and C as files.
+  get_target_property(CB_AV_LINK_OPTIONS PkgConfig::SUBTITLE_AV INTERFACE_LINK_OPTIONS)
+  if(CB_AV_LINK_OPTIONS)
+    string(REPLACE "-framework;" "SHELL:-framework " CB_AV_LINK_OPTIONS "${CB_AV_LINK_OPTIONS}")
+    set_target_properties(PkgConfig::SUBTITLE_AV PROPERTIES INTERFACE_LINK_OPTIONS "${CB_AV_LINK_OPTIONS}")
+  endif()
   target_link_libraries(cb-subtitle-worker PRIVATE PkgConfig::SUBTITLE_AV)
 endif()
 set_target_properties(cb-subtitle-worker PROPERTIES

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:path_provider/path_provider.dart';
 
 import 'package:path/path.dart' as pathlib;
 
@@ -216,7 +217,14 @@ class FileContextBuilder {
 
   /// Scans all available drives/storage locations (top-level, non-recursive).
   Future<List<_FileContext>> _scanAllDrives(bool includeContent) async {
-    final locations = await getAllStorageLocations();
+    // macOS lists `/`, whose top levels are the OS, not the user's files.
+    final locations = [
+      for (final dir in await getAllStorageLocations())
+        if (Platform.isMacOS && dir.path == '/')
+          await getApplicationDocumentsDirectory()
+        else
+          dir,
+    ];
     final allContexts = <_FileContext>[];
 
     for (final dir in locations) {

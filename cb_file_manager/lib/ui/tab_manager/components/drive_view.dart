@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 
@@ -8,6 +9,7 @@ import 'package:cb_file_manager/helpers/files/windows_shell_context_menu.dart';
 import 'package:cb_file_manager/services/drive/drive_actions.dart';
 import 'package:cb_file_manager/services/drive/drive_info.dart';
 import 'package:cb_file_manager/services/drive/drive_inventory_service.dart';
+import 'package:cb_file_manager/services/drive/macos_volumes.dart';
 import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_paths.dart';
 import 'package:cb_file_manager/ui/utils/entity_open_actions.dart';
@@ -64,12 +66,18 @@ class _DriveViewState extends State<DriveView> {
   bool _isLoadingDrives = false;
   Object? _loadError;
 
+  StreamSubscription<void>? _volumeChanges;
+
   bool get _isDesktopPlatform =>
       Platform.isWindows || Platform.isLinux || Platform.isMacOS;
 
   @override
   void initState() {
     super.initState();
+    _volumeChanges = MacosVolumes.changes.listen(
+      (_) => _reloadDriveEntries(force: true),
+      onError: (Object e) => debugPrint('Volume changes failed: $e'),
+    );
     final cached = DriveInventoryService.cachedSnapshot;
     if (cached != null && cached.isNotEmpty) {
       _drives = cached;
@@ -91,6 +99,12 @@ class _DriveViewState extends State<DriveView> {
         (!oldWidget.isRefreshing && widget.isRefreshing)) {
       _reloadDriveEntries(force: true);
     }
+  }
+
+  @override
+  void dispose() {
+    _volumeChanges?.cancel();
+    super.dispose();
   }
 
   Future<void> _revalidateDrivesInBackground() async {

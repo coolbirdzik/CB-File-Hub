@@ -4,6 +4,7 @@ import 'package:cb_file_manager/ui/components/common/search_text_field.dart';
 
 import 'dart:async';
 import 'dart:io';
+import 'package:cb_file_manager/ui/widgets/drawer/storage_section_widget.dart';
 
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/helpers/core/filesystem_utils.dart';
@@ -311,7 +312,7 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
         return _SidebarEntry(
           label: _driveLabel(dir, l10n),
           path: dir.path,
-          icon: _driveIcon(dir),
+          icon: storageLocationIcon(dir),
           requiresAdmin: dir.requiresAdmin,
         );
       }).toList();
@@ -327,6 +328,9 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
   }
 
   String _driveLabel(Directory drive, AppLocalizations l10n) {
+    final volumeLabel = drive.volumeLabel;
+    if (volumeLabel != null) return volumeLabel;
+
     var p = drive.path;
     if (p.length > 1 && p.endsWith(Platform.pathSeparator)) {
       p = p.substring(0, p.length - 1);
@@ -338,13 +342,6 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
           : l10n.mpDriveOther(letter);
     }
     return p;
-  }
-
-  IconData _driveIcon(Directory drive) {
-    if (Platform.isWindows && drive.path.startsWith('C:')) {
-      return PhosphorIconsLight.desktop;
-    }
-    return PhosphorIconsLight.hardDrives;
   }
 
   Future<void> _loadAllTags() async {

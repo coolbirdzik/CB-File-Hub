@@ -1,5 +1,7 @@
 import 'dart:io';
 import 'dart:async';
+import 'package:cb_file_manager/services/drive/macos_volumes.dart';
+import 'package:cb_file_manager/services/drive/drive_inventory_service.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:flutter/foundation.dart';
@@ -75,10 +77,25 @@ class DrawerCubit extends Cubit<DrawerState> {
   bool get _isMacOS => _userFolders.platform == TargetPlatform.macOS;
   bool get _defaultPinnedExpanded => _isMacOS;
 
-  DrawerCubit({MacosUserFoldersService? userFolders})
-    : _userFolders = userFolders ?? MacosUserFoldersService(),
-      super(const DrawerState()) {
+  StreamSubscription<void>? _volumeChanges;
+
+  DrawerCubit({
+    MacosUserFoldersService? userFolders,
+    Stream<void>? volumeChanges,
+  }) : _userFolders = userFolders ?? MacosUserFoldersService(),
+       super(const DrawerState()) {
     _startSyncTimer();
+    _volumeChanges = (volumeChanges ?? MacosVolumes.changes).listen(
+      (_) => _reloadVolumes(),
+      onError: (Object e) => debugPrint('Volume changes failed: $e'),
+    );
+  }
+
+  /// A disk came or went: only the list changes, so no loading state.
+  Future<void> _reloadVolumes() async {
+    DriveInventoryService.invalidateCache();
+    final locations = await getAllStorageLocations();
+    if (!isClosed) emit(state.copyWith(storageLocations: locations));
   }
 
   String _normalizeTabId(String? tabId) {
@@ -390,6 +407,7 @@ class DrawerCubit extends Cubit<DrawerState> {
   Future<void> close() async {
     _syncTimer?.cancel();
     _syncTimer = null;
+    unawaited(_volumeChanges?.cancel());
     return super.close();
   }
 }

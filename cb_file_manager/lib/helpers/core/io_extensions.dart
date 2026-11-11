@@ -5,6 +5,7 @@
 
 // dart
 import 'dart:io';
+import 'package:cb_file_manager/services/drive/drive_info.dart';
 
 // packages
 import 'package:path/path.dart' as path;
@@ -133,4 +134,10 @@ extension DirectoryProperties on Directory {
 
   // Check if a directory requires admin privileges
   bool get requiresAdmin => getProperty('requiresAdmin', defaultValue: false);
+
+  /// The volume's own name, when this directory is a volume root on macOS.
+  String? get volumeLabel => getProperty('volumeLabel') as String?;
+
+  /// What kind of disk this volume root is on macOS.
+  DriveKind? get volumeKind => getProperty('volumeKind') as DriveKind?;
 }

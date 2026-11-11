@@ -753,8 +753,15 @@ class TorrentService extends ChangeNotifier {
                 drive.kind != DriveKind.optical &&
                 drive.kind != DriveKind.network,
           )
-          .map((drive) => drive.path)
+          .map(_scanRootOf)
           .toList();
+
+  /// Walking macOS `/` would read the OS, then the whole Data volume and every
+  /// `/Volumes` disk a second time: the boot volume's torrents are at home.
+  static String _scanRootOf(DriveInfo drive) =>
+      Platform.isMacOS && drive.isSystemVolume
+      ? Platform.environment['HOME'] ?? drive.path
+      : drive.path;
 
   /// Organizes metainfo according to the user's chosen mode. File imports
   /// never contact trackers/peers.

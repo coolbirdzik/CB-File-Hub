@@ -7238,6 +7238,37 @@ class EnglishLocalizations implements AppLocalizations {
   String get cleanerAppStorageKindShared =>
       'Shared with apps of the same vendor';
   @override
+  String get cleanerXcodeDeviceSupport => 'Device Support';
+  @override
+  String get cleanerXcodeDeviceSupportHint =>
+      'Debug symbols copied from your devices. Xcode copies them again the next time you debug on that device.';
+  @override
+  String get cleanerXcodeArchives => 'Archives';
+  @override
+  String get cleanerXcodeArchivesHint =>
+      'Archived builds and their debug symbols, needed to read crash reports from released versions. Xcode cannot recreate them.';
+  @override
+  String get cleanerXcodeDerivedData => 'Derived Data';
+  @override
+  String get cleanerXcodeDerivedDataHint =>
+      'Build products, indexes and package checkouts. The next build will take longer.';
+  @override
+  String get cleanerXcodeDocumentationCache => 'Documentation Cache';
+  @override
+  String get cleanerXcodeDocumentationCacheHint =>
+      'Downloaded documentation pages. Xcode fetches them again when needed.';
+  @override
+  String get cleanerXcodeOldLogs => 'Old Logs';
+  @override
+  String get cleanerXcodeOldLogsHint =>
+      'Logs and crash reports copied from your devices.';
+  @override
+  String get cleanerXcodeOldDocumentationDownloads =>
+      'Old Documentation Downloads';
+  @override
+  String get cleanerXcodeOldDocumentationDownloadsHint =>
+      'Documentation sets downloaded by older Xcode versions.';
+  @override
   String get cleanerAppStorageCacheOptionalHint =>
       'The whole cache folder. The app rebuilds or downloads it again, so it may start slower.';
   @override
