@@ -537,6 +537,7 @@ class _DriveViewState extends State<DriveView> {
     final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
     final l = AppLocalizations.of(context)!;
     final action = await showMenu<String>(
+      popUpAnimationStyle: CbPopoverTransition.menuStyleOf(context),
       context: context,
       position: RelativeRect.fromRect(
         position & Size.zero,
@@ -604,12 +605,10 @@ class _DriveViewState extends State<DriveView> {
         Platform.isWindows &&
         drive.kind != DriveKind.wsl &&
         FileSystemEntity.typeSync(drive.path) != FileSystemEntityType.notFound;
-    final menuColor = Theme.of(context).colorScheme.surface.withAlpha(255);
-
     final selected = await showMenu<String>(
+      popUpAnimationStyle: CbPopoverTransition.menuStyleOf(context),
       context: context,
       position: position,
-      color: menuColor,
       items: <PopupMenuEntry<String>>[
         PopupMenuItem(
           value: 'open',

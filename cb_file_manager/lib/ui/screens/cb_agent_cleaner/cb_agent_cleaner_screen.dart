@@ -4069,6 +4069,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       // require walking the hierarchy.
       boundedAction(
         PopupMenuButton<_TreePreset>(
+          popUpAnimationStyle: CbPopoverTransition.menuStyleOf(context),
           key: const ValueKey<String>('cleaner-preset-menu'),
           tooltip: l.diskCleanerPresetTooltip,
           initialValue: _activePreset,

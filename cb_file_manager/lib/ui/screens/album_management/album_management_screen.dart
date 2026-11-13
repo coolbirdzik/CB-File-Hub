@@ -738,6 +738,7 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
       _selectionBloc.add(ToggleFileSelection(_albumPath(album)));
     }
     final value = await showMenu<String>(
+      popUpAnimationStyle: CbPopoverTransition.menuStyleOf(context),
       context: context,
       position: RelativeRect.fromLTRB(position.dx, position.dy, 0, 0),
       items: _albumMenuItems(album),
@@ -746,6 +747,7 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
   }
 
   Widget _buildAlbumMenu(Album album) => PopupMenuButton<String>(
+    popUpAnimationStyle: CbPopoverTransition.menuStyleOf(context),
     tooltip: context.tr.albumOptions,
     onSelected: (value) => _handleAlbumMenuAction(album, value),
     itemBuilder: (_) => _albumMenuItems(album),
@@ -1083,6 +1085,9 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
                         shape: BoxShape.circle,
                       ),
                       child: PopupMenuButton<String>(
+                        popUpAnimationStyle: CbPopoverTransition.menuStyleOf(
+                          context,
+                        ),
                         tooltip: context.tr.albumOptions,
                         padding: EdgeInsets.zero,
                         icon: const Icon(

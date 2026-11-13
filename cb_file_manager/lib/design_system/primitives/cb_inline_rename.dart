@@ -10,6 +10,7 @@ import '../tokens/cb_type_tokens.dart';
 import 'cb_button.dart';
 import 'cb_decorations.dart';
 import 'cb_surface.dart';
+import 'cb_popover_transition.dart';
 
 /// Characters Windows — the strictest of the three desktop targets — refuses
 /// in a file or folder name. Blocked at the keystroke so the field can never
@@ -730,22 +731,14 @@ Future<String?> showCbInlineRename({
     // Lighter than a dialog scrim: this is a local edit, and dimming the whole
     // window for it would overstate what is happening.
     barrierColor: c.scrim.withValues(alpha: 0.18),
-    transitionDuration: CbDurations.fast,
+    transitionDuration: CbPopoverTransition.reduceMotionOf(context)
+        ? Duration.zero
+        : CbDurations.popoverOpen,
     pageBuilder: (_, _, _) => const SizedBox.shrink(),
     transitionBuilder: (dialogContext, animation, _, _) {
-      final Animation<double> curved = CurvedAnimation(
-        parent: animation,
-        curve: CbCurves.standard,
-        reverseCurve: CbCurves.exit,
-      );
-
-      final Widget body = FadeTransition(
-        opacity: curved,
-        child: ScaleTransition(
-          scale: Tween<double>(begin: 0.97, end: 1).animate(curved),
-          alignment: anchorRect == null ? Alignment.center : Alignment.topLeft,
-          child: Material(type: MaterialType.transparency, child: panel),
-        ),
+      final Widget body = CbPopoverTransition(
+        animation: animation,
+        child: Material(type: MaterialType.transparency, child: panel),
       );
 
       if (anchorRect == null) {

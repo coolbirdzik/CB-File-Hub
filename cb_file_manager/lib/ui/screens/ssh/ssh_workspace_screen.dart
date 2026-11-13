@@ -546,6 +546,7 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
         ),
       if (more.isNotEmpty)
         PopupMenuButton<VoidCallback>(
+          popUpAnimationStyle: CbPopoverTransition.menuStyleOf(context),
           key: const ValueKey('ssh-more-action'),
           icon: const Icon(PhosphorIconsLight.dotsThreeVertical),
           tooltip: tr.moreOptionsTooltip,
@@ -740,6 +741,7 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
     String label(SshHostSortField field) => _sortLabel(tr, field);
     IconData icon(SshHostSortField field) => _sortIcon(field);
     return PopupMenuButton<SshHostSortField>(
+      popUpAnimationStyle: CbPopoverTransition.menuStyleOf(context),
       key: const ValueKey('ssh-host-sort'),
       icon: Icon(
         _sort.ascending

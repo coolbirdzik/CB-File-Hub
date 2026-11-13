@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/design_system/primitives/cb_popover_transition.dart';
 import 'package:flutter/material.dart';
 import 'package:cb_file_manager/ui/utils/base_screen.dart';
 import 'package:cb_file_manager/ui/utils/route.dart';
@@ -70,6 +71,7 @@ class ActionBarHelper {
     required Function(String) onSelected,
   }) {
     return PopupMenuButton<String>(
+      popUpAnimationStyle: CbPopoverTransition.menuStyle,
       onSelected: onSelected,
       itemBuilder: (context) {
         return items.entries.map((entry) {

@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/design_system/primitives/cb_popover_transition.dart';
 import 'package:cb_file_manager/ui/widgets/gallery_nsfw_toggle.dart';
 import 'package:flutter/material.dart';
 import 'package:photo_manager/photo_manager.dart';
@@ -867,6 +868,7 @@ class _LibraryMenuButton extends StatelessWidget {
         shape: BoxShape.circle,
       ),
       child: PopupMenuButton<String>(
+        popUpAnimationStyle: CbPopoverTransition.menuStyleOf(context),
         onSelected: (value) {
           if (value == 'nsfw') {
             onToggleNsfw();

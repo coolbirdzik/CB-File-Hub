@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/design_system/primitives/cb_popover_transition.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:flutter/material.dart';
 
@@ -16,9 +17,8 @@ class NetworkFolderContextMenu {
       context,
     ).context.findRenderObject();
     final RenderBox overlay = renderObject as RenderBox;
-    final menuColor = Theme.of(context).colorScheme.surface.withAlpha(255);
-
     showMenu(
+      popUpAnimationStyle: CbPopoverTransition.menuStyleOf(context),
       context: context,
       position: RelativeRect.fromRect(
         globalPosition & const Size(40, 40),
@@ -48,8 +48,6 @@ class NetworkFolderContextMenu {
           ),
         ),
       ],
-      color: menuColor,
-      elevation: 0,
     );
   }
 }

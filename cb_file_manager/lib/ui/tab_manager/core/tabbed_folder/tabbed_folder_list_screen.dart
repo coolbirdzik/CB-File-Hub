@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/design_system/primitives/cb_popover_transition.dart';
 import 'package:cb_file_manager/ui/widgets/file_properties_pane.dart';
 import 'package:cb_file_manager/ui/widgets/file_pane_layout.dart';
 import 'package:cb_file_manager/ui/widgets/file_preview_pane.dart';
@@ -2428,6 +2429,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
         actions.insert(
           2,
           PopupMenuButton<tab_components.DriveDetailsColumn>(
+            popUpAnimationStyle: CbPopoverTransition.menuStyleOf(context),
             key: const ValueKey('drive-columns-menu'),
             tooltip: context.tr.columnSettingsTooltip,
             icon: const Icon(PhosphorIconsLight.layout),

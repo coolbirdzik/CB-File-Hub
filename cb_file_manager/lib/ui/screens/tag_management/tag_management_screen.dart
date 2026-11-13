@@ -1913,6 +1913,9 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                       ),
                     if (!showingTaggedFiles)
                       PopupMenuButton<String>(
+                        popUpAnimationStyle: CbPopoverTransition.menuStyleOf(
+                          context,
+                        ),
                         icon: const Icon(PhosphorIconsLight.dotsThreeVertical),
                         tooltip: localizations.moreOptionsTooltip,
                         onSelected: (value) {
@@ -2082,6 +2085,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     }
 
     return PopupMenuButton<void>(
+      popUpAnimationStyle: CbPopoverTransition.menuStyleOf(context),
       icon: Icon(
         PhosphorIconsLight.squaresFour,
         color: theme.colorScheme.onSurfaceVariant,
@@ -2117,6 +2121,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
 
   Widget _buildSortMenuButton(ThemeData theme, AppLocalizations localizations) {
     return PopupMenuButton<String>(
+      popUpAnimationStyle: CbPopoverTransition.menuStyleOf(context),
       tooltip: localizations.sortTags,
       onSelected: _changeSortCriteria,
       icon: Icon(
@@ -2149,6 +2154,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     AppLocalizations localizations,
   ) {
     return PopupMenuButton<_TagViewMode>(
+      popUpAnimationStyle: CbPopoverTransition.menuStyleOf(context),
       icon: Icon(
         PhosphorIconsLight.eye,
         color: theme.colorScheme.onSurfaceVariant,

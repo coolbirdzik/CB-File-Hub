@@ -313,6 +313,7 @@ class _AutoRulesScreenState extends State<AutoRulesScreen> {
                   onChanged: (_) => _toggleRule(rule),
                 ),
                 PopupMenuButton<String>(
+                  popUpAnimationStyle: CbPopoverTransition.menuStyleOf(context),
                   onSelected: (value) {
                     if (value == 'edit') {
                       _showEditRuleDialog(rule);

@@ -11,6 +11,7 @@ import '../tokens/cb_type_tokens.dart';
 import 'cb_chevron.dart';
 import 'cb_decorations.dart';
 import 'cb_pressable.dart';
+import 'cb_popover_transition.dart';
 
 /// One option in a [CbSelect].
 @immutable
@@ -245,6 +246,7 @@ class _CbSelectState<T> extends State<CbSelect<T>> {
     setState(() => _isOpen = true);
     await navigator.push(
       _CbSelectRoute<T>(
+        reduceMotion: CbPopoverTransition.reduceMotionOf(context),
         rect: rect,
         openedBelow: rect.top >= anchor.bottom,
         fitContent: widget.searchable,
@@ -507,6 +509,7 @@ class _CbSelectPaint {
 /// choice, and dimming the whole window for it — which Material's dropdown
 /// effectively does by taking over the screen — overstates what is happening.
 class _CbSelectRoute<T> extends PopupRoute<void> {
+  final bool reduceMotion;
   final Rect rect;
   final bool openedBelow;
   final Widget menu;
@@ -518,6 +521,7 @@ class _CbSelectRoute<T> extends PopupRoute<void> {
   final bool fitContent;
 
   _CbSelectRoute({
+    required this.reduceMotion,
     required this.rect,
     required this.openedBelow,
     required this.menu,
@@ -535,10 +539,12 @@ class _CbSelectRoute<T> extends PopupRoute<void> {
   String? get barrierLabel => 'Dismiss';
 
   @override
-  Duration get transitionDuration => CbDurations.fast;
+  Duration get transitionDuration =>
+      reduceMotion ? Duration.zero : CbDurations.popoverOpen;
 
   @override
-  Duration get reverseTransitionDuration => CbDurations.instant;
+  Duration get reverseTransitionDuration =>
+      reduceMotion ? Duration.zero : CbDurations.popoverClose;
 
   @override
   Widget buildPage(
@@ -546,25 +552,10 @@ class _CbSelectRoute<T> extends PopupRoute<void> {
     Animation<double> animation,
     Animation<double> secondaryAnimation,
   ) {
-    // `drive` rather than a `CurvedAnimation`, which the route would have to
-    // own and dispose.
-    final Animation<double> curved = animation.drive(
-      CurveTween(curve: CbCurves.standard),
-    );
-
-    final Widget popover = FadeTransition(
-      opacity: curved,
-      child: AnimatedBuilder(
-        animation: curved,
-        builder: (context, child) {
-          // A 4px rise out of the trigger rather than a grow-from-centre:
-          // the popover should read as attached to the control it
-          // belongs to, not as a surface of its own.
-          final double dy = (1 - curved.value) * (openedBelow ? -4 : 4);
-          return Transform.translate(offset: Offset(0, dy), child: child);
-        },
-        child: capturedThemes.wrap(menu),
-      ),
+    final Widget popover = CbPopoverTransition(
+      animation: animation,
+      hiddenOffset: Offset(0, openedBelow ? -4 : 4),
+      child: capturedThemes.wrap(menu),
     );
 
     if (fitContent) {

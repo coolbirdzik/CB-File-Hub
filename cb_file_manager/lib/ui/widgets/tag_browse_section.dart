@@ -622,6 +622,7 @@ class _TagBrowseSectionState extends State<TagBrowseSection> {
       padding: const EdgeInsets.all(3),
       decoration: decoration,
       child: PopupMenuButton<void>(
+        popUpAnimationStyle: CbPopoverTransition.menuStyleOf(context),
         tooltip: l10n.adjustGridSizeTooltip,
         padding: EdgeInsets.zero,
         offset: const Offset(0, 42),

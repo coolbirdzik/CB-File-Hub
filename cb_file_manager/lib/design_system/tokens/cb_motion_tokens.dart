@@ -16,7 +16,13 @@ class CbDurations {
   /// 140ms — the default: local state changes, small reveals, selection.
   static const Duration fast = Duration(milliseconds: 140);
 
-  /// 220ms — panels, popovers, expanding rows.
+  /// 120ms — anchored menus and floating popovers.
+  static const Duration popoverOpen = Duration(milliseconds: 120);
+
+  /// 70ms — dismiss a floating surface without holding up the next action.
+  static const Duration popoverClose = Duration(milliseconds: 70);
+
+  /// 220ms — docked panels and expanding rows.
   static const Duration normal = Duration(milliseconds: 220);
 
   /// 320ms — full-surface transitions, dialogs, page changes.

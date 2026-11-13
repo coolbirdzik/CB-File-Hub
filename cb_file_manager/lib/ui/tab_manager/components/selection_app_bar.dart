@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/design_system/primitives/cb_popover_transition.dart';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'tag_dialogs.dart';
@@ -60,6 +61,7 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
         if (fileCount > 0 &&
             !isNetworkPath) // Don't show tag options for network paths
           PopupMenuButton<String>(
+            popUpAnimationStyle: CbPopoverTransition.menuStyleOf(context),
             onSelected: (value) {
               if (value == 'add_tags') {
                 showBatchAddTagDialog(context, selectedFilePaths);

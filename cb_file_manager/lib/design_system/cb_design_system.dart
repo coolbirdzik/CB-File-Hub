@@ -36,6 +36,7 @@ export 'primitives/cb_inline_rename.dart';
 export 'primitives/cb_kbd.dart';
 export 'primitives/cb_pressable.dart';
 export 'primitives/cb_panel_reveal.dart';
+export 'primitives/cb_popover_transition.dart';
 export 'primitives/cb_select.dart';
 export 'primitives/cb_slider.dart';
 export 'primitives/cb_surface.dart';

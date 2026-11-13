@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/design_system/primitives/cb_popover_transition.dart';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
@@ -16,6 +17,7 @@ class AddressBarMenu extends StatelessWidget {
     }
 
     return PopupMenuButton<AddressBarMenuItem>(
+      popUpAnimationStyle: CbPopoverTransition.menuStyleOf(context),
       icon: Icon(
         PhosphorIconsLight.dotsThree,
         size: 20,

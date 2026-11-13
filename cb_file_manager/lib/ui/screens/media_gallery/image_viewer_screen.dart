@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:math';
+import 'package:cb_file_manager/design_system/primitives/cb_popover_transition.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -1527,6 +1528,7 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
     );
 
     final value = await showMenu<String>(
+      popUpAnimationStyle: CbPopoverTransition.menuStyleOf(context),
       context: buttonContext,
       position: position,
       color: const Color(0xF21C1C20),

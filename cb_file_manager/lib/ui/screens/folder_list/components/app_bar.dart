@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/design_system/primitives/cb_popover_transition.dart';
 import 'package:cb_file_manager/design_system/primitives/cb_slider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -192,6 +193,7 @@ class FolderListAppBar extends StatelessWidget implements PreferredSizeWidget {
         ),
         // More actions menu
         PopupMenuButton<String>(
+          popUpAnimationStyle: CbPopoverTransition.menuStyleOf(context),
           icon: const Icon(PhosphorIconsLight.dotsThreeVertical, size: 24),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),

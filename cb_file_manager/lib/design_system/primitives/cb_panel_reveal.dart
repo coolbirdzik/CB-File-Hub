@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 
 import '../tokens/cb_motion_tokens.dart';
+import 'cb_popover_transition.dart';
 
 /// Retains a panel until its exit finishes, including interrupted transitions.
 class CbPanelReveal extends StatefulWidget {
@@ -29,8 +30,12 @@ class _CbPanelRevealState extends State<CbPanelReveal>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller = AnimationController(
     vsync: this,
-    duration: CbDurations.normal,
-    reverseDuration: CbDurations.fast,
+    duration: widget.reserveWidth
+        ? CbDurations.normal
+        : CbDurations.popoverOpen,
+    reverseDuration: widget.reserveWidth
+        ? CbDurations.fast
+        : CbDurations.popoverClose,
   )..addStatusListener(_onStatusChanged);
   late final CurvedAnimation _progress = CurvedAnimation(
     parent: _controller,
@@ -49,15 +54,19 @@ class _CbPanelRevealState extends State<CbPanelReveal>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _reduceMotion =
-        MediaQuery.disableAnimationsOf(context) ||
-        MediaQuery.accessibleNavigationOf(context);
+    _reduceMotion = CbPopoverTransition.reduceMotionOf(context);
     _animate();
   }
 
   @override
   void didUpdateWidget(CbPanelReveal oldWidget) {
     super.didUpdateWidget(oldWidget);
+    _controller.duration = widget.reserveWidth
+        ? CbDurations.normal
+        : CbDurations.popoverOpen;
+    _controller.reverseDuration = widget.reserveWidth
+        ? CbDurations.fast
+        : CbDurations.popoverClose;
     if (widget.visible) _retainedChild = widget.child;
     if (widget.visible != oldWidget.visible) _animate();
   }
@@ -92,42 +101,38 @@ class _CbPanelRevealState extends State<CbPanelReveal>
   @override
   Widget build(BuildContext context) {
     if (_retainedChild == null) return const SizedBox.shrink();
+    final Widget panel = widget.reserveWidth
+        ? AnimatedBuilder(
+            animation: _progress,
+            child: _retainedChild,
+            builder: (context, child) => ClipRect(
+              child: Align(
+                alignment: widget.alignment,
+                widthFactor: _progress.value,
+                child: FadeTransition(
+                  opacity: _progress,
+                  child: FractionalTranslation(
+                    translation: widget.hiddenOffset * (1 - _progress.value),
+                    child: child,
+                  ),
+                ),
+              ),
+            ),
+          )
+        : CbPopoverTransition(
+            animation: _controller,
+            // A fixed 4px shift avoids a large jump on tall popovers.
+            hiddenOffset: Offset(
+              widget.hiddenOffset.dx.sign * 4,
+              widget.hiddenOffset.dy.sign * 4,
+            ),
+            child: _retainedChild!,
+          );
     return IgnorePointer(
       ignoring: !widget.visible,
       child: ExcludeFocus(
         excluding: !widget.visible,
-        child: ExcludeSemantics(
-          excluding: !widget.visible,
-          child: AnimatedBuilder(
-            animation: _progress,
-            child: _retainedChild,
-            builder: (context, child) {
-              Widget panel = FadeTransition(
-                opacity: _progress,
-                child: FractionalTranslation(
-                  translation: widget.hiddenOffset * (1 - _progress.value),
-                  child: child,
-                ),
-              );
-              if (widget.reserveWidth) {
-                panel = ClipRect(
-                  child: Align(
-                    alignment: widget.alignment,
-                    widthFactor: _progress.value,
-                    child: panel,
-                  ),
-                );
-              } else {
-                panel = Transform.scale(
-                  scale: 0.97 + 0.03 * _progress.value,
-                  alignment: widget.alignment,
-                  child: panel,
-                );
-              }
-              return panel;
-            },
-          ),
-        ),
+        child: ExcludeSemantics(excluding: !widget.visible, child: panel),
       ),
     );
   }

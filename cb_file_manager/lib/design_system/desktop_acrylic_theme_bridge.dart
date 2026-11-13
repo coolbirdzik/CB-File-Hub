@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'macos_glass_theme.dart';
 import 'desktop_acrylic_theme.dart';
 import 'package:flutter/material.dart';
+import 'cb_tokens.dart';
 
 /// Resolves the Material surface theme used alongside the desktop acrylic
 /// backdrop. The native backdrop supplies the translucency; this theme keeps
@@ -87,11 +88,11 @@ ThemeData createDesktopAcrylicMaterialBridgeTheme({
     surfaceTint: Colors.transparent,
   );
 
-  // Dialogs, menus and dropdown overlays stay solid even when page chrome
-  // uses acrylic, and sit one tonal step above the canvas; their hairline
-  // edge (from the base theme's shapes) finishes the separation.
+  // Floating menus use the same semantic surface as CbSelect, custom
+  // popovers and the Fluent host. The container ramp belongs to page content
+  // and must not replace the overlay colour when enabling acrylic.
   final Color dialogColor = colorScheme.surfaceContainer;
-  final Color menuColor = colorScheme.surfaceContainer;
+  final Color menuColor = baseTheme.cb.colors.surfaceOverlay;
 
   return baseTheme.copyWith(
     extensions: [

@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:cb_file_manager/design_system/primitives/cb_popover_transition.dart';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
@@ -84,6 +85,7 @@ class VideoPlayerAdvancedMenu extends StatelessWidget {
     return Semantics(
       container: true,
       child: PopupMenuButton<String>(
+        popUpAnimationStyle: CbPopoverTransition.menuStyleOf(context),
         icon: const Icon(
           PhosphorIconsLight.dotsThreeVertical,
           color: Colors.white,

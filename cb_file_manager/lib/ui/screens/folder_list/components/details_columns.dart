@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:cb_file_manager/design_system/primitives/cb_popover_transition.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/design_system/primitives/cb_tooltip.dart';
 import 'package:cb_file_manager/ui/components/common/file_details_columns.dart';
@@ -760,6 +761,7 @@ class _DetailsColumnsHeaderState extends State<DetailsColumnsHeader> {
         );
 
     final value = await showMenu<String>(
+      popUpAnimationStyle: CbPopoverTransition.menuStyleOf(context),
       context: context,
       position: RelativeRect.fromLTRB(
         position.dx,

@@ -130,6 +130,7 @@ class GridListViewToggle extends StatelessWidget {
       );
     }
     return PopupMenuButton<ViewMode>(
+      popUpAnimationStyle: CbPopoverTransition.menuStyleOf(context),
       key: const ValueKey('collection-view-menu'),
       tooltip: context.tr.viewModeTooltip,
       initialValue: mode,

@@ -219,6 +219,7 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
             onChanged: (v) => _toggleProvider(provider.id, v),
           ),
           PopupMenuButton<String>(
+            popUpAnimationStyle: CbPopoverTransition.menuStyleOf(context),
             icon: const Icon(PhosphorIconsLight.dotsThreeVertical, size: 18),
             itemBuilder: (_) => [
               PopupMenuItem(

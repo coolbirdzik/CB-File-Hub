@@ -307,6 +307,7 @@ class _TorrentScreenState extends State<TorrentScreen> {
   }
 
   Widget _sortMenu() => PopupMenuButton<Object>(
+    popUpAnimationStyle: CbPopoverTransition.menuStyleOf(context),
     key: const ValueKey('shared-sort-menu'),
     icon: const Icon(PhosphorIconsLight.sortAscending),
     tooltip: l.sortByTooltip,
@@ -1668,6 +1669,7 @@ class _TorrentScreenState extends State<TorrentScreen> {
   );
 
   Widget _filterMenu() => PopupMenuButton<String>(
+    popUpAnimationStyle: CbPopoverTransition.menuStyleOf(context),
     key: const ValueKey('torrent-filter-menu'),
     tooltip: l.torrentColumn('filters'),
     icon: Icon(

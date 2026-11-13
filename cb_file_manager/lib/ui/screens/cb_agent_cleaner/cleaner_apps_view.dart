@@ -691,6 +691,7 @@ class _ViewOptionsMenu extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     return PopupMenuButton<_ViewOption>(
+      popUpAnimationStyle: CbPopoverTransition.menuStyleOf(context),
       key: const ValueKey<String>('cleaner-apps-view-options'),
       tooltip: l10n.cleanerAppsViewOptions,
       icon: const Icon(Icons.tune_rounded, size: 20),

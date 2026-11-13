@@ -1,6 +1,7 @@
 import 'dart:io' show Platform;
 import 'dart:math' as math;
 
+import 'package:cb_file_manager/design_system/primitives/cb_popover_transition.dart';
 import 'package:cb_file_manager/design_system/primitives/cb_slider.dart';
 import 'package:flutter/material.dart';
 import '../../screens/folder_list/components/details_columns.dart';
@@ -407,6 +408,7 @@ class SharedActionBar {
       builder: (context) {
         final l10n = AppLocalizations.of(context)!;
         return PopupMenuButton<String>(
+          popUpAnimationStyle: CbPopoverTransition.menuStyleOf(context),
           icon: const Icon(PhosphorIconsLight.dotsThreeVertical),
           tooltip: l10n.moreOptionsTooltip,
           offset: const Offset(0, 50),
@@ -557,6 +559,7 @@ class SharedActionBar {
     actions.add(
       sortAction ??
           PopupMenuButton<SortOption>(
+            popUpAnimationStyle: CbPopoverTransition.menuStyleOf(context),
             key: const ValueKey('shared-sort-menu'),
             icon: const Icon(PhosphorIconsLight.sortAscending),
             tooltip: l10n.sortByTooltip,
@@ -606,6 +609,7 @@ class SharedActionBar {
         // Desktop: slider popover like sort/viewmode
         actions.add(
           PopupMenuButton<void>(
+            popUpAnimationStyle: CbPopoverTransition.menuStyleOf(context),
             icon: const Icon(PhosphorIconsLight.squaresFour),
             tooltip: l10n.adjustGridSizeTooltip,
             offset: const Offset(0, 50),
@@ -659,6 +663,7 @@ class SharedActionBar {
     // Add view mode toggle button
     actions.add(
       PopupMenuButton<ViewMode>(
+        popUpAnimationStyle: CbPopoverTransition.menuStyleOf(context),
         key: const ValueKey('shared-view-mode-menu'),
         icon: const Icon(PhosphorIconsLight.eye),
         tooltip: l10n.viewModeTooltip,

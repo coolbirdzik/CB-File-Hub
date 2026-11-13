@@ -712,6 +712,7 @@ class _Toolbar extends StatelessWidget {
             ),
             _SelectAll(cubit: cubit, state: state),
             PopupMenuButton<int>(
+              popUpAnimationStyle: CbPopoverTransition.menuStyleOf(context),
               key: const ValueKey<String>('cleaner-leftovers-inactive-menu'),
               tooltip: l.cleanerLeftoversInactiveLabel,
               onSelected: cubit.setInactiveDays,

@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/design_system/primitives/cb_popover_transition.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // Thêm import cho SystemUiOverlayStyle
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -318,6 +319,8 @@ class MobileTabView extends StatelessWidget {
                         ),
                         actions: [
                           PopupMenuButton<String>(
+                            popUpAnimationStyle:
+                                CbPopoverTransition.menuStyleOf(context),
                             icon: Icon(
                               PhosphorIconsLight.dotsThree,
                               color: theme.colorScheme.onSurface,

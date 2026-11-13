@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/design_system/primitives/cb_popover_transition.dart';
 import 'package:flutter/material.dart';
 
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
@@ -180,6 +181,7 @@ class SubtitleControlButton extends StatelessWidget {
     ].join('\n');
 
     return PopupMenuButton<_SubtitleAction>(
+      popUpAnimationStyle: CbPopoverTransition.menuStyleOf(context),
       key: const ValueKey('ai-subtitle-control'),
       tooltip: detail,
       padding: EdgeInsets.zero,

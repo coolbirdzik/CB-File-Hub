@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cb_file_manager/design_system/fluent_chrome_surface.dart';
 import 'package:cb_file_manager/design_system/primitives/cb_panel_reveal.dart';
+import 'package:cb_file_manager/design_system/cb_tokens.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/config/translation_helper.dart';
 
@@ -205,12 +206,9 @@ class _StatusCenterToolbarButtonState extends State<StatusCenterToolbarButton>
     final panelRight = overlayBox.size.width - buttonRect.right;
     final panelTop = buttonRect.bottom + 8;
 
-    // Capture theme colors here while we have a valid app context.
-    // Blend surfaceContainer over surface to guarantee a fully opaque color —
-    // surfaceContainer can carry alpha on some Material 3 themes.
+    // Capture the shared popover surface before entering the root overlay.
     final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-    final bgColor = Color.alphaBlend(cs.surfaceContainer, cs.surface);
+    final bgColor = theme.cb.colors.surfaceOverlay;
     final shadowColor = theme.shadowColor.withValues(alpha: 0.45);
 
     late OverlayEntry entry;
@@ -508,12 +506,7 @@ class _StatusCenterPanelState extends State<StatusCenterPanel> {
     final finished = controller.finishedEntries;
     final showUpdate = AppUpdateStatusCard.isVisible(AppUpdateService.instance);
 
-    final bg =
-        widget.solidBackground ??
-        Color.alphaBlend(
-          theme.colorScheme.surfaceContainer,
-          theme.colorScheme.surface,
-        );
+    final bg = widget.solidBackground ?? theme.cb.colors.surfaceOverlay;
 
     return Material(
       color: bg,
