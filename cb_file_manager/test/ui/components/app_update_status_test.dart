@@ -11,6 +11,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/services.dart';
 import 'package:cb_file_manager/design_system/primitives/cb_panel_reveal.dart';
+import 'package:cb_file_manager/design_system/primitives/cb_popover_transition.dart';
 
 const _update = AppUpdateInfo(
   version: '1.2.0',
@@ -65,20 +66,26 @@ void main() {
     await tester.tap(find.byType(IconButton));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 60));
-    final fade = tester.widget<FadeTransition>(
-      find
-          .descendant(
-            of: find.byType(CbPanelReveal),
-            matching: find.byType(FadeTransition),
-          )
-          .first,
+    final popover = find.descendant(
+      of: find.byType(CbPanelReveal),
+      matching: find.byType(CbPopoverTransition),
     );
-    expect(fade.opacity.value, greaterThan(0));
-    expect(fade.opacity.value, lessThan(1));
+    expect(popover, findsOneWidget);
+    final opacity = find.descendant(
+      of: popover,
+      matching: find.byType(Opacity),
+    );
+    expect(opacity, findsOneWidget);
+    expect(tester.widget<Opacity>(opacity).opacity, greaterThan(0));
+    expect(tester.widget<Opacity>(opacity).opacity, lessThan(1));
     await tester.pumpAndSettle();
+    expect(tester.widget<Opacity>(opacity).opacity, 1);
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 35));
     expect(find.byType(StatusCenterPanel), findsOneWidget);
+    expect(tester.widget<Opacity>(opacity).opacity, greaterThan(0));
+    expect(tester.widget<Opacity>(opacity).opacity, lessThan(1));
     await tester.pumpAndSettle();
     expect(find.byType(StatusCenterPanel), findsNothing);
   });
