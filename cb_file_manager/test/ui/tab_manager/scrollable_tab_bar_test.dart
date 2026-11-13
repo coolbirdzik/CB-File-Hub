@@ -108,6 +108,10 @@ void main() {
     final key = GlobalKey<_TabBarHarnessState>();
     await tester.pumpWidget(_TabBarHarness(key: key));
     final close = find.byIcon(PhosphorIconsLight.x).first;
+    expect(
+      tester.getCenter(close).dy,
+      closeTo(tester.getCenter(find.text('first')).dy, 0.01),
+    );
     final gesture = await tester.startGesture(
       tester.getCenter(close),
       kind: PointerDeviceKind.mouse,

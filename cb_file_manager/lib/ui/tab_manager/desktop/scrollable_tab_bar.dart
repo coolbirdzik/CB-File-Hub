@@ -1459,55 +1459,62 @@ class _ModernTabState extends State<_ModernTab>
                   ),
                 ),
 
-                // Close button - positioned on top of tab
+                // Center against the laid-out tab, including any height
+                // imposed by the title row, rather than a fixed top offset.
                 if (widget.onClose != null)
                   Positioned(
-                    top: 7 + (tabHeight - 22) / 2,
+                    top: 0,
+                    bottom: 0,
+                    width: 22,
                     right: 10, // Position from right edge
-                    child: AnimatedOpacity(
-                      // Raycast-style: the close glyph only appears on the
-                      // active or hovered tab, so the strip reads as titles.
-                      opacity:
-                          (_isHovered || widget.forceHovered || widget.isActive)
-                          ? 1.0
-                          : 0.0,
-                      duration: const Duration(milliseconds: 150),
-                      child: Material(
-                        color: Colors.transparent,
-                        child: MouseRegion(
-                          cursor: SystemMouseCursors.click,
-                          onEnter: (_) =>
-                              setState(() => _isCloseButtonHovered = true),
-                          onExit: (_) =>
-                              setState(() => _isCloseButtonHovered = false),
-                          child: CbPressable(
+                    child: Center(
+                      child: AnimatedOpacity(
+                        // Raycast-style: the close glyph only appears on the
+                        // active or hovered tab, so the strip reads as titles.
+                        opacity:
+                            (_isHovered ||
+                                widget.forceHovered ||
+                                widget.isActive)
+                            ? 1.0
+                            : 0.0,
+                        duration: const Duration(milliseconds: 150),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: MouseRegion(
                             cursor: SystemMouseCursors.click,
-                            semanticLabel: context.tr.closeTab,
-                            onPressed: () {
-                              widget.onClose?.call();
-                              HapticFeedback.lightImpact();
-                            },
-                            builder: (context, state) => Container(
-                              width: 22,
-                              height: 22,
-                              decoration: BoxDecoration(
-                                color: _isCloseButtonHovered
-                                    ? (isDarkMode
-                                          ? Colors.white.withAlpha(
-                                              (0.15 * 255).round(),
-                                            )
-                                          : Colors.black.withAlpha(
-                                              (0.08 * 255).round(),
-                                            ))
-                                    : Colors.transparent,
-                                borderRadius: CbRadii.smAll,
-                              ),
-                              child: Icon(
-                                PhosphorIconsLight.x,
-                                size: 14,
-                                color: widget.isActive
-                                    ? cs.onSurface
-                                    : cs.onSurfaceVariant,
+                            onEnter: (_) =>
+                                setState(() => _isCloseButtonHovered = true),
+                            onExit: (_) =>
+                                setState(() => _isCloseButtonHovered = false),
+                            child: CbPressable(
+                              cursor: SystemMouseCursors.click,
+                              semanticLabel: context.tr.closeTab,
+                              onPressed: () {
+                                widget.onClose?.call();
+                                HapticFeedback.lightImpact();
+                              },
+                              builder: (context, state) => Container(
+                                width: 22,
+                                height: 22,
+                                decoration: BoxDecoration(
+                                  color: _isCloseButtonHovered
+                                      ? (isDarkMode
+                                            ? Colors.white.withAlpha(
+                                                (0.15 * 255).round(),
+                                              )
+                                            : Colors.black.withAlpha(
+                                                (0.08 * 255).round(),
+                                              ))
+                                      : Colors.transparent,
+                                  borderRadius: CbRadii.smAll,
+                                ),
+                                child: Icon(
+                                  PhosphorIconsLight.x,
+                                  size: 14,
+                                  color: widget.isActive
+                                      ? cs.onSurface
+                                      : cs.onSurfaceVariant,
+                                ),
                               ),
                             ),
                           ),

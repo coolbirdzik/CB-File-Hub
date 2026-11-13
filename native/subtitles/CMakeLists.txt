@@ -57,6 +57,11 @@ if(WIN32 AND CB_SUBTITLE_VULKAN)
     file(WRITE "${CB_VK_CMAKE}" "${CB_VK_PATCHED}")
   endif()
 endif()
+# Whisper still declares CMake 3.5. Apply a supported policy floor to this
+# third-party subtree without changing downloaded sources or other app plugins.
+if(NOT DEFINED CMAKE_POLICY_VERSION_MINIMUM OR CMAKE_POLICY_VERSION_MINIMUM VERSION_LESS 3.10)
+  set(CMAKE_POLICY_VERSION_MINIMUM 3.10)
+endif()
 add_subdirectory("${whisper_SOURCE_DIR}" "${whisper_BINARY_DIR}" EXCLUDE_FROM_ALL)
 set(CB_JSON_HEADER "${CMAKE_CURRENT_BINARY_DIR}/json.hpp")
 file(DOWNLOAD https://raw.githubusercontent.com/nlohmann/json/v3.12.0/single_include/nlohmann/json.hpp
