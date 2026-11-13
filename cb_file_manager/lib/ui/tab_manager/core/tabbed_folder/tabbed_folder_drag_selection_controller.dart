@@ -5,7 +5,6 @@ import 'package:cb_file_manager/bloc/selection/selection.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_bloc.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:cb_file_manager/ui/widgets/selection_rectangle_painter.dart';
-import 'package:cb_file_manager/ui/widgets/value_listenable_builders.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart';
@@ -216,36 +215,33 @@ class TabbedFolderDragSelectionController {
     _lastFolders = null;
   }
 
-  Widget buildOverlay() {
-    return ValueListenableBuilder3<bool, Offset?, Offset?>(
-      valueListenable1: isDragging,
-      valueListenable2: dragStartPosition,
-      valueListenable3: dragCurrentPosition,
-      builder: (context, dragging, startPosition, currentPosition, _) {
-        if (!dragging || startPosition == null || currentPosition == null) {
-          return const SizedBox.shrink();
-        }
+  late final Listenable _overlayRepaint = Listenable.merge([
+    isDragging,
+    dragStartPosition,
+    dragCurrentPosition,
+  ]);
 
-        final selectionRect = Rect.fromPoints(startPosition, currentPosition);
-
-        return Positioned.fill(
-          child: IgnorePointer(
-            child: RepaintBoundary(
-              child: CustomPaint(
-                painter: SelectionRectanglePainter(
-                  selectionRect: selectionRect,
-                  fillColor: Theme.of(
-                    context,
-                  ).colorScheme.primaryContainer.withValues(alpha: 0.4),
-                  borderColor: Theme.of(context).primaryColor,
-                ),
+  Widget buildOverlay() => Positioned.fill(
+    child: IgnorePointer(
+      child: RepaintBoundary(
+        child: Builder(
+          builder: (context) {
+            final theme = Theme.of(context);
+            return CustomPaint(
+              painter: _DragSelectionPainter(
+                dragging: isDragging,
+                start: dragStartPosition,
+                current: dragCurrentPosition,
+                repaint: _overlayRepaint,
+                fill: theme.colorScheme.primaryContainer.withValues(alpha: 0.4),
+                border: theme.primaryColor,
               ),
-            ),
-          ),
-        );
-      },
-    );
-  }
+            );
+          },
+        ),
+      ),
+    ),
+  );
 
   void _selectItemsInRect(Rect selectionRect) {
     if (!isDragging.value) return;
@@ -310,4 +306,39 @@ class TabbedFolderDragSelectionController {
       SelectItemsInRect(folderPaths: folders, filePaths: files),
     );
   }
+}
+
+/// Pointer motion only invalidates paint; the overlay's widgets and layout stay
+/// in place even when a mouse delivers several events within a single frame.
+class _DragSelectionPainter extends CustomPainter {
+  _DragSelectionPainter({
+    required this.dragging,
+    required this.start,
+    required this.current,
+    required this.fill,
+    required this.border,
+    required Listenable repaint,
+  }) : super(repaint: repaint);
+  final ValueListenable<bool> dragging;
+  final ValueListenable<Offset?> start, current;
+  final Color fill, border;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final from = start.value, to = current.value;
+    if (!dragging.value || from == null || to == null) return;
+    SelectionRectanglePainter(
+      selectionRect: Rect.fromPoints(from, to),
+      fillColor: fill,
+      borderColor: border,
+    ).paint(canvas, size);
+  }
+
+  @override
+  bool shouldRepaint(_DragSelectionPainter old) =>
+      old.fill != fill ||
+      old.border != border ||
+      old.dragging != dragging ||
+      old.start != start ||
+      old.current != current;
 }

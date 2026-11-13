@@ -4,7 +4,6 @@ import 'dart:io';
 import 'dart:async'; // Add this import for Completer
 // For math operations with drag selection and min/max functions
 
-import 'package:cb_file_manager/helpers/ui/frame_timing_optimizer.dart';
 import '../../components/common/shared_action_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -60,6 +59,9 @@ import 'package:cb_file_manager/ui/utils/grid_zoom_constraints.dart';
 import 'package:cb_file_manager/ui/utils/view_mode_spectrum.dart';
 import 'package:cb_file_manager/ui/widgets/selection_summary_tooltip.dart';
 import 'package:cb_file_manager/ui/components/common/file_view_shell.dart';
+import '../../components/common/file_keyboard_shortcuts.dart';
+import '../../components/common/optimized_interaction_handler.dart';
+import '../../tab_manager/core/tab_focus_gate.dart';
 import 'package:cb_file_manager/ui/components/common/browser_like_collection_view.dart';
 
 /// A screen for browsing network locations, with a UI consistent with TabbedFolderListScreen
@@ -132,6 +134,11 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
   SftpBrowserActions? _sftpActions;
   SftpFileAccess? _sftpService;
   bool _wasWorking = false;
+  Widget? _cachedContentView;
+  Object? _cachedContentKey;
+  final Map<List<FileSystemEntity>, List<FileSystemEntity>> _matchingCache =
+      Map.identity();
+  String? _matchingQuery;
 
   void _syncSftpActions(NetworkBrowsingState state) {
     final service = state.currentService;
@@ -146,6 +153,7 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
   }
 
   void _sftpChanged() {
+    _cachedContentView = null;
     if (!mounted) return;
     final working = _sftpActions?.busy ?? false;
     final completed = _wasWorking && !working;
@@ -511,14 +519,23 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
 
   List<FileSystemEntity> _matchingEntities(List<FileSystemEntity>? entities) {
     final query = _searchController.text.trim();
-    return (entities ?? const <FileSystemEntity>[])
-        .where(
-          (entity) => TextUtils.matchesVietnamese(
-            entity.path.replaceAll('\\', '/').split('/').last,
-            query,
-          ),
-        )
-        .toList();
+    if (entities == null) return const [];
+    if (query.isEmpty) return entities;
+    if (_matchingQuery != query || _matchingCache.length > 4) {
+      _matchingCache.clear();
+    }
+    _matchingQuery = query;
+    return _matchingCache.putIfAbsent(
+      entities,
+      () => entities
+          .where(
+            (entity) => TextUtils.matchesVietnamese(
+              entity.path.replaceAll('\\', '/').split('/').last,
+              query,
+            ),
+          )
+          .toList(),
+    );
   }
 
   List<String> _visiblePathsForState(NetworkBrowsingState state) {
@@ -972,106 +989,149 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
           ]);
         }
 
-        return ScreenScaffold(
-          selectionState: selectionState,
-          isNetworkPath: true,
-          isDesktop: _isDesktopMode,
-          onClearSelection: _clearSelection,
-          showRemoveTagsDialog: (_) {},
-          showManageAllTagsDialog: (_) {},
-          showDeleteConfirmationDialog: (_) =>
-              _withSftpSelection((a, e) => a.delete(context, e)),
-          showAppBar: widget.showAppBar,
-          showSearchBar: _showSearchBar,
-          searchBar: _buildSearchBar(context),
-          pathNavigationBar: NetworkNavigationBar(
-            tabId: widget.tabId,
-            path: _currentPath,
-            homePath: _currentPath.toLowerCase().startsWith('#network/sftp/')
-                ? '#ssh'
-                : '#home',
-            allowPathEditing: true,
-            onNavigate: _navigateToPath,
-          ),
-          actions: [
-            CbButton.icon(
-              icon: PhosphorIconsLight.plugs,
-              tooltip: AppLocalizations.of(context)!.networkConnections,
-              onPressed: () => _navigateToPath('#network'),
+        return Focus(
+          canRequestFocus: false,
+          onKeyEvent: (_, event) {
+            if (!TabFocusGate.isActiveTab(context)) {
+              return KeyEventResult.ignored;
+            }
+            return FileKeyboardShortcuts.handle(
+              isDesktop: _isDesktopMode,
+              event: event,
+              onSelectAll: () => _selectAll(networkState),
+              onDelete: _sftpActions == null
+                  ? null
+                  : (_) => _withSftpSelection((a, e) => a.delete(context, e)),
+              onCopy: _sftpActions == null
+                  ? null
+                  : () => _withSftpSelection((a, e) => a.hold(e, cut: false)),
+              onCut: _sftpActions == null
+                  ? null
+                  : () => _withSftpSelection((a, e) => a.hold(e, cut: true)),
+              onPaste: _sftpActions?.canPaste == true
+                  ? () => _sftpActions!.paste(
+                      context,
+                      _sftpService!.resolveRemotePath(_currentPath),
+                    )
+                  : null,
+            );
+          },
+          child: ScreenScaffold(
+            selectionState: selectionState,
+            isNetworkPath: true,
+            isDesktop: _isDesktopMode,
+            onClearSelection: _clearSelection,
+            showRemoveTagsDialog: (_) {},
+            showManageAllTagsDialog: (_) {},
+            showDeleteConfirmationDialog: (_) =>
+                _withSftpSelection((a, e) => a.delete(context, e)),
+            showAppBar: widget.showAppBar,
+            showSearchBar: _showSearchBar,
+            searchBar: _buildSearchBar(context),
+            pathNavigationBar: NetworkNavigationBar(
+              tabId: widget.tabId,
+              path: _currentPath,
+              homePath: _currentPath.toLowerCase().startsWith('#network/sftp/')
+                  ? '#ssh'
+                  : '#home',
+              allowPathEditing: true,
+              onNavigate: _navigateToPath,
             ),
-            if (!networkState.hasError)
-              ...actions
-            else
+            actions: [
+              if (_sftpActions != null)
+                CbButton.icon(
+                  key: const ValueKey('sftp-browser-delete-selection'),
+                  icon: PhosphorIconsLight.trash,
+                  tooltip: context.tr.delete,
+                  size: CbButtonSize.sm,
+                  onPressed:
+                      selectionState.selectedCount == 0 || _sftpActions!.busy
+                      ? null
+                      : () =>
+                            _withSftpSelection((a, e) => a.delete(context, e)),
+                ),
               CbButton.icon(
-                icon: PhosphorIconsLight.arrowClockwise,
-                tooltip: AppLocalizations.of(context)!.refresh,
-                onPressed: _scheduleNetworkDirectoryLoad,
+                icon: PhosphorIconsLight.plugs,
+                tooltip: AppLocalizations.of(context)!.networkConnections,
+                onPressed: () => _navigateToPath('#network'),
               ),
-          ],
-          body: FileViewShell(
-            viewMode: _viewMode,
-            onViewScaleDelta: _handleViewScaleDelta,
-            onMouseBack: _handleBackButton,
-            onMouseForward: _handleMouseForwardButton,
-            onRefresh: _refreshFileList,
-            onSelectAll: () => _selectAll(networkState),
-            onCopy: _sftpActions == null
-                ? null
-                : () => _withSftpSelection((a, e) => a.hold(e, cut: false)),
-            onCut: _sftpActions == null
-                ? null
-                : () => _withSftpSelection((a, e) => a.hold(e, cut: true)),
-            onPaste: _sftpActions?.canPaste == true
-                ? () => _sftpActions!.paste(
-                    context,
-                    _sftpService!.resolveRemotePath(_currentPath),
-                  )
-                : null,
-            onDelete: _sftpActions == null
-                ? null
-                : ({required permanent}) =>
-                      _withSftpSelection((a, e) => a.delete(context, e)),
-            onRename: _sftpActions == null
-                ? null
-                : () => _withSftpSelection((a, e) async {
-                    if (e.length == 1) await a.rename(context, e.single);
-                  }),
-            onSearch: _openOrFocusSearch,
-            onEscape: selectionState.selectedCount > 0
-                ? () {
-                    _clearSelection();
-                    _sftpActions?.cancelClipboard();
-                  }
-                : _showSearchBar
-                ? () => setState(() {
-                    _showSearchBar = false;
-                  })
-                : null,
-            child: ClipRect(
-              child: Material(
-                type: MaterialType.transparency,
-                child: FileContextMenuExtension(
-                  isVirtual: (path) => path.startsWith('#network/SFTP/'),
-                  sections: (_, paths) => _contextMenuSections(
-                    paths.length == 1 &&
-                            _selectionBloc.state.isPathSelected(paths.single)
-                        ? _selectionBloc.state.allSelectedPaths
-                        : paths,
-                  ),
-                  onOpen: (file) => _handleFileOpen(context, file),
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.translucent,
-                    onSecondaryTapUp: (details) =>
-                        _showContextMenu(context, details.globalPosition, null),
-                    child: _buildBody(context, networkState, selectionState),
+              if (!networkState.hasError)
+                ...actions
+              else
+                CbButton.icon(
+                  icon: PhosphorIconsLight.arrowClockwise,
+                  tooltip: AppLocalizations.of(context)!.refresh,
+                  onPressed: _scheduleNetworkDirectoryLoad,
+                ),
+            ],
+            body: FileViewShell(
+              viewMode: _viewMode,
+              onViewScaleDelta: _handleViewScaleDelta,
+              onMouseBack: _handleBackButton,
+              onMouseForward: _handleMouseForwardButton,
+              onRefresh: _refreshFileList,
+              onSelectAll: () => _selectAll(networkState),
+              onCopy: _sftpActions == null
+                  ? null
+                  : () => _withSftpSelection((a, e) => a.hold(e, cut: false)),
+              onCut: _sftpActions == null
+                  ? null
+                  : () => _withSftpSelection((a, e) => a.hold(e, cut: true)),
+              onPaste: _sftpActions?.canPaste == true
+                  ? () => _sftpActions!.paste(
+                      context,
+                      _sftpService!.resolveRemotePath(_currentPath),
+                    )
+                  : null,
+              onDelete: _sftpActions == null
+                  ? null
+                  : ({required permanent}) =>
+                        _withSftpSelection((a, e) => a.delete(context, e)),
+              onRename: _sftpActions == null
+                  ? null
+                  : () => _withSftpSelection((a, e) async {
+                      if (e.length == 1) await a.rename(context, e.single);
+                    }),
+              onSearch: _openOrFocusSearch,
+              onEscape: selectionState.selectedCount > 0
+                  ? () {
+                      _clearSelection();
+                      _sftpActions?.cancelClipboard();
+                    }
+                  : _showSearchBar
+                  ? () => setState(() {
+                      _showSearchBar = false;
+                    })
+                  : null,
+              child: ClipRect(
+                child: Material(
+                  type: MaterialType.transparency,
+                  child: FileContextMenuExtension(
+                    isVirtual: (path) => path.startsWith('#network/SFTP/'),
+                    sections: (_, paths) => _contextMenuSections(
+                      paths.length == 1 &&
+                              _selectionBloc.state.isPathSelected(paths.single)
+                          ? _selectionBloc.state.allSelectedPaths
+                          : paths,
+                    ),
+                    onOpen: (file) => _handleFileOpen(context, file),
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.translucent,
+                      onSecondaryTapUp: (details) => _showContextMenu(
+                        context,
+                        details.globalPosition,
+                        null,
+                      ),
+                      child: _buildBody(context, networkState, selectionState),
+                    ),
                   ),
                 ),
               ),
             ),
+            floatingActionButton: _isDesktopMode
+                ? null
+                : _buildFloatingActionButton(selectionState),
           ),
-          floatingActionButton: _isDesktopMode
-              ? null
-              : _buildFloatingActionButton(selectionState),
         );
       },
     );
@@ -1110,8 +1170,6 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
     NetworkBrowsingState state,
     SelectionState selectionState,
   ) {
-    FrameTimingOptimizer().optimizeBeforeHeavyOperation();
-
     if (_enableVerboseLogs) {
       debugPrint("NetworkBrowserScreen: _buildBody called with state:");
       debugPrint("  - isLoading: ${state.isLoading}");
@@ -1183,7 +1241,6 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
         final Widget contentView = _buildContentView(
           folders: folders,
           files: files,
-          selectionState: selectionState,
         );
 
         content = Stack(
@@ -1265,6 +1322,7 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
             left: 0,
             right: 0,
             child: SelectionSummaryTooltip(
+              showTotalSize: false,
               selectedFileCount: selectionState.selectedFilePaths.length,
               selectedFolderCount: selectionState.selectedFolderPaths.length,
               selectedFilePaths: selectionState.selectedFilePaths.toList(),
@@ -1278,8 +1336,26 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
   Widget _buildContentView({
     required List<FileSystemEntity> folders,
     required List<FileSystemEntity> files,
-    required SelectionState selectionState,
   }) {
+    final state = _networkBrowsingBloc.state;
+    final key = (
+      state.directories,
+      state.files,
+      _currentPath,
+      _searchController.text,
+      _viewMode,
+      _gridZoomLevel,
+      _columnVisibility,
+      _sortOption,
+      Theme.of(context),
+      Localizations.localeOf(context),
+      MediaQuery.sizeOf(context),
+    );
+    // Rows subscribe to selection separately, so dragging can reuse the layout.
+    if (_cachedContentView != null && _cachedContentKey == key) {
+      return _cachedContentView!;
+    }
+    _cachedContentKey = key;
     final items = <FileSystemEntity>[...folders, ...files];
     final maxZoom = GridZoomConstraints.maxGridSizeForContext(
       context,
@@ -1312,16 +1388,26 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
               constraints.maxWidth - 16,
             ),
             gridChildAspectRatio: GridZoomConstraints.fileGridAspectRatio,
-            listItemBuilder: (itemContext, item) =>
-                _buildListItem(itemContext, item, selectionState),
-            gridItemBuilder: (itemContext, item) =>
-                _buildGridItem(itemContext, item, selectionState),
-            detailsItemBuilder: (itemContext, item) =>
-                _buildDetailsItem(itemContext, item, selectionState),
+            listItemBuilder: (itemContext, item) => _selectableNetworkItem(
+              item,
+              (context, selection) => _buildListItem(context, item, selection),
+            ),
+            gridItemBuilder: (itemContext, item) => _selectableNetworkItem(
+              item,
+              (context, selection) => _buildGridItem(context, item, selection),
+            ),
+            detailsItemBuilder: (itemContext, item) => _selectableNetworkItem(
+              item,
+              (context, selection) =>
+                  _buildDetailsItem(context, item, selection),
+            ),
             treeIsLeaf: (item) => item is File,
             treeChildrenLoader: _loadNetworkChildren,
             treeItemBuilder: (itemContext, node, depth) =>
-                _buildNetworkTreeRow(itemContext, node, depth),
+                _selectableNetworkItem(
+                  node.data,
+                  (context, _) => _buildNetworkTreeRow(context, node, depth),
+                ),
             detailsHeader: _viewMode == ViewMode.details
                 ? folder_list_components.DetailsColumnsHeader(
                     sortOption: _sortOption,
@@ -1333,13 +1419,26 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
                 : null,
           ),
     );
-    if (_viewMode != ViewMode.details) return view;
-    return folder_list_components.DetailsLayoutHost(
+    if (_viewMode != ViewMode.details) return _cachedContentView = view;
+    return _cachedContentView = folder_list_components.DetailsLayoutHost(
       columns: _columnVisibility,
       onChanged: _applyColumnVisibility,
       child: view,
     );
   }
+
+  Widget _selectableNetworkItem(
+    FileSystemEntity item,
+    Widget Function(BuildContext, SelectionState) builder,
+  ) => BlocSelector<SelectionBloc, SelectionState, (bool, bool, bool)>(
+    bloc: _selectionBloc,
+    selector: (state) => (
+      state.isPathSelected(item.path),
+      state.selectedCount > 1,
+      state.isSelectionMode,
+    ),
+    builder: (context, _) => builder(context, _selectionBloc.state),
+  );
 
   // Scroll controller for auto load more
   late ScrollController _scrollController;
@@ -1813,8 +1912,7 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
     return _wrapNetworkItem(
       entity,
       selected,
-      GestureDetector(
-        behavior: HitTestBehavior.opaque,
+      OptimizedInteractionLayer(
         onSecondaryTapUp: (details) =>
             _showContextMenu(itemContext, details.globalPosition, entity.path),
         onTap: () {

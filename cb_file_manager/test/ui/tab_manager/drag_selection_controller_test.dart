@@ -1,7 +1,7 @@
 import 'package:cb_file_manager/bloc/selection/selection.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tabbed_folder/tabbed_folder_drag_selection_controller.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:cb_file_manager/ui/widgets/selection_geometry_item.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -73,6 +73,49 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     expect(controller.hitTestItem(const Offset(20, 20)), isNull);
   });
+
+  testWidgets(
+    'pointer bursts repaint the overlay without rebuilding its widgets',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Stack(
+              key: controller.stackKey,
+              children: [
+                const Positioned.fill(child: SizedBox.expand()),
+                KeyedSubtree(
+                  key: const ValueKey('selection-overlay'),
+                  child: controller.buildOverlay(),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      controller.start(Offset.zero);
+      controller.update(const Offset(20, 20));
+      await tester.pump();
+      final paint = find.descendant(
+        of: find.byKey(const ValueKey('selection-overlay')),
+        matching: find.byType(CustomPaint),
+      );
+      final before = tester.widget<CustomPaint>(paint);
+      for (var i = 0; i < 100; i++) {
+        controller.update(Offset(20 + i / 100, 20));
+      }
+      await tester.pump();
+      expect(identical(tester.widget<CustomPaint>(paint), before), isTrue);
+      expect(selection.rectangleEvents, 1);
+      controller.update(const Offset(60, 20));
+      controller.end();
+      await tester.pump();
+      expect(selection.state.selectedFilePaths, {'file'});
+      expect(selection.state.selectedFolderPaths, {'folder'});
+      expect(identical(tester.widget<CustomPaint>(paint), before), isTrue);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('coalesces moves and skips unchanged selections', (tester) async {
     controller.start(Offset.zero);

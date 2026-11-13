@@ -987,10 +987,14 @@ class _PaneController extends ChangeNotifier {
   int _ticket = 0;
   bool _disposed = false;
 
-  List<TransferEntry> get selectedEntries =>
-      entries.where((e) => selected.contains(e.path)).toList();
+  List<TransferEntry>? _selectedEntriesCache;
+  Set<String> _entryPaths = const {};
+  List<TransferEntry> get selectedEntries => _selectedEntriesCache ??= entries
+      .where((e) => selected.contains(e.path))
+      .toList(growable: false);
 
   void _notify() {
+    _selectedEntriesCache = null;
     if (!_disposed) notifyListeners();
   }
 
@@ -1016,6 +1020,7 @@ class _PaneController extends ChangeNotifier {
     fileSystem = null;
     path = '';
     entries = const [];
+    _entryPaths = const {};
     selected.clear();
     anchor = cursor = null;
     loading = false;
@@ -1039,11 +1044,10 @@ class _PaneController extends ChangeNotifier {
       });
       path = target;
       entries = list;
+      _entryPaths = list.map((e) => e.path).toSet();
       selected
         ..clear()
-        ..addAll(
-          keepSelection?.where((p) => list.any((e) => e.path == p)) ?? const [],
-        );
+        ..addAll(keepSelection?.where(_entryPaths.contains) ?? const []);
       if (!selected.contains(anchor)) anchor = null;
       if (!selected.contains(cursor)) cursor = null;
     } catch (e) {
@@ -1096,10 +1100,9 @@ class _PaneController extends ChangeNotifier {
   }
 
   void replaceSelection(Iterable<String> paths) {
-    final available = entries.map((e) => e.path).toSet();
     selected
       ..clear()
-      ..addAll(paths.where(available.contains));
+      ..addAll(paths.where(_entryPaths.contains));
     anchor = cursor = selected.lastOrNull;
     _notify();
   }
@@ -1498,181 +1501,202 @@ class _TransferPaneState extends State<_TransferPane> {
       _path.text = displayPath;
     }
     final selectedCount = _pane.selected.length;
-    return DragTarget<_TransferDrag>(
-      onWillAcceptWithDetails: (details) =>
-          active && widget.canTransfer && details.data.from != widget.side,
-      onAcceptWithDetails: (details) => widget.onDrop(details.data.entries),
-      builder: (context, candidates, _) => DecoratedBox(
-        decoration: BoxDecoration(
-          color: c.surface,
-          borderRadius: CbRadii.mdAll,
-          border: Border.all(
-            color: candidates.isNotEmpty ? c.accent.base : c.strokeSubtle,
-            width: candidates.isNotEmpty
-                ? CbStrokes.emphasis
-                : CbStrokes.hairline,
+    return Focus(
+      canRequestFocus: false,
+      onKeyEvent: _onKey,
+      child: DragTarget<_TransferDrag>(
+        onWillAcceptWithDetails: (details) =>
+            active && widget.canTransfer && details.data.from != widget.side,
+        onAcceptWithDetails: (details) => widget.onDrop(details.data.entries),
+        builder: (context, candidates, _) => DecoratedBox(
+          decoration: BoxDecoration(
+            color: c.surface,
+            borderRadius: CbRadii.mdAll,
+            border: Border.all(
+              color: candidates.isNotEmpty ? c.accent.base : c.strokeSubtle,
+              width: candidates.isNotEmpty
+                  ? CbStrokes.emphasis
+                  : CbStrokes.hairline,
+            ),
           ),
-        ),
-        child: ClipRRect(
-          borderRadius: CbRadii.mdAll,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  CbSpacing.md,
-                  CbSpacing.sm,
-                  CbSpacing.sm,
-                  CbSpacing.xs,
-                ),
-                child: widget.header,
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: CbSpacing.sm),
-                child: Row(
-                  children: [
-                    CbButton.icon(
-                      icon: PhosphorIconsLight.arrowUp,
-                      tooltip: tr.parentFolder,
-                      size: CbButtonSize.sm,
-                      onPressed: active && fs.parent(_pane.path) != null
-                          ? () => _pane.up()
-                          : null,
-                    ),
-                    const SizedBox(width: CbSpacing.xs),
-                    Expanded(child: _addressBar(context, active)),
-                    const SizedBox(width: CbSpacing.xs),
-                    CbButton.icon(
-                      icon: PhosphorIconsLight.arrowClockwise,
-                      tooltip: tr.refresh,
-                      size: CbButtonSize.sm,
-                      onPressed: active ? () => _pane.refresh() : null,
-                    ),
-                    CbButton.icon(
-                      icon: PhosphorIconsLight.folderPlus,
-                      tooltip: tr.newFolder,
-                      size: CbButtonSize.sm,
-                      onPressed: active && _pane.path.isNotEmpty
-                          ? widget.onNewFolder
-                          : null,
-                    ),
-                    SizedBox(
-                      width: 32,
-                      height: 32,
-                      child: GridListViewToggle(
-                        mode: _view.mode,
-                        supportedModes: _viewModes,
-                        onChanged: (mode) =>
-                            _changePresentation(_view.select(mode)),
-                      ),
-                    ),
-                    if (_view.mode == ViewMode.grid)
-                      CbButton.icon(
-                        key: ValueKey('sftp-transfer-zoom-${widget.side.name}'),
-                        icon: PhosphorIconsLight.magnifyingGlassPlus,
-                        tooltip: tr.adjustGridSizeTooltip,
-                        size: CbButtonSize.sm,
-                        onPressed: () => SharedActionBar.showGridSizeDialog(
-                          context,
-                          currentGridSize: _scale.zoom,
-                          onApply: (zoom) =>
-                              _changePresentation(_scale.setZoom(zoom)),
-                        ),
-                      ),
-                    if (widget.actions != null)
-                      Builder(
-                        builder: (context) => CbButton.icon(
-                          key: ValueKey(
-                            'sftp-transfer-more-${widget.side.name}',
-                          ),
-                          icon: PhosphorIconsLight.dotsThree,
-                          tooltip: tr.moreOptions,
-                          size: CbButtonSize.sm,
-                          onPressed: !_canAct
-                              ? null
-                              : () {
-                                  final box =
-                                      context.findRenderObject()! as RenderBox;
-                                  _showMenu(
-                                    box.localToGlobal(
-                                      box.size.bottomLeft(Offset.zero),
-                                    ),
-                                  );
-                                },
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: CbSpacing.xs),
-              if (_pane.loading && active)
-                const LinearProgressIndicator(minHeight: 2)
-              else
-                const SizedBox(height: 2),
-              if (_pane.error != null && active) _error(context),
-              Expanded(child: widget.placeholder ?? _list(context, active)),
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  border: Border(top: BorderSide(color: c.strokeSubtle)),
-                ),
-                child: Padding(
+          child: ClipRRect(
+            borderRadius: CbRadii.mdAll,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
                   padding: const EdgeInsets.fromLTRB(
                     CbSpacing.md,
-                    CbSpacing.xs,
-                    CbSpacing.xs,
+                    CbSpacing.sm,
+                    CbSpacing.sm,
                     CbSpacing.xs,
                   ),
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      final enabled =
-                          active && widget.canTransfer && selectedCount > 0;
-                      void send() => widget.onTransfer(_pane.selectedEntries);
-                      return Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              active
-                                  ? tr.sshPaneStatus(
-                                      _pane.entries.length,
-                                      selectedCount,
-                                    )
-                                  : '',
-                              style: CbTypography.caption.copyWith(
-                                color: c.textTertiary,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
+                  child: widget.header,
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: CbSpacing.sm),
+                  child: Row(
+                    children: [
+                      CbButton.icon(
+                        icon: PhosphorIconsLight.arrowUp,
+                        tooltip: tr.parentFolder,
+                        size: CbButtonSize.sm,
+                        onPressed: active && fs.parent(_pane.path) != null
+                            ? () => _pane.up()
+                            : null,
+                      ),
+                      const SizedBox(width: CbSpacing.xs),
+                      Expanded(child: _addressBar(context, active)),
+                      const SizedBox(width: CbSpacing.xs),
+                      CbButton.icon(
+                        icon: PhosphorIconsLight.arrowClockwise,
+                        tooltip: tr.refresh,
+                        size: CbButtonSize.sm,
+                        onPressed: active ? () => _pane.refresh() : null,
+                      ),
+                      CbButton.icon(
+                        icon: PhosphorIconsLight.folderPlus,
+                        tooltip: tr.newFolder,
+                        size: CbButtonSize.sm,
+                        onPressed: active && _pane.path.isNotEmpty
+                            ? widget.onNewFolder
+                            : null,
+                      ),
+                      SizedBox(
+                        width: 32,
+                        height: 32,
+                        child: GridListViewToggle(
+                          mode: _view.mode,
+                          supportedModes: _viewModes,
+                          onChanged: (mode) =>
+                              _changePresentation(_view.select(mode)),
+                        ),
+                      ),
+                      if (_view.mode == ViewMode.grid)
+                        CbButton.icon(
+                          key: ValueKey(
+                            'sftp-transfer-zoom-${widget.side.name}',
                           ),
-                          if (constraints.maxWidth < 360)
-                            CbButton.icon(
-                              key: ValueKey(
-                                'sftp-transfer-send-${widget.side.name}',
-                              ),
-                              icon: widget.transferIcon,
-                              tooltip: widget.transferLabel,
-                              variant: CbButtonVariant.primary,
-                              size: CbButtonSize.sm,
-                              onPressed: enabled ? send : null,
-                            )
-                          else
-                            CbButton(
-                              key: ValueKey(
-                                'sftp-transfer-send-${widget.side.name}',
-                              ),
-                              icon: widget.transferIcon,
-                              label: widget.transferLabel,
-                              variant: CbButtonVariant.primary,
-                              size: CbButtonSize.sm,
-                              onPressed: enabled ? send : null,
+                          icon: PhosphorIconsLight.magnifyingGlassPlus,
+                          tooltip: tr.adjustGridSizeTooltip,
+                          size: CbButtonSize.sm,
+                          onPressed: () => SharedActionBar.showGridSizeDialog(
+                            context,
+                            currentGridSize: _scale.zoom,
+                            onApply: (zoom) =>
+                                _changePresentation(_scale.setZoom(zoom)),
+                          ),
+                        ),
+                      if (widget.actions != null)
+                        CbButton.icon(
+                          key: ValueKey(
+                            'sftp-transfer-delete-${widget.side.name}',
+                          ),
+                          icon: PhosphorIconsLight.trash,
+                          tooltip: tr.delete,
+                          size: CbButtonSize.sm,
+                          onPressed: _canAct && selectedCount > 0
+                              ? () => widget.actions!.onDelete(
+                                  _pane.selectedEntries,
+                                )
+                              : null,
+                        ),
+                      if (widget.actions != null)
+                        Builder(
+                          builder: (context) => CbButton.icon(
+                            key: ValueKey(
+                              'sftp-transfer-more-${widget.side.name}',
                             ),
-                        ],
-                      );
-                    },
+                            icon: PhosphorIconsLight.dotsThree,
+                            tooltip: tr.moreOptions,
+                            size: CbButtonSize.sm,
+                            onPressed: !_canAct
+                                ? null
+                                : () {
+                                    final box =
+                                        context.findRenderObject()!
+                                            as RenderBox;
+                                    _showMenu(
+                                      box.localToGlobal(
+                                        box.size.bottomLeft(Offset.zero),
+                                      ),
+                                    );
+                                  },
+                          ),
+                        ),
+                    ],
                   ),
                 ),
-              ),
-            ],
+                const SizedBox(height: CbSpacing.xs),
+                if (_pane.loading && active)
+                  const LinearProgressIndicator(minHeight: 2)
+                else
+                  const SizedBox(height: 2),
+                if (_pane.error != null && active) _error(context),
+                Expanded(child: widget.placeholder ?? _list(context, active)),
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    border: Border(top: BorderSide(color: c.strokeSubtle)),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      CbSpacing.md,
+                      CbSpacing.xs,
+                      CbSpacing.xs,
+                      CbSpacing.xs,
+                    ),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final enabled =
+                            active && widget.canTransfer && selectedCount > 0;
+                        void send() => widget.onTransfer(_pane.selectedEntries);
+                        return Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                active
+                                    ? tr.sshPaneStatus(
+                                        _pane.entries.length,
+                                        selectedCount,
+                                      )
+                                    : '',
+                                style: CbTypography.caption.copyWith(
+                                  color: c.textTertiary,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (constraints.maxWidth < 360)
+                              CbButton.icon(
+                                key: ValueKey(
+                                  'sftp-transfer-send-${widget.side.name}',
+                                ),
+                                icon: widget.transferIcon,
+                                tooltip: widget.transferLabel,
+                                variant: CbButtonVariant.primary,
+                                size: CbButtonSize.sm,
+                                onPressed: enabled ? send : null,
+                              )
+                            else
+                              CbButton(
+                                key: ValueKey(
+                                  'sftp-transfer-send-${widget.side.name}',
+                                ),
+                                icon: widget.transferIcon,
+                                label: widget.transferLabel,
+                                variant: CbButtonVariant.primary,
+                                size: CbButtonSize.sm,
+                                onPressed: enabled ? send : null,
+                              ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

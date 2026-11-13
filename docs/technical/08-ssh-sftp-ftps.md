@@ -23,7 +23,7 @@ spectrum as the file browser. The grid-size control is also available in the
 toolbar (or More on narrow windows). Zoom is stored under the collection's own
 `collection_zoom_ssh_hosts` preference; small cards retain their name and menu.
 
-On desktop, both host layouts support rectangle selection, Ctrl/Cmd-click,
+On desktop, all host layouts support rectangle selection, Ctrl/Cmd-click,
 Shift-click, Ctrl/Cmd+A, Escape, Delete and F2 (edit one selected host). Copy
 and Paste duplicate selected profiles with distinct names while retaining their
 vault credentials and key/proxy references. Cut keeps the original until Paste;
@@ -31,6 +31,9 @@ SSH and SFTP host lists share one collection, so pasting a cut host there keeps
 its identity and forwarding rules. Escape cancels a pending cut. The clipboard
 stays in memory; passwords are never put on the system text clipboard. Built-in
 section folders are navigation entries and cannot be deleted as hosts.
+Toolbar Delete, keyboard Delete and context-menu Delete act on the complete
+selection. Right-clicking an already-selected host preserves the selection;
+keyboard file actions also remain available when a toolbar control has focus.
 
 ## SSH and SFTP
 

@@ -9,6 +9,7 @@ import '../../screens/folder_list/folder_list_state.dart';
 import '../../tab_manager/core/tabbed_folder/tabbed_folder_drag_selection_controller.dart';
 import '../../utils/grid_zoom_constraints.dart';
 import '../../widgets/adaptive_file_list.dart';
+import '../../widgets/selection_geometry_item.dart';
 
 /// Browser-like collections share view persistence and layout behavior.
 class GridListViewController extends ChangeNotifier {
@@ -198,31 +199,15 @@ class GridListCollection<T> extends StatefulWidget {
 }
 
 class _GridListCollectionState<T> extends State<GridListCollection<T>> {
-  void _registerItem(BuildContext context, String identity) {
-    final controller = widget.dragSelectionController;
-    if (!widget.isDesktop || controller == null) return;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      final box = context.findRenderObject() as RenderBox?;
-      if (box == null || !box.attached || !box.hasSize) return;
-      final origin = box.localToGlobal(Offset.zero);
-      controller.registerItemPosition(
-        identity,
-        Rect.fromLTWH(origin.dx, origin.dy, box.size.width, box.size.height),
-      );
-    });
-  }
-
   Widget _buildItem(BuildContext context, T item, ViewMode mode) {
     final identity = widget.identity(item);
-    return LayoutBuilder(
-      builder: (context, _) {
-        _registerItem(context, identity);
-        return KeyedSubtree(
-          key: ValueKey('${mode.name}-$identity'),
-          child: widget.itemBuilder(context, item, mode),
-        );
-      },
+    return KeyedSubtree(
+      key: ValueKey('${mode.name}-$identity'),
+      child: SelectionGeometryItem(
+        path: identity,
+        controller: widget.isDesktop ? widget.dragSelectionController : null,
+        child: widget.itemBuilder(context, item, mode),
+      ),
     );
   }
 
@@ -347,7 +332,6 @@ class _GridListCollectionState<T> extends State<GridListCollection<T>> {
                 return;
               }
               drag.start(event.localPosition);
-              setState(() {});
             },
             onPointerMove: (event) {
               if (event.kind == PointerDeviceKind.mouse &&

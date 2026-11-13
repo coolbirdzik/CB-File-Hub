@@ -459,7 +459,8 @@ class _SshHostListItemState extends State<SshHostListItem> {
       onTap: widget.isDesktop ? _select : () => widget.onOpen?.call(),
       onDoubleTap: widget.isDesktop ? widget.onOpen : null,
       onSecondaryTapUp: (_) {
-        _select();
+        _focus.requestFocus();
+        if (!widget.isSelected) widget.onSelect();
         _menu.currentState?.showButtonMenu();
       },
       child: child,

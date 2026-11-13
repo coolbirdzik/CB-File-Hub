@@ -378,6 +378,50 @@ void main() {
     });
   }
 
+  for (final keyboard in [false, true]) {
+    for (final width in [320.0, 1200.0]) {
+      testWidgets(
+        'transfer ${keyboard ? 'key after toolbar focus' : 'toolbar Delete'} deletes multiple remote items at $width',
+        (tester) async {
+          final fixture = await pumpScreen(tester, width: width);
+          await tester.tap(find.text('backup'));
+          await tester.pumpAndSettle();
+          await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+          await tester.tap(find.text('server.log'));
+          await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+          await tester.pumpAndSettle();
+          final toolbar = find.byKey(
+            const ValueKey('sftp-transfer-delete-remote'),
+          );
+          if (keyboard) {
+            Focus.of(
+              tester.element(
+                find.descendant(of: toolbar, matching: find.byType(Icon)).first,
+              ),
+            ).requestFocus();
+            await tester.pump();
+            await tester.sendKeyEvent(LogicalKeyboardKey.delete);
+          } else {
+            await tester.tap(toolbar);
+          }
+          await tester.pumpAndSettle();
+          expect(fixture.remote.files.length, 1);
+          await tester.tap(
+            find.byKey(const ValueKey('sftp-transfer-confirm-delete')),
+          );
+          await tester.pumpAndSettle();
+          expect(fixture.remote.files, isEmpty);
+          expect(
+            fixture.remote.dirs,
+            isNot(contains('/home/developer/backup')),
+          );
+          expect(fixture.local.text('/home/me/notes.txt'), 'remember');
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
   testWidgets('the local pane offers no file operations', (tester) async {
     final fixture = await pumpScreen(tester, width: 1200);
     await tester.tap(find.text('notes.txt'));

@@ -19,6 +19,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'network_recovery_test.dart' show host;
 import 'ssh_connection_dialog_test.dart' show FixtureSshDiscovery;
 
+class _CountingSort extends SshHostSortController {
+  int comparisons = 0;
+  @override
+  int compare(SshProfile a, SshProfile b) {
+    comparisons++;
+    return super.compare(a, b);
+  }
+}
+
 void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
@@ -27,8 +36,9 @@ void main() {
 
   Future<SshProfileStore> pumpWorkspace(
     WidgetTester tester,
-    ViewMode mode,
-  ) async {
+    ViewMode mode, {
+    SshHostSortController? sort,
+  }) async {
     tester.view.physicalSize = const Size(1200, 700);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -65,7 +75,7 @@ void main() {
             tabId: tabs.state.activeTabId!,
             store: store,
             viewController: view,
-            sortController: SshHostSortController(),
+            sortController: sort ?? SshHostSortController(),
             discovery: FixtureSshDiscovery(
               Future.value(const LocalSshSnapshot()),
             ),
@@ -90,7 +100,86 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testWidgets('dragging selection does not re-sort the host collection', (
+    tester,
+  ) async {
+    final sort = _CountingSort();
+    await pumpWorkspace(tester, ViewMode.grid, sort: sort);
+    final before = sort.comparisons;
+    expect(before, greaterThan(0));
+    final area = tester.getRect(
+      find.byKey(const ValueKey('grid-list-collection-grid')),
+    );
+    final gesture = await tester.startGesture(
+      area.bottomRight - const Offset(12, 12),
+      kind: PointerDeviceKind.mouse,
+    );
+    for (final point in [area.center, area.topLeft + const Offset(1, 1)]) {
+      await gesture.moveTo(point);
+      await tester.pump();
+    }
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(selected(tester), {'Alpha', 'Beta', 'Gamma'});
+    expect(sort.comparisons, before);
+    expect(tester.takeException(), isNull);
+  });
+
   for (final mode in [ViewMode.list, ViewMode.details, ViewMode.grid]) {
+    testWidgets(
+      'SSH ${mode.name} context Delete keeps the complete selection',
+      (tester) async {
+        final store = await pumpWorkspace(tester, mode);
+        await tester.tap(find.text('Alpha'));
+        await tester.pumpAndSettle();
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+        await tester.tap(find.text('Beta'));
+        await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+        await tester.pumpAndSettle();
+        expect(selected(tester), {'Alpha', 'Beta'});
+        await tester.tap(find.text('Alpha'), buttons: kSecondaryMouseButton);
+        await tester.pumpAndSettle();
+        expect(selected(tester), {'Alpha', 'Beta'});
+        await tester.tap(find.text('Delete'));
+        await tester.pumpAndSettle();
+        expect(store.profiles.length, 3);
+        await tester.tap(find.widgetWithText(CbButton, 'Delete'));
+        await tester.pumpAndSettle();
+        expect(store.profiles.map((p) => p.name), ['Gamma']);
+      },
+    );
+
+    for (final keyboard in [false, true]) {
+      testWidgets(
+        'SSH ${mode.name} ${keyboard ? 'key after toolbar focus' : 'toolbar Delete'} removes both selected hosts',
+        (tester) async {
+          final store = await pumpWorkspace(tester, mode);
+          await tester.tap(find.text('Alpha'));
+          await tester.pumpAndSettle();
+          await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+          await tester.tap(find.text('Beta'));
+          await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+          await tester.pumpAndSettle();
+          final toolbar = find.byKey(const ValueKey('ssh-delete-selection'));
+          if (keyboard) {
+            Focus.of(
+              tester.element(
+                find.descendant(of: toolbar, matching: find.byType(Icon)).first,
+              ),
+            ).requestFocus();
+            await tester.pump();
+            await tester.sendKeyEvent(LogicalKeyboardKey.delete);
+          } else {
+            await tester.tap(toolbar);
+          }
+          await tester.pumpAndSettle();
+          expect(store.profiles.length, 3);
+          await tester.tap(find.widgetWithText(CbButton, 'Delete'));
+          await tester.pumpAndSettle();
+          expect(store.profiles.map((p) => p.name), ['Gamma']);
+        },
+      );
+    }
     testWidgets('SSH ${mode.name} supports Ctrl/Shift and select all', (
       tester,
     ) async {

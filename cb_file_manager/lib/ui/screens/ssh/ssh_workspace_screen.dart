@@ -23,6 +23,8 @@ import '../../../helpers/core/text_utils.dart';
 import '../../../helpers/core/desktop_shortcuts.dart';
 import '../../../bloc/selection/selection.dart';
 import '../../components/common/file_view_shell.dart';
+import '../../components/common/file_keyboard_shortcuts.dart';
+import '../../tab_manager/core/tab_focus_gate.dart';
 import '../../tab_manager/core/tabbed_folder/tabbed_folder_drag_selection_controller.dart';
 import '../folder_list/folder_list_state.dart';
 import 'ssh_connection_status.dart';
@@ -85,6 +87,8 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
   );
   late final StreamSubscription<SelectionState> _selectionSubscription;
   List<_HostsEntry> _hostEntries = const [];
+  Widget? _cachedHostCollection;
+  Object? _cachedHostKey;
   String? _selectionAnchor;
   bool _editingSelection = false;
   static final _clipboards =
@@ -253,7 +257,9 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
   @override
   void initState() {
     super.initState();
-    _selectionSubscription = _selection.stream.listen((_) => _changed());
+    _selectionSubscription = _selection.stream.listen((_) {
+      if (mounted) setState(() {});
+    });
     _clipboard.addListener(_changed);
     store.addListener(_changed);
     _tunnels.addListener(_changed);
@@ -266,6 +272,7 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
   }
 
   void _changed() {
+    _cachedHostCollection = null;
     if (!_dragSelection.isDragging.value) _dragSelection.clearItemPositions();
     if (mounted) setState(() {});
   }
@@ -497,63 +504,86 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
   Widget build(BuildContext context) {
     final tr = context.tr;
     final hosts = _section == SshSection.hosts;
-    return SystemScreen(
-      tabId: widget.tabId,
-      systemId: widget.sftpOnly ? '#sftp' : _section.path,
-      title: widget.sftpOnly ? 'SFTP' : tr.sshWorkspace,
-      icon: PhosphorIconsLight.terminalWindow,
-      showAppBar: true,
-      viewMode: hosts ? _view.mode : ViewMode.list,
-      onRefresh: _load,
-      showSearchBar: _searching,
-      searchBar: _searchBar(context),
-      onSearch: _openSearch,
-      onEscape: _searching ? _closeSearch : null,
-      actions: _actions(context),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final compact = constraints.maxWidth < _compactWidth;
-          return FileViewShell(
-            viewMode: _view.mode,
-            onViewScaleDelta: hosts
-                ? (delta) =>
-                      _run(() => _scale.step(delta, constraints.maxWidth))
-                : null,
-            enableKeyboardShortcuts: hosts,
-            onSelectAll: _selectAllHosts,
-            onCopy: () => _holdProfiles(false),
-            onCut: () => _holdProfiles(true),
-            onPaste: _pasteProfiles,
-            onDelete: ({required permanent}) => _deleteProfiles(),
-            onRename: _selectedProfiles.length == 1
-                ? () => _edit(_selectedProfiles.single)
-                : null,
-            onEscape: () {
-              _clearHostSelection();
-              _clipboard.value = null;
-            },
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (_error != null) _errorBanner(context),
-                if (!_loaded && _error == null)
-                  const LinearProgressIndicator(minHeight: 2),
-                Expanded(
-                  child: switch (_section) {
-                    SshSection.hosts => _hostsSection(context),
-                    SshSection.keys => _keysSection(context, compact: compact),
-                    SshSection.proxies => _proxiesSection(context),
-                    SshSection.knownHosts => _knownHostsSection(context),
-                    SshSection.forwards => _forwardsSection(
-                      context,
-                      compact: compact,
-                    ),
-                  },
-                ),
-              ],
-            ),
-          );
-        },
+    return Focus(
+      canRequestFocus: false,
+      onKeyEvent: (_, event) {
+        if (!hosts || !TabFocusGate.isActiveTab(context)) {
+          return KeyEventResult.ignored;
+        }
+        return FileKeyboardShortcuts.handle(
+          isDesktop: isDesktopPlatform,
+          event: event,
+          onDelete: (_) => _deleteProfiles(),
+          onSelectAll: _selectAllHosts,
+          onCopy: () => _holdProfiles(false),
+          onCut: () => _holdProfiles(true),
+          onPaste: _pasteProfiles,
+          onRename: _selectedProfiles.length == 1
+              ? () => _edit(_selectedProfiles.single)
+              : null,
+        );
+      },
+      child: SystemScreen(
+        tabId: widget.tabId,
+        systemId: widget.sftpOnly ? '#sftp' : _section.path,
+        title: widget.sftpOnly ? 'SFTP' : tr.sshWorkspace,
+        icon: PhosphorIconsLight.terminalWindow,
+        showAppBar: true,
+        viewMode: hosts ? _view.mode : ViewMode.list,
+        onRefresh: _load,
+        showSearchBar: _searching,
+        searchBar: _searchBar(context),
+        onSearch: _openSearch,
+        onEscape: _searching ? _closeSearch : null,
+        actions: _actions(context),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final compact = constraints.maxWidth < _compactWidth;
+            return FileViewShell(
+              viewMode: _view.mode,
+              onViewScaleDelta: hosts
+                  ? (delta) =>
+                        _run(() => _scale.step(delta, constraints.maxWidth))
+                  : null,
+              enableKeyboardShortcuts: hosts,
+              onSelectAll: _selectAllHosts,
+              onCopy: () => _holdProfiles(false),
+              onCut: () => _holdProfiles(true),
+              onPaste: _pasteProfiles,
+              onDelete: ({required permanent}) => _deleteProfiles(),
+              onRename: _selectedProfiles.length == 1
+                  ? () => _edit(_selectedProfiles.single)
+                  : null,
+              onEscape: () {
+                _clearHostSelection();
+                _clipboard.value = null;
+              },
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (_error != null) _errorBanner(context),
+                  if (!_loaded && _error == null)
+                    const LinearProgressIndicator(minHeight: 2),
+                  Expanded(
+                    child: switch (_section) {
+                      SshSection.hosts => _hostsSection(context),
+                      SshSection.keys => _keysSection(
+                        context,
+                        compact: compact,
+                      ),
+                      SshSection.proxies => _proxiesSection(context),
+                      SshSection.knownHosts => _knownHostsSection(context),
+                      SshSection.forwards => _forwardsSection(
+                        context,
+                        compact: compact,
+                      ),
+                    },
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
       ),
     );
   }
@@ -777,6 +807,16 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
             onPressed: _load,
           ),
       ],
+      if (hosts && !compact)
+        CbButton.icon(
+          key: const ValueKey('ssh-delete-selection'),
+          icon: PhosphorIconsLight.trash,
+          tooltip: tr.delete,
+          size: CbButtonSize.sm,
+          onPressed: _selectedProfiles.isEmpty || _editingSelection
+              ? null
+              : () => _deleteProfiles(),
+        ),
       if (add != null)
         IconButton(
           key: const ValueKey('ssh-add-action'),
@@ -870,6 +910,22 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
   Widget _hostsSection(BuildContext context) {
     final tr = context.tr;
     final query = _search.text;
+    final key = (
+      query,
+      _view.mode,
+      _scale.zoom,
+      _connecting,
+      _statusProfileId,
+      _status,
+      Theme.of(context),
+      Localizations.localeOf(context),
+      MediaQuery.sizeOf(context),
+    );
+    // Selection updates individual rows without filtering/sorting hosts again.
+    if (_cachedHostCollection != null && _cachedHostKey == key) {
+      return _cachedHostCollection!;
+    }
+    _cachedHostKey = key;
     final profiles =
         store.profiles
             .where(
@@ -893,7 +949,7 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
       for (final profile in profiles) _ProfileEntry(profile),
     ];
     _hostEntries = entries;
-    return GestureDetector(
+    return _cachedHostCollection = GestureDetector(
       behavior: HitTestBehavior.translucent,
       onTap: _clearHostSelection,
       child: entries.isEmpty
@@ -928,18 +984,23 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
                   ],
                 ),
               ),
-              itemBuilder: (_, entry, mode) => switch (entry) {
-                _SectionEntry(:final section) => _folderItem(
-                  context,
-                  section,
-                  mode,
-                ),
-                _ProfileEntry(:final profile) => _hostItem(
-                  context,
-                  profile,
-                  mode,
-                ),
-              },
+              itemBuilder: (_, entry, mode) =>
+                  BlocSelector<SelectionBloc, SelectionState, bool>(
+                    bloc: _selection,
+                    selector: (state) => state.isPathSelected(entry.id),
+                    builder: (context, _) => switch (entry) {
+                      _SectionEntry(:final section) => _folderItem(
+                        context,
+                        section,
+                        mode,
+                      ),
+                      _ProfileEntry(:final profile) => _hostItem(
+                        context,
+                        profile,
+                        mode,
+                      ),
+                    },
+                  ),
             ),
     );
   }

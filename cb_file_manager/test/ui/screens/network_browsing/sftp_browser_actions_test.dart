@@ -13,6 +13,7 @@ import 'package:cb_file_manager/services/network_browsing/sftp_service.dart';
 import 'package:cb_file_manager/ui/screens/network_browsing/network_browser_screen.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';
 import 'package:cb_file_manager/ui/widgets/drag_selection_region.dart';
+import 'package:cb_file_manager/ui/widgets/selection_geometry_item.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -93,7 +94,15 @@ void main() {
     );
     await preferencesDirectory.delete(recursive: true);
   });
-  setUp(() => SharedPreferences.setMockInitialValues({}));
+  setUp(() async {
+    SharedPreferences.setMockInitialValues({});
+    // UserPreferences uses the suite's SQLite database, so resetting the
+    // SharedPreferences mock alone does not clear the preceding zoom test.
+    await UserPreferences.instance.setNetworkBrowserViewMode(ViewMode.list);
+    await UserPreferences.instance.setGridZoomLevel(
+      UserPreferences.defaultGridZoomLevel,
+    );
+  });
 
   Future<({MemoryTransferFileSystem fs, TabManagerBloc tabs})> pumpBrowser(
     WidgetTester tester, {
@@ -255,12 +264,79 @@ void main() {
     ViewMode.details,
     ViewMode.tree,
   ]) {
+    for (final keyboard in [false, true]) {
+      testWidgets(
+        'SFTP ${mode.name} ${keyboard ? 'key after toolbar focus' : 'toolbar Delete'} deletes both selected files',
+        (tester) async {
+          final fixture = await pumpBrowser(tester, mode: mode);
+          Finder item(String name) => mode == ViewMode.tree
+              ? find.text(name)
+              : find.byKey(ValueKey('file-${mode.name}-item-$_root/$name'));
+          await tester.tap(item('alpha.txt'));
+          await tester.pumpAndSettle();
+          await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+          await tester.tap(item('beta.txt'));
+          await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+          await tester.pumpAndSettle();
+          final selection = tester
+              .element(item('alpha.txt'))
+              .read<SelectionBloc>()
+              .state;
+          expect(selection.selectedCount, 2);
+          final toolbar = find.byKey(
+            const ValueKey('sftp-browser-delete-selection'),
+          );
+          if (keyboard) {
+            Focus.of(
+              tester.element(
+                find.descendant(of: toolbar, matching: find.byType(Icon)).first,
+              ),
+            ).requestFocus();
+            await tester.pump();
+            await tester.sendKeyEvent(LogicalKeyboardKey.delete);
+          } else {
+            await tester.tap(toolbar);
+          }
+          await tester.pumpAndSettle();
+          expect(fixture.fs.files.length, 2);
+          await tester.tap(
+            find.byKey(const ValueKey('sftp-browser-confirm-delete')),
+          );
+          await tester.pumpAndSettle();
+          expect(fixture.fs.files, isEmpty);
+          expect(fixture.fs.dirs, contains('/target'));
+          expect(tester.widget<CbButton>(toolbar).onPressed, isNull);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
+  for (final mode in [
+    ViewMode.list,
+    ViewMode.grid,
+    ViewMode.details,
+    ViewMode.tree,
+  ]) {
     testWidgets(
       'SFTP ${mode.name} rectangle selection and Delete remove all selected entries',
       (tester) async {
         final fixture = await pumpBrowser(tester, mode: mode);
         final region = find.byType(DragSelectionRegion);
         final rect = tester.getRect(region);
+        for (final path in ['/target', '/alpha.txt', '/beta.txt']) {
+          final item = find.byWidgetPredicate(
+            (widget) =>
+                widget is SelectionGeometryItem && widget.path == '$_root$path',
+          );
+          expect(item, findsOneWidget);
+          final bounds = tester.getRect(item);
+          expect(
+            bounds.intersect(rect),
+            bounds,
+            reason: 'The rectangle fixture must keep $path fully visible.',
+          );
+        }
         final gesture = await tester.startGesture(
           rect.bottomRight - const Offset(12, 12),
           kind: PointerDeviceKind.mouse,
