@@ -44,7 +44,7 @@ Future<void> selectViewMode(WidgetTester tester, ViewMode mode) async {
   if (find.byKey(const ValueKey('shared-view-mode-menu')).evaluate().isEmpty) {
     await tester.tap(find.byKey(const ValueKey('ssh-more-action')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('ssh-view-mode-toggle')));
+    await tester.tap(find.byKey(ValueKey('ssh-view-mode-${mode.name}')));
     await tester.pumpAndSettle();
     return;
   }
@@ -185,7 +185,13 @@ void main() {
                   .isSelected,
               isFalse,
             );
-            expect(find.byType(PopupMenuButton<void>), findsOneWidget);
+            expect(
+              find.descendant(
+                of: find.byType(SshHostListItem),
+                matching: find.byType(PopupMenuButton<void>),
+              ),
+              findsOneWidget,
+            );
             await selectViewMode(tester, ViewMode.list);
             expect(
               find.byKey(const ValueKey('grid-list-collection-list')),

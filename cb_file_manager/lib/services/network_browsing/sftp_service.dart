@@ -4,12 +4,23 @@ import 'package:dartssh2/dartssh2.dart';
 import 'package:path/path.dart' as p;
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../ssh/ssh_profile_store.dart';
+import '../ssh/sftp_transfer.dart';
 import 'network_service_base.dart';
 
-class SFTPService extends NetworkServiceBase {
+/// A connected browser can reuse the SFTP transfer backend for file actions.
+abstract interface class SftpFileAccess {
+  TransferFileSystem get transferFileSystem;
+  String resolveRemotePath(String path);
+}
+
+class SFTPService extends NetworkServiceBase implements SftpFileAccess {
   SSHClient? _ssh;
   SftpClient? _sftp;
   String _basePath = '';
+  TransferFileSystem? _transferFileSystem;
+  @override
+  TransferFileSystem get transferFileSystem =>
+      _transferFileSystem ??= SftpTransferFileSystem(client);
   @override
   String get serviceName => 'SFTP';
   @override
@@ -27,6 +38,7 @@ class SFTPService extends NetworkServiceBase {
     return _sftp!;
   }
 
+  @override
   String resolveRemotePath(String path) {
     if (path.startsWith('#network/')) {
       final parts = path.split('/');
@@ -81,6 +93,7 @@ class SFTPService extends NetworkServiceBase {
 
   @override
   Future<void> disconnect() async {
+    _transferFileSystem = null;
     final ssh = _ssh;
     _ssh = null;
     try {

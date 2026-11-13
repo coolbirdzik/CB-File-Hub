@@ -7,6 +7,7 @@ import 'dart:async'; // Add this import for Completer
 import 'package:cb_file_manager/helpers/ui/frame_timing_optimizer.dart';
 import '../../components/common/shared_action_bar.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -45,7 +46,15 @@ import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
 import 'package:cb_file_manager/ui/components/common/skeleton_helper.dart';
 import 'package:cb_file_manager/helpers/network/streaming_helper.dart';
 import 'package:cb_file_manager/ui/utils/platform_utils.dart';
-import 'package:cb_file_manager/ui/widgets/value_listenable_builders.dart';
+import 'package:cb_file_manager/ui/widgets/drag_selection_region.dart';
+import 'package:cb_file_manager/ui/widgets/selection_geometry_item.dart';
+import 'package:cb_file_manager/ui/tab_manager/core/tabbed_folder/tabbed_folder_drag_selection_controller.dart';
+import 'package:cb_file_manager/services/network_browsing/sftp_service.dart';
+import 'package:cb_file_manager/services/ssh/sftp_transfer.dart';
+import '../ssh/sftp_browser_actions.dart';
+import '../../components/common/shared_file_context_menu.dart';
+import '../../components/common/app_toast.dart';
+import '../../../config/translation_helper.dart';
 import 'package:cb_file_manager/ui/tab_manager/mobile/mobile_file_actions_controller.dart';
 import 'package:cb_file_manager/ui/utils/grid_zoom_constraints.dart';
 import 'package:cb_file_manager/ui/utils/view_mode_spectrum.dart';
@@ -72,6 +81,12 @@ class NetworkBrowserScreen extends StatefulWidget {
 
 class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
     with SingleTickerProviderStateMixin {
+  static const _viewModes = {
+    ViewMode.tree,
+    ViewMode.details,
+    ViewMode.list,
+    ViewMode.grid,
+  };
   static const bool _enableVerboseLogs = false;
   late SearchTextController _searchController;
   final _searchFocusNode = FocusNode(debugLabel: 'network search');
@@ -84,6 +99,8 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
   ViewMode _viewMode = ViewMode.list;
   SortOption _sortOption = SortOption.nameAsc;
   int _gridZoomLevel = 3;
+  Future<void> _zoomWrites = Future.value();
+  bool _presentationChanged = false;
   ColumnVisibility _columnVisibility = const ColumnVisibility();
   bool _arePreferencesLoading = true;
 
@@ -110,14 +127,80 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
   StreamSubscription? _thumbnailLoadingSubscription;
   StreamSubscription? _networkBrowsingSubscription;
 
-  // Variables for drag selection
-  final Map<String, Rect> _itemPositions = {};
-  final ValueNotifier<bool> _isDraggingNotifier = ValueNotifier<bool>(false);
-  final ValueNotifier<Offset?> _dragStartPositionNotifier =
-      ValueNotifier<Offset?>(null);
-  final ValueNotifier<Offset?> _dragCurrentPositionNotifier =
-      ValueNotifier<Offset?>(null);
+  late final TabbedFolderDragSelectionController _dragSelection;
   final GlobalKey _contentStackKey = GlobalKey();
+  SftpBrowserActions? _sftpActions;
+  SftpFileAccess? _sftpService;
+  bool _wasWorking = false;
+
+  void _syncSftpActions(NetworkBrowsingState state) {
+    final service = state.currentService;
+    final access = service is SftpFileAccess ? service as SftpFileAccess : null;
+    final fs = service?.isConnected == true ? access?.transferFileSystem : null;
+    if (identical(fs, _sftpActions?.fs)) return;
+    _sftpActions?.dispose();
+    _sftpService = access;
+    _sftpActions = fs == null ? null : SftpBrowserActions(fs);
+    _sftpActions?.addListener(_sftpChanged);
+    _wasWorking = false;
+  }
+
+  void _sftpChanged() {
+    if (!mounted) return;
+    final working = _sftpActions?.busy ?? false;
+    final completed = _wasWorking && !working;
+    _wasWorking = working;
+    setState(() {});
+    if (completed) {
+      _clearSelection();
+      _refreshFileList();
+    }
+  }
+
+  Future<void> _withSftpSelection(
+    FutureOr<void> Function(SftpBrowserActions, List<TransferEntry>) action, {
+    List<String>? paths,
+  }) async {
+    final actions = _sftpActions;
+    final service = _sftpService;
+    final selected = paths ?? _selectionBloc.state.allSelectedPaths;
+    if (actions == null ||
+        service == null ||
+        actions.busy ||
+        selected.isEmpty) {
+      return;
+    }
+    try {
+      final remotePaths = selected.map(service.resolveRemotePath).toSet();
+      // Read authoritative metadata, including link flags, before a recursive
+      // operation. A directory link must never delete its target's contents.
+      final entries = <TransferEntry>[];
+      for (final parent in remotePaths.map(actions.fs.paths.dirname).toSet()) {
+        entries.addAll(
+          (await actions.fs.list(
+            parent,
+          )).where((e) => remotePaths.contains(e.path)),
+        );
+      }
+      if (!mounted || actions != _sftpActions || actions.busy) {
+        return;
+      }
+      // Selecting a parent and its child in tree view must operate only once.
+      final roots = entries
+          .where(
+            (e) => !entries.any(
+              (other) =>
+                  other.isDirectory &&
+                  other.path != e.path &&
+                  actions.fs.paths.isWithin(other.path, e.path),
+            ),
+          )
+          .toList();
+      await action(actions, roots);
+    } catch (error) {
+      if (mounted) AppToast.error(context, error.toString());
+    }
+  }
 
   bool get _isDesktopMode => !Platform.isAndroid && !Platform.isIOS;
 
@@ -144,6 +227,12 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
         .read<NetworkBrowsingBloc>()
         .createBrowserSession();
     _selectionBloc = SelectionBloc();
+    _dragSelection = TabbedFolderDragSelectionController(
+      selectionBloc: _selectionBloc,
+      folderPaths: () =>
+          _networkBrowsingBloc.state.directories?.map((d) => d.path) ??
+          const [],
+    );
 
     // Listen for thumbnail loading changes
     _thumbnailLoadingSubscription = ThumbnailLoader.onPendingTasksChanged
@@ -169,6 +258,7 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
 
     // Listen for network browsing state changes to initialize StreamingHelper
     _networkBrowsingSubscription = _networkBrowsingBloc.stream.listen((state) {
+      _syncSftpActions(state);
       if (state.currentService != null && mounted) {
         StreamingHelper.instance.initializeStreaming(state.currentService!);
         debugPrint(
@@ -190,7 +280,8 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
       if (mounted) {
         setState(() {
           // Render the current query against the latest network state.
-          _itemPositions.clear();
+          _dragSelection.clearItemPositions();
+          _clearSelection();
         });
       }
     });
@@ -237,10 +328,8 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
     _scrollController.dispose();
     _selectionBloc.close();
 
-    // Dispose of ValueNotifiers
-    _isDraggingNotifier.dispose();
-    _dragStartPositionNotifier.dispose();
-    _dragCurrentPositionNotifier.dispose();
+    _dragSelection.dispose();
+    _sftpActions?.dispose();
     _thumbnailLoadingSubscription?.cancel();
     _networkBrowsingSubscription?.cancel();
     _networkBrowsingBloc.close();
@@ -332,7 +421,9 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
       );
       final effectiveViewMode = viewMode == ViewMode.gridPreview
           ? ViewMode.grid
-          : viewMode;
+          : _viewModes.contains(viewMode)
+          ? viewMode
+          : ViewMode.list;
       final globalSortOption = await prefs.getSortOption();
       final sortOption = await prefs.getNetworkBrowserSortOption(
         fallback: globalSortOption,
@@ -347,11 +438,14 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
 
       if (mounted) {
         setState(() {
-          _viewMode = effectiveViewMode;
+          if (!_presentationChanged) _viewMode = effectiveViewMode;
           _sortOption = sortOption;
-          _gridZoomLevel = gridZoomLevel
-              .clamp(UserPreferences.minGridZoomLevel, maxZoom)
-              .toInt();
+          if (!_presentationChanged) {
+            _gridZoomLevel = gridZoomLevel.clamp(
+              UserPreferences.minGridZoomLevel,
+              maxZoom,
+            );
+          }
           _columnVisibility = columnVisibility;
           _arePreferencesLoading = false;
         });
@@ -387,19 +481,25 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
   }
 
   Future<void> _saveGridZoomSetting(int zoomLevel) async {
+    _presentationChanged = true;
+    if (!mounted) return;
+    setState(() => _gridZoomLevel = zoomLevel);
+    if (!isDesktopPlatform) {
+      MobileFileActionsController.forTab(widget.tabId).currentGridSize =
+          zoomLevel;
+    }
     try {
-      final UserPreferences prefs = UserPreferences.instance;
-      await prefs.init();
-      await prefs.setGridZoomLevel(zoomLevel);
-      setState(() {
-        _gridZoomLevel = zoomLevel;
-      });
-
-      // Update mobile controller
-      if (!isDesktopPlatform) {
-        MobileFileActionsController.forTab(widget.tabId).currentGridSize =
-            zoomLevel;
-      }
+      _zoomWrites = _zoomWrites.then(
+        (_) async {
+          final prefs = UserPreferences.instance;
+          await prefs.init();
+          await prefs.setGridZoomLevel(zoomLevel);
+        },
+        onError: (Object _) async {
+          await UserPreferences.instance.setGridZoomLevel(zoomLevel);
+        },
+      );
+      await _zoomWrites;
     } catch (e) {
       // Reduced debug logging
     }
@@ -551,6 +651,7 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
   }
 
   void _toggleViewMode() {
+    _presentationChanged = true;
     setState(() {
       if (_viewMode == ViewMode.list) {
         _viewMode = ViewMode.grid;
@@ -572,6 +673,8 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
   }
 
   void _setViewMode(ViewMode mode) {
+    mode = _viewModes.contains(mode) ? mode : ViewMode.list;
+    _presentationChanged = true;
     if (_viewMode == mode) return; // No change needed
 
     setState(() {
@@ -832,6 +935,7 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
               onSortOptionSelected: _applySortOption,
               currentSortOption: _sortOption,
               viewMode: _viewMode,
+              allowedViewModes: _viewModes,
               onViewModeToggled: _toggleViewMode,
               onViewModeSelected: _setViewMode,
               onRefresh: _refreshFileList,
@@ -875,7 +979,8 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
           onClearSelection: _clearSelection,
           showRemoveTagsDialog: (_) {},
           showManageAllTagsDialog: (_) {},
-          showDeleteConfirmationDialog: (_) {},
+          showDeleteConfirmationDialog: (_) =>
+              _withSftpSelection((a, e) => a.delete(context, e)),
           showAppBar: widget.showAppBar,
           showSearchBar: _showSearchBar,
           searchBar: _buildSearchBar(context),
@@ -910,16 +1015,58 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
             onMouseForward: _handleMouseForwardButton,
             onRefresh: _refreshFileList,
             onSelectAll: () => _selectAll(networkState),
+            onCopy: _sftpActions == null
+                ? null
+                : () => _withSftpSelection((a, e) => a.hold(e, cut: false)),
+            onCut: _sftpActions == null
+                ? null
+                : () => _withSftpSelection((a, e) => a.hold(e, cut: true)),
+            onPaste: _sftpActions?.canPaste == true
+                ? () => _sftpActions!.paste(
+                    context,
+                    _sftpService!.resolveRemotePath(_currentPath),
+                  )
+                : null,
+            onDelete: _sftpActions == null
+                ? null
+                : ({required permanent}) =>
+                      _withSftpSelection((a, e) => a.delete(context, e)),
+            onRename: _sftpActions == null
+                ? null
+                : () => _withSftpSelection((a, e) async {
+                    if (e.length == 1) await a.rename(context, e.single);
+                  }),
             onSearch: _openOrFocusSearch,
             onEscape: selectionState.selectedCount > 0
-                ? _clearSelection
+                ? () {
+                    _clearSelection();
+                    _sftpActions?.cancelClipboard();
+                  }
                 : _showSearchBar
                 ? () => setState(() {
                     _showSearchBar = false;
                   })
                 : null,
             child: ClipRect(
-              child: _buildBody(context, networkState, selectionState),
+              child: Material(
+                type: MaterialType.transparency,
+                child: FileContextMenuExtension(
+                  isVirtual: (path) => path.startsWith('#network/SFTP/'),
+                  sections: (_, paths) => _contextMenuSections(
+                    paths.length == 1 &&
+                            _selectionBloc.state.isPathSelected(paths.single)
+                        ? _selectionBloc.state.allSelectedPaths
+                        : paths,
+                  ),
+                  onOpen: (file) => _handleFileOpen(context, file),
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.translucent,
+                    onSecondaryTapUp: (details) =>
+                        _showContextMenu(context, details.globalPosition, null),
+                    child: _buildBody(context, networkState, selectionState),
+                  ),
+                ),
+              ),
             ),
           ),
           floatingActionButton: _isDesktopMode
@@ -1051,58 +1198,48 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
                   ? Colors.transparent
                   : null,
               enableBlur: _viewMode != ViewMode.list || !isDesktopPlatform,
-              child: GestureDetector(
-                onTap: () {
-                  if (selectionState.selectedCount > 0) {
-                    _clearSelection();
-                  }
-                },
-                onSecondaryTapUp: (details) {
-                  _showContextMenu(context, details.globalPosition, null);
-                },
-                onPanStart: isDesktopPlatform
-                    ? (details) {
-                        _startDragSelection(details.localPosition);
-                      }
-                    : null,
-                onPanUpdate: isDesktopPlatform
-                    ? (details) {
-                        _updateDragSelection(details.localPosition);
-                      }
-                    : null,
-                onPanEnd: isDesktopPlatform
-                    ? (details) {
-                        _endDragSelection();
-                      }
-                    : null,
-                behavior: HitTestBehavior.translucent,
-                child: Column(
-                  children: [
-                    Expanded(child: contentView),
-                    if (state.isLoadingMore)
-                      Container(
-                        padding: const EdgeInsets.symmetric(vertical: 8.0),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              AppLocalizations.of(context)!.loading,
-                              style: const TextStyle(fontSize: 12),
-                            ),
-                          ],
+              child: DragSelectionRegion(
+                controller: _dragSelection,
+                enabled: isDesktopPlatform,
+                child: GestureDetector(
+                  onTap: () {
+                    if (selectionState.selectedCount > 0) {
+                      _clearSelection();
+                    }
+                  },
+                  onSecondaryTapUp: (details) {
+                    _showContextMenu(context, details.globalPosition, null);
+                  },
+                  behavior: HitTestBehavior.translucent,
+                  child: Column(
+                    children: [
+                      Expanded(child: contentView),
+                      if (state.isLoadingMore)
+                        Container(
+                          padding: const EdgeInsets.symmetric(vertical: 8.0),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                AppLocalizations.of(context)!.loading,
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
-            _buildDragSelectionOverlay(),
           ],
         );
       }
@@ -1151,42 +1288,50 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
     final crossAxisCount = _gridZoomLevel
         .clamp(UserPreferences.minGridZoomLevel, maxZoom)
         .toInt();
-    final view = BrowserLikeCollectionView<FileSystemEntity>(
-      viewMode: _viewMode,
-      useAdaptiveList: true,
-      items: items,
-      isDesktop: isDesktopPlatform,
-      stackKey: _contentStackKey,
-      onRefresh: () async => _refreshFileList(),
-      scrollController: _scrollController,
-      padding: const EdgeInsets.all(8.0),
-      physics: const ClampingScrollPhysics(),
-      gridCacheExtent: 1500,
-      detailsCacheExtent: 800,
-      listCacheExtent: 1200,
-      itemIdentity: (item) => item.path,
-      registerItemPosition: _registerItemPosition,
-      dragSelectionOverlay: const SizedBox.shrink(),
-      gridCrossAxisCount: crossAxisCount,
-      listItemBuilder: (itemContext, item) =>
-          _buildListItem(itemContext, item, selectionState),
-      gridItemBuilder: (itemContext, item) =>
-          _buildGridItem(itemContext, item, selectionState),
-      detailsItemBuilder: (itemContext, item) =>
-          _buildDetailsItem(itemContext, item, selectionState),
-      treeIsLeaf: (item) => item is File,
-      treeChildrenLoader: _loadNetworkChildren,
-      treeItemBuilder: (itemContext, node, depth) =>
-          _buildNetworkTreeRow(itemContext, node, depth),
-      detailsHeader: _viewMode == ViewMode.details
-          ? folder_list_components.DetailsColumnsHeader(
-              sortOption: _sortOption,
-              supportsMetadataSort: false,
-              onSortOptionSelected: _applySortOption,
-              // Matches the list padding.
-              horizontalPadding: 8.0,
-            )
-          : null,
+    final view = LayoutBuilder(
+      builder: (context, constraints) =>
+          BrowserLikeCollectionView<FileSystemEntity>(
+            viewMode: _viewMode,
+            useAdaptiveList: true,
+            items: items,
+            isDesktop: isDesktopPlatform,
+            stackKey: _contentStackKey,
+            onRefresh: () async => _refreshFileList(),
+            scrollController: _scrollController,
+            padding: const EdgeInsets.all(8.0),
+            physics: const ClampingScrollPhysics(),
+            gridCacheExtent: 1500,
+            detailsCacheExtent: 800,
+            listCacheExtent: 1200,
+            itemIdentity: (item) => item.path,
+            registerItemPosition: (_, _) {},
+            measurePositions: false,
+            dragSelectionOverlay: const SizedBox.shrink(),
+            gridCrossAxisCount: GridZoomConstraints.columnCountForZoom(
+              crossAxisCount,
+              constraints.maxWidth - 16,
+            ),
+            gridChildAspectRatio: GridZoomConstraints.fileGridAspectRatio,
+            listItemBuilder: (itemContext, item) =>
+                _buildListItem(itemContext, item, selectionState),
+            gridItemBuilder: (itemContext, item) =>
+                _buildGridItem(itemContext, item, selectionState),
+            detailsItemBuilder: (itemContext, item) =>
+                _buildDetailsItem(itemContext, item, selectionState),
+            treeIsLeaf: (item) => item is File,
+            treeChildrenLoader: _loadNetworkChildren,
+            treeItemBuilder: (itemContext, node, depth) =>
+                _buildNetworkTreeRow(itemContext, node, depth),
+            detailsHeader: _viewMode == ViewMode.details
+                ? folder_list_components.DetailsColumnsHeader(
+                    sortOption: _sortOption,
+                    supportsMetadataSort: false,
+                    onSortOptionSelected: _applySortOption,
+                    // Matches the list padding.
+                    horizontalPadding: 8.0,
+                  )
+                : null,
+          ),
     );
     if (_viewMode != ViewMode.details) return view;
     return folder_list_components.DetailsLayoutHost(
@@ -1289,50 +1434,99 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
   }
 
   void _showContextMenu(BuildContext context, Offset position, String? path) {
-    // Implementation for context menu
-  }
-
-  void _startDragSelection(Offset position) {
-    // Implementation for drag selection start
-  }
-
-  void _updateDragSelection(Offset position) {
-    // Implementation for drag selection update
-  }
-
-  void _endDragSelection() {
-    // Implementation for drag selection end
-  }
-
-  void _registerItemPosition(String path, Rect position) {
-    _itemPositions[path] = position;
-  }
-
-  Widget _buildDragSelectionOverlay() {
-    return ValueListenableBuilder3<bool, Offset?, Offset?>(
-      valueListenable1: _isDraggingNotifier,
-      valueListenable2: _dragStartPositionNotifier,
-      valueListenable3: _dragCurrentPositionNotifier,
-      builder: (context, isDragging, startPosition, currentPosition, child) {
-        if (!isDragging || startPosition == null || currentPosition == null) {
-          return const SizedBox.shrink();
-        }
-
-        final rect = Rect.fromPoints(startPosition, currentPosition);
-        return Positioned(
-          left: rect.left,
-          top: rect.top,
-          width: rect.width,
-          height: rect.height,
-          child: Container(
-            decoration: CbDecorations.tint(
-              context,
-              Theme.of(context).primaryColor,
-            ),
-          ),
-        );
-      },
+    final selected = path == null || _selectionBloc.state.isPathSelected(path)
+        ? _selectionBloc.state.allSelectedPaths
+        : [path];
+    showContextMenuPopup(
+      context: context,
+      globalPosition: position,
+      sections: _contextMenuSections(selected),
     );
+  }
+
+  List<ContextMenuSection> _contextMenuSections(List<String> selected) {
+    final tr = context.tr;
+    final actions = _sftpActions;
+    return [
+      if (actions != null)
+        ContextMenuSection(
+          actions: [
+            if (selected.length == 1)
+              ContextMenuAction(
+                id: 'open',
+                label: tr.open,
+                icon: PhosphorIconsLight.folderOpen,
+                onSelected: (_) => _withSftpSelection((a, entries) {
+                  if (entries.length != 1) return;
+                  if (entries.single.isDirectory) {
+                    _navigateToPath(selected.single);
+                  } else {
+                    _handleFileOpen(context, File(selected.single));
+                  }
+                }, paths: selected),
+              ),
+            if (selected.isNotEmpty) ...[
+              ContextMenuAction(
+                id: 'cut',
+                label: tr.cut,
+                icon: PhosphorIconsLight.scissors,
+                onSelected: (_) => _withSftpSelection(
+                  (a, e) => a.hold(e, cut: true),
+                  paths: selected,
+                ),
+              ),
+              ContextMenuAction(
+                id: 'copy',
+                label: tr.copy,
+                icon: PhosphorIconsLight.copy,
+                onSelected: (_) => _withSftpSelection(
+                  (a, e) => a.hold(e, cut: false),
+                  paths: selected,
+                ),
+              ),
+              ContextMenuAction(
+                id: 'delete',
+                label: tr.delete,
+                icon: PhosphorIconsLight.trash,
+                isDestructive: true,
+                onSelected: (_) => _withSftpSelection(
+                  (a, e) => a.delete(context, e),
+                  paths: selected,
+                ),
+              ),
+              if (selected.length == 1)
+                ContextMenuAction(
+                  id: 'rename',
+                  label: tr.rename,
+                  icon: PhosphorIconsLight.pencilSimple,
+                  onSelected: (_) => _withSftpSelection((a, e) async {
+                    if (e.length == 1) await a.rename(context, e.single);
+                  }, paths: selected),
+                ),
+            ],
+            if (actions.canPaste)
+              ContextMenuAction(
+                id: 'paste',
+                label: tr.pasteHere,
+                icon: PhosphorIconsLight.clipboardText,
+                onSelected: (_) => actions.paste(
+                  context,
+                  _sftpService!.resolveRemotePath(_currentPath),
+                ),
+              ),
+          ],
+        ),
+      ContextMenuSection(
+        actions: [
+          ContextMenuAction(
+            id: 'refresh',
+            label: tr.refresh,
+            icon: PhosphorIconsLight.arrowClockwise,
+            onSelected: (_) => _refreshFileList(),
+          ),
+        ],
+      ),
+    ];
   }
 
   Widget _buildFloatingActionButton(SelectionState selectionState) {
@@ -1362,7 +1556,25 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
     StreamingHelper.instance.openFileWithStreaming(context, filePath, fileName);
   }
 
-  Widget _wrapNetworkItem(bool isSelected, Widget child) {
+  Widget _wrapNetworkItem(
+    FileSystemEntity item,
+    bool isSelected,
+    Widget child,
+  ) {
+    if (_sftpActions != null && _sftpService != null) {
+      child = Opacity(
+        opacity: _sftpActions!.isCut(_sftpService!.resolveRemotePath(item.path))
+            ? 0.45
+            : 1,
+        child: child,
+      );
+    }
+    child = SelectionGeometryItem(
+      path: item.path,
+      controller: _dragSelection,
+      isFolder: item is Directory,
+      child: child,
+    );
     if (_viewMode == ViewMode.list && isDesktopPlatform) {
       return RepaintBoundary(child: child);
     }
@@ -1392,6 +1604,7 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
       return KeyedSubtree(
         key: ValueKey('folder-grid-${item.path}'),
         child: _wrapNetworkItem(
+          item,
           isSelected,
           folder_list_components.FolderGridItem(
             key: ValueKey('folder-grid-item-${item.path}'),
@@ -1411,6 +1624,7 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
     return KeyedSubtree(
       key: ValueKey('file-grid-${file.path}'),
       child: _wrapNetworkItem(
+        item,
         isSelected,
         folder_list_components.FileGridItem(
           key: ValueKey('file-grid-item-${file.path}'),
@@ -1440,6 +1654,7 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
       return KeyedSubtree(
         key: ValueKey('folder-details-${item.path}'),
         child: _wrapNetworkItem(
+          item,
           isSelected,
           folder_list_components.FolderDetailsItem(
             key: ValueKey('folder-details-item-${item.path}'),
@@ -1460,6 +1675,7 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
     return KeyedSubtree(
       key: ValueKey('file-details-${file.path}'),
       child: _wrapNetworkItem(
+        item,
         isSelected,
         folder_list_components.FileDetailsItem(
           key: ValueKey('file-details-item-${file.path}'),
@@ -1488,6 +1704,7 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
       return KeyedSubtree(
         key: ValueKey('folder-list-${item.path}'),
         child: _wrapNetworkItem(
+          item,
           isSelected,
           folder_list_components.FolderItem(
             key: ValueKey('folder-list-item-${item.path}'),
@@ -1509,6 +1726,7 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
     return KeyedSubtree(
       key: ValueKey('file-list-${file.path}'),
       child: _wrapNetworkItem(
+        item,
         isSelected,
         folder_list_components.FileItem(
           key: ValueKey('file-list-item-${file.path}'),
@@ -1591,43 +1809,65 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
     final name = segments.isEmpty ? entity.path : segments.last;
     final theme = Theme.of(itemContext);
 
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () {
-        if (isDir) {
-          _navigateToPath(entity.path);
-        }
-      },
-      onDoubleTap: () {
-        if (isDir) {
-          _navigateToPath(entity.path);
-        } else if (entity is File) {
-          _handleFileOpen(itemContext, entity);
-        }
-      },
-      child: Row(
-        children: [
-          Icon(
-            isDir ? PhosphorIconsLight.folder : PhosphorIconsLight.file,
-            size: 14,
-            color: isDir
-                ? theme.colorScheme.primary
-                : theme.colorScheme.onSurfaceVariant,
-          ),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Text(
-              name,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: isDir ? FontWeight.w500 : FontWeight.normal,
-                color: theme.colorScheme.onSurface,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+    final selected = _selectionBloc.state.isPathSelected(entity.path);
+    return _wrapNetworkItem(
+      entity,
+      selected,
+      GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onSecondaryTapUp: (details) =>
+            _showContextMenu(itemContext, details.globalPosition, entity.path),
+        onTap: () {
+          if (isDesktopPlatform) {
+            final keyboard = HardwareKeyboard.instance;
+            if (isDir) {
+              _toggleFolderSelection(
+                entity.path,
+                ctrlSelect: keyboard.isControlPressed || keyboard.isMetaPressed,
+                shiftSelect: keyboard.isShiftPressed,
+              );
+            } else {
+              _toggleFileSelection(
+                entity.path,
+                ctrlSelect: keyboard.isControlPressed || keyboard.isMetaPressed,
+                shiftSelect: keyboard.isShiftPressed,
+              );
+            }
+          } else if (isDir) {
+            _navigateToPath(entity.path);
+          }
+        },
+        onDoubleTap: () {
+          if (isDir) {
+            _navigateToPath(entity.path);
+          } else if (entity is File) {
+            _handleFileOpen(itemContext, entity);
+          }
+        },
+        child: Row(
+          children: [
+            Icon(
+              isDir ? PhosphorIconsLight.folder : PhosphorIconsLight.file,
+              size: 14,
+              color: isDir
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.onSurfaceVariant,
             ),
-          ),
-        ],
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                name,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: isDir ? FontWeight.w500 : FontWeight.normal,
+                  color: theme.colorScheme.onSurface,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

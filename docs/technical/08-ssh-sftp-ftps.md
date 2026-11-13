@@ -11,13 +11,26 @@ double-click or Enter opens SSH (or browses files in SFTP). The host menu keeps
 terminal, file browsing, edit and delete actions available; its address is shown
 in a tooltip. Discovered config aliases remain in the connection form only.
 
-SSH/SFTP host collections offer only Grid and List, with a visible toggle beside
+SSH/SFTP host collections offer Grid, List and Details, with a view menu beside
 search and Grid as the fallback. `GridListCollection<T>`, `GridListViewToggle`
 and `GridListViewController` are common components built on the existing browser
 collection. The scoped SQLite preference `collection_view_ssh_hosts` persists
 the choice without changing file-browser preferences. Both views keep the same
 selection and host actions. A fixed management toolbar prevents selection from
 moving the double-click target; Grid also shows address and authentication.
+Ctrl+wheel moves through Details, List and grid sizes using the same view-scale
+spectrum as the file browser. The grid-size control is also available in the
+toolbar (or More on narrow windows). Zoom is stored under the collection's own
+`collection_zoom_ssh_hosts` preference; small cards retain their name and menu.
+
+On desktop, both host layouts support rectangle selection, Ctrl/Cmd-click,
+Shift-click, Ctrl/Cmd+A, Escape, Delete and F2 (edit one selected host). Copy
+and Paste duplicate selected profiles with distinct names while retaining their
+vault credentials and key/proxy references. Cut keeps the original until Paste;
+SSH and SFTP host lists share one collection, so pasting a cut host there keeps
+its identity and forwarding rules. Escape cancels a pending cut. The clipboard
+stays in memory; passwords are never put on the system text clipboard. Built-in
+section folders are navigation entries and cannot be deleted as hosts.
 
 ## SSH and SFTP
 
@@ -76,8 +89,13 @@ keys. Trust is scoped to hostname and port and can be removed from the workspace
 SFTP connections have separate transports per account/host/port. Virtual paths
 encode the connection authority and preserve remote file names literally. The
 provider supports listing, streaming, download/upload, mkdir, rename and delete.
-Directory deletion is non-recursive, so non-empty directories produce a server
-error rather than silently deleting their contents.
+The provider's directory deletion removes empty folders. The connected SFTP
+browser adds confirmed recursive deletion through the transfer backend, with
+per-path failures shown in a dialog. It supports rectangle and modifier selection,
+Ctrl/Cmd+C/X/V, Delete, F2, and file/folder/background context menus. Copy and move
+work between folders and tabs sharing that live connection; reconnecting starts
+a new clipboard scope. Linked directories are not traversed during deletion.
+Search changes clear selection, and text inputs retain their editing shortcuts.
 
 ### Two-pane SFTP file transfer
 
@@ -96,10 +114,17 @@ A closed transport shows a reconnect action and cancels a running transfer.
 
 Each pane has Up, Refresh, New folder and an editable path field; on Windows
 the level above a drive root lists the drives. Rows support click, Ctrl/Shift
-selection, arrow keys, Ctrl+A, Enter, Backspace, F5 and Escape. Double-clicking
+selection, rectangle selection, arrow keys, Ctrl+A, Enter, Backspace, F5 and Escape. Double-clicking
 a folder opens it; double-clicking a file sends it to the other pane. Selected
 items go across with the pane's Upload/Download button, Enter, or by dragging
 them onto the other pane.
+
+Each pane also has its own List/Details/Grid menu and grid-size control.
+Ctrl+wheel changes that pane's view and grid size; selection and transfer actions
+survive layout changes. Mode and zoom persist separately for the local and remote
+panes (`sftp_transfer_local` and `sftp_transfer_remote`) through the shared
+`CollectionViewScaleController`. The connected SFTP browser uses the file grid's
+canonical width calculation, updating zoom immediately and saving it afterwards.
 
 `services/ssh/sftp_transfer.dart` performs transfers over a small
 `TransferFileSystem` interface (local and SFTP implementations):
@@ -119,8 +144,9 @@ them onto the other pane.
 - Progress is aggregated in bytes across the batch and throttled to 100 ms.
   Cancel stops between chunks and deletes the partly written file. The
   destination pane refreshes afterwards; failures are listed in a dialog.
-- There is no delete action: SFTP folder deletion stays non-recursive, and a
-  local delete here would bypass the Recycle Bin.
+- The remote pane supports Copy/Cut/Paste, F2 and confirmed recursive Delete.
+  The local pane offers transfer and navigation actions; local deletion remains
+  outside this screen. Rename and path fields retain normal text editing.
 
 Tests: `test/services/ssh/sftp_transfer_test.dart` (recursive copy, progress,
 links, Windows names and case, conflicts, cancel, drive list) and

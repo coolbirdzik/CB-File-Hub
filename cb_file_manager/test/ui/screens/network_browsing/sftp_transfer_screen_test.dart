@@ -1,4 +1,9 @@
 import 'dart:async';
+import 'package:cb_file_manager/ui/widgets/selection_geometry_item.dart';
+import 'package:cb_file_manager/ui/components/common/file_view_shell.dart';
+import 'package:cb_file_manager/ui/components/common/grid_list_collection.dart';
+import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
+import 'package:cb_file_manager/ui/widgets/drag_selection_region.dart';
 
 import 'package:cb_file_manager/services/ssh/ssh_profile_store.dart';
 import 'package:cb_file_manager/ui/screens/ssh/sftp_transfer_screen.dart';
@@ -259,6 +264,119 @@ void main() {
     await tester.pump(const Duration(seconds: 6));
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('remote rectangle selection deletes every selected entry', (
+    tester,
+  ) async {
+    final fixture = await pumpScreen(tester, width: 1200);
+    final remote = find.byKey(const ValueKey('sftp-transfer-remote'));
+    final region = find.descendant(
+      of: remote,
+      matching: find.byType(DragSelectionRegion),
+    );
+    final rect = tester.getRect(region);
+    final gesture = await tester.startGesture(
+      rect.bottomRight - const Offset(12, 12),
+      kind: PointerDeviceKind.mouse,
+    );
+    await gesture.moveTo(rect.topLeft + const Offset(1, 1));
+    await tester.pump();
+    await gesture.up();
+    await tester.pumpAndSettle();
+    await tester.sendKeyEvent(LogicalKeyboardKey.delete);
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('sftp-transfer-confirm-delete')),
+      findsOneWidget,
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('sftp-transfer-confirm-delete')),
+    );
+    await tester.pumpAndSettle();
+    expect(fixture.remote.files, isEmpty);
+    expect(fixture.remote.dirs, isNot(contains('/home/developer/backup')));
+    expect(fixture.local.text('/home/me/notes.txt'), 'remember');
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final width in [320.0, 1200.0]) {
+    testWidgets('transfer views and wheel zoom work independently at $width', (
+      tester,
+    ) async {
+      await pumpScreen(tester, width: width);
+      final remote = find.byKey(const ValueKey('sftp-transfer-remote'));
+      final local = find.byKey(const ValueKey('sftp-transfer-local'));
+      FileViewShell shell() => tester
+          .widgetList<FileViewShell>(
+            find.descendant(of: remote, matching: find.byType(FileViewShell)),
+          )
+          .single;
+      shell().onViewScaleDelta!(1);
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<GridListViewToggle>(
+              find.descendant(
+                of: remote,
+                matching: find.byType(GridListViewToggle),
+              ),
+            )
+            .mode,
+        ViewMode.list,
+      );
+      shell().onViewScaleDelta!(1);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('sftp-transfer-grid-remote')),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .widget<GridListViewToggle>(
+              find.descendant(
+                of: local,
+                matching: find.byType(GridListViewToggle),
+              ),
+            )
+            .mode,
+        ViewMode.details,
+      );
+      final before = tester
+          .getSize(
+            find
+                .ancestor(
+                  of: find.text('server.log'),
+                  matching: find.byType(SelectionGeometryItem),
+                )
+                .first,
+          )
+          .width;
+      shell().onViewScaleDelta!(1);
+      await tester.pumpAndSettle();
+      final after = tester
+          .getSize(
+            find
+                .ancestor(
+                  of: find.text('server.log'),
+                  matching: find.byType(SelectionGeometryItem),
+                )
+                .first,
+          )
+          .width;
+      expect(after, greaterThanOrEqualTo(before));
+      await tester.tap(
+        find.descendant(of: remote, matching: find.byType(GridListViewToggle)),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('collection-view-details')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('sftp-transfer-grid-remote')),
+        findsNothing,
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('the local pane offers no file operations', (tester) async {
     final fixture = await pumpScreen(tester, width: 1200);

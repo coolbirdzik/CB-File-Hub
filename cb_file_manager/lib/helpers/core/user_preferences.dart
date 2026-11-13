@@ -1017,6 +1017,7 @@ class UserPreferences {
   Future<ViewMode> getGridListCollectionMode(
     String collectionId, {
     Set<ViewMode> supportedModes = const {ViewMode.grid, ViewMode.list},
+    ViewMode fallback = ViewMode.grid,
   }) async {
     final value = await _getPreference<String>('collection_view_$collectionId');
     ViewMode? restored;
@@ -1027,6 +1028,7 @@ class UserPreferences {
       }
     }
     if (restored != null && supportedModes.contains(restored)) return restored;
+    if (supportedModes.contains(fallback)) return fallback;
     return supportedModes.contains(ViewMode.grid)
         ? ViewMode.grid
         : supportedModes.first;
@@ -1037,6 +1039,18 @@ class UserPreferences {
     ViewMode mode,
   ) async {
     await _savePreference<String>('collection_view_$collectionId', mode.name);
+  }
+
+  Future<int> getCollectionGridZoomLevel(String collectionId) async =>
+      ((await _getPreference<int>('collection_zoom_$collectionId')) ??
+              defaultGridZoomLevel)
+          .clamp(minGridZoomLevel, maxGridZoomLevel);
+
+  Future<void> setCollectionGridZoomLevel(String collectionId, int zoom) async {
+    await _savePreference<int>(
+      'collection_zoom_$collectionId',
+      zoom.clamp(minGridZoomLevel, maxGridZoomLevel),
+    );
   }
 
   /// Opaque sort token of a collection, owned by the collection's controller.

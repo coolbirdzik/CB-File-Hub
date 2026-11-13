@@ -12,6 +12,14 @@ import '../../../bloc/selection/selection.dart';
 import '../../../config/translation_helper.dart';
 import '../../../design_system/cb_design_system.dart';
 import '../../../helpers/core/text_utils.dart';
+import '../../../helpers/core/desktop_shortcuts.dart';
+import '../../../helpers/core/user_preferences.dart';
+import '../../components/common/collection_view_scale_controller.dart';
+import '../../components/common/grid_list_collection.dart';
+import '../../components/common/file_view_shell.dart';
+import '../../components/common/shared_action_bar.dart';
+import '../../utils/grid_zoom_constraints.dart';
+import '../folder_list/folder_list_state.dart';
 import '../../../services/ssh/sftp_transfer.dart';
 import '../../../services/ssh/ssh_profile_store.dart';
 import '../../components/common/app_toast.dart';
@@ -20,12 +28,17 @@ import '../../components/common/optimized_interaction_handler.dart';
 import '../../components/common/screen_scaffold.dart';
 import '../../components/common/shared_file_context_menu.dart';
 import '../../tab_manager/core/tab_manager.dart';
+import '../../tab_manager/core/tab_focus_gate.dart';
 import '../../utils/format_utils.dart';
 import '../../utils/item_interaction_style.dart';
 import '../../utils/platform_utils.dart';
 import '../../utils/route.dart';
+import '../../widgets/drag_selection_region.dart';
+import '../../widgets/selection_geometry_item.dart';
+import '../../tab_manager/core/tabbed_folder/tabbed_folder_drag_selection_controller.dart';
 import '../network_browsing/components/network_navigation_bar.dart';
 import 'ssh_host_dialog.dart';
+import 'sftp_name_dialog.dart';
 
 /// Panes sit side by side from this width; below it the local pane stacks
 /// above the remote one.
@@ -98,6 +111,7 @@ class _SftpTransferScreenState extends State<SftpTransferScreen> {
 
   /// A remote move, rename or delete is running.
   bool _working = false;
+  bool _confirmingDelete = false;
 
   @override
   void initState() {
@@ -436,7 +450,7 @@ class _SftpTransferScreenState extends State<SftpTransferScreen> {
     String initial = '',
   }) => RouteUtils.showAcrylicDialog<String>(
     context: context,
-    builder: (context) => _NameDialog(
+    builder: (context) => SftpNameDialog(
       title: title,
       icon: icon,
       action: action,
@@ -509,6 +523,7 @@ class _SftpTransferScreenState extends State<SftpTransferScreen> {
   }
 
   Future<void> _paste() async {
+    if (_task != null || _working) return;
     final clip = _clip;
     final fs = _remote.fileSystem;
     final destination = _remote.path;
@@ -529,10 +544,21 @@ class _SftpTransferScreenState extends State<SftpTransferScreen> {
     if (!clip.cut) {
       return _copyInto(from: fs, target: _remote, items: clip.entries);
     }
-    setState(() => _clip = null);
-    await _remoteWork(
-      (fs) => moveTransferEntries(fs, clip.entries, destination),
-    );
+    await _remoteWork((fs) async {
+      final failures = await moveTransferEntries(fs, clip.entries, destination);
+      if (mounted && _clip == clip) {
+        final failed = failures.map((f) => f.path).toSet();
+        final remaining = clip.entries
+            .where((e) => failed.contains(e.path))
+            .toList();
+        setState(
+          () => _clip = remaining.isEmpty
+              ? null
+              : (entries: remaining, cut: true),
+        );
+      }
+      return failures;
+    });
   }
 
   Future<void> _renameEntry(TransferEntry entry) async {
@@ -546,7 +572,13 @@ class _SftpTransferScreenState extends State<SftpTransferScreen> {
       placeholder: tr.newNameLabel,
       initial: entry.name,
     );
-    if (!mounted || name == null || name.isEmpty || name == entry.name) return;
+    if (!mounted ||
+        fs != _remote.fileSystem ||
+        name == null ||
+        name.isEmpty ||
+        name == entry.name) {
+      return;
+    }
     if (!_validName(fs, name)) {
       AppToast.error(context, tr.sshTransferInvalidName);
       return;
@@ -563,37 +595,47 @@ class _SftpTransferScreenState extends State<SftpTransferScreen> {
   }
 
   Future<void> _delete(List<TransferEntry> entries) async {
-    if (entries.isEmpty || _task != null || _working) return;
-    final tr = context.tr;
-    const shown = 6;
-    final listed = entries.take(shown).map((e) => e.name).join('\n');
-    final confirmed = await RouteUtils.showAcrylicDialog<bool>(
-      context: context,
-      builder: (context) => CbDialog(
-        title: tr.sshRemoteDeleteConfirm(entries.length),
-        subtitle: entries.length > shown
-            ? '$listed\n+${entries.length - shown}'
-            : listed,
-        icon: PhosphorIconsLight.trash,
-        width: 460,
-        actions: [
-          CbButton(
-            label: tr.cancel,
-            autofocus: true,
-            onPressed: () => Navigator.pop(context),
-          ),
-          CbButton(
-            key: const ValueKey('sftp-transfer-confirm-delete'),
-            label: tr.delete,
-            variant: CbButtonVariant.danger,
-            onPressed: () => Navigator.pop(context, true),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
-    setState(() => _clip = null);
-    await _remoteWork((fs) => deleteTransferEntries(fs, entries));
+    if (entries.isEmpty || _task != null || _working || _confirmingDelete) {
+      return;
+    }
+    final fileSystem = _remote.fileSystem;
+    _confirmingDelete = true;
+    try {
+      final tr = context.tr;
+      const shown = 6;
+      final listed = entries.take(shown).map((e) => e.name).join('\n');
+      final confirmed = await RouteUtils.showAcrylicDialog<bool>(
+        context: context,
+        builder: (context) => CbDialog(
+          title: tr.sshRemoteDeleteConfirm(entries.length),
+          subtitle: entries.length > shown
+              ? '$listed\n+${entries.length - shown}'
+              : listed,
+          icon: PhosphorIconsLight.trash,
+          width: 460,
+          actions: [
+            CbButton(
+              label: tr.cancel,
+              autofocus: true,
+              onPressed: () => Navigator.pop(context),
+            ),
+            CbButton(
+              key: const ValueKey('sftp-transfer-confirm-delete'),
+              label: tr.delete,
+              variant: CbButtonVariant.danger,
+              onPressed: () => Navigator.pop(context, true),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted || fileSystem != _remote.fileSystem) {
+        return;
+      }
+      setState(() => _clip = null);
+      await _remoteWork((fs) => deleteTransferEntries(fs, entries));
+    } finally {
+      _confirmingDelete = false;
+    }
   }
 
   // ─── Layout ──────────────────────────────────────────────────────────────
@@ -921,66 +963,6 @@ class _SftpTransferScreenState extends State<SftpTransferScreen> {
   }
 }
 
-/// Asks for a file or folder name and pops it trimmed.
-class _NameDialog extends StatefulWidget {
-  const _NameDialog({
-    required this.title,
-    required this.icon,
-    required this.action,
-    required this.placeholder,
-    required this.initial,
-  });
-  final String title, action, placeholder, initial;
-  final IconData icon;
-
-  @override
-  State<_NameDialog> createState() => _NameDialogState();
-}
-
-class _NameDialogState extends State<_NameDialog> {
-  // The extension stays out of the selection, so typing replaces the name.
-  late final _controller = TextEditingController(text: widget.initial)
-    ..selection = TextSelection(
-      baseOffset: 0,
-      extentOffset: widget.initial.lastIndexOf('.') > 0
-          ? widget.initial.lastIndexOf('.')
-          : widget.initial.length,
-    );
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _submit() => Navigator.pop(context, _controller.text.trim());
-
-  @override
-  Widget build(BuildContext context) => CbDialog(
-    title: widget.title,
-    icon: widget.icon,
-    width: 420,
-    content: CbTextField(
-      key: const ValueKey('sftp-transfer-name'),
-      controller: _controller,
-      placeholder: widget.placeholder,
-      autofocus: true,
-      onSubmitted: (_) => _submit(),
-    ),
-    actions: [
-      CbButton(
-        label: context.tr.cancel,
-        onPressed: () => Navigator.pop(context),
-      ),
-      CbButton(
-        label: widget.action,
-        variant: CbButtonVariant.primary,
-        onPressed: _submit,
-      ),
-    ],
-  );
-}
-
 enum _PaneSide { local, remote }
 
 class _TransferDrag {
@@ -1113,6 +1095,15 @@ class _PaneController extends ChangeNotifier {
     _notify();
   }
 
+  void replaceSelection(Iterable<String> paths) {
+    final available = entries.map((e) => e.path).toSet();
+    selected
+      ..clear()
+      ..addAll(paths.where(available.contains));
+    anchor = cursor = selected.lastOrNull;
+    _notify();
+  }
+
   void clearSelection() {
     if (selected.isEmpty) return;
     selected.clear();
@@ -1215,9 +1206,47 @@ class _TransferPane extends StatefulWidget {
 }
 
 class _TransferPaneState extends State<_TransferPane> {
+  static const _viewModes = {ViewMode.list, ViewMode.details, ViewMode.grid};
+  String get _viewPreference => 'sftp_transfer_${widget.side.name}';
+  late final _view = GridListViewController(
+    initialMode: ViewMode.details,
+    supportedModes: _viewModes,
+    load: () => UserPreferences.instance.getGridListCollectionMode(
+      _viewPreference,
+      supportedModes: _viewModes,
+      fallback: ViewMode.details,
+    ),
+    save: (mode) => UserPreferences.instance.setGridListCollectionMode(
+      _viewPreference,
+      mode,
+    ),
+  );
+  late final _scale = CollectionViewScaleController(
+    view: _view,
+    loadZoom: () =>
+        UserPreferences.instance.getCollectionGridZoomLevel(_viewPreference),
+    saveZoom: (zoom) => UserPreferences.instance.setCollectionGridZoomLevel(
+      _viewPreference,
+      zoom,
+    ),
+  );
+  double _viewportWidth = 600;
+
+  void _changePresentation(Future<void> action) => unawaited(
+    action.catchError((Object error) {
+      if (mounted) AppToast.error(context, error.toString());
+    }),
+  );
   final _path = TextEditingController();
   final _focus = FocusNode(debugLabel: 'transfer pane');
   final _scroll = ScrollController();
+  final _dragBloc = SelectionBloc();
+  late final _dragSelection = TabbedFolderDragSelectionController(
+    selectionBloc: _dragBloc,
+    folderPaths: () =>
+        _pane.entries.where((e) => e.isDirectory).map((e) => e.path),
+  );
+  late final StreamSubscription<SelectionState> _dragSubscription;
   String? _shownPath;
 
   _PaneController get _pane => widget.controller;
@@ -1226,6 +1255,12 @@ class _TransferPaneState extends State<_TransferPane> {
   void initState() {
     super.initState();
     _pane.addListener(_changed);
+    _view.addListener(_changed);
+    _scale.addListener(_changed);
+    _changePresentation(_scale.initialize());
+    _dragSubscription = _dragBloc.stream.listen((selection) {
+      _pane.replaceSelection(selection.allSelectedPaths);
+    });
   }
 
   @override
@@ -1244,6 +1279,11 @@ class _TransferPaneState extends State<_TransferPane> {
 
   @override
   void dispose() {
+    _scale.dispose();
+    _view.dispose();
+    _dragSubscription.cancel();
+    _dragSelection.dispose();
+    _dragBloc.close();
     _pane.removeListener(_changed);
     _path.dispose();
     _focus.dispose();
@@ -1264,8 +1304,17 @@ class _TransferPaneState extends State<_TransferPane> {
   void _reveal(int index) {
     if (!_scroll.hasClients) return;
     final position = _scroll.position;
-    final top = _listPadding + index * _rowExtent;
-    final bottom = top + _rowExtent + _listPadding;
+    final grid = _view.mode == ViewMode.grid;
+    final columns = GridZoomConstraints.columnCountForZoom(
+      _scale.zoom,
+      _viewportWidth - 8,
+    );
+    final extent = grid
+        ? (_viewportWidth / columns).clamp(90.0, 160.0)
+        : _rowExtent;
+    final row = grid ? index ~/ columns : index;
+    final top = _listPadding + row * (extent + (grid ? 4 : 0));
+    final bottom = top + extent + _listPadding;
     if (top < position.pixels) {
       _scroll.jumpTo(top - _listPadding);
     } else if (bottom > position.pixels + position.viewportDimension) {
@@ -1358,6 +1407,8 @@ class _TransferPaneState extends State<_TransferPane> {
   }
 
   KeyEventResult _onKey(FocusNode _, KeyEvent event) {
+    if (!TabFocusGate.isActiveTab(context)) return KeyEventResult.ignored;
+    if (DesktopShortcuts.isTextInputFocused) return KeyEventResult.ignored;
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
       return KeyEventResult.ignored;
     }
@@ -1505,6 +1556,29 @@ class _TransferPaneState extends State<_TransferPane> {
                           ? widget.onNewFolder
                           : null,
                     ),
+                    SizedBox(
+                      width: 32,
+                      height: 32,
+                      child: GridListViewToggle(
+                        mode: _view.mode,
+                        supportedModes: _viewModes,
+                        onChanged: (mode) =>
+                            _changePresentation(_view.select(mode)),
+                      ),
+                    ),
+                    if (_view.mode == ViewMode.grid)
+                      CbButton.icon(
+                        key: ValueKey('sftp-transfer-zoom-${widget.side.name}'),
+                        icon: PhosphorIconsLight.magnifyingGlassPlus,
+                        tooltip: tr.adjustGridSizeTooltip,
+                        size: CbButtonSize.sm,
+                        onPressed: () => SharedActionBar.showGridSizeDialog(
+                          context,
+                          currentGridSize: _scale.zoom,
+                          onApply: (zoom) =>
+                              _changePresentation(_scale.setZoom(zoom)),
+                        ),
+                      ),
                     if (widget.actions != null)
                       Builder(
                         builder: (context) => CbButton.icon(
@@ -1719,115 +1793,186 @@ class _TransferPaneState extends State<_TransferPane> {
   Widget _list(BuildContext context, bool active) {
     final c = context.cbColors;
     if (!active) return const SizedBox.shrink();
-    return Focus(
-      focusNode: _focus,
-      onKeyEvent: _onKey,
-      child: GestureDetector(
-        behavior: HitTestBehavior.translucent,
-        onTap: () {
-          _focus.requestFocus();
-          _pane.clearSelection();
-        },
-        onSecondaryTapUp: (details) {
-          _focus.requestFocus();
-          _pane.clearSelection();
-          _showMenu(details.globalPosition);
-        },
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            if (_pane.entries.isEmpty) {
-              if (_pane.loading) return const SizedBox.shrink();
-              return Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      PhosphorIconsLight.folderOpen,
-                      size: CbSizes.iconXl,
-                      color: c.iconSubtle,
-                    ),
-                    const SizedBox(height: CbSpacing.sm),
-                    Text(
-                      context.tr.emptyFolder,
-                      style: CbTypography.body.copyWith(color: c.textTertiary),
-                    ),
-                  ],
-                ),
-              );
-            }
-            final showModified = constraints.maxWidth >= 440;
-            final showSize = constraints.maxWidth >= 280;
-            final tr = context.tr;
-            final heading = CbTypography.caption.copyWith(
-              color: c.textTertiary,
-            );
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Container(
-                  height: CbSizes.controlXs,
-                  padding: const EdgeInsets.symmetric(horizontal: CbSpacing.md),
-                  decoration: BoxDecoration(
-                    border: Border(bottom: BorderSide(color: c.strokeSubtle)),
-                  ),
-                  child: Row(
-                    children: [
-                      const SizedBox(width: CbSizes.iconMd + CbSpacing.sm),
-                      Expanded(
-                        child: Text(
-                          tr.columnName,
-                          style: heading,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      if (showSize)
-                        SizedBox(
-                          width: 72,
-                          child: Text(
-                            tr.columnSize,
-                            style: heading,
-                            textAlign: TextAlign.right,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      if (showModified)
-                        SizedBox(
-                          width: 112,
-                          child: Text(
-                            tr.columnDateModified,
-                            style: heading,
-                            textAlign: TextAlign.right,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: Scrollbar(
-                    controller: _scroll,
-                    child: ListView.builder(
-                      controller: _scroll,
-                      padding: const EdgeInsets.symmetric(
-                        vertical: _listPadding,
-                      ),
-                      itemExtent: _rowExtent,
-                      itemCount: _pane.entries.length,
-                      itemBuilder: (context, index) => _row(
-                        context,
-                        _pane.entries[index],
-                        showSize: showSize,
-                        showModified: showModified,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+    return FileViewShell(
+      viewMode: _view.mode,
+      enableKeyboardShortcuts: false,
+      onViewScaleDelta: (delta) =>
+          _changePresentation(_scale.step(delta, _viewportWidth)),
+      child: Focus(
+        focusNode: _focus,
+        onKeyEvent: _onKey,
+        child: Listener(
+          onPointerDown: (_) {
+            _focus.requestFocus();
+            _dragBloc.add(
+              SelectItemsInRect(
+                filePaths: _pane.selectedEntries
+                    .where((e) => !e.isDirectory)
+                    .map((e) => e.path)
+                    .toSet(),
+                folderPaths: _pane.selectedEntries
+                    .where((e) => e.isDirectory)
+                    .map((e) => e.path)
+                    .toSet(),
+                isCtrlPressed: false,
+                isShiftPressed: false,
+              ),
             );
           },
+          child: DragSelectionRegion(
+            controller: _dragSelection,
+            enabled: isDesktopPlatform,
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: () {
+                _focus.requestFocus();
+                _pane.clearSelection();
+              },
+              onSecondaryTapUp: (details) {
+                _focus.requestFocus();
+                _pane.clearSelection();
+                _showMenu(details.globalPosition);
+              },
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  _viewportWidth = constraints.maxWidth;
+                  if (_pane.entries.isEmpty) {
+                    if (_pane.loading) return const SizedBox.shrink();
+                    return Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            PhosphorIconsLight.folderOpen,
+                            size: CbSizes.iconXl,
+                            color: c.iconSubtle,
+                          ),
+                          const SizedBox(height: CbSpacing.sm),
+                          Text(
+                            context.tr.emptyFolder,
+                            style: CbTypography.body.copyWith(
+                              color: c.textTertiary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                  if (_view.mode == ViewMode.grid) {
+                    final columns = GridZoomConstraints.columnCountForZoom(
+                      _scale.zoom,
+                      constraints.maxWidth - 8,
+                    );
+                    return Scrollbar(
+                      controller: _scroll,
+                      child: GridView.builder(
+                        key: ValueKey('sftp-transfer-grid-${widget.side.name}'),
+                        controller: _scroll,
+                        padding: const EdgeInsets.all(4),
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: columns,
+                          crossAxisSpacing: 4,
+                          mainAxisSpacing: 4,
+                          mainAxisExtent: (constraints.maxWidth / columns)
+                              .clamp(90.0, 160.0),
+                        ),
+                        itemCount: _pane.entries.length,
+                        itemBuilder: (context, index) => _row(
+                          context,
+                          _pane.entries[index],
+                          showSize: false,
+                          showModified: false,
+                          grid: true,
+                        ),
+                      ),
+                    );
+                  }
+                  final showModified =
+                      _view.mode == ViewMode.details &&
+                      constraints.maxWidth >= 440;
+                  final showSize =
+                      _view.mode == ViewMode.details &&
+                      constraints.maxWidth >= 280;
+                  final tr = context.tr;
+                  final heading = CbTypography.caption.copyWith(
+                    color: c.textTertiary,
+                  );
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Container(
+                        height: CbSizes.controlXs,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: CbSpacing.md,
+                        ),
+                        decoration: BoxDecoration(
+                          border: Border(
+                            bottom: BorderSide(color: c.strokeSubtle),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            const SizedBox(
+                              width: CbSizes.iconMd + CbSpacing.sm,
+                            ),
+                            Expanded(
+                              child: Text(
+                                tr.columnName,
+                                style: heading,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (showSize)
+                              SizedBox(
+                                width: 72,
+                                child: Text(
+                                  tr.columnSize,
+                                  style: heading,
+                                  textAlign: TextAlign.right,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            if (showModified)
+                              SizedBox(
+                                width: 112,
+                                child: Text(
+                                  tr.columnDateModified,
+                                  style: heading,
+                                  textAlign: TextAlign.right,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: Scrollbar(
+                          controller: _scroll,
+                          child: ListView.builder(
+                            controller: _scroll,
+                            padding: const EdgeInsets.symmetric(
+                              vertical: _listPadding,
+                            ),
+                            itemExtent: _rowExtent,
+                            itemCount: _pane.entries.length,
+                            itemBuilder: (context, index) => _row(
+                              context,
+                              _pane.entries[index],
+                              showSize: showSize,
+                              showModified: showModified,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -1838,6 +1983,7 @@ class _TransferPaneState extends State<_TransferPane> {
     TransferEntry entry, {
     required bool showSize,
     required bool showModified,
+    bool grid = false,
   }) {
     final c = context.cbColors;
     final selected = _pane.selected.contains(entry.path);
@@ -1854,54 +2000,77 @@ class _TransferPaneState extends State<_TransferPane> {
           isSelected: selected,
           isHovering: hovered,
         ),
-        padding: const EdgeInsets.symmetric(horizontal: CbSpacing.md),
-        child: Row(
-          children: [
-            Icon(
-              entry.isLink
-                  ? PhosphorIconsLight.link
-                  : entry.isDirectory
-                  ? PhosphorIconsFill.folder
-                  : PhosphorIconsLight.file,
-              size: CbSizes.iconMd,
-              color: entry.isDirectory ? c.accent.text : c.iconSubtle,
-            ),
-            const SizedBox(width: CbSpacing.sm),
-            Expanded(
-              child: Text(
-                entry.name,
-                style: CbTypography.body.copyWith(color: c.textPrimary),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            if (showSize)
-              SizedBox(
-                width: 72,
-                child: Text(
-                  entry.isDirectory
-                      ? ''
-                      : FormatUtils.formatFileSize(entry.size),
-                  style: meta,
-                  textAlign: TextAlign.right,
-                  maxLines: 1,
+        padding: EdgeInsets.symmetric(horizontal: grid ? 4 : CbSpacing.md),
+        child: grid
+            ? LayoutBuilder(
+                builder: (context, constraints) => Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      entry.isDirectory
+                          ? PhosphorIconsFill.folder
+                          : PhosphorIconsLight.file,
+                      size: (constraints.maxWidth * 0.4).clamp(20.0, 48.0),
+                      color: c.accent.text,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      entry.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: CbTypography.bodySm,
+                    ),
+                  ],
                 ),
+              )
+            : Row(
+                children: [
+                  Icon(
+                    entry.isLink
+                        ? PhosphorIconsLight.link
+                        : entry.isDirectory
+                        ? PhosphorIconsFill.folder
+                        : PhosphorIconsLight.file,
+                    size: CbSizes.iconMd,
+                    color: entry.isDirectory ? c.accent.text : c.iconSubtle,
+                  ),
+                  const SizedBox(width: CbSpacing.sm),
+                  Expanded(
+                    child: Text(
+                      entry.name,
+                      style: CbTypography.body.copyWith(color: c.textPrimary),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (showSize)
+                    SizedBox(
+                      width: 72,
+                      child: Text(
+                        entry.isDirectory
+                            ? ''
+                            : FormatUtils.formatFileSize(entry.size),
+                        style: meta,
+                        textAlign: TextAlign.right,
+                        maxLines: 1,
+                      ),
+                    ),
+                  if (showModified)
+                    SizedBox(
+                      width: 112,
+                      child: Text(
+                        entry.modified == null
+                            ? ''
+                            : _modifiedFormat.format(entry.modified!),
+                        style: meta,
+                        textAlign: TextAlign.right,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                ],
               ),
-            if (showModified)
-              SizedBox(
-                width: 112,
-                child: Text(
-                  entry.modified == null
-                      ? ''
-                      : _modifiedFormat.format(entry.modified!),
-                  style: meta,
-                  textAlign: TextAlign.right,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-          ],
-        ),
       ),
     );
     final interactive = OptimizedInteractionLayer(
@@ -1955,7 +2124,7 @@ class _TransferPaneState extends State<_TransferPane> {
       ),
     );
     final data = _TransferDrag(widget.side, dragged);
-    return isDesktopPlatform
+    final draggable = isDesktopPlatform
         ? Draggable<_TransferDrag>(
             data: data,
             feedback: feedback,
@@ -1967,6 +2136,12 @@ class _TransferPaneState extends State<_TransferPane> {
             feedback: feedback,
             child: interactive,
           );
+    return SelectionGeometryItem(
+      path: entry.path,
+      isFolder: entry.isDirectory,
+      controller: _dragSelection,
+      child: draggable,
+    );
   }
 }
 

@@ -29,6 +29,7 @@ class SshHostListItem extends StatefulWidget {
     required this.browseTooltip,
     this.isConnecting = false,
     this.isGrid = false,
+    this.isDetails = false,
     this.authenticationLabel,
     this.usesKeyAuth = false,
     this.group = '',
@@ -57,6 +58,7 @@ class SshHostListItem extends StatefulWidget {
   final VoidCallback onSelect;
   final VoidCallback? onOpen, onOpenInNewTab, onBrowse, onBrowseInNewTab;
   final bool showTerminalAction;
+  final bool isDetails;
   final PopupMenuItemBuilder<void> menuBuilder;
 
   @override
@@ -109,7 +111,13 @@ class _SshHostListItemState extends State<SshHostListItem> {
           ?widget.authenticationLabel,
           ?widget.routeLabel,
         ].join('\n'),
-        child: widget.isGrid ? _grid(context) : _list(context),
+        child: widget.isGrid
+            ? LayoutBuilder(
+                builder: (context, constraints) => constraints.maxWidth < 240
+                    ? _compactGrid(context)
+                    : _grid(context),
+              )
+            : _list(context),
       ),
     ),
   );
@@ -153,7 +161,7 @@ class _SshHostListItemState extends State<SshHostListItem> {
                         ),
                         child: _steps(),
                       )
-                    : constraints.maxWidth < 480
+                    : !widget.isDetails && constraints.maxWidth < 480
                     ? null
                     : ConstrainedBox(
                         constraints: BoxConstraints(
@@ -173,6 +181,41 @@ class _SshHostListItemState extends State<SshHostListItem> {
           ),
         ),
         _menuButton(compact: true),
+      ],
+    ),
+  );
+
+  Widget _compactGrid(BuildContext context) => CbSurface(
+    selected: widget.isSelected,
+    clip: true,
+    child: Stack(
+      children: [
+        Positioned.fill(
+          child: _interact(
+            Padding(
+              padding: const EdgeInsets.all(4),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _avatar(24),
+                  const SizedBox(height: 4),
+                  Text(
+                    widget.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: CbTypography.bodySm,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          top: 0,
+          right: 0,
+          child: _menuButton(compact: true, extent: 18),
+        ),
       ],
     ),
   );
@@ -435,9 +478,9 @@ class _SshHostListItemState extends State<SshHostListItem> {
     child: child,
   );
 
-  Widget _menuButton({bool compact = false}) => SizedBox(
-    width: compact ? CbSizes.controlMd : CbSizes.controlSm,
-    height: compact ? CbSizes.controlMd : CbSizes.controlSm,
+  Widget _menuButton({bool compact = false, double? extent}) => SizedBox(
+    width: extent ?? (compact ? CbSizes.controlMd : CbSizes.controlSm),
+    height: extent ?? (compact ? CbSizes.controlMd : CbSizes.controlSm),
     child: PopupMenuButton<void>(
       key: _menu,
       tooltip: widget.menuTooltip,

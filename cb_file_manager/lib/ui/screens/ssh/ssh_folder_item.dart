@@ -73,7 +73,33 @@ class _SshFolderItemState extends State<SshFolderItem> {
       child: OptimizedInteractionLayer(
         onTap: widget.isDesktop ? _select : widget.onOpen,
         onDoubleTap: widget.isDesktop ? widget.onOpen : null,
-        child: widget.isGrid ? _grid(context) : _list(context),
+        child: widget.isGrid
+            ? LayoutBuilder(
+                builder: (context, constraints) => constraints.maxWidth < 200
+                    ? CbSurface(
+                        selected: widget.isSelected,
+                        clip: true,
+                        child: Padding(
+                          padding: const EdgeInsets.all(4),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              _tile(24),
+                              const SizedBox(height: 4),
+                              Text(
+                                widget.name,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                                style: CbTypography.bodySm,
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    : _grid(context),
+              )
+            : _list(context),
       ),
     ),
   );

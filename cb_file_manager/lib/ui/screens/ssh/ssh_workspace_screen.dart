@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
+import 'package:uuid/uuid.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -14,9 +16,14 @@ import '../../utils/route.dart';
 import '../../utils/platform_utils.dart';
 import '../../components/common/app_toast.dart';
 import '../../components/common/grid_list_collection.dart';
+import '../../components/common/collection_view_scale_controller.dart';
 import '../../components/common/search_text_field.dart';
 import '../../../helpers/core/user_preferences.dart';
 import '../../../helpers/core/text_utils.dart';
+import '../../../helpers/core/desktop_shortcuts.dart';
+import '../../../bloc/selection/selection.dart';
+import '../../components/common/file_view_shell.dart';
+import '../../tab_manager/core/tabbed_folder/tabbed_folder_drag_selection_controller.dart';
 import '../folder_list/folder_list_state.dart';
 import 'ssh_connection_status.dart';
 import '../../components/common/shared_action_bar.dart';
@@ -37,6 +44,7 @@ import 'ssh_proxy_dialog.dart';
 const double _compactWidth = 640;
 
 class SshWorkspaceScreen extends StatefulWidget {
+  static const viewModes = {ViewMode.list, ViewMode.details, ViewMode.grid};
   final String tabId;
   final bool sftpOnly;
   final SshProfileStore? store;
@@ -69,7 +77,140 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
   final _search = SearchTextController();
   final _searchFocus = FocusNode();
   bool _loaded = false;
-  String? _error, _connecting, _selectedId;
+  String? _error, _connecting;
+  final _selection = SelectionBloc();
+  late final _dragSelection = TabbedFolderDragSelectionController(
+    selectionBloc: _selection,
+    folderPaths: () => _hostEntries.whereType<_SectionEntry>().map((e) => e.id),
+  );
+  late final StreamSubscription<SelectionState> _selectionSubscription;
+  List<_HostsEntry> _hostEntries = const [];
+  String? _selectionAnchor;
+  bool _editingSelection = false;
+  static final _clipboards =
+      Expando<ValueNotifier<({List<SshProfile> profiles, bool cut})?>>();
+  late final _clipboard = _clipboards[store] ??=
+      ValueNotifier<({List<SshProfile> profiles, bool cut})?>(null);
+
+  bool _selected(String id) => _selection.state.isPathSelected(id);
+
+  List<SshProfile> get _selectedProfiles => _hostEntries
+      .whereType<_ProfileEntry>()
+      .where((e) => _selected(e.id))
+      .map((e) => e.profile)
+      .toList();
+
+  void _clearHostSelection() {
+    _selectionAnchor = null;
+    _selection.add(ClearSelection());
+  }
+
+  void _selectHostEntry(String id) {
+    final keyboard = HardwareKeyboard.instance;
+    final ordered = _hostEntries.map((e) => e.id).toList();
+    final ids = <String>{};
+    if (keyboard.isShiftPressed && ordered.contains(_selectionAnchor)) {
+      final from = ordered.indexOf(_selectionAnchor!);
+      final to = ordered.indexOf(id);
+      ids.addAll(
+        ordered.sublist(from < to ? from : to, (from > to ? from : to) + 1),
+      );
+      if (DesktopShortcuts.isPrimaryPressed) {
+        ids.addAll(_selection.state.allSelectedPaths);
+      }
+    } else {
+      if (DesktopShortcuts.isPrimaryPressed) {
+        ids.addAll(_selection.state.allSelectedPaths);
+      }
+      if (!ids.remove(id)) ids.add(id);
+      _selectionAnchor = id;
+    }
+    final folders = _hostEntries
+        .whereType<_SectionEntry>()
+        .map((e) => e.id)
+        .toSet();
+    _selection.add(
+      SelectItemsInRect(
+        filePaths: ids.difference(folders),
+        folderPaths: ids.intersection(folders),
+        isCtrlPressed: false,
+        isShiftPressed: false,
+        lastSelectedPath: id,
+      ),
+    );
+  }
+
+  void _selectAllHosts() => _selection.add(
+    SelectAll(
+      allFilePaths: _hostEntries
+          .whereType<_ProfileEntry>()
+          .map((e) => e.id)
+          .toList(),
+      allFolderPaths: _hostEntries
+          .whereType<_SectionEntry>()
+          .map((e) => e.id)
+          .toList(),
+    ),
+  );
+
+  void _holdProfiles(bool cut) {
+    final profiles = _selectedProfiles;
+    if (profiles.isEmpty) return;
+    _clipboard.value = (profiles: profiles, cut: cut);
+  }
+
+  Future<void> _pasteProfiles() => _run(() async {
+    final clip = _clipboard.value;
+    if (clip == null || _editingSelection) return;
+    // Hosts and SFTP share the same saved collection: a cut pasted back into
+    // it retains its identity, credentials and forwarding rules.
+    if (clip.cut) {
+      _clipboard.value = null;
+      return;
+    }
+    setState(() => _editingSelection = true);
+    try {
+      for (final profile in clip.profiles) {
+        var name = profile.name;
+        var suffix = 2;
+        while (store.profiles.any((p) => p.name == name)) {
+          name = '${profile.name} (${suffix++})';
+        }
+        await store.saveProfile(
+          SshProfile(
+            id: const Uuid().v4(),
+            name: name,
+            host: profile.host,
+            username: profile.username,
+            port: profile.port,
+            password: profile.password,
+            keyId: profile.keyId,
+            proxyId: profile.proxyId,
+            group: profile.group,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _editingSelection = false);
+    }
+  });
+
+  Future<void> _deleteProfiles([List<SshProfile>? targets]) => _run(() async {
+    final profiles = targets ?? _selectedProfiles;
+    if (profiles.isEmpty || _editingSelection) return;
+    setState(() => _editingSelection = true);
+    try {
+      if (!await _confirm(profiles.map((p) => p.name).join('\n')) || !mounted) {
+        return;
+      }
+      for (final profile in profiles) {
+        await store.deleteProfile(profile.id);
+      }
+      _clearHostSelection();
+    } finally {
+      if (mounted) setState(() => _editingSelection = false);
+    }
+  });
 
   /// The latest file-browsing connection, kept after a failure so the card
   /// shows which step failed.
@@ -79,13 +220,28 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
   late final _view =
       widget.viewController ??
       GridListViewController(
-        load: () =>
-            UserPreferences.instance.getGridListCollectionMode('ssh_hosts'),
+        supportedModes: SshWorkspaceScreen.viewModes,
+        load: () => UserPreferences.instance.getGridListCollectionMode(
+          'ssh_hosts',
+          supportedModes: SshWorkspaceScreen.viewModes,
+        ),
         save: (mode) => UserPreferences.instance.setGridListCollectionMode(
           'ssh_hosts',
           mode,
         ),
       );
+  late final _scale = CollectionViewScaleController(
+    view: _view,
+    loadZoom: widget.viewController == null
+        ? () => UserPreferences.instance.getCollectionGridZoomLevel('ssh_hosts')
+        : null,
+    saveZoom: widget.viewController == null
+        ? (zoom) => UserPreferences.instance.setCollectionGridZoomLevel(
+            'ssh_hosts',
+            zoom,
+          )
+        : null,
+  );
   late final _tunnels = widget.tunnels ?? SshTunnelManager.instance;
   late final _sort =
       widget.sortController ??
@@ -97,16 +253,20 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
   @override
   void initState() {
     super.initState();
+    _selectionSubscription = _selection.stream.listen((_) => _changed());
+    _clipboard.addListener(_changed);
     store.addListener(_changed);
     _tunnels.addListener(_changed);
     _view.addListener(_changed);
+    _scale.addListener(_changed);
     _sort.addListener(_changed);
-    _run(_view.initialize);
+    _run(_scale.initialize);
     _run(_sort.initialize);
     _load();
   }
 
   void _changed() {
+    if (!_dragSelection.isDragging.value) _dragSelection.clearItemPositions();
     if (mounted) setState(() {});
   }
 
@@ -129,9 +289,14 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
 
   @override
   void dispose() {
+    _clipboard.removeListener(_changed);
+    _selectionSubscription.cancel();
+    _dragSelection.dispose();
+    _selection.close();
     store.removeListener(_changed);
     _tunnels.removeListener(_changed);
     _view.removeListener(_changed);
+    _scale.dispose();
     if (widget.viewController == null) _view.dispose();
     _sort.removeListener(_changed);
     if (widget.sortController == null) _sort.dispose();
@@ -348,25 +513,45 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final compact = constraints.maxWidth < _compactWidth;
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (_error != null) _errorBanner(context),
-              if (!_loaded && _error == null)
-                const LinearProgressIndicator(minHeight: 2),
-              Expanded(
-                child: switch (_section) {
-                  SshSection.hosts => _hostsSection(context),
-                  SshSection.keys => _keysSection(context, compact: compact),
-                  SshSection.proxies => _proxiesSection(context),
-                  SshSection.knownHosts => _knownHostsSection(context),
-                  SshSection.forwards => _forwardsSection(
-                    context,
-                    compact: compact,
-                  ),
-                },
-              ),
-            ],
+          return FileViewShell(
+            viewMode: _view.mode,
+            onViewScaleDelta: hosts
+                ? (delta) =>
+                      _run(() => _scale.step(delta, constraints.maxWidth))
+                : null,
+            enableKeyboardShortcuts: hosts,
+            onSelectAll: _selectAllHosts,
+            onCopy: () => _holdProfiles(false),
+            onCut: () => _holdProfiles(true),
+            onPaste: _pasteProfiles,
+            onDelete: ({required permanent}) => _deleteProfiles(),
+            onRename: _selectedProfiles.length == 1
+                ? () => _edit(_selectedProfiles.single)
+                : null,
+            onEscape: () {
+              _clearHostSelection();
+              _clipboard.value = null;
+            },
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (_error != null) _errorBanner(context),
+                if (!_loaded && _error == null)
+                  const LinearProgressIndicator(minHeight: 2),
+                Expanded(
+                  child: switch (_section) {
+                    SshSection.hosts => _hostsSection(context),
+                    SshSection.keys => _keysSection(context, compact: compact),
+                    SshSection.proxies => _proxiesSection(context),
+                    SshSection.knownHosts => _knownHostsSection(context),
+                    SshSection.forwards => _forwardsSection(
+                      context,
+                      compact: compact,
+                    ),
+                  },
+                ),
+              ],
+            ),
           );
         },
       ),
@@ -383,7 +568,11 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
         controller: _search,
         focusNode: _searchFocus,
         autofocus: true,
-        onChanged: (_) => setState(() {}),
+        onChanged: (_) {
+          _dragSelection.clearItemPositions();
+          _clearHostSelection();
+          setState(() {});
+        },
         textAlignVertical: TextAlignVertical.center,
         decoration: InputDecoration(
           hintText: tr.search,
@@ -424,11 +613,44 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
       ),
     };
     void openWorkspace() => navigateNetworkTab(context, widget.tabId, '#ssh');
-    final otherMode = _view.mode == ViewMode.grid
-        ? ViewMode.list
-        : ViewMode.grid;
     // Null separates groups.
     final more = <_MenuAction?>[
+      if (hosts) ...[
+        (
+          key: const ValueKey('ssh-select-all'),
+          icon: PhosphorIconsLight.checks,
+          label: tr.selectAll,
+          run: _selectAllHosts,
+        ),
+        if (_selectedProfiles.isNotEmpty) ...[
+          (
+            key: const ValueKey('ssh-copy'),
+            icon: PhosphorIconsLight.copy,
+            label: tr.copy,
+            run: () => _holdProfiles(false),
+          ),
+          (
+            key: const ValueKey('ssh-cut'),
+            icon: PhosphorIconsLight.scissors,
+            label: tr.cut,
+            run: () => _holdProfiles(true),
+          ),
+          (
+            key: const ValueKey('ssh-delete'),
+            icon: PhosphorIconsLight.trash,
+            label: tr.delete,
+            run: () => _deleteProfiles(),
+          ),
+        ],
+        if (_clipboard.value != null)
+          (
+            key: const ValueKey('ssh-paste'),
+            icon: PhosphorIconsLight.clipboardText,
+            label: tr.pasteHere,
+            run: _pasteProfiles,
+          ),
+        null,
+      ],
       if (hosts)
         (
           key: const ValueKey('ssh-transfer-action'),
@@ -467,16 +689,30 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
             run: _openSearch,
           ),
         if (hosts) ...[
-          (
-            key: const ValueKey('ssh-view-mode-toggle'),
-            icon: otherMode == ViewMode.list
-                ? PhosphorIconsLight.list
-                : PhosphorIconsLight.squaresFour,
-            label: otherMode == ViewMode.list
-                ? tr.viewModeList
-                : tr.viewModeGrid,
-            run: () => _run(() => _view.select(otherMode)),
-          ),
+          for (final mode in SshWorkspaceScreen.viewModes)
+            (
+              key: ValueKey('ssh-view-mode-${mode.name}'),
+              icon: mode == ViewMode.grid
+                  ? PhosphorIconsLight.squaresFour
+                  : PhosphorIconsLight.list,
+              label: switch (mode) {
+                ViewMode.grid => tr.viewModeGrid,
+                ViewMode.details => tr.viewModeDetails,
+                _ => tr.viewModeList,
+              },
+              run: () => _run(() => _view.select(mode)),
+            ),
+          if (_view.mode == ViewMode.grid)
+            (
+              key: const ValueKey('ssh-grid-size'),
+              icon: PhosphorIconsLight.magnifyingGlassPlus,
+              label: tr.adjustGridSizeTooltip,
+              run: () => SharedActionBar.showGridSizeDialog(
+                context,
+                currentGridSize: _scale.zoom,
+                onApply: (zoom) => _run(() => _scale.setZoom(zoom)),
+              ),
+            ),
           for (final field in SshHostSortField.values)
             (
               key: ValueKey('ssh-host-sort-${field.name}'),
@@ -520,7 +756,11 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
           onSortOptionSelected: (_) {},
           currentSortOption: SortOption.nameAsc,
           viewMode: _view.mode,
-          allowedViewModes: const {ViewMode.list, ViewMode.grid},
+          allowedViewModes: SshWorkspaceScreen.viewModes,
+          currentGridZoomLevel: _view.mode == ViewMode.grid
+              ? _scale.zoom
+              : null,
+          onGridZoomChanged: (zoom) => _run(() => _scale.setZoom(zoom)),
           onViewModeToggled: () {},
           onViewModeSelected: (mode) => _run(() => _view.select(mode)),
           onRefresh: _load,
@@ -652,11 +892,10 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
           _SectionEntry(section),
       for (final profile in profiles) _ProfileEntry(profile),
     ];
+    _hostEntries = entries;
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
-      onTap: _selectedId == null
-          ? null
-          : () => setState(() => _selectedId = null),
+      onTap: _clearHostSelection,
       child: entries.isEmpty
           ? _empty(
               context,
@@ -667,12 +906,28 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
             )
           : GridListCollection<_HostsEntry>(
               mode: _view.mode,
+              supportedModes: SshWorkspaceScreen.viewModes,
+              gridZoomLevel: _scale.zoom,
               isDesktop: isDesktopPlatform,
               items: entries,
               identity: (entry) => entry.id,
               onRefresh: _load,
+              dragSelectionController: _dragSelection,
+              onBackgroundTap: _clearHostSelection,
               gridMinExtent: SshHostListItem.gridExtent,
               gridMaxExtent: SshHostListItem.gridExtent,
+              detailsHeader: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(child: Text(tr.sshDisplayName)),
+                    Text(tr.host),
+                  ],
+                ),
+              ),
               itemBuilder: (_, entry, mode) => switch (entry) {
                 _SectionEntry(:final section) => _folderItem(
                   context,
@@ -712,9 +967,8 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
       detail: tr.itemsCount(count),
       isGrid: mode == ViewMode.grid,
       isDesktop: isDesktopPlatform,
-      isSelected: _selectedId == id,
-      onSelect: () =>
-          setState(() => _selectedId = _selectedId == id ? null : id),
+      isSelected: _selected(id),
+      onSelect: () => _selectHostEntry(id),
       onOpen: () => navigateNetworkTab(context, widget.tabId, section.path),
     );
   }
@@ -794,112 +1048,149 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
     final proxy = p.proxyId == null
         ? null
         : store.proxies.where((x) => x.id == p.proxyId).firstOrNull;
-    return SshHostListItem(
-      key: ValueKey(p.id),
-      name: p.name,
-      routeLabel: p.proxyId == null
-          ? tr.sshProxyNone
-          : '${tr.sshProxy}: ${proxy == null ? '—' : sshProxyDescription(proxy)}',
-      viaProxy: p.proxyId != null,
-      connectionStatus: _statusProfileId == p.id ? _status : null,
-      isGrid: mode == ViewMode.grid,
-      authenticationLabel: p.keyId == null ? tr.sshPasswordAuth : tr.sshKeyAuth,
-      usesKeyAuth: p.keyId != null,
-      description: '${p.username}@${p.host}:${p.port}',
-      group: p.group,
-      isDesktop: isDesktopPlatform,
-      isSelected: _selectedId == p.id,
-      isConnecting: _connecting == p.id,
-      terminalTooltip: tr.sshOpenTerminal,
-      browseTooltip: tr.sshBrowseFiles,
-      onSelect: () =>
-          setState(() => _selectedId = _selectedId == p.id ? null : p.id),
-      onOpen: _connecting != null
-          ? null
-          : () {
-              if (widget.sftpOnly) {
-                _browse(p);
-              } else {
-                _openTerminal(p);
-              }
-            },
-      onOpenInNewTab: _connecting != null
-          ? null
-          : () {
-              if (widget.sftpOnly) {
-                _browse(p, openInNewTab: true);
-              } else {
-                _openTerminalInNewTab(p);
-              }
-            },
-      onBrowse: _connecting == null ? () => _browse(p) : null,
-      onBrowseInNewTab: _connecting == null
-          ? () => _browse(p, openInNewTab: true)
-          : null,
-      showTerminalAction: !widget.sftpOnly,
-      menuTooltip: tr.moreOptions,
-      menuBuilder: (menuContext) => [
-        _menuItem(
-          menuContext,
-          PhosphorIconsLight.terminalWindow,
-          tr.sshOpenTerminal,
-          () => _openTerminal(p),
-        ),
-        _menuItem(
-          menuContext,
-          PhosphorIconsLight.arrowSquareOut,
-          '${tr.sshOpenTerminal} (${tr.openInNewTab})',
-          () => _openTerminalInNewTab(p),
-        ),
-        const PopupMenuDivider(),
-        _menuItem(
-          menuContext,
-          PhosphorIconsLight.folderOpen,
-          _connecting == p.id ? tr.sshConnecting : tr.sshBrowseFiles,
-          () => _browse(p),
-          enabled: _connecting == null,
-        ),
-        _menuItem(
-          menuContext,
-          PhosphorIconsLight.arrowSquareOut,
-          '${tr.sshBrowseFiles} (${tr.openInNewTab})',
-          () => _browse(p, openInNewTab: true),
-          enabled: _connecting == null,
-        ),
-        _menuItem(
-          menuContext,
-          PhosphorIconsLight.arrowsLeftRight,
-          tr.sshFileTransfer,
-          () => _openTransfer(p),
-        ),
-        _menuItem(
-          menuContext,
-          PhosphorIconsLight.arrowSquareOut,
-          '${tr.sshFileTransfer} (${tr.openInNewTab})',
-          () => _openTransfer(p, true),
-        ),
-        if (!widget.sftpOnly)
-          _menuItem(menuContext, PhosphorIconsLight.plus, tr.sshAddForward, () {
-            navigateNetworkTab(context, widget.tabId, SshSection.forwards.path);
-            showSshForwardDialog(context, store, profileId: p.id);
+    final cut =
+        _clipboard.value?.cut == true &&
+        _clipboard.value!.profiles.any((item) => item.id == p.id);
+    return Opacity(
+      opacity: cut ? 0.45 : 1,
+      child: SshHostListItem(
+        key: ValueKey(p.id),
+        name: p.name,
+        routeLabel: p.proxyId == null
+            ? tr.sshProxyNone
+            : '${tr.sshProxy}: ${proxy == null ? '—' : sshProxyDescription(proxy)}',
+        viaProxy: p.proxyId != null,
+        connectionStatus: _statusProfileId == p.id ? _status : null,
+        isGrid: mode == ViewMode.grid,
+        isDetails: mode == ViewMode.details,
+        authenticationLabel: p.keyId == null
+            ? tr.sshPasswordAuth
+            : tr.sshKeyAuth,
+        usesKeyAuth: p.keyId != null,
+        description: '${p.username}@${p.host}:${p.port}',
+        group: p.group,
+        isDesktop: isDesktopPlatform,
+        isSelected: _selected(p.id),
+        isConnecting: _connecting == p.id,
+        terminalTooltip: tr.sshOpenTerminal,
+        browseTooltip: tr.sshBrowseFiles,
+        onSelect: () => _selectHostEntry(p.id),
+        onOpen: _connecting != null
+            ? null
+            : () {
+                if (widget.sftpOnly) {
+                  _browse(p);
+                } else {
+                  _openTerminal(p);
+                }
+              },
+        onOpenInNewTab: _connecting != null
+            ? null
+            : () {
+                if (widget.sftpOnly) {
+                  _browse(p, openInNewTab: true);
+                } else {
+                  _openTerminalInNewTab(p);
+                }
+              },
+        onBrowse: _connecting == null ? () => _browse(p) : null,
+        onBrowseInNewTab: _connecting == null
+            ? () => _browse(p, openInNewTab: true)
+            : null,
+        showTerminalAction: !widget.sftpOnly,
+        menuTooltip: tr.moreOptions,
+        menuBuilder: (menuContext) => [
+          _menuItem(
+            menuContext,
+            PhosphorIconsLight.terminalWindow,
+            tr.sshOpenTerminal,
+            () => _openTerminal(p),
+          ),
+          _menuItem(
+            menuContext,
+            PhosphorIconsLight.arrowSquareOut,
+            '${tr.sshOpenTerminal} (${tr.openInNewTab})',
+            () => _openTerminalInNewTab(p),
+          ),
+          const PopupMenuDivider(),
+          _menuItem(menuContext, PhosphorIconsLight.copy, tr.copy, () {
+            if (!_selected(p.id)) {
+              _clipboard.value = (profiles: [p], cut: false);
+            } else {
+              _holdProfiles(false);
+            }
           }),
-        const PopupMenuDivider(),
-        _menuItem(
-          menuContext,
-          PhosphorIconsLight.pencilSimple,
-          tr.edit,
-          () => _edit(p),
-        ),
-        _menuItem(
-          menuContext,
-          PhosphorIconsLight.trash,
-          tr.delete,
-          () => _run(() async {
-            if (await _confirm(p.name)) await store.deleteProfile(p.id);
+          _menuItem(menuContext, PhosphorIconsLight.scissors, tr.cut, () {
+            if (!_selected(p.id)) {
+              _clipboard.value = (profiles: [p], cut: true);
+            } else {
+              _holdProfiles(true);
+            }
           }),
-          danger: true,
-        ),
-      ],
+          if (_clipboard.value != null)
+            _menuItem(
+              menuContext,
+              PhosphorIconsLight.clipboardText,
+              tr.pasteHere,
+              _pasteProfiles,
+            ),
+          const PopupMenuDivider(),
+          _menuItem(
+            menuContext,
+            PhosphorIconsLight.folderOpen,
+            _connecting == p.id ? tr.sshConnecting : tr.sshBrowseFiles,
+            () => _browse(p),
+            enabled: _connecting == null,
+          ),
+          _menuItem(
+            menuContext,
+            PhosphorIconsLight.arrowSquareOut,
+            '${tr.sshBrowseFiles} (${tr.openInNewTab})',
+            () => _browse(p, openInNewTab: true),
+            enabled: _connecting == null,
+          ),
+          _menuItem(
+            menuContext,
+            PhosphorIconsLight.arrowsLeftRight,
+            tr.sshFileTransfer,
+            () => _openTransfer(p),
+          ),
+          _menuItem(
+            menuContext,
+            PhosphorIconsLight.arrowSquareOut,
+            '${tr.sshFileTransfer} (${tr.openInNewTab})',
+            () => _openTransfer(p, true),
+          ),
+          if (!widget.sftpOnly)
+            _menuItem(
+              menuContext,
+              PhosphorIconsLight.plus,
+              tr.sshAddForward,
+              () {
+                navigateNetworkTab(
+                  context,
+                  widget.tabId,
+                  SshSection.forwards.path,
+                );
+                showSshForwardDialog(context, store, profileId: p.id);
+              },
+            ),
+          const PopupMenuDivider(),
+          _menuItem(
+            menuContext,
+            PhosphorIconsLight.pencilSimple,
+            tr.edit,
+            () => _edit(p),
+          ),
+          _menuItem(
+            menuContext,
+            PhosphorIconsLight.trash,
+            tr.delete,
+            () => _deleteProfiles(_selected(p.id) ? _selectedProfiles : [p]),
+            danger: true,
+          ),
+        ],
+      ),
     );
   }
 

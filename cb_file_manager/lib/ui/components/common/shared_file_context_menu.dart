@@ -2533,6 +2533,18 @@ void showFolderContextMenu({
   Function(BuildContext, String)? showAddTagToFileDialog,
   Offset? globalPosition,
 }) {
+  final extension = FileContextMenuExtension.maybeOf(context);
+  if (extension?.isVirtual(folder.path) ?? false) {
+    unawaited(
+      showContextMenuPopup(
+        context: context,
+        globalPosition:
+            globalPosition ?? MediaQuery.sizeOf(context).center(Offset.zero),
+        sections: extension!.sections(context, [folder.path]),
+      ),
+    );
+    return;
+  }
   final folderListBloc = _maybeFolderListBloc(context);
   if (_isMobileContextMenuPlatform()) {
     unawaited(

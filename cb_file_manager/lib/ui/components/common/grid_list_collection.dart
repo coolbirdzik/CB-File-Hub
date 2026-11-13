@@ -16,12 +16,13 @@ class GridListViewController extends ChangeNotifier {
     this.load,
     this.save,
     this.supportedModes = const {ViewMode.grid, ViewMode.list},
-  });
+    ViewMode initialMode = ViewMode.grid,
+  }) : _mode = normalize(initialMode, supportedModes: supportedModes);
 
   final Future<ViewMode> Function()? load;
   final Future<void> Function(ViewMode)? save;
   final Set<ViewMode> supportedModes;
-  ViewMode _mode = ViewMode.grid;
+  ViewMode _mode;
   ViewMode get mode => _mode;
   bool _changed = false, _disposed = false, _initialized = false;
   Future<void> _writes = Future.value();
@@ -44,6 +45,9 @@ class GridListViewController extends ChangeNotifier {
     _mode = normalize(restored, supportedModes: supportedModes);
     notifyListeners();
   }
+
+  /// A related display option changed before loading finished.
+  void cancelPendingRestore() => _changed = true;
 
   Future<void> select(ViewMode mode) {
     _changed = true;
