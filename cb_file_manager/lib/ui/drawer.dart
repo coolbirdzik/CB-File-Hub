@@ -30,6 +30,7 @@ import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/services/app_update/app_update_service.dart';
 import 'package:cb_file_manager/ui/components/app_update/app_update_dialog.dart';
 import 'components/common/macos_traffic_light_inset.dart';
+import 'tab_manager/components/drive_avatar.dart';
 
 /// Returns a key that forces a Fluent drawer section to honor the active tab's
 /// persisted expansion state after a tab switch or expansion change.
@@ -916,6 +917,7 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
     required IconData icon,
     required String title,
     required VoidCallback onPressed,
+    Widget? leading,
     String? semanticLabel,
     bool selected = false,
     Widget? trailing,
@@ -965,7 +967,7 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
               ),
               child: Row(
                 children: [
-                  Icon(icon, size: 16, color: iconColor),
+                  leading ?? Icon(icon, size: 16, color: iconColor),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
@@ -1043,6 +1045,9 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
     return _fluentNavigationItem(
       context,
       icon: storageLocationIcon(storage),
+      leading: storage.driveInfo == null
+          ? null
+          : DriveAvatar(drive: storage.driveInfo!, size: 18),
       title: displayName,
       semanticLabel: semanticLabel,
       selected: _isFluentPathSelected(activePath, storage.path),
@@ -1264,6 +1269,15 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
   String _normalizePinnedNavigationPath(String path) {
     final trimmed = path.trim();
     if (trimmed.isEmpty) return path;
+    // A known volume or WSL root is already a directory. Probing it with
+    // typeSync during drawer rendering can block the UI and start a distro.
+    if (Directory(trimmed).driveInfo != null ||
+        RegExp(
+          r'^\\\\(?:wsl\.localhost|wsl\$)\\[^\\]+\\?$',
+          caseSensitive: false,
+        ).hasMatch(trimmed.replaceAll('/', '\\'))) {
+      return path;
+    }
 
     try {
       final type = FileSystemEntity.typeSync(trimmed, followLinks: false);

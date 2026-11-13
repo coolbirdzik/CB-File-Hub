@@ -40,6 +40,8 @@ class FileTreeView extends StatefulWidget {
   final ValueChanged<List<String>>? onStartFileDrag;
   final Future<void> Function(List<String>, String)? onMoveItemsToFolder;
   final void Function(BuildContext context, Offset position) showContextMenu;
+  final void Function(FileSystemEntity entity, Offset position)?
+  onEntityContextMenu;
 
   const FileTreeView({
     super.key,
@@ -55,6 +57,7 @@ class FileTreeView extends StatefulWidget {
     this.onStartFileDrag,
     this.onMoveItemsToFolder,
     required this.showContextMenu,
+    this.onEntityContextMenu,
   });
 
   @override
@@ -168,7 +171,9 @@ class _FileTreeViewState extends State<FileTreeView> {
         childrenLoader: _loadChildren,
         onTap: _onTap,
         onDoubleTap: _onDoubleTap,
-        onSecondary: (node, pos) => widget.showContextMenu(context, pos),
+        onSecondary: (node, pos) => widget.onEntityContextMenu != null
+            ? widget.onEntityContextMenu!(node.data, pos)
+            : widget.showContextMenu(context, pos),
         emptyState: Center(
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -182,13 +187,14 @@ class _FileTreeViewState extends State<FileTreeView> {
           final theme = Theme.of(context);
           final row = Row(
             children: [
-              Icon(
-                isDir ? PhosphorIconsLight.folder : PhosphorIconsLight.file,
-                size: 14,
-                color: isDir
-                    ? theme.colorScheme.primary
-                    : theme.colorScheme.onSurfaceVariant,
-              ),
+              FileEntryPresentation.leadingOf(context, entity.path, size: 16) ??
+                  Icon(
+                    isDir ? PhosphorIconsLight.folder : PhosphorIconsLight.file,
+                    size: 14,
+                    color: isDir
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.onSurfaceVariant,
+                  ),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(

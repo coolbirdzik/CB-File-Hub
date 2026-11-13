@@ -87,6 +87,8 @@ class MillerColumnsView extends StatefulWidget {
   final Future<void> Function(BuildContext, List<String>)? onDeleteFiles;
   final VoidCallback toggleSelectionMode;
   final Function(BuildContext, Offset) showContextMenu;
+  final void Function(FileSystemEntity entity, Offset position)?
+  onEntityContextMenu;
   final ScrollController? scrollController;
   final GlobalKey Function(String path)? itemKeyForPath;
   final ValueChanged<List<String>>? onStartFileDrag;
@@ -113,6 +115,7 @@ class MillerColumnsView extends StatefulWidget {
     this.onDeleteFiles,
     required this.toggleSelectionMode,
     required this.showContextMenu,
+    this.onEntityContextMenu,
     this.scrollController,
     this.itemKeyForPath,
     this.onStartFileDrag,
@@ -171,6 +174,13 @@ class _MillerColumnsViewState extends State<MillerColumnsView> {
   }
 
   Future<void> _onFolderTap(int columnIndex, String folderPath) async {
+    if (widget.onEntityContextMenu != null) {
+      widget.toggleFolderSelection(
+        folderPath,
+        shiftSelect: false,
+        ctrlSelect: false,
+      );
+    }
     // Single click: open folder contents in next column.
     // Show a loading placeholder column immediately so the user gets
     // feedback instead of an empty-looking pane while we list the directory.
@@ -418,6 +428,9 @@ class _MillerColumnsViewState extends State<MillerColumnsView> {
       onMoveItemsToFolder: widget.onMoveItemsToFolder,
       child: _MillerFolderRow(
         key: ValueKey('miller-folder-${folder.path}'),
+        onContextMenu: widget.onEntityContextMenu == null
+            ? null
+            : (position) => widget.onEntityContextMenu!(folder, position),
         folder: folder,
         isSelected: isSelected,
         isColumnSelected: isColumnSelected,
@@ -447,6 +460,9 @@ class _MillerColumnsViewState extends State<MillerColumnsView> {
         path: file.path,
         child: _MillerFileRow(
           key: ValueKey('miller-file-${file.path}'),
+          onContextMenu: widget.onEntityContextMenu == null
+              ? null
+              : (position) => widget.onEntityContextMenu!(file, position),
           file: file,
           isSelected: isSelected,
           lastSelectedPath: selectionState.lastSelectedPath,
@@ -469,6 +485,7 @@ class _MillerColumnsViewState extends State<MillerColumnsView> {
 ///  - double-click → navigates the tab into the folder
 ///  - right-click → folder context menu
 class _MillerFolderRow extends StatefulWidget {
+  final void Function(Offset)? onContextMenu;
   final Directory folder;
   final bool isSelected;
   final bool isColumnSelected;
@@ -480,6 +497,7 @@ class _MillerFolderRow extends StatefulWidget {
 
   const _MillerFolderRow({
     super.key,
+    this.onContextMenu,
     required this.folder,
     required this.isSelected,
     required this.isColumnSelected,
@@ -523,6 +541,10 @@ class _MillerFolderRowState extends State<_MillerFolderRow> {
   }
 
   void _showContextMenu(Offset globalPosition) {
+    if (widget.onContextMenu != null) {
+      widget.onContextMenu!(globalPosition);
+      return;
+    }
     showFolderContextMenu(
       context: context,
       folder: widget.folder,
@@ -540,7 +562,12 @@ class _MillerFolderRowState extends State<_MillerFolderRow> {
         renameController != null &&
         renameController.renamingPath == widget.folder.path;
     final bool isBeingCut = ItemInteractionStyle.isBeingCut(widget.folder.path);
-    final String name = FileTypeUtils.getFileName(widget.folder.path);
+    final basename = FileTypeUtils.getFileName(widget.folder.path);
+    final name = FileEntryPresentation.nameOf(
+      context,
+      widget.folder.path,
+      fallback: basename.isEmpty ? widget.folder.path : basename,
+    );
 
     return ValueListenableBuilder<bool>(
       valueListenable: _isHovering,
@@ -580,11 +607,15 @@ class _MillerFolderRowState extends State<_MillerFolderRow> {
                 ),
                 child: Row(
                   children: [
-                    Icon(
-                      PhosphorIconsLight.folder,
-                      size: 20,
-                      color: theme.colorScheme.primary,
-                    ),
+                    FileEntryPresentation.leadingOf(
+                          context,
+                          widget.folder.path,
+                        ) ??
+                        Icon(
+                          PhosphorIconsLight.folder,
+                          size: 20,
+                          color: theme.colorScheme.primary,
+                        ),
                     const SizedBox(width: 10),
                     Expanded(
                       child:
@@ -640,6 +671,7 @@ class _MillerFolderRowState extends State<_MillerFolderRow> {
 ///  - double-click → open file
 ///  - right-click → file context menu
 class _MillerFileRow extends StatefulWidget {
+  final void Function(Offset)? onContextMenu;
   final File file;
   final bool isSelected;
   final String? lastSelectedPath;
@@ -652,6 +684,7 @@ class _MillerFileRow extends StatefulWidget {
 
   const _MillerFileRow({
     super.key,
+    this.onContextMenu,
     required this.file,
     required this.isSelected,
     required this.lastSelectedPath,
@@ -715,6 +748,10 @@ class _MillerFileRowState extends State<_MillerFileRow> {
   }
 
   void _showContextMenu(Offset globalPosition) {
+    if (widget.onContextMenu != null) {
+      widget.onContextMenu!(globalPosition);
+      return;
+    }
     final bool isVideo = FileTypeUtils.isVideoFile(widget.file.path);
     final bool isImage = FileTypeUtils.isImageFile(widget.file.path);
     showFileContextMenu(

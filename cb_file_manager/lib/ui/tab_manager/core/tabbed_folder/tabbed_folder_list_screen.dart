@@ -2,6 +2,7 @@ import 'package:cb_file_manager/ui/widgets/file_properties_pane.dart';
 import 'package:cb_file_manager/ui/widgets/file_pane_layout.dart';
 import 'package:cb_file_manager/ui/widgets/file_preview_pane.dart';
 import 'package:cb_file_manager/helpers/core/search_query.dart';
+import 'package:cb_file_manager/services/drive/drive_browser_entries.dart';
 import 'dart:async';
 import 'package:cb_file_manager/ui/widgets/file_drag_drop_item.dart';
 import 'dart:io';
@@ -158,6 +159,12 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
 
   // Trạng thái hiển thị thanh tìm kiếm
   bool _showSearchBar = false;
+  String _driveSearchQuery = '';
+  bool _drivePropertiesVisible = false;
+  final Set<tab_components.DriveDetailsColumn> _driveColumns = tab_components
+      .DriveDetailsColumn
+      .values
+      .toSet();
 
   // Current path displayed in this tab
   String _currentPath = '';
@@ -1093,13 +1100,52 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
 
   Future<void> _toggleSearchBar(BuildContext context) async {
     if (_showSearchBar) {
-      setState(() {
-        _showSearchBar = false;
-      });
+      _closeSearchBar();
       return;
     }
 
+    if (_isDrivesMode()) {
+      _openOrFocusSearch();
+      return;
+    }
     await _showSearchTip(context);
+  }
+
+  void _setDriveSearchQuery(String query) {
+    if (!mounted || query == _driveSearchQuery) return;
+    setState(() => _driveSearchQuery = query);
+    MobileFileActionsController.forTab(widget.tabId).currentSearchQuery = query;
+  }
+
+  void _closeSearchBar() {
+    setState(() {
+      _showSearchBar = false;
+      if (_isDrivesMode()) _driveSearchQuery = '';
+    });
+    if (_isDrivesMode()) {
+      MobileFileActionsController.forTab(widget.tabId).currentSearchQuery =
+          null;
+    }
+  }
+
+  Widget _buildSearchBar() {
+    final drives = _isDrivesMode();
+    return tab_components.SearchBar(
+      focusNode: _searchFocusNode,
+      currentPath: _currentPath,
+      tabId: widget.tabId,
+      folderListBloc: _folderListBloc,
+      initialQuery: drives ? _driveSearchQuery : null,
+      onQueryChanged: drives ? _setDriveSearchQuery : null,
+      onSearch: drives ? _setDriveSearchQuery : null,
+      onClearSearch: drives ? () => _setDriveSearchQuery('') : null,
+      showTipsButton: !drives,
+      showTagSearch: !drives,
+      showGlobalSearchToggle: !drives,
+      showRegexToggle: !drives,
+      hintText: drives ? context.tr.searchStorageLocations : null,
+      onCloseSearch: _closeSearchBar,
+    );
   }
 
   void _openOrFocusSearch() {
@@ -1331,6 +1377,12 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
   void _handleCurrentPathChanged(String path) {
     if (!mounted) return;
     setState(() {
+      if (_isDrivesMode() != _isDrivesPathValue(path)) {
+        _driveSearchQuery = '';
+        _showSearchBar = false;
+        MobileFileActionsController.forTab(widget.tabId).currentSearchQuery =
+            null;
+      }
       _currentPath = path;
       _pathController.text = _displayPathForInput(path);
     });
@@ -1550,6 +1602,15 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
             onSearch: _openOrFocusSearch,
           );
           if (searchResult != KeyEventResult.ignored) return searchResult;
+          if (_isDrivesMode()) {
+            return BrowserLikeKeyboardShortcuts.handleBasic(
+              isDesktop: isDesktopPlatform,
+              event: event,
+              onRefresh: _refreshFileList,
+              onBack: _handleMouseBackButton,
+              onForward: _handleMouseForwardButton,
+            );
+          }
           // Keys the focused preview pane didn't use (it only claims the
           // video player's) must not drive the list behind it.
           if (_keyboardController.previewFocusNode.hasFocus ||
@@ -1639,6 +1700,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
           onPointerDown: (PointerDownEvent event) {
             // The preview pane takes focus itself when clicked.
             if (isDesktopPlatform &&
+                !_isDrivesMode() &&
                 !_isPointerInside(_propertiesPaneFocusNode.context, event) &&
                 !_isPointerInside(
                   _keyboardController.previewFocusNode.context,
@@ -1772,17 +1834,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
           // (outside the pane's BlocProvider subtree), so we pass the pane's
           // FolderListBloc directly to avoid a context lookup failure.
           final titleWidget = _showSearchBar
-              ? tab_components.SearchBar(
-                  focusNode: _searchFocusNode,
-                  currentPath: _currentPath,
-                  tabId: widget.tabId,
-                  folderListBloc: _folderListBloc,
-                  onCloseSearch: () {
-                    setState(() {
-                      _showSearchBar = false;
-                    });
-                  },
-                )
+              ? _buildSearchBar()
               : tab_components.PathNavigationBar(
                   tabId: widget.tabId,
                   pathController: _pathController,
@@ -1841,16 +1893,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
               showAppBar: notifier != null ? false : widget.showAppBar,
               // In split mode, search bar is shown in shared bar above; suppress it here.
               showSearchBar: notifier != null ? false : _showSearchBar,
-              searchBar: tab_components.SearchBar(
-                focusNode: _searchFocusNode,
-                currentPath: _currentPath,
-                tabId: widget.tabId,
-                onCloseSearch: () {
-                  setState(() {
-                    _showSearchBar = false;
-                  });
-                },
-              ),
+              searchBar: _buildSearchBar(),
               pathNavigationBar: tab_components.PathNavigationBar(
                 tabId: widget.tabId,
                 pathController: _pathController,
@@ -1922,8 +1965,16 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
                     isLazyLoading: _isLazyLoadingDrives,
                     viewMode: state.viewMode,
                     gridZoomLevel: state.gridZoomLevel,
-                    onZoomChanged: handleZoomLevelChange,
+                    onZoomChanged: handleViewScaleChange,
                     isRefreshing: _isRefreshing,
+                    searchQuery: _driveSearchQuery,
+                    sortOption: state.sortOption,
+                    showProperties: _drivePropertiesVisible,
+                    visibleColumns: _driveColumns,
+                    onSort: (option) => _folderListBloc.add(
+                      SetSortOption(option, folderPath: _currentPath),
+                    ),
+                    onClearSearch: () => _setDriveSearchQuery(''),
                   ),
                 ),
               ),
@@ -2337,31 +2388,67 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
 
   List<Widget> _getAppBarActions() {
     if (_isDrivesMode()) {
-      final isGridView = _folderListBloc.state.viewMode == ViewMode.grid;
-
-      return [
-        if (isGridView)
+      final state = _folderListBloc.state;
+      final actions = SharedActionBar.buildCommonActions(
+        context: context,
+        onSearchPressed: () => _toggleSearchBar(context),
+        isSearchActive: _showSearchBar,
+        onSortOptionSelected: (option) => _folderListBloc.add(
+          SetSortOption(option, folderPath: _currentPath),
+        ),
+        currentSortOption: DriveBrowserEntries.effectiveSort(state.sortOption),
+        allowedSortOptions: DriveBrowserEntries.sortOptions,
+        viewMode: state.viewMode,
+        showDesktopViewModes: isDesktopPlatform,
+        onViewModeToggled: _toggleDrivesViewMode,
+        onViewModeSelected: _setViewMode,
+        onRefresh: _refreshFileList,
+        currentGridZoomLevel: state.gridZoomLevel,
+        onGridZoomChanged: handleGridZoomChange,
+        onSelectionModeToggled: () {},
+        showMoreOptions: false,
+      );
+      if (isDesktopPlatform) {
+        actions.insert(
+          1,
           IconButton(
-            icon: const Icon(PhosphorIconsLight.squaresFour),
-            tooltip: context.tr.adjustGridSizeTooltip,
-            onPressed: () => SharedActionBar.showGridSizeDialog(
-              context,
-              currentGridSize: _folderListBloc.state.gridZoomLevel,
-              onApply: handleGridZoomChange,
-              sizeMode: GridSizeMode.referenceWidth,
+            key: const ValueKey('drive-properties-toggle'),
+            tooltip: _drivePropertiesVisible
+                ? context.tr.hidePropertiesPane
+                : context.tr.showPropertiesPane,
+            isSelected: _drivePropertiesVisible,
+            icon: const Icon(PhosphorIconsLight.sidebar),
+            onPressed: () => setState(
+              () => _drivePropertiesVisible = !_drivePropertiesVisible,
             ),
           ),
-        IconButton(
-          icon: const Icon(PhosphorIconsLight.eye),
-          tooltip: context.tr.toggleView,
-          onPressed: _toggleDrivesViewMode,
-        ),
-        IconButton(
-          icon: const Icon(PhosphorIconsLight.arrowsClockwise),
-          tooltip: context.tr.refresh,
-          onPressed: _refreshFileList,
-        ),
-      ];
+        );
+      }
+      if (state.viewMode == ViewMode.details) {
+        actions.insert(
+          2,
+          PopupMenuButton<tab_components.DriveDetailsColumn>(
+            key: const ValueKey('drive-columns-menu'),
+            tooltip: context.tr.columnSettingsTooltip,
+            icon: const Icon(PhosphorIconsLight.layout),
+            itemBuilder: (context) => [
+              for (final column in tab_components.DriveDetailsColumn.values)
+                if (column != tab_components.DriveDetailsColumn.name)
+                  CheckedPopupMenuItem(
+                    value: column,
+                    checked: _driveColumns.contains(column),
+                    child: Text(
+                      tab_components.driveColumnLabel(context, column),
+                    ),
+                  ),
+            ],
+            onSelected: (column) => setState(() {
+              if (!_driveColumns.remove(column)) _driveColumns.add(column);
+            }),
+          ),
+        );
+      }
+      return actions;
     }
 
     // Use AppBarActionsBuilder to build actions based on selection state

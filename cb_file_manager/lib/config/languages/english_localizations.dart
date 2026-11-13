@@ -280,6 +280,8 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get torrentBackgroundFailed => 'Could not add torrent';
   @override
+  String get torrentDownloadStartFailed => 'Could not start the download';
+  @override
   String get torrentOpeningOptions => 'When opening torrents';
   @override
   String get torrentShowDownloadDialog =>
@@ -3285,6 +3287,13 @@ class EnglishLocalizations implements AppLocalizations {
   // UI labels
   @override
   String get noStorageLocationsFound => 'No storage locations found';
+
+  @override
+  String driveLocationCount(int count) =>
+      '$count ${count == 1 ? 'location' : 'locations'}';
+
+  @override
+  String get searchStorageLocations => 'Search storage by name or path';
   @override
   String get driveGroupFixed => 'This PC';
   @override

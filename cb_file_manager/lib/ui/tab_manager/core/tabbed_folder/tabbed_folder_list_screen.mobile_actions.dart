@@ -63,6 +63,10 @@ extension _TabbedFolderListMobileActions on _TabbedFolderListScreenState {
 
   // Handle mobile inline search
   void _handleMobileSearchImpl(String? query) {
+    if (_isDrivesMode()) {
+      _setDriveSearchQuery(query ?? '');
+      return;
+    }
     if (query == null || query.isEmpty) {
       // Clear search
       _folderListBloc.add(const ClearSearchAndFilters());

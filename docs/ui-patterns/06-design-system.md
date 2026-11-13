@@ -96,6 +96,49 @@ Status colours (`c.status.danger`, `.success`, …) are independent of the accen
 | `CbDialog` | `AlertDialog` | Built on `CbSurface`; `showCbConfirmDialog` covers the common case |
 | `CbKbd` | hand-drawn shortcut labels | Key caps (`Ctrl` `K`, `↵`, `Esc`) for menus and the command palette |
 
+## Desktop selection and double-click timing
+
+Selection, focus and pressed feedback must appear on the first pointer frame.
+Do not put desktop selection only in `GestureDetector.onTap` when the same
+control has `onDoubleTap`: the first tap waits for the double-tap timeout.
+`onTapDown` alone is also insufficient inside a scrollable, where gesture
+arbitration can wait for Flutter's press timeout. This can make a cheap state
+update look like slow rendering.
+
+For selectable desktop rows/cards, use the shared primitives:
+
+```dart
+CbSurface(
+  selected: isSelected,
+  pressOnPointerDown: isDesktop,
+  onPressed: selectAndFocus, // Primary mouse down; called once per press.
+  onDoubleTap: open,
+  onActivate: open,         // Keyboard Space/Enter.
+  child: content,
+)
+```
+
+`CbPressable` handles immediate primary-mouse selection with a raw `Listener`,
+suppresses the later `onTap` callback, and clears pressed feedback on pointer
+up/cancel. A delayed gesture callback must not make the released row look
+pressed again. `CbSurface` paints selection/focus/press without an additional
+transition delay in this mode. Touch keeps normal tap/scroll arbitration.
+
+Enable `pressOnPointerDown` only for reversible selection/focus. Keep opening,
+navigation and destructive actions on committed gestures. Preserve double-click,
+dragging, context menus, child buttons and keyboard activation; do not work around
+the delay by removing double-click or shortening global gesture timeouts.
+
+Regression tests must use a mouse pointer down followed by `pump()` with no
+elapsed duration, assert selection/pressed feedback, then release and assert
+feedback clears immediately. Check exactly one selection per press, one open per
+double-click, cancellation, secondary buttons, child actions, touch scrolling and
+keyboard activation. A test that waits 300–400 ms before asserting selection
+cannot detect this regression.
+
+Coverage: `test/design_system/primitives/cb_pressable_pointer_test.dart` and
+`test/ui/screens/home/drive_browser_content_test.dart`.
+
 ## Command palette (Ctrl/⌘+K)
 
 `ui/components/command_palette/` is the Raycast-style launcher: a frosted, hairline-edged window with a borderless search row, grouped results and a footer of key hints. `showCommandPalette` takes items that are ready now, a `deferredItems` future merged in when it resolves (so the palette opens instantly), and `itemsForQuery` for query-dependent rows. `rankCommandPaletteItems` keeps section order and ranks titles by prefix, word start, then substring, using `TextUtils.searchKey`, so matching is accent-insensitive.

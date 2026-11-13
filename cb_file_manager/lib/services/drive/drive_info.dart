@@ -1,7 +1,16 @@
 /// Typed volume metadata for the drive manager UI.
-enum DriveKind { fixed, removable, network, optical, ram, internal, unknown }
+enum DriveKind {
+  fixed,
+  removable,
+  network,
+  optical,
+  ram,
+  internal,
+  unknown,
+  wsl,
+}
 
-enum DriveGroup { fixed, removable, network, other }
+enum DriveGroup { fixed, removable, network, other, wsl }
 
 class DriveSpaceInfo {
   final int totalBytes;
@@ -80,6 +89,8 @@ class DriveInfo {
         return DriveGroup.removable;
       case DriveKind.network:
         return DriveGroup.network;
+      case DriveKind.wsl:
+        return DriveGroup.wsl;
       case DriveKind.optical:
       case DriveKind.unknown:
         return DriveGroup.other;
@@ -102,6 +113,8 @@ class DriveInfo {
         return 'Internal storage';
       case DriveKind.unknown:
         return 'Storage';
+      case DriveKind.wsl:
+        return 'Linux (WSL)';
     }
   }
 
@@ -112,6 +125,8 @@ class DriveInfo {
     if (requiresAdmin) parts.add('Restricted');
     return parts.join(' · ');
   }
+
+  bool get isWindowsVolume => RegExp(r'^[a-zA-Z]:[\\/]?$').hasMatch(path);
 
   DriveInfo copyWith({
     String? path,
@@ -179,6 +194,8 @@ class DriveInfo {
       case DriveGroup.network:
         return 2;
       case DriveGroup.other:
+        return 4;
+      case DriveGroup.wsl:
         return 3;
     }
   }

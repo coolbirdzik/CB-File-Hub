@@ -229,6 +229,8 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get torrentBackgroundFailed => 'Không thể thêm torrent';
   @override
+  String get torrentDownloadStartFailed => 'Chưa thể bắt đầu tải';
+  @override
   String get torrentOpeningOptions => 'Khi mở torrent';
   @override
   String get torrentShowDownloadDialog =>
@@ -3267,6 +3269,12 @@ class VietnameseLocalizations implements AppLocalizations {
   // UI labels
   @override
   String get noStorageLocationsFound => 'Không tìm thấy vị trí lưu trữ nào';
+
+  @override
+  String driveLocationCount(int count) => '$count vị trí';
+
+  @override
+  String get searchStorageLocations => 'Tìm ổ đĩa theo tên hoặc đường dẫn';
   @override
   String get driveGroupFixed => 'Máy tính này';
   @override

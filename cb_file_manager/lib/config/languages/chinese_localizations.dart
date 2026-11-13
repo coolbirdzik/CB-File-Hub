@@ -252,6 +252,8 @@ class ChineseLocalizations implements AppLocalizations {
   @override
   String get torrentBackgroundFailed => '无法添加种子';
   @override
+  String get torrentDownloadStartFailed => '无法开始下载';
+  @override
   String get torrentOpeningOptions => '打开种子时';
   @override
   String get torrentShowDownloadDialog => '打开种子时显示下载选项';
@@ -3076,6 +3078,12 @@ class ChineseLocalizations implements AppLocalizations {
   // UI labels
   @override
   String get noStorageLocationsFound => '未找到存储位置';
+
+  @override
+  String driveLocationCount(int count) => '$count 个位置';
+
+  @override
+  String get searchStorageLocations => '按名称或路径搜索存储位置';
   @override
   String get driveGroupFixed => '此电脑';
   @override

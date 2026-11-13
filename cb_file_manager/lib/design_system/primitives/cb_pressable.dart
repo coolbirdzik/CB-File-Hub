@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 
 import '../tokens/cb_motion_tokens.dart';
@@ -36,6 +37,14 @@ class CbPressable extends StatefulWidget {
   final Widget Function(BuildContext context, CbInteractionState state) builder;
 
   final VoidCallback? onPressed;
+  final VoidCallback? onDoubleTap;
+  final VoidCallback? onActivate;
+
+  /// For desktop selection/focus only: primary mouse down calls [onPressed]
+  /// immediately, without waiting for the tap/double-tap gesture arena. The
+  /// later tap callback is suppressed. Touch retains normal tap arbitration.
+  /// Never enable this for navigation, deletion, or other committed actions.
+  final bool pressOnPointerDown;
   final VoidCallback? onLongPress;
   final VoidCallback? onSecondaryTap;
 
@@ -65,6 +74,9 @@ class CbPressable extends StatefulWidget {
     super.key,
     required this.builder,
     this.onPressed,
+    this.onDoubleTap,
+    this.onActivate,
+    this.pressOnPointerDown = false,
     this.onLongPress,
     this.onSecondaryTap,
     this.enabled = true,
@@ -85,6 +97,9 @@ class _CbPressableState extends State<CbPressable> {
   bool _hovered = false;
   bool _pressed = false;
   bool _focused = false;
+  bool _mouseFeedback = false;
+  bool _pressedOnPointerDown = false;
+  int? _primaryPointer;
 
   bool get _isEnabled => widget.enabled && widget.onPressed != null;
 
@@ -101,6 +116,35 @@ class _CbPressableState extends State<CbPressable> {
   void _activate() {
     if (!_isEnabled) return;
     widget.onPressed!.call();
+  }
+
+  void _onPointerDown(PointerDownEvent event) {
+    if (!_isEnabled ||
+        !widget.pressOnPointerDown ||
+        event.kind != PointerDeviceKind.mouse ||
+        event.buttons != kPrimaryButton) {
+      return;
+    }
+    _mouseFeedback = true;
+    _primaryPointer = event.pointer;
+    _pressedOnPointerDown = true;
+    _setPressed(true);
+    _activate();
+  }
+
+  void _releasePointer(PointerEvent event) {
+    if (event.pointer != _primaryPointer) return;
+    _primaryPointer = null;
+    _setPressed(false);
+    if (event is PointerCancelEvent) _pressedOnPointerDown = false;
+  }
+
+  void _onTap() {
+    if (_mouseFeedback && _pressedOnPointerDown) {
+      _pressedOnPointerDown = false;
+      return;
+    }
+    _activate();
   }
 
   @override
@@ -121,15 +165,33 @@ class _CbPressableState extends State<CbPressable> {
         _setHovered(false);
         _setPressed(false);
       },
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: _isEnabled ? _activate : null,
-        onTapDown: _isEnabled ? (_) => _setPressed(true) : null,
-        onTapUp: _isEnabled ? (_) => _setPressed(false) : null,
-        onTapCancel: _isEnabled ? () => _setPressed(false) : null,
-        onLongPress: _isEnabled ? widget.onLongPress : null,
-        onSecondaryTap: _isEnabled ? widget.onSecondaryTap : null,
-        child: child,
+      child: Listener(
+        onPointerDown: (event) {
+          _mouseFeedback = false;
+          _onPointerDown(event);
+        },
+        onPointerUp: _releasePointer,
+        onPointerCancel: _releasePointer,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: _isEnabled ? _onTap : null,
+          onDoubleTap: _isEnabled && widget.onDoubleTap != null
+              ? () {
+                  _pressedOnPointerDown = false;
+                  widget.onDoubleTap!();
+                }
+              : null,
+          onTapDown: _isEnabled
+              ? (_) {
+                  if (!_mouseFeedback) _setPressed(true);
+                }
+              : null,
+          onTapUp: _isEnabled ? (_) => _setPressed(false) : null,
+          onTapCancel: _isEnabled ? () => _setPressed(false) : null,
+          onLongPress: _isEnabled ? widget.onLongPress : null,
+          onSecondaryTap: _isEnabled ? widget.onSecondaryTap : null,
+          child: child,
+        ),
       ),
     );
 
@@ -150,7 +212,11 @@ class _CbPressableState extends State<CbPressable> {
       actions: <Type, Action<Intent>>{
         ActivateIntent: CallbackAction<ActivateIntent>(
           onInvoke: (_) {
-            _activate();
+            if (widget.onActivate != null) {
+              widget.onActivate!();
+            } else {
+              _activate();
+            }
             return null;
           },
         ),

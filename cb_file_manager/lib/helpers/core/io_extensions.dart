@@ -140,4 +140,15 @@ extension DirectoryProperties on Directory {
 
   /// What kind of disk this volume root is on macOS.
   DriveKind? get volumeKind => getProperty('volumeKind') as DriveKind?;
+
+  /// Typed metadata shared by Browse and the drawer's directory-based API.
+  DriveInfo? get driveInfo => getProperty('driveInfo') as DriveInfo?;
+}
+
+extension DriveDirectoryPresentation on DriveInfo {
+  Directory toStorageDirectory() => Directory(this.path)
+    ..setProperty('driveInfo', this)
+    ..setProperty('requiresAdmin', requiresAdmin)
+    ..setProperty('volumeLabel', displayName)
+    ..setProperty('volumeKind', kind);
 }

@@ -10,6 +10,7 @@ import '../../helpers/core/io_extensions.dart';
 import 'android_storage_volumes.dart';
 import 'drive_info.dart';
 import 'windows_volume_probe.dart';
+import 'windows_wsl_inventory.dart';
 
 /// Process-local inventory of mounted drives/volumes.
 class DriveInventoryService {
@@ -69,12 +70,12 @@ class DriveInventoryService {
   static const Duration volumeProbeTimeout = Duration(seconds: 6);
 
   static Future<List<DriveInfo>> _loadWindows() async {
+    final wsl = WindowsWslInventory.load();
     final systemDrive = Platform.environment['SystemDrive'];
     final directories = await getAllWindowsDrives();
     final roots = <String>[
       for (final dir in directories) DriveInfo.normalizeWindowsRoot(dir.path),
     ];
-    if (roots.isEmpty) return <DriveInfo>[];
 
     // GetDriveType/GetVolumeInformation/GetDiskFreeSpaceEx each block their
     // calling thread until the volume answers, so they run in a background
@@ -106,6 +107,7 @@ class DriveInventoryService {
           probes,
           systemDrive,
         ),
+      ...await wsl,
     ];
   }
 

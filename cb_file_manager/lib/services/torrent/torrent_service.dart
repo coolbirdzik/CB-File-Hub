@@ -676,6 +676,9 @@ class TorrentService extends ChangeNotifier {
     );
   });
 
+  /// Returns the saved entry even if starting its download fails. Receiving a
+  /// torrent and running its payload are separate outcomes; [TorrentEntry.error]
+  /// retains download failures for the notification and library.
   Future<TorrentEntry> downloadInBackground(TorrentEntry entry) =>
       _backgroundAction(() => _downloadInBackground(entry));
 
@@ -709,7 +712,7 @@ class TorrentService extends ChangeNotifier {
     } catch (e) {
       await repository.update(current.hash, {'status': 'error', 'error': '$e'});
       notifyListeners();
-      rethrow;
+      return (await repository.get(current.hash))!;
     }
   }
 

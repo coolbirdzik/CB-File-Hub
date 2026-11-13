@@ -394,7 +394,7 @@ void main() {
   }
 
   test(
-    'background failure is indexed and notified without blocking the next import',
+    'background download failure still reports a successful import with details',
     () async {
       final source = await create('Downloads/first.torrent');
       final second = await create(
@@ -412,11 +412,17 @@ void main() {
         },
         statusCenter: statusCenter,
       );
-      expect(await receiver.receiveSource(source.path), isNull);
+      final received = await receiver.receiveSource(source.path);
+      expect(received, isNotNull);
       final failed = (await repo.page()).entries.single;
+      expect(received!.hash, failed.hash);
+      expect(received.status, 'error');
       expect(failed.status, 'error');
       expect(failed.error, contains('aria2 unavailable'));
-      expect(notices.single.isError, isTrue);
+      expect(notices.single.title, 'Torrent received');
+      expect(notices.single.isError, isFalse);
+      expect(notices.single.body, contains('Could not start the download'));
+      expect(notices.single.body, contains('aria2 unavailable'));
       engine.startError = null;
       expect(await receiver.receiveSource(second.path), isNotNull);
       expect(notices.last.isError, isFalse);
@@ -426,10 +432,93 @@ void main() {
       final statuses = statusCenter.finishedEntries;
       expect(statuses.map((e) => e.status), [
         OperationProgressStatus.success,
-        OperationProgressStatus.error,
+        OperationProgressStatus.success,
       ]);
       expect(statuses.first.detail, contains('Second.mp4'));
+      expect(statuses.last.detail, contains('aria2 unavailable'));
       expect(statusCenter.unseenCount, 2);
+    },
+  );
+
+  for (final sourceType in ['magnet', 'entry']) {
+    test(
+      'background $sourceType download failure keeps import success',
+      () async {
+        final source = sourceType == 'magnet'
+            ? 'magnet:?xt=urn:btih:${'3' * 40}&dn=Received'
+            : (await create('Downloads/received.torrent')).path;
+        final existing = sourceType == 'entry'
+            ? await service.openSource(source)
+            : null;
+        await service.setDefaultDownloadDirectory(p.join(root.path, 'payload'));
+        engine.startError = StateError('aria2 unavailable');
+        final notices = <({String title, String body, bool isError})>[];
+        final receiver = TorrentBackgroundReceiver(
+          service,
+          notify: ({required title, required body, required isError}) async {
+            notices.add((title: title, body: body, isError: isError));
+          },
+        );
+        final received = existing == null
+            ? await receiver.receiveSource(source)
+            : await receiver.receiveEntry(existing);
+        expect(received, isNotNull);
+        expect(received!.error, contains('aria2 unavailable'));
+        expect((await repo.page()).total, 1);
+        expect(notices.single.title, 'Torrent received');
+        expect(notices.single.isError, isFalse);
+        expect(notices.single.body, contains('aria2 unavailable'));
+      },
+    );
+  }
+
+  test('invalid background source still reports an import failure', () async {
+    final source = File(p.join(root.path, 'invalid.torrent'));
+    await source.writeAsString('invalid metainfo');
+    final notices = <({String title, String body, bool isError})>[];
+    final statusCenter = OperationProgressController();
+    final receiver = TorrentBackgroundReceiver(
+      service,
+      notify: ({required title, required body, required isError}) async {
+        notices.add((title: title, body: body, isError: isError));
+      },
+      statusCenter: statusCenter,
+    );
+    expect(await receiver.receiveSource(source.path), isNull);
+    expect((await repo.page()).total, 0);
+    expect(notices.single.title, 'Could not add torrent');
+    expect(notices.single.isError, isTrue);
+    expect(notices.single.body, contains('invalid.torrent'));
+    expect(
+      statusCenter.finishedEntries.single.status,
+      OperationProgressStatus.error,
+    );
+  });
+
+  test(
+    'metadata failure is extra information on a successful receive',
+    () async {
+      final entry = await service.importMagnet(
+        'magnet:?xt=urn:btih:${'4' * 40}&dn=Metadata',
+      );
+      service.metadataPollInterval = Duration.zero;
+      engine.metadataStatus = 'error';
+      await service.fetchMetadata(entry);
+      expect(service.metadataError(entry.hash), isNotNull);
+      await service.setDefaultDownloadDirectory(p.join(root.path, 'payload'));
+      final notices = <({String title, String body, bool isError})>[];
+      final receiver = TorrentBackgroundReceiver(
+        service,
+        notify: ({required title, required body, required isError}) async {
+          notices.add((title: title, body: body, isError: isError));
+        },
+      );
+      expect(await receiver.receiveEntry(entry), isNotNull);
+      expect(notices.single.title, 'Torrent received');
+      expect(notices.single.isError, isFalse);
+      expect(notices.single.body, contains('Could not fetch the file list'));
+      expect(notices.single.body, contains(service.metadataError(entry.hash)));
+      expect((await repo.get(entry.hash))!.status, 'waiting');
     },
   );
 

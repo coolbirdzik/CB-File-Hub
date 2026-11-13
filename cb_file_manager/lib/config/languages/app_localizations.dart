@@ -163,6 +163,7 @@ abstract class AppLocalizations {
   String get torrentBackgroundAdded;
   String get torrentBackgroundAlreadyExists;
   String get torrentBackgroundFailed;
+  String get torrentDownloadStartFailed;
   String get torrentShowDownloadDialog;
   String get torrentShowDownloadDialogHint;
   String get torrentDestinationRequired;
@@ -1233,6 +1234,8 @@ abstract class AppLocalizations {
 
   // UI labels
   String get noStorageLocationsFound;
+  String driveLocationCount(int count);
+  String get searchStorageLocations;
   String get driveGroupFixed;
   String get driveGroupRemovable;
   String get driveGroupNetwork;

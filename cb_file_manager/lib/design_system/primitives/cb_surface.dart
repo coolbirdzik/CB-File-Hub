@@ -63,6 +63,10 @@ class CbSurface extends StatelessWidget {
   final bool clip;
 
   final VoidCallback? onPressed;
+  final VoidCallback? onDoubleTap;
+  final VoidCallback? onActivate;
+  final bool pressOnPointerDown;
+  final bool descendantsAreFocusable;
   final VoidCallback? onLongPress;
   final VoidCallback? onSecondaryTap;
   final String? tooltip;
@@ -82,6 +86,10 @@ class CbSurface extends StatelessWidget {
     this.height,
     this.clip = false,
     this.onPressed,
+    this.onDoubleTap,
+    this.onActivate,
+    this.pressOnPointerDown = false,
+    this.descendantsAreFocusable = false,
     this.onLongPress,
     this.onSecondaryTap,
     this.tooltip,
@@ -108,6 +116,10 @@ class CbSurface extends StatelessWidget {
         ? _paint(context, const CbInteractionState())
         : CbPressable(
             onPressed: onPressed,
+            onDoubleTap: onDoubleTap,
+            onActivate: onActivate,
+            pressOnPointerDown: pressOnPointerDown,
+            descendantsAreFocusable: descendantsAreFocusable,
             onLongPress: onLongPress,
             onSecondaryTap: onSecondaryTap,
             tooltip: tooltip,
@@ -148,7 +160,10 @@ class CbSurface extends StatelessWidget {
           );
 
     return AnimatedContainer(
-      duration: CbDurations.fast,
+      duration:
+          pressOnPointerDown && (state.pressed || state.focused || selected)
+          ? Duration.zero
+          : CbDurations.fast,
       curve: CbCurves.standard,
       width: width,
       height: height,

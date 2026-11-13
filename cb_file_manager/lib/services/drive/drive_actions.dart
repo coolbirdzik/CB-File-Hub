@@ -53,7 +53,9 @@ class DriveActions {
   }
 
   static Future<bool> openFormat(DriveInfo drive) async {
-    if (!Platform.isWindows || drive.isSystemVolume) return false;
+    if (!Platform.isWindows || drive.isSystemVolume || !drive.isWindowsVolume) {
+      return false;
+    }
     final root = DriveInfo.normalizeWindowsRoot(drive.path);
     try {
       final invoked = await WindowsShellContextMenu.invokeVerb(
@@ -90,12 +92,23 @@ class DriveActions {
     }
   }
 
-  static Future<bool> openTerminal(String drivePath) async {
+  static Future<bool> openTerminal(
+    String drivePath, {
+    String? distribution,
+  }) async {
     if (!Platform.isWindows) return false;
     try {
       await Process.start('wt.exe', <String>[
-        '-d',
-        drivePath,
+        if (distribution != null) ...[
+          'wsl.exe',
+          '--distribution',
+          distribution,
+          '--cd',
+          '/',
+        ] else ...[
+          '-d',
+          drivePath,
+        ],
       ], mode: ProcessStartMode.detached);
       return true;
     } catch (_) {
@@ -103,7 +116,9 @@ class DriveActions {
         await Process.start('powershell.exe', <String>[
           '-NoExit',
           '-Command',
-          "Set-Location -LiteralPath '${drivePath.replaceAll("'", "''")}'",
+          distribution == null
+              ? "Set-Location -LiteralPath '${drivePath.replaceAll("'", "''")}'"
+              : "& wsl.exe --distribution '${distribution.replaceAll("'", "''")}' --cd /",
         ], mode: ProcessStartMode.detached);
         return true;
       } catch (e) {

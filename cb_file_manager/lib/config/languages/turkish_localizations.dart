@@ -281,6 +281,8 @@ class TurkishLocalizations implements AppLocalizations {
   @override
   String get torrentBackgroundFailed => 'Torrent eklenemedi';
   @override
+  String get torrentDownloadStartFailed => 'İndirme başlatılamadı';
+  @override
   String get torrentOpeningOptions => 'Torrent açarken';
   @override
   String get torrentShowDownloadDialog =>
@@ -3306,6 +3308,13 @@ class TurkishLocalizations implements AppLocalizations {
   // UI labels
   @override
   String get noStorageLocationsFound => 'Depolama konumu bulunamadı';
+
+  @override
+  String driveLocationCount(int count) => '$count konum';
+
+  @override
+  String get searchStorageLocations =>
+      'Depolama konumunu ada veya yola göre ara';
   @override
   String get driveGroupFixed => 'Bu bilgisayar';
   @override

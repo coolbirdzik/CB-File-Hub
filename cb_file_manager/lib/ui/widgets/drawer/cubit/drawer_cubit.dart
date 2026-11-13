@@ -2,11 +2,12 @@ import 'dart:io';
 import 'dart:async';
 import 'package:cb_file_manager/services/drive/macos_volumes.dart';
 import 'package:cb_file_manager/services/drive/drive_inventory_service.dart';
+import 'package:cb_file_manager/services/drive/drive_info.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:flutter/foundation.dart';
 import 'package:cb_file_manager/services/filesystem/macos_user_folders_service.dart';
-import 'package:cb_file_manager/helpers/core/filesystem_utils.dart';
+import 'package:cb_file_manager/helpers/core/io_extensions.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 
 // State
@@ -74,6 +75,7 @@ class DrawerCubit extends Cubit<DrawerState> {
 
   Timer? _syncTimer;
   final MacosUserFoldersService _userFolders;
+  final Future<List<DriveInfo>> Function() _loadDrives;
   bool get _isMacOS => _userFolders.platform == TargetPlatform.macOS;
   bool get _defaultPinnedExpanded => _isMacOS;
 
@@ -82,7 +84,9 @@ class DrawerCubit extends Cubit<DrawerState> {
   DrawerCubit({
     MacosUserFoldersService? userFolders,
     Stream<void>? volumeChanges,
+    Future<List<DriveInfo>> Function()? loadDrives,
   }) : _userFolders = userFolders ?? MacosUserFoldersService(),
+       _loadDrives = loadDrives ?? (() => DriveInventoryService.load()),
        super(const DrawerState()) {
     _startSyncTimer();
     _volumeChanges = (volumeChanges ?? MacosVolumes.changes).listen(
@@ -94,9 +98,13 @@ class DrawerCubit extends Cubit<DrawerState> {
   /// A disk came or went: only the list changes, so no loading state.
   Future<void> _reloadVolumes() async {
     DriveInventoryService.invalidateCache();
-    final locations = await getAllStorageLocations();
+    final locations = await _loadStorageDirectories();
     if (!isClosed) emit(state.copyWith(storageLocations: locations));
   }
+
+  Future<List<Directory>> _loadStorageDirectories() async => [
+    for (final drive in await _loadDrives()) drive.toStorageDirectory(),
+  ];
 
   String _normalizeTabId(String? tabId) {
     final normalized = tabId?.trim() ?? '';
@@ -143,7 +151,7 @@ class DrawerCubit extends Cubit<DrawerState> {
     );
     final List<Directory> locations;
     try {
-      locations = await getAllStorageLocations();
+      locations = await _loadStorageDirectories();
     } catch (e) {
       emit(state.copyWith(isLoading: false, error: e.toString()));
       return;

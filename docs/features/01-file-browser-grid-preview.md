@@ -1,5 +1,37 @@
 ## File Browser Grid + Preview Mode
 
+### Home Browse: storage locations and WSL
+
+Browse shows Windows drive letters and registered WSL distributions. Storage
+avatars identify the Windows system volume, ordinary disks, removable media,
+network drives and Linux. Group filters above the collection expose each group
+and its count, including Linux · WSL even when its cards start below the fold.
+Grid, tiles and list show groups; keyboard navigation follows their displayed
+order. Details, tree and columns retain their own layouts. Hierarchical roots
+reuse the same display names and storage icons as the cards.
+
+The drawer's Drives section loads that same inventory, including WSL. Its
+directory adapter retains drive names, kinds and protected-volume flags for both
+Fluent and Material renderers; both use the shared storage avatar. Selecting a
+WSL entry opens its UNC root in the current tab. Rendering the drawer never
+probes a known volume/WSL root with `typeSync`, so it does not start Linux merely
+to label or highlight a row. Coverage: `test/ui/drawer_storage_test.dart`.
+
+`DriveInventoryService` adds `WindowsWslInventory` results to the physical drive
+inventory. It runs `wsl.exe --list --quiet` with a four-second timeout, decodes
+redirected UTF-16 output, and maps each distro to `\\wsl.localhost\<name>\`.
+Missing WSL or command failure leaves the Windows drives available. Enumeration
+does not list distro directories; opening a location uses the normal UNC file
+browser. WSL capacity is left unknown during discovery and is excluded from the
+physical-capacity sum. Format, Windows volume cleanup and BitLocker are not
+offered for a WSL share. Its terminal action opens the selected distribution.
+
+Microsoft references: [list distributions](https://learn.microsoft.com/en-us/windows/wsl/basic-commands)
+and [WSL UNC file access](https://learn.microsoft.com/en-us/windows/dev-environment/wsl-interop).
+Coverage: `test/services/drive/windows_wsl_inventory_test.dart`,
+`test/ui/screens/home/drive_browser_content_test.dart`, and
+`test/ui/screens/home/drive_hierarchy_test.dart`.
+
 ### Requirements
 - Desktop only: add a new view mode alongside list/grid/details.
 - Preview pane on the right in grid mode; allow toggle show/hide.

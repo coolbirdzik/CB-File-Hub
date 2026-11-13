@@ -10,6 +10,7 @@ import 'package:cb_file_manager/helpers/core/io_extensions.dart';
 import 'package:cb_file_manager/config/translation_helper.dart';
 import 'package:cb_file_manager/ui/widgets/drawer/cubit/drawer_cubit.dart';
 import 'package:cb_file_manager/ui/utils/route.dart';
+import 'package:cb_file_manager/ui/tab_manager/components/drive_avatar.dart';
 
 class StorageSectionWidget extends StatefulWidget {
   final Function(String path, String name) onNavigate;
@@ -101,6 +102,7 @@ IconData storageLocationIcon(Directory drive) {
     return PhosphorIconsLight.desktop;
   }
   return switch (drive.volumeKind) {
+    DriveKind.wsl => PhosphorIconsLight.linuxLogo,
     DriveKind.removable => PhosphorIconsLight.usb,
     DriveKind.network => PhosphorIconsLight.cloud,
     _ => PhosphorIconsLight.hardDrives,
@@ -213,6 +215,9 @@ class _StorageSectionWidgetState extends State<StorageSectionWidget> {
     return _buildItem(
       context,
       icon: icon,
+      leading: storage.driveInfo == null
+          ? null
+          : DriveAvatar(drive: storage.driveInfo!, size: 20),
       title: displayName,
       subtitle: requiresAdmin ? context.tr.requiresAdminPrivileges : null,
       iconColor: requiresAdmin ? theme.colorScheme.tertiary : null,
@@ -229,6 +234,7 @@ class _StorageSectionWidgetState extends State<StorageSectionWidget> {
   Widget _buildItem(
     BuildContext context, {
     required IconData icon,
+    Widget? leading,
     required String title,
     String? subtitle,
     Color? iconColor,
@@ -240,11 +246,14 @@ class _StorageSectionWidgetState extends State<StorageSectionWidget> {
     return ListTile(
       contentPadding: const EdgeInsets.only(left: 52, right: 14),
       dense: true,
-      leading: Icon(
-        icon,
-        size: 20,
-        color: iconColor ?? theme.colorScheme.primary.withValues(alpha: 0.8),
-      ),
+      leading:
+          leading ??
+          Icon(
+            icon,
+            size: 20,
+            color:
+                iconColor ?? theme.colorScheme.primary.withValues(alpha: 0.8),
+          ),
       title: Text(
         title,
         style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),

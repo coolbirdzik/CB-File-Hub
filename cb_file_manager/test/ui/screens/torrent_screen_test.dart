@@ -395,11 +395,30 @@ class _Service extends TorrentService {
       'paused',
       'complete',
     ].contains(entry.status)) {
-      await download(
-        entry,
-        defaultDownloadDirectory!,
-        startImmediately: startDownloadsImmediately,
-      );
+      try {
+        await download(
+          entry,
+          defaultDownloadDirectory!,
+          startImmediately: startDownloadsImmediately,
+        );
+      } catch (error) {
+        final repo = repository as _Repository;
+        repo.taskStatus = 'error';
+        repo.taskError = '$error';
+        return TorrentEntry.fromMap({
+          'hash': entry.hash,
+          'name': entry.name,
+          'torrent_path': entry.torrentPath,
+          'category': entry.category,
+          'group_name': entry.group,
+          'total_bytes': entry.totalBytes,
+          'file_count': entry.fileCount,
+          'status': 'error',
+          'error': '$error',
+          'completed_bytes': entry.completedBytes,
+          'download_speed': 0,
+        });
+      }
     }
     return entry;
   }
@@ -528,7 +547,8 @@ void main() {
           (notices.single.arguments as Map)['body'],
           contains(fails ? 'aria2 unavailable' : 'New torrent.iso'),
         );
-        expect((notices.single.arguments as Map)['isError'], fails);
+        expect((notices.single.arguments as Map)['title'], 'Torrent received');
+        expect((notices.single.arguments as Map)['isError'], isFalse);
         if (fails) {
           repo.taskStatus = 'error';
           repo.taskError = 'aria2 unavailable';

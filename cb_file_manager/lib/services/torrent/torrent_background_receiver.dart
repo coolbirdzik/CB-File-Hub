@@ -77,9 +77,19 @@ class TorrentBackgroundReceiver {
         : existed
         ? l.torrentBackgroundAlreadyExists
         : l.torrentBackgroundAdded;
-    final body = error == null
-        ? '${entry!.name}\n${l.torrentStatus(entry.status)}'
-        : '$name\n$error';
+    final String body;
+    if (entry != null) {
+      final metadataError = service.metadataError(entry.hash);
+      body = [
+        entry.name,
+        l.torrentStatus(entry.status),
+        if (entry.error?.isNotEmpty ?? false)
+          '${l.torrentDownloadStartFailed}: ${entry.error}',
+        if (metadataError != null) '${l.torrentMetadataFailed}: $metadataError',
+      ].join('\n');
+    } else {
+      body = '$name\n$error';
+    }
     _recordStatus(title, body, isError: error != null);
     try {
       await notify(title: title, body: body, isError: error != null);

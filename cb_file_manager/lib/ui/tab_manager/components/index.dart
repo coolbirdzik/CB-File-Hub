@@ -2,6 +2,7 @@
 
 // Export all component files for easy importing
 export 'drive_view.dart';
+export 'drive_browser_content.dart' show DriveDetailsColumn, driveColumnLabel;
 export '../../../ui/screens/folder_list/components/folder_details_item.dart';
 export '../../../ui/screens/folder_list/components/folder_grid_item.dart';
 export 'navigation_bar.dart'; // This will export PathNavigationBar from the file

@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'package:cb_file_manager/services/drive/drive_browser_entries.dart';
+import 'package:cb_file_manager/ui/components/common/shared_action_bar.dart';
 
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -74,6 +76,39 @@ class MobileFileActionsController {
   /// Show sort options dialog
   void showSortDialog(BuildContext context) {
     if (currentSortOption == null || onSortOptionSelected == null) return;
+
+    if (actionBarProfile == MobileActionBarProfile.drivesMinimal) {
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        builder: (context) => SafeArea(
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final item in SharedActionBar.buildSortMenuItems(
+                  context,
+                  DriveBrowserEntries.effectiveSort(currentSortOption),
+                  DriveBrowserEntries.sortOptions,
+                ))
+                  if (item is PopupMenuItem<SortOption>)
+                    ListTile(
+                      title: item.child,
+                      onTap: () {
+                        currentSortOption = item.value;
+                        onSortOptionSelected!(item.value!);
+                        Navigator.pop(context);
+                      },
+                    )
+                  else
+                    const Divider(),
+              ],
+            ),
+          ),
+        ),
+      );
+      return;
+    }
 
     final theme = Theme.of(context);
     final localizations = AppLocalizations.of(context)!;
@@ -310,6 +345,22 @@ class MobileFileActionsController {
                 ),
                 _buildViewModeOption(
                   context,
+                  ViewMode.tiles,
+                  localizations.viewModeTiles,
+                  PhosphorIconsLight.gridNine,
+                ),
+                if (actionBarProfile == MobileActionBarProfile.drivesMinimal &&
+                    (Platform.isWindows ||
+                        Platform.isLinux ||
+                        Platform.isMacOS))
+                  _buildViewModeOption(
+                    context,
+                    ViewMode.columns,
+                    localizations.viewModeColumns,
+                    PhosphorIconsLight.columns,
+                  ),
+                _buildViewModeOption(
+                  context,
                   ViewMode.details,
                   localizations.viewModeDetails,
                   PhosphorIconsLight.rows,
@@ -521,6 +572,19 @@ class MobileFileActionsController {
         children: isDrivesMinimal
             ? [
                 IconButton(
+                  icon: const Icon(
+                    PhosphorIconsLight.magnifyingGlass,
+                    size: 20,
+                  ),
+                  tooltip: localizations.search,
+                  onPressed: () => showInlineSearch(context),
+                ),
+                IconButton(
+                  icon: const Icon(PhosphorIconsLight.sortAscending, size: 20),
+                  tooltip: localizations.sort,
+                  onPressed: () => showSortDialog(context),
+                ),
+                IconButton(
                   icon: const Icon(PhosphorIconsLight.arrowLeft, size: 20),
                   tooltip: localizations.back,
                   padding: EdgeInsets.zero,
@@ -722,7 +786,11 @@ class MobileFileActionsController {
                             autofocus: true,
                             style: const TextStyle(fontSize: 14),
                             decoration: InputDecoration(
-                              hintText: localizations.searchByNameOrTag,
+                              hintText:
+                                  actionBarProfile ==
+                                      MobileActionBarProfile.drivesMinimal
+                                  ? localizations.searchStorageLocations
+                                  : localizations.searchByNameOrTag,
                               border: InputBorder.none,
                               isDense: true,
                             ),
