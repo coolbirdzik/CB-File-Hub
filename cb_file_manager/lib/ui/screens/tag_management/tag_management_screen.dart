@@ -1804,6 +1804,22 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     final theme = Theme.of(context);
     final localizations = AppLocalizations.of(context)!;
     final bool showingTaggedFiles = _selectedTagForFiles != null;
+    final compactToolbar = MediaQuery.sizeOf(context).width < 640;
+
+    PopupMenuItem<String> compactAction(
+      String value,
+      IconData icon,
+      String label,
+    ) => PopupMenuItem(
+      value: value,
+      child: Row(
+        children: [
+          Icon(icon, size: 20),
+          const SizedBox(width: 10),
+          Flexible(child: Text(label)),
+        ],
+      ),
+    );
 
     Widget body;
     if (_isInitialLoading) {
@@ -1888,9 +1904,10 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                         tooltip: localizations.deleteSelected,
                       ),
                     ],
-                    if (!showingTaggedFiles)
+                    if (!showingTaggedFiles && !compactToolbar)
                       ..._buildTagToolbarActions(theme, localizations),
-                    if (!showingTaggedFiles || !_isMobile) ...[
+                    if ((!showingTaggedFiles && !compactToolbar) ||
+                        (showingTaggedFiles && !_isMobile)) ...[
                       IconButton(
                         icon: const Icon(PhosphorIconsLight.arrowsClockwise),
                         onPressed: _isLoading
@@ -1901,7 +1918,8 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                         tooltip: localizations.refresh,
                       ),
                     ],
-                    if (!showingTaggedFiles)
+                    if (!showingTaggedFiles &&
+                        (!compactToolbar || _isSearching))
                       IconButton(
                         icon: Icon(
                           _isSearching
@@ -1910,6 +1928,13 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                         ),
                         onPressed: _toggleSearch,
                         tooltip: localizations.searchTags,
+                      ),
+                    if (!showingTaggedFiles)
+                      IconButton(
+                        key: const ValueKey('tag-add-action'),
+                        icon: const Icon(PhosphorIconsLight.plus),
+                        tooltip: localizations.newTagTooltip,
+                        onPressed: _showCreateTagDialog,
                       ),
                     if (!showingTaggedFiles)
                       PopupMenuButton<String>(
@@ -1923,12 +1948,89 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                             case 'select_all':
                               _selectAllFilteredTags();
                               break;
-                            case 'new_tag':
-                              _showCreateTagDialog();
+                            case 'search':
+                              _toggleSearch();
                               break;
+                            case 'refresh':
+                              _refreshTags();
+                              break;
+                            case 'filter':
+                              _showFilterDialog();
+                              break;
+                            case 'grid_size':
+                              SharedActionBar.showGridSizeDialog(
+                                context,
+                                currentGridSize: _tagGridZoomLevel,
+                                onApply: _setTagGridZoomLevel,
+                              );
+                              break;
+                            default:
+                              if (value.startsWith('sort:')) {
+                                _changeSortCriteria(value.substring(5));
+                              } else if (value.startsWith('view:')) {
+                                _selectTagViewMode(
+                                  _TagViewMode.values.byName(
+                                    value.substring(5),
+                                  ),
+                                );
+                              }
                           }
                         },
                         itemBuilder: (context) => [
+                          if (compactToolbar) ...[
+                            if (!_isSearching)
+                              compactAction(
+                                'search',
+                                PhosphorIconsLight.magnifyingGlass,
+                                localizations.searchTags,
+                              ),
+                            compactAction(
+                              'filter',
+                              PhosphorIconsLight.funnel,
+                              localizations.tagFilterTitle,
+                            ),
+                            for (final sort in [
+                              ('name', localizations.sortByAlphabet),
+                              ('popularity', localizations.sortByPopular),
+                              ('recent', localizations.sortByRecent),
+                            ])
+                              compactAction(
+                                'sort:${sort.$1}',
+                                PhosphorIconsLight.sortAscending,
+                                '${localizations.sortTags}: ${sort.$2}',
+                              ),
+                            for (final mode in _TagViewMode.values)
+                              compactAction(
+                                'view:${mode.name}',
+                                switch (mode) {
+                                  _TagViewMode.list => PhosphorIconsLight.list,
+                                  _TagViewMode.grid =>
+                                    PhosphorIconsLight.squaresFour,
+                                  _TagViewMode.tree =>
+                                    PhosphorIconsLight.treeView,
+                                },
+                                switch (mode) {
+                                  _TagViewMode.list =>
+                                    localizations.viewModeList,
+                                  _TagViewMode.grid =>
+                                    localizations.viewModeGrid,
+                                  _TagViewMode.tree =>
+                                    localizations.viewModeTree,
+                                },
+                              ),
+                            if (_viewMode == _TagViewMode.grid)
+                              compactAction(
+                                'grid_size',
+                                PhosphorIconsLight.magnifyingGlassPlus,
+                                localizations.adjustGridSizeTooltip,
+                              ),
+                            compactAction(
+                              'refresh',
+                              PhosphorIconsLight.arrowsClockwise,
+                              localizations.refresh,
+                            ),
+                            const PopupMenuDivider(),
+                          ],
                           PopupMenuItem<String>(
                             value: 'select_all',
                             child: Row(
@@ -1936,17 +2038,6 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                                 const Icon(PhosphorIconsLight.checks, size: 20),
                                 const SizedBox(width: 10),
                                 Text(localizations.selectAllTags),
-                              ],
-                            ),
-                          ),
-                          const PopupMenuDivider(),
-                          PopupMenuItem<String>(
-                            value: 'new_tag',
-                            child: Row(
-                              children: [
-                                const Icon(PhosphorIconsLight.plus, size: 20),
-                                const SizedBox(width: 10),
-                                Text(localizations.createNewTagButton),
                               ],
                             ),
                           ),
@@ -1960,19 +2051,6 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
               Expanded(child: body),
             ],
           ),
-          floatingActionButton: _selectedTagForFiles == null
-              ? FloatingActionButton(
-                  heroTag: null,
-                  onPressed: _showCreateTagDialog,
-                  backgroundColor: theme.colorScheme.primary,
-                  tooltip: localizations.newTagTooltip,
-                  child: Icon(
-                    PhosphorIconsLight.plus,
-                    color: theme.colorScheme.onPrimary,
-                    size: 24,
-                  ),
-                )
-              : null,
         ),
       ),
     );
@@ -2183,15 +2261,15 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
           localizations.viewModeTree,
         ),
       ],
-      onSelected: (mode) {
-        if (mode != _viewMode) {
-          setState(() => _viewMode = mode);
-          // Tree shows the whole hierarchy; list/grid honor the drill scope.
-          // Recompute the visible set for the new mode.
-          _filterTags();
-        }
-      },
+      onSelected: _selectTagViewMode,
     );
+  }
+
+  void _selectTagViewMode(_TagViewMode mode) {
+    if (mode == _viewMode) return;
+    setState(() => _viewMode = mode);
+    // Tree shows the whole hierarchy; list/grid honor the drill scope.
+    _filterTags();
   }
 
   Widget _buildMobileTaggedFilesToolbar() {

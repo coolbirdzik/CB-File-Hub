@@ -2,6 +2,100 @@ import 'app_localizations.dart';
 
 class EnglishLocalizations implements AppLocalizations {
   @override
+  String get cutInPlace => 'Export here';
+  @override
+  String get cutChooseOtherFolder => 'Choose another folder';
+  @override
+  String get cutInPlaceHint =>
+      'Save the results beside the original video. Existing filenames are skipped automatically.';
+  @override
+  String cutExportSegments(int count) => 'Export $count segments';
+  @override
+  String get vpMute => 'Mute';
+  @override
+  String get vpUnmute => 'Unmute';
+  @override
+  String get vpEnterFullscreen => 'Enter fullscreen';
+  @override
+  String get vpExitFullscreen => 'Exit fullscreen';
+
+  @override
+  String get cutOutputMode => 'Output';
+  @override
+  String get cutFormat => 'Format';
+  @override
+  String get cutOptions => 'Export options';
+  @override
+  String get cutFileDates => 'File dates';
+  @override
+  String get cutExportTime => 'Export time';
+  @override
+  String get cutSourceTime => 'Keep source file dates';
+  @override
+  String get cutFileDatesHint =>
+      'Keep the original modification date so exports stay together when sorted by date. Windows also keeps the creation date.';
+
+  @override
+  String get cutIncludeSubtitles => 'Copy embedded subtitles';
+  @override
+  String get cutSubtitleHint =>
+      'Subtitle cues crossing a cut boundary may extend the exported duration.';
+
+  @override
+  String get cutTitle => 'Lossless cut';
+  @override
+  String get cutKeyframeHint =>
+      'Original quality, no re-encoding. Cuts may start at an earlier keyframe. The source stays unchanged.';
+  @override
+  String get cutInvalidRange =>
+      'Enter a valid range within the video (HH:MM:SS.mmm), with end after start.';
+  @override
+  String get cutStart => 'Start';
+  @override
+  String get cutEnd => 'End';
+  @override
+  String get cutMarkIn => 'Set start at playhead (I)';
+  @override
+  String get cutMarkOut => 'Set end at playhead (O)';
+  @override
+  String get cutAddSegment => 'Add segment';
+  @override
+  String get cutPreview => 'Go to start';
+  @override
+  String get cutRange => 'Selected cut range';
+  @override
+  String get cutSegments => 'Segments to export';
+  @override
+  String get cutRemoveSegment => 'Remove segment';
+  @override
+  String get cutDraftHint =>
+      'Each segment is saved separately. Add another segment, or select a row to edit it. Export all at once as _1, _2, ….';
+  @override
+  String get cutSeparate => 'Separate files';
+  @override
+  String get cutMerge => 'Join segments';
+  @override
+  String get cutOriginalFormat => 'Source format';
+  @override
+  String get cutChooseFfmpeg => 'Choose FFmpeg';
+  @override
+  String get cutFfmpegMissing =>
+      'FFmpeg is required. Select an installed FFmpeg executable to export.';
+  @override
+  String get cutOutputFolder => 'Choose output folder';
+  @override
+  String get cutExport => 'Export losslessly';
+  @override
+  String get cutExporting => 'Exporting';
+  @override
+  String get cutExportFailed =>
+      'Export failed. Try the source format or MKV if tracks are incompatible with MP4.';
+  @override
+  String get cutSaved => 'Export complete';
+  @override
+  String get cutOpenOutput => 'Open output in new tab';
+
+  @override
   String aiSubtitleCacheVersions(int entries) => '$entries saved versions';
   @override
   String get aiSubtitleCache => 'Subtitle cache';

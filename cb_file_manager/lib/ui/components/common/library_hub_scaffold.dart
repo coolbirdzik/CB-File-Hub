@@ -23,7 +23,6 @@ class LibraryHubScaffold extends StatefulWidget {
   final IconData icon;
   final Widget body;
   final VoidCallback onRefresh;
-  final Widget? floatingActionButton;
   final List<Widget> actions;
   final List<BreadcrumbSegment>? breadcrumbSegments;
   final String? parentPath;
@@ -49,7 +48,6 @@ class LibraryHubScaffold extends StatefulWidget {
     required this.icon,
     required this.body,
     required this.onRefresh,
-    this.floatingActionButton,
     this.actions = const [],
     this.breadcrumbSegments,
     this.parentPath,
@@ -173,7 +171,6 @@ class _LibraryHubScaffoldState extends State<LibraryHubScaffold> {
                 ),
             ],
             body: Material(type: MaterialType.transparency, child: widget.body),
-            floatingActionButton: widget.floatingActionButton,
           ),
           if ((Platform.isWindows || Platform.isLinux || Platform.isMacOS) &&
               SelectionSummaryTooltip.isVisibleFor(widget.selectionState))

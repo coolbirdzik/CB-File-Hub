@@ -157,8 +157,11 @@ class _CreateVideoLibraryDialogState extends State<CreateVideoLibraryDialog> {
               const SizedBox(height: 16),
 
               // Video Sources
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 12,
+                runSpacing: 8,
                 children: [
                   Text(
                     localizations.videoSources,

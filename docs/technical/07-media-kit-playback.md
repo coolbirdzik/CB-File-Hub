@@ -3,6 +3,22 @@
 Local video, audio, HTTP streams, SMB, desktop PiP and frame picking share
 `cb_file_manager/lib/services/media/media_kit_playback.dart`.
 
+Desktop local-file players also expose [lossless cutting](../features/11-lossless-video-cut.md).
+The player keeps its media_kit surface mounted while the editor selects ranges.
+FFmpeg exports through stream copy; `cb_native` job 30 handles the subprocess,
+bounded pipe parsing, progress and cancellation on Rust threads. The Dart
+subprocess runner remains the fallback when that native job is unavailable.
+Export results open in a fresh app tab through
+`ui/utils/video_output_folder_navigation.dart`. The desktop window service
+routes dedicated-player requests to a normal browser engine (including engines
+in the same process), or starts a browser when none exists. In-window fullscreen
+routes return to the browser after adding the result tab.
+The result filename is passed as `highlightedFileName` through local `AddTab`,
+validated `open_folders` IPC and `WindowTabPayload` startup. The existing folder
+screen handles selection and scrolling after its listing/preferences finish
+loading. Batch-result filename actions each reveal their own file; the general
+open-output action reveals the first result.
+
 Dependencies verified against pub.dev on 2026-09-12:
 
 - `media_kit` 1.2.6

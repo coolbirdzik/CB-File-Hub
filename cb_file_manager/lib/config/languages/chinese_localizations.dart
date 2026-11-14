@@ -2,6 +2,92 @@ import 'app_localizations.dart';
 
 class ChineseLocalizations implements AppLocalizations {
   @override
+  String get cutInPlace => '原位导出';
+  @override
+  String get cutChooseOtherFolder => '选择其他文件夹';
+  @override
+  String get cutInPlaceHint => '将结果保存在原视频旁。自动跳过已存在的文件名。';
+  @override
+  String cutExportSegments(int count) => '导出 $count 个片段';
+  @override
+  String get vpMute => '静音';
+  @override
+  String get vpUnmute => '取消静音';
+  @override
+  String get vpEnterFullscreen => '全屏';
+  @override
+  String get vpExitFullscreen => '退出全屏';
+
+  @override
+  String get cutOutputMode => '输出方式';
+  @override
+  String get cutFormat => '格式';
+  @override
+  String get cutOptions => '导出选项';
+  @override
+  String get cutFileDates => '文件日期';
+  @override
+  String get cutExportTime => '导出时间';
+  @override
+  String get cutSourceTime => '保留源文件日期';
+  @override
+  String get cutFileDatesHint => '保留源文件的修改日期，按日期排序时让导出文件相邻。Windows 还会保留创建日期。';
+
+  @override
+  String get cutIncludeSubtitles => '复制内嵌字幕';
+  @override
+  String get cutSubtitleHint => '跨越剪切边界的字幕可能延长导出时长。';
+
+  @override
+  String get cutTitle => '无损剪切';
+  @override
+  String get cutKeyframeHint => '保留原始质量，不重新编码。起点可能提前到前一个关键帧。原文件保持不变。';
+  @override
+  String get cutInvalidRange => '请输入视频范围内的有效时间段 (HH:MM:SS.mmm)，结束时间须晚于开始时间。';
+  @override
+  String get cutStart => '开始';
+  @override
+  String get cutEnd => '结束';
+  @override
+  String get cutMarkIn => '将当前位置设为起点 (I)';
+  @override
+  String get cutMarkOut => '将当前位置设为终点 (O)';
+  @override
+  String get cutAddSegment => '添加片段';
+  @override
+  String get cutPreview => '跳到起点';
+  @override
+  String get cutRange => '所选剪切范围';
+  @override
+  String get cutSegments => '待导出片段';
+  @override
+  String get cutRemoveSegment => '移除片段';
+  @override
+  String get cutDraftHint => '每个片段单独保存。添加片段或选择一行编辑。一次导出为 _1、_2 等文件。';
+  @override
+  String get cutSeparate => '分别导出';
+  @override
+  String get cutMerge => '合并片段';
+  @override
+  String get cutOriginalFormat => '原始格式';
+  @override
+  String get cutChooseFfmpeg => '选择 FFmpeg';
+  @override
+  String get cutFfmpegMissing => '导出需要 FFmpeg。请选择已安装的 FFmpeg 可执行文件。';
+  @override
+  String get cutOutputFolder => '选择输出文件夹';
+  @override
+  String get cutExport => '无损导出';
+  @override
+  String get cutExporting => '正在导出';
+  @override
+  String get cutExportFailed => '导出失败。如轨道与 MP4 不兼容，请尝试原始格式或 MKV。';
+  @override
+  String get cutSaved => '导出完成';
+  @override
+  String get cutOpenOutput => '在新标签页打开输出文件夹';
+
+  @override
   String aiSubtitleCacheVersions(int entries) => '$entries 个已保存版本';
   @override
   String get aiSubtitleCache => '字幕缓存';

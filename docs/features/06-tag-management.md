@@ -154,6 +154,10 @@ If SQLite fails to initialize, app falls back to JSON storage at:
 
 ## View Modes
 
+Create a tag with the **+** button on the top toolbar, immediately before the
+more menu, matching the SSH workspace. On narrow windows, **+** remains visible
+while search, filters, sorting, view modes and refresh move into the more menu.
+
 The tag management screen has three view modes, selected from the `eye` icon popup menu in the toolbar: **List**, **Grid**, and **Tree**.
 
 ### Tree mode

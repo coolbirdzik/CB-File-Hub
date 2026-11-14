@@ -759,6 +759,17 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
     AppLocalizations l10n,
   ) {
     final actions = SharedActionBar.buildCommonActions(
+      compact: MediaQuery.sizeOf(context).width < 640,
+      primaryAction: CbButton.icon(
+        key: ValueKey(
+          widget.sourceGalleryMode ? 'create-image-source' : 'create-album',
+        ),
+        icon: PhosphorIconsLight.plus,
+        tooltip: widget.sourceGalleryMode
+            ? l10n.createImageSource
+            : l10n.albumCreateAlbum,
+        onPressed: _showCreateAlbumDialog,
+      ),
       context: context,
       onSearchPressed: _toggleSearchBar,
       isSearchActive: _showSearchBar,
@@ -774,17 +785,6 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
       currentGridZoomLevel: _view.mode == ViewMode.grid ? _gridZoomLevel : null,
       onGridZoomChanged: _setGridZoom,
       onSelectionModeToggled: _toggleSelectionMode,
-    );
-    actions.insert(
-      actions.length - 1,
-      CbButton.icon(
-        key: ValueKey(
-          widget.sourceGalleryMode ? 'create-image-source' : 'create-album',
-        ),
-        icon: PhosphorIconsLight.plus,
-        tooltip: l10n.create,
-        onPressed: _showCreateAlbumDialog,
-      ),
     );
     return [
       if (selection.isSelectionMode) ...[

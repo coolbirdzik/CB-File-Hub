@@ -1,6 +1,51 @@
 import 'package:flutter/material.dart';
 
 abstract class AppLocalizations {
+  String get cutInPlace;
+  String get cutChooseOtherFolder;
+  String get cutInPlaceHint;
+
+  String get vpMute;
+  String get vpUnmute;
+  String get vpEnterFullscreen;
+  String get vpExitFullscreen;
+
+  String get cutIncludeSubtitles;
+  String get cutSubtitleHint;
+  String get cutExportTime;
+  String get cutSourceTime;
+  String get cutFileDatesHint;
+  String get cutOptions;
+  String get cutFileDates;
+  String get cutOutputMode;
+  String get cutFormat;
+
+  String get cutTitle;
+  String get cutKeyframeHint;
+  String get cutInvalidRange;
+  String get cutStart;
+  String get cutEnd;
+  String get cutMarkIn;
+  String get cutMarkOut;
+  String get cutAddSegment;
+  String get cutPreview;
+  String get cutRange;
+  String get cutSegments;
+  String get cutRemoveSegment;
+  String get cutDraftHint;
+  String get cutSeparate;
+  String get cutMerge;
+  String get cutOriginalFormat;
+  String get cutChooseFfmpeg;
+  String get cutFfmpegMissing;
+  String get cutOutputFolder;
+  String get cutExport;
+  String cutExportSegments(int count);
+  String get cutExporting;
+  String get cutExportFailed;
+  String get cutSaved;
+  String get cutOpenOutput;
+
   String aiSubtitleCacheVersions(int entries);
   String get aiSubtitleCache;
   String get aiSubtitleCacheHint;

@@ -2,6 +2,100 @@ import 'app_localizations.dart';
 
 class TurkishLocalizations implements AppLocalizations {
   @override
+  String get cutInPlace => 'Buraya dışa aktar';
+  @override
+  String get cutChooseOtherFolder => 'Başka klasör seç';
+  @override
+  String get cutInPlaceHint =>
+      'Sonuçları kaynak videonun yanına kaydet. Mevcut dosya adları otomatik atlanır.';
+  @override
+  String cutExportSegments(int count) => '$count bölümü dışa aktar';
+  @override
+  String get vpMute => 'Sesi kapat';
+  @override
+  String get vpUnmute => 'Sesi aç';
+  @override
+  String get vpEnterFullscreen => 'Tam ekran';
+  @override
+  String get vpExitFullscreen => 'Tam ekrandan çık';
+
+  @override
+  String get cutOutputMode => 'Çıktı';
+  @override
+  String get cutFormat => 'Biçim';
+  @override
+  String get cutOptions => 'Dışa aktarma seçenekleri';
+  @override
+  String get cutFileDates => 'Dosya tarihleri';
+  @override
+  String get cutExportTime => 'Dışa aktarma zamanı';
+  @override
+  String get cutSourceTime => 'Kaynak dosya tarihlerini koru';
+  @override
+  String get cutFileDatesHint =>
+      'Tarihe göre sıralarken dosyaların birlikte kalması için kaynak değiştirme tarihini korur. Windows oluşturma tarihini de korur.';
+
+  @override
+  String get cutIncludeSubtitles => 'Gömülü altyazıları kopyala';
+  @override
+  String get cutSubtitleHint =>
+      'Kesim sınırını aşan altyazılar çıktı süresini uzatabilir.';
+
+  @override
+  String get cutTitle => 'Kayıpsız kesme';
+  @override
+  String get cutKeyframeHint =>
+      'Özgün kalite, yeniden kodlama yok. Kesim önceki anahtar kareden başlayabilir. Kaynak dosya korunur.';
+  @override
+  String get cutInvalidRange =>
+      'Video içinde geçerli bir aralık girin (HH:MM:SS.mmm); bitiş başlangıçtan sonra olmalı.';
+  @override
+  String get cutStart => 'Başlangıç';
+  @override
+  String get cutEnd => 'Bitiş';
+  @override
+  String get cutMarkIn => 'Başlangıcı oynatma konumuna ayarla (I)';
+  @override
+  String get cutMarkOut => 'Bitişi oynatma konumuna ayarla (O)';
+  @override
+  String get cutAddSegment => 'Bölüm ekle';
+  @override
+  String get cutPreview => 'Başlangıca git';
+  @override
+  String get cutRange => 'Seçili kesim aralığı';
+  @override
+  String get cutSegments => 'Dışa aktarılacak bölümler';
+  @override
+  String get cutRemoveSegment => 'Bölümü kaldır';
+  @override
+  String get cutDraftHint =>
+      'Her bölüm ayrı kaydedilir. Bölüm ekleyin veya düzenlemek için bir satır seçin. Tümünü _1, _2, … olarak dışa aktarın.';
+  @override
+  String get cutSeparate => 'Ayrı dosyalar';
+  @override
+  String get cutMerge => 'Bölümleri birleştir';
+  @override
+  String get cutOriginalFormat => 'Kaynak biçimi';
+  @override
+  String get cutChooseFfmpeg => 'FFmpeg seç';
+  @override
+  String get cutFfmpegMissing =>
+      'Dışa aktarmak için kurulu FFmpeg çalıştırılabilir dosyasını seçin.';
+  @override
+  String get cutOutputFolder => 'Çıktı klasörünü seç';
+  @override
+  String get cutExport => 'Kayıpsız dışa aktar';
+  @override
+  String get cutExporting => 'Dışa aktarılıyor';
+  @override
+  String get cutExportFailed =>
+      'Dışa aktarma başarısız. Parçalar MP4 ile uyumsuzsa kaynak biçimini veya MKV deneyin.';
+  @override
+  String get cutSaved => 'Dışa aktarma tamamlandı';
+  @override
+  String get cutOpenOutput => 'Çıktıyı yeni sekmede aç';
+
+  @override
   String aiSubtitleCacheVersions(int entries) => '$entries kayıtlı sürüm';
   @override
   String get aiSubtitleCache => 'Altyazı önbelleği';

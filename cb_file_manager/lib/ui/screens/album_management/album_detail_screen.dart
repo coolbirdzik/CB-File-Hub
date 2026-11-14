@@ -994,7 +994,15 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
     bool isDesktop,
   ) {
     final hasSelection = sel.selectedFilePaths.isNotEmpty;
+    final compact = MediaQuery.sizeOf(context).width < 640;
     final commonActions = SharedActionBar.buildCommonActions(
+      compact: compact,
+      primaryAction: IconButton(
+        key: const ValueKey('album-add-images'),
+        icon: const Icon(PhosphorIconsLight.plus),
+        onPressed: _showAddFilesMenu,
+        tooltip: context.tr.albumAddImagesTooltip,
+      ),
       context: context,
       onSearchPressed: _toggleSearchBar,
       isSearchActive: _showSearchBar,
@@ -1013,6 +1021,21 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
       onGridZoomChanged: _applyGridSize,
       onSelectionModeToggled: _toggleSelectionMode,
       additionalMoreOptions: [
+        if (compact)
+          PopupMenuItem(
+            value: 'shuffle_album',
+            child: Row(
+              children: [
+                const Icon(PhosphorIconsLight.shuffle),
+                const SizedBox(width: 8),
+                Text(
+                  _isShuffled
+                      ? context.tr.albumUnshuffle
+                      : context.tr.albumShuffle,
+                ),
+              ],
+            ),
+          ),
         PopupMenuItem(
           value: 'edit_album',
           child: Row(
@@ -1048,26 +1071,19 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
       ],
       onAdditionalMoreOptionSelected: _handleAlbumMoreOption,
     );
-    final moreIndex = commonActions.length - 1;
-    commonActions.insert(
-      moreIndex,
-      IconButton(
-        icon: const Icon(PhosphorIconsLight.shuffle),
-        color: _isShuffled ? Theme.of(context).colorScheme.primary : null,
-        tooltip: _isShuffled
-            ? context.tr.albumUnshuffle
-            : context.tr.albumShuffle,
-        onPressed: _toggleShuffle,
-      ),
-    );
-    commonActions.insert(
-      moreIndex + 1,
-      IconButton(
-        icon: const Icon(PhosphorIconsLight.plus),
-        onPressed: _showAddFilesMenu,
-        tooltip: context.tr.albumAddImagesTooltip,
-      ),
-    );
+    if (!compact) {
+      commonActions.insert(
+        commonActions.length - 2, // Shuffle precedes the pinned add/more pair.
+        IconButton(
+          icon: const Icon(PhosphorIconsLight.shuffle),
+          color: _isShuffled ? Theme.of(context).colorScheme.primary : null,
+          tooltip: _isShuffled
+              ? context.tr.albumUnshuffle
+              : context.tr.albumShuffle,
+          onPressed: _toggleShuffle,
+        ),
+      );
+    }
     return [
       // ── Album-specific: remove selected items ─────────────────────────────
       // Visible on desktop when in selection mode (mirrors file-browser: no
@@ -1090,6 +1106,9 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
 
   Future<void> _handleAlbumMoreOption(String value) async {
     switch (value) {
+      case 'shuffle_album':
+        _toggleShuffle();
+        break;
       case 'edit_album':
         await _editAlbum();
         break;
@@ -1426,13 +1445,6 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                 ],
               ),
             ),
-            floatingActionButton: inSel
-                ? null
-                : FloatingActionButton(
-                    onPressed: _showAddFilesMenu,
-                    tooltip: context.tr.albumAddImagesTooltip,
-                    child: const Icon(PhosphorIconsLight.plus),
-                  ),
           );
         },
       ),

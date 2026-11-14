@@ -333,8 +333,11 @@ class _CreateAlbumDialogState extends State<CreateAlbumDialog> {
                 _buildColorPicker(),
                 const SizedBox(height: 16),
                 if (widget.sourceMode) ...[
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  Wrap(
+                    alignment: WrapAlignment.spaceBetween,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 12,
+                    runSpacing: 8,
                     children: [
                       Text(
                         l10n.imageSources,

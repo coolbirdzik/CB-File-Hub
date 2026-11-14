@@ -262,9 +262,16 @@ class DesktopWindowingService {
 
   /// Uses existing window discovery, but accepts folder requests only from the
   /// same executable so installed and development copies cannot target each other.
-  Future<bool> openFoldersInExistingWindow(List<WindowTabPayload> tabs) async {
+  Future<bool> openFoldersInExistingWindow(
+    List<WindowTabPayload> tabs, {
+    bool allowSameProcess = false,
+  }) async {
     for (final window in await listWindows()) {
-      if (window.role != 'normal' || window.processId == pid) continue;
+      if (window.role != 'normal' ||
+          window.windowId == _windowId ||
+          (!allowSameProcess && window.processId == pid)) {
+        continue;
+      }
       if (Platform.isWindows) {
         await WindowsNativeTabDragDropService.allowForegroundWindow(
           pid: window.processId,
@@ -276,11 +283,51 @@ class DesktopWindowingService {
           'type': 'open_folders',
           'executable': Platform.resolvedExecutable,
           'paths': tabs.map((tab) => tab.path).toList(),
+          'highlights': {
+            for (final tab in tabs)
+              if (tab.highlightedFileName != null)
+                tab.path: tab.highlightedFileName,
+          },
         },
       );
       if (response?['type'] == 'ok') return true;
     }
     return false;
+  }
+
+  /// Opens a fresh file-browser tab from a player/secondary window. Prefer
+  /// this engine's shell, then another app shell, then create an app window.
+  Future<bool> openFolderInNewTab(
+    String folderPath, {
+    String? highlightedFileName,
+  }) async {
+    final request = await FolderLaunchRequest.takeArguments(
+      ['--open-folder', folderPath],
+      highlightedFiles: {
+        FolderLaunchRequest.normalizeLocation(folderPath) ?? folderPath:
+            ?highlightedFileName,
+      },
+    );
+    if (request.rejected.isNotEmpty || request.tabs.length != 1) return false;
+    final tab = request.tabs.single;
+    final bloc = _tabBloc;
+    if (_windowRole == 'normal' && bloc != null && !bloc.isClosed) {
+      bloc.add(
+        AddTab(
+          path: tab.path,
+          name: tab.name,
+          highlightedFileName: tab.highlightedFileName,
+        ),
+      );
+      return true;
+    }
+    if (await openFoldersInExistingWindow(
+      request.tabs,
+      allowSameProcess: true,
+    )) {
+      return true;
+    }
+    return openNewWindow(tabs: request.tabs);
   }
 
   /// Loads [tabs] into the pre-warmed spare window behind the scenes (shown,
@@ -928,27 +975,42 @@ class DesktopWindowingService {
 
     if (type == 'open_folders') {
       final paths = message['paths'];
+      final highlights = message['highlights'];
       if (_tabBloc == null ||
           _windowRole != 'normal' ||
           message['executable'] != Platform.resolvedExecutable ||
           paths is! List ||
           paths.length > 100 ||
-          paths.any((value) => value is! String)) {
+          paths.any((value) => value is! String) ||
+          (highlights != null &&
+              (highlights is! Map ||
+                  highlights.length > 100 ||
+                  highlights.entries.any(
+                    (entry) => entry.key is! String || entry.value is! String,
+                  )))) {
         _writeJsonLine(socket, {'type': 'error'});
         return;
       }
       final raw = paths.cast<String>();
       final home = raw.length == 1 && raw.single == '#home';
-      final request = await FolderLaunchRequest.takeArguments([
-        '--open-folder',
-        if (!home) ...raw,
-      ]);
+      final request = await FolderLaunchRequest.takeArguments(
+        ['--open-folder', if (!home) ...raw],
+        highlightedFiles: highlights == null
+            ? const {}
+            : Map<String, String>.from(highlights as Map),
+      );
       if (request.rejected.isNotEmpty) {
         _writeJsonLine(socket, {'type': 'error'});
         return;
       }
       for (final tab in request.tabs) {
-        _tabBloc!.add(AddTab(path: tab.path, name: tab.name));
+        _tabBloc!.add(
+          AddTab(
+            path: tab.path,
+            name: tab.name,
+            highlightedFileName: tab.highlightedFileName,
+          ),
+        );
       }
       _writeJsonLine(socket, {'type': 'ok'});
       unawaited(focusTorrentWindow());

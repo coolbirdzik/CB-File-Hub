@@ -159,6 +159,16 @@ install(FILES
 
 # Copy the native assets provided by the build.dart from all packages.
 # This directory may not exist if there are no native assets for the platform.
+# Lossless export uses the CLI from the already pinned FFmpeg runtime. The CLI
+# also needs avfilter/avdevice, beyond the thumbnail helper's linked DLLs.
+install(PROGRAMS "${COOLBIRD_FFMPEG_DIR}/bin/ffmpeg.exe"
+  DESTINATION "${INSTALL_BUNDLE_LIB_DIR}/ffmpeg" COMPONENT Runtime)
+install(DIRECTORY "${COOLBIRD_FFMPEG_DIR}/bin/"
+  DESTINATION "${INSTALL_BUNDLE_LIB_DIR}/ffmpeg" COMPONENT Runtime
+  FILES_MATCHING PATTERN "*.dll")
+install(FILES "${COOLBIRD_FFMPEG_DIR}/LICENSE.txt"
+  DESTINATION "${INSTALL_BUNDLE_LIB_DIR}/ffmpeg" COMPONENT Runtime)
+
 set(NATIVE_ASSETS_DIR "${PROJECT_BUILD_DIR}/native_assets/windows")
 if(EXISTS "${NATIVE_ASSETS_DIR}")
   # Trailing slash copies the contents of the directory.

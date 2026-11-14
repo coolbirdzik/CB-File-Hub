@@ -151,6 +151,7 @@ const int jobArchiveChildren = 26;
 const int jobSyntax = 27;
 const int jobPermanentDelete = 28;
 const int jobRootSizes = 29;
+const int jobFfmpegProcess = 30;
 
 // Job states (job.rs).
 const int jobRunning = 0;

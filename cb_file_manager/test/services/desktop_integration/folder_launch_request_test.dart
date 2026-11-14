@@ -12,6 +12,37 @@ void main() {
   tearDown(() async => root.delete(recursive: true));
 
   test(
+    'folder requests carry a Unicode filename through tab serialization',
+    () async {
+      const name = 'đêm_2.mkv';
+      final request = await FolderLaunchRequest.takeArguments(
+        ['--open-folder', root.uri.toString()],
+        highlightedFiles: {root.path: name},
+      );
+      expect(request.rejected, isEmpty);
+      expect(request.tabs.single.toJson()['highlightedFileName'], name);
+    },
+  );
+
+  test('highlight accepts filenames only, never paths or traversal', () async {
+    for (final name in [
+      '',
+      '.',
+      '..',
+      '../outside.mkv',
+      r'..\outside.mkv',
+      'bad\u0000.mkv',
+    ]) {
+      final request = await FolderLaunchRequest.takeArguments(
+        ['--open-folder', root.path],
+        highlightedFiles: {root.path: name},
+      );
+      expect(request.tabs, isEmpty, reason: name);
+      expect(request.rejected, [root.path]);
+    }
+  });
+
+  test(
     'opens multiple Unicode/spaced folders and deduplicates URI/path pairs',
     () async {
       final first = await Directory(

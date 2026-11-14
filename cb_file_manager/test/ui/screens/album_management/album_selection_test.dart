@@ -109,9 +109,10 @@ void main() {
     WidgetTester tester,
     String path, {
     bool reuseTabs = false,
+    double width = 1400,
   }) async {
     if (!reuseTabs) tabs = TabManagerBloc();
-    tester.view.physicalSize = const Size(1400, 1400);
+    tester.view.physicalSize = Size(width, 1400);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -148,6 +149,48 @@ void main() {
     );
     await flush(tester);
   }
+
+  testWidgets(
+    'narrow Image Gallery keeps creation and view changes reachable',
+    (tester) async {
+      await mount(tester, '#gallery', width: 320);
+      expect(
+        tester.takeException(),
+        isNull,
+        reason: 'mounting the narrow gallery',
+      );
+      final create = find.byKey(const ValueKey('create-image-source'));
+      expect(tester.getRect(create).right, lessThanOrEqualTo(320));
+      expect(find.byType(FloatingActionButton), findsNothing);
+      await tester.tap(find.byKey(const ValueKey('shared-more-action')));
+      await flush(tester);
+      expect(
+        tester.takeException(),
+        isNull,
+        reason: 'opening the compact toolbar menu',
+      );
+      await tester.ensureVisible(find.text('List'));
+      await tester.tap(find.text('List'));
+      await flush(tester);
+      expect(
+        tester.takeException(),
+        isNull,
+        reason: 'switching the narrow gallery to list',
+      );
+      expect(
+        find.byKey(const ValueKey('grid-list-collection-list')),
+        findsOneWidget,
+      );
+      await tester.tap(create);
+      await flush(tester);
+      expect(tester.takeException(), isNull, reason: 'opening source creation');
+      expect(find.text('Create Image Source'), findsOneWidget);
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpWidget(const SizedBox());
+      await flush(tester);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   for (final mode in ['grid', 'list', 'gallery']) {
     testWidgets('$mode albums select singly and open by double click', (

@@ -2,6 +2,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
@@ -38,6 +39,9 @@ import '../../../../config/languages/app_localizations.dart';
 import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import '../../../tab_manager/core/tab_manager.dart';
 import 'video_player_advanced_menu.dart';
+import 'video_player_context_menu_region.dart';
+import 'video_player_desktop_toolbar.dart';
+import 'video_cut_panel.dart';
 import 'video_player_control_buttons.dart';
 import 'video_player_dialogs.dart';
 import 'video_player_fast_seek.dart';
@@ -376,6 +380,9 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
   @override
   double _savedVolume = 70.0;
   bool _showControls = true;
+  bool _cutMode = false;
+  bool _playerMenuOpen = false;
+  final _cutPanelKey = GlobalKey<VideoCutPanelState>();
   final bool _showSpeedIndicator = false;
 
   // The end of playback hands over to the next video only once.
@@ -753,6 +760,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
     super.didUpdateWidget(oldWidget);
     // Reinitialize if media source changed
     if (_hasMediaSourceChanged(oldWidget)) {
+      _cutMode = false;
       if (_hasError) {
         // A failed source (e.g. a hardware-decode fallback) needs a fresh
         // player so the updated decoding preferences take effect.
@@ -929,7 +937,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
       if (mounted && width != null) _extractVideoMetadata();
     });
     _player!.stream.completed.listen((completed) {
-      if (!completed || !mounted || _advancedToNextVideo) return;
+      if (!completed || !mounted || _advancedToNextVideo || _cutMode) return;
       if (widget.looping || !widget.hasNextVideo) return;
       _advancedToNextVideo = true;
       widget.onNextVideo?.call();
@@ -1288,7 +1296,10 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
                         onDoubleTap: widget.allowFullScreen
                             ? _toggleFullScreen
                             : null,
-                        child: _buildPrimaryVideoSurface(),
+                        child: VideoPlayerContextMenuRegion(
+                          onRequested: _showPlayerContextMenu,
+                          child: _buildPrimaryVideoSurface(),
+                        ),
                       ),
                       if (_isLoading)
                         Positioned.fill(
@@ -1375,13 +1386,17 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
         // to zero when the controls hide, even though playback keeps running.
         fit: StackFit.expand,
         children: [
-          Positioned.fill(child: _buildVideoWidget()),
+          Positioned.fill(
+            child: VideoPlayerContextMenuRegion(
+              onRequested: _showPlayerContextMenu,
+              child: _buildVideoWidget(),
+            ),
+          ),
           if (_isLoading)
             Positioned.fill(child: IgnorePointer(child: _buildLoadingWidget())),
           if (widget.showControls && _showControls) _buildCustomControls(),
           if (_showSpeedIndicator && _currentStream != null)
             _buildSpeedIndicatorOverlay(),
-          _buildFastSeekGestureOverlay(),
           _buildFastSeekIndicator(),
           _buildOsd(),
         ],
@@ -1432,15 +1447,6 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
   /// Avoids "big" VideoPlayerLoadingWidget + a second different loading in SMB/media_kit mode.
   Widget _buildLoadingWidget() {
     return const Center(child: CircularProgressIndicator(color: Colors.white));
-  }
-
-  Widget _buildFastSeekGestureOverlay() {
-    return FastSeekGestureOverlay(
-      onRewindStart: () => _startFastSeeking(forward: false),
-      onRewindEnd: _stopFastSeeking,
-      onForwardStart: () => _startFastSeeking(forward: true),
-      onForwardEnd: _stopFastSeeking,
-    );
   }
 
   Widget _buildFastSeekIndicator() {
@@ -1676,6 +1682,36 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
 
   // Event Handlers
   KeyEventResult _handleKeyEvent(KeyEvent event) {
+    // Editable timecodes keep normal text navigation and typing shortcuts.
+    if (FocusManager.instance.primaryFocus?.context
+            ?.findAncestorWidgetOfExactType<EditableText>() !=
+        null) {
+      return KeyEventResult.ignored;
+    }
+    if (_cutMode &&
+        event is KeyDownEvent &&
+        !HardwareKeyboard.instance.isControlPressed &&
+        !HardwareKeyboard.instance.isAltPressed &&
+        !HardwareKeyboard.instance.isMetaPressed) {
+      if (event.logicalKey == LogicalKeyboardKey.keyI) {
+        _cutPanelKey.currentState?.markIn();
+        return KeyEventResult.handled;
+      }
+      if (event.logicalKey == LogicalKeyboardKey.keyO) {
+        _cutPanelKey.currentState?.markOut();
+        return KeyEventResult.handled;
+      }
+    }
+    if (event is KeyDownEvent &&
+        (event.logicalKey == LogicalKeyboardKey.contextMenu ||
+            (event.logicalKey == LogicalKeyboardKey.f10 &&
+                HardwareKeyboard.instance.isShiftPressed))) {
+      final box = context.findRenderObject();
+      if (box is RenderBox && box.hasSize) {
+        _showPlayerContextMenu(box.localToGlobal(box.size.center(Offset.zero)));
+        return KeyEventResult.handled;
+      }
+    }
     final isCtrlPressed = HardwareKeyboard.instance.isControlPressed;
 
     // Our timer owns repetition; consume platform repeats as well.
@@ -1760,7 +1796,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
   }
 
   bool _shouldAutoHideControls() {
-    if (!widget.showControls) return false;
+    if (!widget.showControls || _cutMode || _playerMenuOpen) return false;
     if (_isAndroidPip) return false;
     if (_isSeeking || _isFastSeeking || _isHoveringSeekBar) return false;
     return _isCurrentlyPlaying();
@@ -1925,7 +1961,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
     _showControlsWithTimer();
   }
 
-  // Fast seeking methods (hold arrow on desktop, long press on mobile)
+  // Fast seeking methods (hold an arrow key; long press opens the player menu)
   // Repeats every 100ms after a hold delay, by the configured key step (30s
   // with Ctrl). With acceleration on, the step grows while held:
   // normal: step -> 5s -> ... -> 10m; Ctrl: 30s -> 60s -> 2m -> ... -> 20m
@@ -2448,10 +2484,107 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
     }
   }
 
-  Widget _buildDesktopControls() {
-    // Bottom overlay with: Play/Pause, currentTime, slider, duration, volume, menu, fullscreen
-    return Stack(
+  bool get _canLosslessCut =>
+      (Platform.isWindows || Platform.isMacOS || Platform.isLinux) &&
+      widget.file != null &&
+      widget.fileType == FileCategory.video;
+
+  void _toggleLosslessCut() {
+    setState(() {
+      _cutMode = !_cutMode;
+      _showControls = true;
+    });
+    _startHideControlsTimer();
+    widget.onControlVisibilityChanged?.call(true);
+  }
+
+  Widget _buildCutButton() => VideoPlayerControlButton(
+    icon: PhosphorIconsLight.scissors,
+    tooltip: context.tr.cutTitle,
+    enabled: (_player?.state.duration ?? Duration.zero) > Duration.zero,
+    onPressed: _toggleLosslessCut,
+  );
+
+  Widget _buildDesktopSeekControl() => _withSeekHoverPreview(
+    Semantics(
+      container: true,
+      child: StreamBuilder<Duration>(
+        stream: _player!.stream.position,
+        builder: (context, snapshot) {
+          final position = snapshot.data ?? Duration.zero;
+          final duration = _player!.state.duration;
+          final maxMs = duration.inMilliseconds <= 0
+              ? 1
+              : duration.inMilliseconds;
+          final subtitles = LocalSubtitleScope.of(context);
+          final subtitleProgress = subtitles?.preferences.enabled == true
+              ? subtitles!.progress
+              : null;
+          return Semantics(
+            container: true,
+            child: SliderTheme(
+              data: SliderTheme.of(context).copyWith(
+                trackHeight: 2.5,
+                trackShape: subtitleProgress == null
+                    ? null
+                    : SubtitleSeekTrackShape(subtitleProgress),
+                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
+              ),
+              child: CbSlider(
+                value: _seekSliderValue(position, maxMs),
+                min: 0,
+                max: maxMs.toDouble(),
+                activeColor: Colors.white,
+                inactiveColor: Colors.white24,
+                onChangeStart: (_) => _startSeekDrag(),
+                onChanged: _seekDuringDrag,
+                onChangeEnd: (value) =>
+                    _finishSeekDrag(Duration(milliseconds: value.toInt())),
+              ),
+            ),
+          );
+        },
+      ),
+    ),
+  );
+
+  Widget _buildDesktopControls() => LayoutBuilder(
+    builder: (context, constraints) => Stack(
       children: [
+        if (_cutMode && _canLosslessCut)
+          Positioned(
+            left: 12,
+            right: 12,
+            bottom: 64,
+            child: Align(
+              alignment: Alignment.bottomCenter,
+              heightFactor: 1,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: 960,
+                  maxHeight: math.max(
+                    0,
+                    math.min(
+                      math.max(280, constraints.maxHeight * 0.58),
+                      constraints.maxHeight - 96,
+                    ),
+                  ),
+                ),
+                child: VideoCutPanel(
+                  key: _cutPanelKey,
+                  source: widget.file!.path,
+                  duration: _player!.state.duration,
+                  position: () => _seekDragPosition ?? _player!.state.position,
+                  onSeek: (position) => _player?.seek(position),
+                  onRangeSeekStart: _startSeekDrag,
+                  onRangeSeek: (position) =>
+                      _seekDuringDrag(position.inMilliseconds.toDouble()),
+                  onRangeSeekEnd: (position) => _finishSeekDrag(position),
+                  onClose: _toggleLosslessCut,
+                ),
+              ),
+            ),
+          ),
         Positioned(
           left: 0,
           right: 0,
@@ -2465,158 +2598,46 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
                 colors: [Color(0x00000000), Color(0xB3000000)],
               ),
             ),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final fullScreenButton = widget.allowFullScreen
-                    ? VideoPlayerControlButton(
-                        icon: _isFullScreen
-                            ? PhosphorIconsLight.cornersIn
-                            : PhosphorIconsLight.cornersOut,
-                        onPressed: _toggleFullScreen,
-                        enabled: true,
-                        tooltip: _isFullScreen
-                            ? 'Exit fullscreen'
-                            : 'Enter fullscreen',
-                      )
-                    : null;
-
-                final seekSlider = Expanded(
-                  // Material Slider owns an OverlayPortal for its value
-                  // indicator. Keep that traversal anchor separate while
-                  // playback continuously updates the control row.
-                  child: _withSeekHoverPreview(
-                    Semantics(
-                      container: true,
-                      child: StreamBuilder<Duration>(
-                        stream: _player!.stream.position,
-                        builder: (context, snapshot) {
-                          final position = snapshot.data ?? Duration.zero;
-                          final duration = _player!.state.duration;
-                          final maxMs = duration.inMilliseconds <= 0
-                              ? 1
-                              : duration.inMilliseconds;
-                          final value = _seekSliderValue(position, maxMs);
-                          final subtitles = LocalSubtitleScope.of(context);
-                          final subtitleProgress =
-                              subtitles?.preferences.enabled == true
-                              ? subtitles!.progress
-                              : null;
-                          return Semantics(
-                            container: true,
-                            child: SliderTheme(
-                              data: SliderTheme.of(context).copyWith(
-                                trackHeight: 2.5,
-                                trackShape: subtitleProgress == null
-                                    ? null
-                                    : SubtitleSeekTrackShape(subtitleProgress),
-                                thumbShape: const RoundSliderThumbShape(
-                                  enabledThumbRadius: 7,
-                                ),
-                              ),
-                              child: CbSlider(
-                                value: value,
-                                min: 0,
-                                max: maxMs.toDouble(),
-                                activeColor: Colors.white,
-                                inactiveColor: Colors.white24,
-                                onChangeStart: (_) => _startSeekDrag(),
-                                onChanged: _seekDuringDrag,
-                                onChangeEnd: (value) => _finishSeekDrag(
-                                  Duration(milliseconds: value.toInt()),
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
+            child: VideoPlayerDesktopToolbar(
+              playPause: _buildPlayPauseButton(),
+              seekControl: _buildDesktopSeekControl(),
+              position: StreamBuilder<Duration>(
+                stream: _player!.stream.position,
+                builder: (context, snapshot) => Text(
+                  VideoPlayerUtils.formatDuration(
+                    _seekDisplayPosition(snapshot.data ?? Duration.zero),
                   ),
-                );
-
-                final width = constraints.maxWidth;
-                if (width < 520) {
-                  return Row(
-                    children: [
-                      _buildPlayPauseButton(),
-                      const SizedBox(width: 8),
-                      seekSlider,
-                      if (widget.fileType == FileCategory.video)
-                        LocalSubtitleControls(
-                          onSettings: _showAiSubtitleDialog,
-                        ),
-                      if (_hasPlaylist) ...[
-                        const SizedBox(width: 8),
-                        _buildPlaylistButton(),
-                      ],
-                      if (fullScreenButton != null) ...[
-                        const SizedBox(width: 8),
-                        fullScreenButton,
-                      ],
-                    ],
-                  );
-                }
-
-                final showSecondaryActions = width >= 760;
-
-                return Row(
-                  children: [
-                    // Play / Pause
-                    _buildPlayPauseButton(),
-                    const SizedBox(width: 8),
-
-                    // Current time
-                    StreamBuilder<Duration>(
-                      stream: _player!.stream.position,
-                      builder: (context, snapshot) {
-                        final p = _seekDisplayPosition(
-                          snapshot.data ?? Duration.zero,
-                        );
-                        return Text(
-                          VideoPlayerUtils.formatDuration(p),
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 12,
-                          ),
-                        );
-                      },
-                    ),
-
-                    const SizedBox(width: 8),
-                    seekSlider,
-                    const SizedBox(width: 8),
-
-                    // Duration
-                    Text(
-                      VideoPlayerUtils.formatDuration(_player!.state.duration),
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 12,
-                      ),
-                    ),
-
-                    const SizedBox(width: 8),
-                    if (_hasPlaylist) ...[
-                      _buildPlaylistButton(),
-                      const SizedBox(width: 4),
-                    ],
-                    if (showSecondaryActions && widget.allowMuting)
-                      _buildVolumeControl(),
-                    if (widget.fileType == FileCategory.video)
-                      LocalSubtitleControls(onSettings: _showAiSubtitleDialog),
-                    if (showSecondaryActions) ...[
-                      const SizedBox(width: 4),
-                      _buildAdvancedControlsMenu(),
-                    ],
-                    ?fullScreenButton,
-                  ],
-                );
-              },
+                  style: const TextStyle(color: Colors.white70, fontSize: 12),
+                ),
+              ),
+              duration: Text(
+                VideoPlayerUtils.formatDuration(_player!.state.duration),
+                style: const TextStyle(color: Colors.white70, fontSize: 12),
+              ),
+              cut: _canLosslessCut ? _buildCutButton() : null,
+              playlist: _hasPlaylist ? _buildPlaylistButton() : null,
+              volume: widget.allowMuting ? _buildVolumeControl() : null,
+              subtitles: widget.fileType == FileCategory.video
+                  ? LocalSubtitleControls(onSettings: _showAiSubtitleDialog)
+                  : null,
+              menu: _buildAdvancedControlsMenu(),
+              fullscreen: widget.allowFullScreen
+                  ? VideoPlayerControlButton(
+                      icon: _isFullScreen
+                          ? PhosphorIconsLight.cornersIn
+                          : PhosphorIconsLight.cornersOut,
+                      onPressed: _toggleFullScreen,
+                      tooltip: _isFullScreen
+                          ? context.tr.vpExitFullscreen
+                          : context.tr.vpEnterFullscreen,
+                    )
+                  : null,
             ),
           ),
         ),
       ],
-    );
-  }
+    ),
+  );
 
   Widget _buildPlayPauseButton() {
     if (_player != null) {
@@ -3327,8 +3348,63 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
   }
 
   /// Advanced controls menu với popup menu để giảm số nút trên thanh điều khiển
-  Widget _buildAdvancedControlsMenu() {
+  void _setPlayerMenuOpen(bool open) {
+    if (!mounted) return;
+    setState(() {
+      _playerMenuOpen = open;
+      _showControls = true;
+    });
+    if (open) {
+      _hideControlsTimer?.cancel();
+    } else {
+      _startHideControlsTimer();
+    }
+    widget.onControlVisibilityChanged?.call(true);
+  }
+
+  Future<void> _showPlayerContextMenu(Offset position) async {
+    if (_playerMenuOpen || !widget.showControls) return;
+    final sourceWidget = widget;
+    final sourcePlayer = _player;
+    final menu = _buildAdvancedControlsMenu();
+    _setPlayerMenuOpen(true);
+    try {
+      await menu.showAt(
+        context,
+        position,
+        isCurrent: () =>
+            mounted &&
+            !_hasMediaSourceChanged(sourceWidget) &&
+            identical(sourcePlayer, _player),
+      );
+    } finally {
+      if (mounted) _setPlayerMenuOpen(false);
+    }
+  }
+
+  void _openLosslessCut() {
+    if (!_canLosslessCut ||
+        (_player?.state.duration ?? Duration.zero) <= Duration.zero) {
+      return;
+    }
+    if (!_cutMode) _toggleLosslessCut();
+  }
+
+  VideoPlayerAdvancedMenu _buildAdvancedControlsMenu() {
     return VideoPlayerAdvancedMenu(
+      onPlayPause: _togglePlayPause,
+      onRewind: () => _seekBackward(10),
+      onForward: () => _seekForward(10),
+      onMute: widget.allowMuting ? _toggleMute : null,
+      onFullscreen: widget.allowFullScreen ? _toggleFullScreen : null,
+      onLosslessCut: _canLosslessCut ? _openLosslessCut : null,
+      losslessCutEnabled:
+          (_player?.state.duration ?? Duration.zero) > Duration.zero,
+      isPlaying: _player?.state.playing ?? false,
+      isMuted: _isMuted,
+      isFullscreen: _isFullScreen,
+      onMenuOpened: () => _setPlayerMenuOpen(true),
+      onMenuClosed: () => _setPlayerMenuOpen(false),
       onScreenshot: _takeScreenshot,
       onAudioTracks: _showAudioTrackDialog,
       onSubtitles: (Platform.isWindows || Platform.isMacOS || Platform.isLinux)

@@ -289,6 +289,21 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
       title: localizations.videoGallery,
       icon: PhosphorIconsLight.filmStrip,
       onRefresh: _refreshData,
+      showRefreshAction: false,
+      actions: [
+        IconButton(
+          key: const ValueKey('shared-refresh-action'),
+          icon: const Icon(PhosphorIconsLight.arrowsClockwise),
+          tooltip: localizations.refreshTooltip,
+          onPressed: _refreshData,
+        ),
+        IconButton(
+          key: const ValueKey('create-video-library'),
+          icon: const Icon(PhosphorIconsLight.plus),
+          tooltip: localizations.createVideoLibrary,
+          onPressed: _showCreateLibraryDialog,
+        ),
+      ],
       onEscape: () => setState(() => _selectedLibraryId = null),
       body: DeviceMediaSources(
         tabId: widget.tabId,
@@ -375,11 +390,6 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
             ),
           ),
         ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _showCreateLibraryDialog,
-        tooltip: localizations.createVideoLibrary,
-        child: const Icon(PhosphorIconsLight.plus),
       ),
     );
   }

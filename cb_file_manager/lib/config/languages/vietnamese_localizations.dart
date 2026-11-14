@@ -2,6 +2,100 @@ import 'app_localizations.dart';
 
 class VietnameseLocalizations implements AppLocalizations {
   @override
+  String get cutInPlace => 'Xuất tại chỗ';
+  @override
+  String get cutChooseOtherFolder => 'Chọn thư mục khác';
+  @override
+  String get cutInPlaceHint =>
+      'Lưu kết quả ngay cạnh video gốc. Nếu trùng tên, app tự chọn số tiếp theo.';
+  @override
+  String cutExportSegments(int count) => 'Xuất $count đoạn';
+  @override
+  String get vpMute => 'Tắt tiếng';
+  @override
+  String get vpUnmute => 'Bật tiếng';
+  @override
+  String get vpEnterFullscreen => 'Toàn màn hình';
+  @override
+  String get vpExitFullscreen => 'Thoát toàn màn hình';
+
+  @override
+  String get cutOutputMode => 'Xuất thành';
+  @override
+  String get cutFormat => 'Định dạng';
+  @override
+  String get cutOptions => 'Tùy chọn xuất';
+  @override
+  String get cutFileDates => 'Thời gian file';
+  @override
+  String get cutExportTime => 'Thời gian export';
+  @override
+  String get cutSourceTime => 'Giữ thời gian file gốc';
+  @override
+  String get cutFileDatesHint =>
+      'Giữ ngày sửa của file gốc để các đoạn nằm gần nhau khi sắp xếp theo ngày. Windows giữ cả ngày tạo.';
+
+  @override
+  String get cutIncludeSubtitles => 'Giữ phụ đề nhúng';
+  @override
+  String get cutSubtitleHint =>
+      'Cue phụ đề vượt qua mốc cắt có thể làm file xuất dài hơn đoạn đã chọn.';
+
+  @override
+  String get cutTitle => 'Cắt video lossless';
+  @override
+  String get cutKeyframeHint =>
+      'Giữ nguyên chất lượng, không mã hóa lại. Điểm đầu có thể lùi về keyframe trước đó. File gốc được giữ nguyên.';
+  @override
+  String get cutInvalidRange =>
+      'Nhập đoạn hợp lệ trong video (HH:MM:SS.mmm), mốc cuối phải sau mốc đầu.';
+  @override
+  String get cutStart => 'Bắt đầu';
+  @override
+  String get cutEnd => 'Kết thúc';
+  @override
+  String get cutMarkIn => 'Đặt mốc đầu tại vị trí đang xem (I)';
+  @override
+  String get cutMarkOut => 'Đặt mốc cuối tại vị trí đang xem (O)';
+  @override
+  String get cutAddSegment => 'Thêm đoạn';
+  @override
+  String get cutPreview => 'Đến mốc đầu';
+  @override
+  String get cutRange => 'Khoảng cắt đã chọn';
+  @override
+  String get cutSegments => 'Các đoạn sẽ xuất';
+  @override
+  String get cutRemoveSegment => 'Bỏ đoạn';
+  @override
+  String get cutDraftHint =>
+      'Mỗi đoạn được lưu riêng. Thêm đoạn tiếp theo hoặc chọn một dòng để sửa. Xuất tất cả một lần thành _1, _2, ….';
+  @override
+  String get cutSeparate => 'Xuất từng đoạn';
+  @override
+  String get cutMerge => 'Nối các đoạn';
+  @override
+  String get cutOriginalFormat => 'Định dạng gốc';
+  @override
+  String get cutChooseFfmpeg => 'Chọn FFmpeg';
+  @override
+  String get cutFfmpegMissing =>
+      'Cần FFmpeg để xuất. Hãy chọn file thực thi FFmpeg đã cài trên máy.';
+  @override
+  String get cutOutputFolder => 'Chọn thư mục xuất';
+  @override
+  String get cutExport => 'Xuất lossless';
+  @override
+  String get cutExporting => 'Đang xuất';
+  @override
+  String get cutExportFailed =>
+      'Xuất thất bại. Thử định dạng gốc hoặc MKV nếu track không tương thích với MP4.';
+  @override
+  String get cutSaved => 'Đã xuất video';
+  @override
+  String get cutOpenOutput => 'Mở kết quả trong tab mới';
+
+  @override
   String aiSubtitleCacheVersions(int entries) => '$entries bản phụ đề';
   @override
   String get aiSubtitleCache => 'Cache phụ đề';

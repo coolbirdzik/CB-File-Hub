@@ -30,6 +30,7 @@
   - `features/08-cloud-backup-sync.md` — Backup/restore settings and tags via Google Drive, Dropbox or OneDrive
   - `features/09-app-updates.md` — In-app updates: GitHub download for MSI/portable/DMG, Microsoft Store and Google Play APIs
   - `features/11-desktop-tab-windows.md` — Chrome-style tab tear-off and merge between windows (Windows)
+  - [Lossless video cutting](features/11-lossless-video-cut.md) — Player ranges, separate/joined exports, Rust subprocess jobs and Dart fallback
 - **UI Patterns**
   - `ui-patterns/01-operation-progress.md`
   - `ui-patterns/02-file-folder-listing.md`

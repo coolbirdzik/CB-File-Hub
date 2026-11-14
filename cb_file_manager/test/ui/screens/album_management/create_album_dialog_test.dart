@@ -1,11 +1,38 @@
 import 'package:cb_file_manager/config/languages/app_localizations_delegate.dart';
 import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:cb_file_manager/ui/screens/album_management/create_album_dialog.dart';
+import 'package:cb_file_manager/ui/screens/video_library/create_video_library_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  testWidgets('video source creation fits a narrow window', (tester) async {
+    tester.view.physicalSize = const Size(320, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('en'),
+        localizationsDelegates: const [
+          AppLocalizationsDelegate(),
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        theme: CbThemeBuilder.build(
+          brightness: Brightness.light,
+          accent: Colors.teal,
+        ),
+        home: const CreateVideoLibraryDialog(),
+      ),
+    );
+    await tester.pump();
+    expect(find.byType(CreateVideoLibraryDialog), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('image source dialog lays out a populated directory list', (
     tester,
   ) async {

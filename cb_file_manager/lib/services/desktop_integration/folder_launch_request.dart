@@ -13,8 +13,9 @@ class FolderLaunchRequest {
   const FolderLaunchRequest(this.tabs, this.rejected, this.requested);
 
   static Future<FolderLaunchRequest> takeArguments(
-    List<String> arguments,
-  ) async {
+    List<String> arguments, {
+    Map<String, String> highlightedFiles = const {},
+  }) async {
     final explicit = arguments.contains('--open-folder');
     final tabs = <WindowTabPayload>[];
     final rejected = <String>[];
@@ -32,6 +33,15 @@ class FolderLaunchRequest {
         directory = null;
       }
       if (directory != null) {
+        final highlight = highlightedFiles[directory];
+        if (highlight != null &&
+            (highlight.isEmpty ||
+                highlight == '.' ||
+                highlight == '..' ||
+                highlight.contains(RegExp(r'[/\\\x00]')))) {
+          rejected.add(value);
+          continue;
+        }
         final key = Platform.isWindows ? directory.toLowerCase() : directory;
         if (seen.add(key)) {
           final basename = p.basename(directory);
@@ -39,6 +49,7 @@ class FolderLaunchRequest {
             WindowTabPayload(
               path: directory,
               name: basename.isEmpty ? directory : basename,
+              highlightedFileName: highlight,
             ),
           );
         }

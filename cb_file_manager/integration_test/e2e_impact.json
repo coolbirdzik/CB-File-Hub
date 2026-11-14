@@ -245,6 +245,7 @@
         "cb_file_manager/lib/ui/components/pip_window/**",
         "cb_file_manager/lib/ui/state/video_ui_state.dart",
         "cb_file_manager/lib/ui/utils/video_playback_launcher.dart",
+        "cb_file_manager/lib/ui/utils/video_output_folder_navigation.dart",
         "cb_file_manager/lib/services/pip_window_service.dart",
         "cb_file_manager/lib/services/windowing/video_window_service.dart"
       ],

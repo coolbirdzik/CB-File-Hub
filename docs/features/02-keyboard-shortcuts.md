@@ -50,6 +50,16 @@ The Delete key on a typical Mac keyboard produces Backspace; use `⌘Backspace` 
 
 History shortcuts are also available on file surfaces with history callbacks. Parent-folder commands apply in the folder browser; new-folder creation is available in local filesystem directories, including mounted volumes. Plain typing performs type-ahead selection; its buffer resets after one second. Command chords do not enter the type-ahead buffer.
 
+## Video lossless editor
+
+Open the desktop local-file player's scissors button first. While the editor
+is open, **I** sets the start at the playhead and **O** sets the end. Timecode
+fields keep their normal text editing keys. These shortcuts do not export or
+modify the source. See [lossless video cutting](11-lossless-video-cut.md).
+
+Right-click or long-press the video to open the shared player menu. On desktop,
+**Shift+F10** or the keyboard Menu key opens it when the player has focus.
+
 ## Dialogs
 
 `Enter` confirms the focused action, `Escape` cancels, and `Tab` moves focus between controls. Image and video viewers retain their own media controls. macOS continues to handle standard application commands such as `⌘Q`, `⌘H`, and `⌘M` through its native menu.

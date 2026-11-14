@@ -96,6 +96,29 @@ Status colours (`c.status.danger`, `.success`, …) are independent of the accen
 | `CbDialog` | `AlertDialog` | Built on `CbSurface`; `showCbConfirmDialog` covers the common case |
 | `CbKbd` | hand-drawn shortcut labels | Key caps (`Ctrl` `K`, `↵`, `Esc`) for menus and the command palette |
 
+## Library toolbar actions
+
+Image Gallery, Albums and album contents keep their create/add action on the
+top toolbar, immediately before the more menu. Video Gallery puts **Create
+video library** beside refresh on the same bar. Media screens do not duplicate
+these commands as floating buttons. Video-library file selection is available
+through the existing more menu instead of a second floating selection button.
+
+`SharedActionBar.buildCommonActions` accepts a `primaryAction` and an opt-in
+`compact` layout. Gallery/album callers enable it below 640 px: create/add stays
+visible, and search, sort, view, grid-size and refresh commands move into the
+more menu. Closing an active search stays on the bar. The compact menu reuses
+the full toolbar's allowed sort/view entries and callbacks; album shuffle,
+edit and smart-rule commands remain available there too. Other callers retain
+their existing layout unless they opt in.
+Image/video source dialogs also wrap their source heading and add-directory
+button onto separate lines when the available width is small.
+
+`LibraryHubScaffold` hosts toolbar actions only; it has no floating-action API.
+Widget coverage for compact callbacks lives in
+`test/ui/components/common/shared_action_bar_compact_test.dart`; album and video
+screen tests cover creation, navigation, selection, search and view preferences.
+
 ## Desktop selection and double-click timing
 
 Selection, focus and pressed feedback must appear on the first pointer frame.

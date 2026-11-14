@@ -981,6 +981,7 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
                   searchBar: _buildSearchBar(l10n),
                   pathNavigationBar: _buildPathNavigationBar(l10n),
                   actions: SharedActionBar.buildCommonActions(
+                    compact: MediaQuery.sizeOf(context).width < 640,
                     allowMetadataSorting: true,
                     context: context,
                     onSearchPressed: _toggleSearchBar,
@@ -999,11 +1000,6 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
                         ? _showColumnSettings
                         : null,
                     onSelectionModeToggled: _toggleSelectionMode,
-                  ),
-                  floatingActionButton: FloatingActionButton(
-                    heroTag: null,
-                    onPressed: _toggleSelectionMode,
-                    child: const Icon(PhosphorIconsLight.checkSquare),
                   ),
                   onGridZoomDelta: _handleGridZoomDelta,
                   onViewScaleDelta: _handleViewScaleDelta,
