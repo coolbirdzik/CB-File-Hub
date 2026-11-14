@@ -30,6 +30,21 @@ Flutter generates native plugin registration and bundles media_kit's libraries.
 `PlaybackPlayer` initializes MediaKit before creating a player, including when
 launched directly by a PiP window or integration test.
 
+On Windows, `windows/cmake/media_kit_video_multi_engine.cmake` compiles a
+patched copy of media_kit_video's host implementation. Each HWND owns its
+plugin callback; the upstream process-wide singleton sends texture callbacks
+to the newest engine (including a hidden spare), leaving other previews waiting
+forever. The pub cache stays unchanged. The patch checks its upstream anchors
+and stops configuration if a dependency update needs review.
+Player disposal waits for initialization before entering media_kit's global
+disposal lock, so closing a pending preview cannot block subsequent players.
+Local previews show initialization errors before checking for a video controller;
+retry creates a fresh player.
+From the repository root, `node --test scripts/tests/media_kit_multi_engine.test.mjs`
+compiles the original and patched Windows dispatch code against two simulated
+window queues: the original reproduces the bug and the patch passes dispatch,
+message forwarding and teardown checks. This is a native unit test, not E2E.
+
 The wrapper retains synchronous play/pause intent for rapid seek drags. Native
 events drive position, duration, buffering, volume and dimensions. Screenshots
 use media_kit's PNG capture. Paused opening renders the preview without briefly

@@ -300,6 +300,14 @@ class PlaybackPlayer {
     for (final subscription in _sizeSubscriptions) {
       await subscription.cancel();
     }
+    // NativePlayer.dispose acquires a process-wide lock before waiting for
+    // the video surface. Wait outside that lock so closing an initializing
+    // preview cannot block creation of every subsequent player.
+    if (_player.platform case final mk.NativePlayer native) {
+      await native.future;
+      await native.waitForPlayerInitialization;
+      await native.waitForVideoControllerInitializationIfAttached;
+    }
     await _player.dispose();
     if (_proxyUrl case final url?) SmbHttpProxyServer.instance.release(url);
   }

@@ -788,6 +788,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
       PlaybackVideoConfiguration.forDecoder(_videoDecoder);
 
   Future<void> _initializePlayer() async {
+    if (!mounted) return;
     try {
       setState(() {
         _isLoading = true;
@@ -800,6 +801,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
       _hwDecodeFallbackAttempted = false;
       _hasNotifiedInitialization = false;
 
+      _initializationTimeout?.cancel();
       _initializationTimeout = Timer(const Duration(seconds: 30), () {
         if (_isLoading && mounted) {
           setState(() {
@@ -1268,10 +1270,9 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
   }
 
   Widget _buildLocalFilePlayer() {
+    if (_hasError) return _buildErrorWidget(_errorMessage);
     return _videoController == null
         ? const Center(child: CircularProgressIndicator(color: Colors.white))
-        : _hasError
-        ? _buildErrorWidget(_errorMessage)
         : Focus(
             focusNode: _keyboardFocusNode,
             autofocus: true,
@@ -1434,6 +1435,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
     return VideoPlayerErrorWidget(
       message: message,
       onRetry: () {
+        _disposeResources();
         setState(() {
           _hasError = false;
           _isLoading = true;

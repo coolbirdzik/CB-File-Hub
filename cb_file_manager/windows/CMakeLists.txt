@@ -86,6 +86,9 @@ add_subdirectory(smb_native)
 # them to the application.
 include(flutter/generated_plugins.cmake)
 
+include(cmake/media_kit_video_multi_engine.cmake)
+coolbird_patch_media_kit_video()
+
 
 # === Installation ===
 # Support files are copied into place next to the executable, so that it can
