@@ -49,6 +49,8 @@ The screenshots render the app's production widgets with an original demo illust
 ### Media gallery: photos, videos and tags
 Gallery and video library, built-in player with picture-in-picture, image editor, albums and rule-based smart albums, and hierarchical tags you can search across every folder.
 
+**Lossless video cutting (desktop):** cut multiple segments or join them directly in the player without re-encoding. Export numbered clips beside the original, optionally keep its file dates, and reveal results in a new app tab. [Keyframe-based cutting](docs/features/11-lossless-video-cut.md).
+
 <table>
   <tr>
     <td width="50%"><img src="screenshots/promo/desktop/02_gallery_hub.png" alt="Photo and video gallery hub" /></td>

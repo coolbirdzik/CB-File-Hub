@@ -19,6 +19,7 @@
 
 - **[Dịch video theo thời gian thực](#dịch-video-theo-thời-gian-thực-trên-desktop):** nhận diện lời nói, dịch phụ đề khi xem video, quản lý model và lưu cache cho lần sau.
 - **Ảnh, video và âm thanh:** thư viện trực quan, hình thu nhỏ, trình xem, chỉnh sửa ảnh và trình phát tích hợp.
+- **[Cắt video lossless (desktop)](docs/features/11-lossless-video-cut.md):** cắt nhiều đoạn hoặc nối đoạn theo keyframe, không mã hóa lại; xuất `_1`, `_2`… cạnh file gốc, tùy chọn giữ thời gian file và mở kết quả trong tab mới.
 - **Duyệt tập tin linh hoạt:** nhiều tab, chia đôi, ghim vị trí, khôi phục phiên và các chế độ xem quen thuộc.
 - **Thư viện torrent:** index chung, nơi lưu tùy chọn, nhập từ ứng dụng khác, hợp nhất mục trùng và quản lý tải xuống.
 - **[Tự chọn thời điểm lấy thumbnail video](#tự-chọn-thời-điểm-lấy-thumbnail-video):** chọn ảnh đại diện từ mốc 10%, 20%, 50% hoặc vị trí khác trong video.
