@@ -7,14 +7,34 @@ import 'package:cb_file_manager/ui/screens/folder_list/bloc/file_navigation_even
 import 'package:cb_file_manager/ui/screens/folder_list/bloc/file_navigation_state.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:cb_native/cb_native.dart';
+import 'package:ffi/ffi.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
+import 'package:win32/win32.dart' as win;
+
+/// Start with an open folder without starting thumbnail prefetch or a watcher.
+/// Those readers can change last-access times between the two parity scans.
+class _OpenFolderNavigation extends FileNavigationBloc {
+  _OpenFolderNavigation(Directory folder, NativeListing listing) {
+    emit(
+      state.copyWith(
+        currentPath: folder,
+        isLoading: false,
+        sortOption: SortOption.nameAsc,
+        folders: [for (final entry in listing.folders) Directory(entry.path)],
+        files: [for (final entry in listing.files) File(entry.path)],
+      ),
+    );
+  }
+}
 
 /// The folder browser lists through Rust when package:cb_native is built and
 /// through the Dart isolate otherwise; both must show the same order.
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   final skip = CbNative.isAvailable ? null : 'Rust library not built';
   late Directory root;
+  final fixtureLocks = <win.HANDLE>[];
 
   setUpAll(() async {
     root = await Directory.systemTemp.createTemp('cb_native_listing_');
@@ -35,7 +55,35 @@ void main() {
     final base = DateTime(2024, 1, 1);
     for (final (i, name) in files.indexed) {
       final file = File(p.join(root.path, name));
-      await file.writeAsBytes(List<int>.filled((i * 7 + 3) % 23 + i, 0));
+      if (Platform.isWindows) {
+        // Create before writing, so background indexers cannot open a content
+        // reader and overwrite the deliberately distinct last-access times.
+        // Attribute queries and writes remain shared, including Rust/Dart stat.
+        final nativePath = file.path.toNativeUtf16();
+        try {
+          final opened = win.CreateFile(
+            win.PCWSTR(nativePath),
+            win.GENERIC_READ,
+            win.FILE_SHARE_WRITE | win.FILE_SHARE_DELETE,
+            null,
+            win.CREATE_NEW,
+            win.FILE_ATTRIBUTE_NORMAL,
+            null,
+          );
+          expect(
+            opened.value.isValid,
+            isTrue,
+            reason: '${file.path}: ${opened.error}',
+          );
+          fixtureLocks.add(opened.value);
+        } finally {
+          calloc.free(nativePath);
+        }
+      }
+      await file.writeAsBytes(
+        List<int>.filled((i * 7 + 3) % 23 + i, 0),
+        mode: FileMode.writeOnly,
+      );
       await file.setLastModified(base.add(Duration(hours: (i * 5) % 11 + i)));
       await file.setLastAccessed(base.add(Duration(hours: (i * 3) % 7 + i)));
     }
@@ -54,6 +102,9 @@ void main() {
   });
 
   tearDownAll(() async {
+    for (final handle in fixtureLocks) {
+      win.CloseHandle(handle);
+    }
     if (Platform.isWindows) {
       await Process.run('attrib', ['-R', '-H', p.join(root.path, '*')]);
     }
@@ -86,25 +137,47 @@ void main() {
   }
 
   test('changing the sort of an open folder re-lists it natively', () async {
-    final bloc = FileNavigationBloc();
+    final listing = await NativeFs.listDirectory(
+      root.path,
+      sort: NativeListSort.nameAsc,
+      skipSuffixes: const ['.tags'],
+      skipNames: const ['.cbfile_config.json'],
+    );
+    final bloc = _OpenFolderNavigation(root, listing!);
     addTearDown(bloc.close);
-    bloc.add(FileNavigationLoad(root.path));
-    await bloc.stream.firstWhere((s) => !s.isLoading && s.files.isNotEmpty);
+
+    // A real re-list must observe changes after the folder was opened, rather
+    // than merely sorting its previous in-memory sizes or dates.
+    final changed = File(p.join(root.path, '_x.pdf'));
+    await changed.writeAsBytes(
+      List<int>.filled(4096, 0),
+      mode: FileMode.writeOnly,
+    );
+    await changed.setLastAccessed(DateTime(2023, 1, 1));
+    if (Platform.isWindows) {
+      expect(changed.readAsBytesSync, throwsA(isA<FileSystemException>()));
+    }
 
     for (final sort in [
       SortOption.sizeDesc,
       SortOption.dateAccessedAsc,
+      SortOption.dateAccessedDesc,
       SortOption.typeDesc,
     ]) {
       final states = <FileNavigationState>[];
       final sub = bloc.stream.listen(states.add);
-      bloc.add(FileNavigationSetSortOption(sort, persist: false));
-      final done = await bloc.stream.firstWhere(
+      final next = bloc.stream.firstWhere(
         (s) => s.sortOption == sort && !s.isLoading,
       );
+      bloc.add(FileNavigationSetSortOption(sort, persist: false));
+      final done = await next.timeout(const Duration(seconds: 10));
       await sub.cancel();
       final dart = await dartScanDirectoryForTesting(root.path, sort);
+      if (sort == SortOption.sizeDesc || sort == SortOption.dateAccessedAsc) {
+        expect(done.files.first.path, changed.path, reason: sort.name);
+      }
       expect(done.files.map((f) => f.path), dart.files, reason: sort.name);
+      expect(done.error, isNull);
       expect(done.folders.map((f) => f.path).toSet(), dart.folders.toSet());
       expect(
         states.any((s) => s.isLoading),

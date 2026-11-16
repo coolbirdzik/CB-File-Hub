@@ -60,13 +60,31 @@ void main() {
   });
 
   tearDownAll(() async {
+    if (blockDecoder != null && !blockDecoder!.isCompleted) {
+      blockDecoder!.complete();
+    }
+    VideoThumbnailHelper.cancelForDirectory(root.path);
     await DatabaseManager.getInstance().close();
     await SqliteDatabaseProvider.closeSharedDatabase();
     final messenger =
         TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
     messenger.setMockMethodCallHandler(native, null);
     messenger.setMockMethodCallHandler(pathProvider, null);
-    await root.delete(recursive: true);
+    // Windows can briefly retain an image/IO handle after widget teardown.
+    // Retry only sharing violations; persistent locks and other errors fail.
+    for (var attempt = 0; ; attempt++) {
+      try {
+        await root.delete(recursive: true);
+        break;
+      } on FileSystemException catch (error) {
+        if (!Platform.isWindows ||
+            error.osError?.errorCode != 32 ||
+            attempt == 5) {
+          rethrow;
+        }
+        await Future<void>.delayed(Duration(milliseconds: 50 << attempt));
+      }
+    }
   });
 
   setUp(() async {
