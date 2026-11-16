@@ -59,6 +59,7 @@ jobs:
         run: |
           python3 -m unittest discover -s scripts/tests -p test_fetch_subtitle_vulkan.py
           node --test scripts/tests/windows_build.test.mjs
+          node --test scripts/tests/windows_ffmpeg.test.mjs
           node --test scripts/tests/linux_package.test.mjs
           node --test scripts/tests/macos_subtitle_bundle.test.mjs
       - uses: actions/upload-artifact@v7.0.1

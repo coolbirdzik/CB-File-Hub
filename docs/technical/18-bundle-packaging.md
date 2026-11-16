@@ -79,9 +79,11 @@ GPU/model compatibility on every driver.
 The follow-up Windows build is **366.99 MiB**, another **144.72 MiB / 28.28%**
 below the 511.71 MiB intermediate bundle. The source-built FFmpeg runtime keeps
 the native decoders, demuxers, muxers, bitstream filters, networking, Schannel
-HTTPS, software AV1 through dav1d, and DXVA2/D3D11/D3D12 acceleration. The app's
-thumbnail path uses D3D11. Only the basic CLI filters and two small utility
-encoders (`pcm_s16le`, `wrapped_avframe`) remain; lossless exports use stream copy.
+HTTPS, software AV1 through dav1d, and DXVA2/D3D11 acceleration. D3D12VA is
+disabled because Ubuntu 24.04's MinGW headers lack its required video interfaces;
+the app's thumbnail extraction does not require that backend. Only the basic CLI
+filters and two small utility encoders (`pcm_s16le`, `wrapped_avframe`) remain;
+lossless exports use stream copy.
 Capture devices and general-purpose transcoding encoders are excluded.
 
 This is a runtime for the app's media operations, not the full FFmpeg CLI.
@@ -102,6 +104,9 @@ Windows); required Debian/Ubuntu packages are listed at the top of
 libraries, DLLs, licenses and the recipe into the ignored
 `cb_file_manager/windows/ffmpeg-slim/` directory, outside `flutter clean`'s
 output. MinGW's C11 thread DLL is included beside the shared FFmpeg DLLs.
+Source downloads are verified before replacing the cache. zlib uses its official
+GitHub release first and its official fossil archive as a fallback; a transfer
+failure or checksum mismatch tries the next URL without weakening verification.
 
 CMake validates the recipe marker and required files before selecting the slim
 runtime. A stale/incomplete marked runtime fails with a rebuild instruction.
@@ -123,6 +128,9 @@ The earlier 511.71 MiB bundle compressed to 106.44 MiB with solid 7z, versus
 **138.71 MiB** as ZIP (deflate level 9). Both archives were read back and the
 relative paths and SHA-256 of all **97 files** matched the Release bundle.
 Archive compression reduces downloads, not installed bytes.
+These size figures describe the earlier local build. Remeasure releases built
+with Ubuntu 24.04's compiler and the D3D12VA compatibility fix instead of assuming
+identical native output bytes.
 
 Validation on Windows with Flutter 3.47.8:
 

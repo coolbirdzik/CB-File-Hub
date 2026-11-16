@@ -6,6 +6,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7.0.1
+      - name: Test verified source downloads
+        run: node --test scripts/tests/windows_ffmpeg.test.mjs
       - name: Restore recipe-specific runtime
         id: cache
         uses: actions/cache@v4

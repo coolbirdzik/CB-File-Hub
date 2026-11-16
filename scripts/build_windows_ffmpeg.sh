@@ -15,11 +15,26 @@ for tool in gcc x86_64-w64-mingw32-gcc x86_64-w64-mingw32-g++ make nasm pkg-conf
     command -v "$tool" >/dev/null || { echo "Missing build tool: $tool" >&2; exit 1; }
 done
 fetch() {
-    local name=$1 sha=$2 url=$3
-    if ! [ -f "$cache/sources/$name" ] || ! echo "$sha  $cache/sources/$name" | sha256sum --status -c; then
-        curl --fail --location --retry 3 --connect-timeout 20 "$url" -o "$cache/sources/$name"
+    local name=$1 sha=$2
+    shift 2
+    local target="$cache/sources/$name" url temporary
+    if [ -f "$target" ] && echo "$sha  $target" | sha256sum --status -c; then
+        echo "$target: verified cache"
+        return 0
     fi
-    echo "$sha  $cache/sources/$name" | sha256sum -c
+    for url in "$@"; do
+        temporary=$(mktemp "$target.XXXXXX")
+        if curl --fail --location --retry 3 --connect-timeout 20 --max-time 300 \
+            "$url" -o "$temporary" && echo "$sha  $temporary" | sha256sum --status -c; then
+            mv -f "$temporary" "$target"
+            echo "$target: OK"
+            return 0
+        fi
+        echo "Download or SHA-256 verification failed for $name from $url" >&2
+        rm -f "$temporary"
+    done
+    echo "Cannot fetch verified source: $name" >&2
+    return 1
 }
 if ! [ -f "$prefix/.runtime-version" ]; then
     fetch ffmpeg-8.1.2.tar.xz 464beb5e7bf0c311e68b45ae2f04e9cc2af88851abb4082231742a74d97b524c \
@@ -27,6 +42,7 @@ if ! [ -f "$prefix/.runtime-version" ]; then
     fetch dav1d-1.5.3.tar.xz 732010aa5ef461fa93355ed2c6c5fedb48ddc4b74e697eaabe8907eaeb943011 \
         https://downloads.videolan.org/pub/videolan/dav1d/1.5.3/dav1d-1.5.3.tar.xz
     fetch zlib-1.3.1.tar.gz 9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23 \
+        https://github.com/madler/zlib/releases/download/v1.3.1/zlib-1.3.1.tar.gz \
         https://zlib.net/fossils/zlib-1.3.1.tar.gz
     tar -xf "$cache/sources/ffmpeg-8.1.2.tar.xz" -C "$work"
     tar -xf "$cache/sources/dav1d-1.5.3.tar.xz" -C "$work"
@@ -51,6 +67,8 @@ EOF
         --prefix "$prefix" --buildtype release --default-library static \
         -Denable_tools=false -Denable_tests=false
     ninja -C "$work/dav1d-build" -j"$jobs" install
+    # Ubuntu 24.04's MinGW headers do not provide the required D3D12 video
+    # interfaces. Keep the supported DXVA2/D3D11 backends on every build host.
     mkdir -p "$work/ffmpeg-build"
     (cd "$work/ffmpeg-build" && PKG_CONFIG_LIBDIR="$prefix/lib/pkgconfig" \
         "$work/ffmpeg-8.1.2/configure" --prefix="$prefix" \
@@ -60,7 +78,7 @@ EOF
         --disable-avdevice --disable-filters --enable-filter=aresample,scale \
         --disable-encoders --enable-encoder=pcm_s16le,wrapped_avframe \
         --enable-libdav1d --enable-zlib --enable-schannel \
-        --enable-dxva2 --enable-d3d11va --enable-d3d12va --disable-pthreads --enable-w32threads \
+        --enable-dxva2 --enable-d3d11va --disable-d3d12va --disable-pthreads --enable-w32threads \
         --extra-cflags="-I$prefix/include" --extra-ldflags="-L$prefix/lib -static-libgcc -static-libstdc++" \
         --pkg-config=pkg-config --pkg-config-flags=--static && make -j"$jobs" && make install)
     mkdir -p "$prefix/licenses"
