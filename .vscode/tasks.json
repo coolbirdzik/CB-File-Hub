@@ -1,5 +1,12 @@
 {
   "version": "2.0.0",
+  "windows": {
+    "options": {
+      "env": {
+        "PATH": "${env:USERPROFILE}\\.cargo\\bin;${env:LOCALAPPDATA}\\Microsoft\\WinGet\\Links;${env:PATH}"
+      }
+    }
+  },
   "tasks": [
     {
       "label": "just",
