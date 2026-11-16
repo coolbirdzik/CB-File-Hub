@@ -29,6 +29,9 @@ hooks:
     sqlite3:
       source: system
       name_windows: winsqlite3
+    flutter_edge_ai_litertlm:
+      # CPU/GPU remain bundled. Enable only for Intel NPU distribution builds.
+      intel_npu: false
 
 dependencies:
   flutter:
@@ -148,6 +151,9 @@ dependency_overrides:
   # third_party/phosphor_flutter/README.md
   phosphor_flutter:
     path: third_party/phosphor_flutter
+  # Canonical Windows DLL names and optional Intel NPU runtime. See PATCHES.md.
+  flutter_edge_ai_litertlm:
+    path: third_party/flutter_edge_ai_litertlm
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

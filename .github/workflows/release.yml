@@ -39,6 +39,9 @@ env:
   ONEDRIVE_CLIENT_ID: ${{ secrets.ONEDRIVE_CLIENT_ID }}
 
 jobs:
+  windows-ffmpeg:
+    uses: ./.github/workflows/windows-ffmpeg.yml
+
   validate-store-listings:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -184,22 +187,24 @@ jobs:
           echo "" >> release_notes.md
           echo "### Windows" >> release_notes.md
           echo "- **Portable**: \`CBFileHub-$VERSION-windows-portable.zip\` - Extract and run, no installation needed" >> release_notes.md
+          echo "- **Smaller portable download**: \`CBFileHub-$VERSION-windows-portable.7z\` - Extract with 7-Zip" >> release_notes.md
           echo "- **MSI Installer**: \`CBFileHub-Setup-$VERSION.msi\` - Classic Windows installer" >> release_notes.md
           echo "- **Microsoft Store**: [CB FileHub](https://apps.microsoft.com/detail/9nchpzkc4m5c) - Store install with automatic updates" >> release_notes.md
           echo "" >> release_notes.md
           echo "### Android" >> release_notes.md
           echo "- **APK**: \`CBFileHub-$VERSION-arm64-v8a.apk\` (64-bit)" >> release_notes.md
-          echo "- **APK**: \`CBFileHub-$VERSION-armeabi-v7a.apk\` (32-bit)" >> release_notes.md
+          echo "- **APK**: \`CBFileHub-$VERSION-x86_64.apk\` (64-bit Intel/emulator)" >> release_notes.md
           echo "- **AAB**: \`CBFileHub-$VERSION.aab\` (For Google Play)" >> release_notes.md
           echo "" >> release_notes.md
           echo "### macOS" >> release_notes.md
-          echo "- **DMG**: \`CBFileHub-$VERSION-macos.dmg\` - Universal (Apple Silicon + Intel), macOS 12+" >> release_notes.md
+          echo "- **DMG**: \`CBFileHub-$VERSION-macos-arm64.dmg\` (Apple Silicon), \`CBFileHub-$VERSION-macos-x64.dmg\` (Intel), macOS 12+" >> release_notes.md
           echo "" >> release_notes.md
           echo "### Linux (x64)" >> release_notes.md
           echo "- **Debian 12**: \`CBFileHub-$VERSION-linux-amd64.deb\` or portable \`CBFileHub-$VERSION-linux-x64.tar.gz\`" >> release_notes.md
           echo "- **Debian 13**: \`CBFileHub-$VERSION-linux-debian13-amd64.deb\` or portable \`CBFileHub-$VERSION-linux-debian13-x64.tar.gz\`" >> release_notes.md
           echo "- **Ubuntu 24.04, Mint 22**: \`CBFileHub-$VERSION-linux-ubuntu24.04-amd64.deb\` or portable \`CBFileHub-$VERSION-linux-ubuntu24.04-x64.tar.gz\`" >> release_notes.md
           echo "- **Ubuntu 22.04, Mint 21**: \`CBFileHub-$VERSION-linux-ubuntu22.04-amd64.deb\` or portable \`CBFileHub-$VERSION-linux-ubuntu22.04-x64.tar.gz\`" >> release_notes.md
+          echo "- **Smaller portable archives**: matching \`tar.xz\` files are also available for each Linux distro." >> release_notes.md
           echo "" >> release_notes.md
           echo "## 🚀 Installation" >> release_notes.md
           echo "" >> release_notes.md
@@ -224,7 +229,7 @@ jobs:
           echo "" >> release_notes.md
           echo "### macOS" >> release_notes.md
           echo "The app is not notarized by Apple, so macOS asks you to allow it once:" >> release_notes.md
-          echo "1. Open \`CBFileHub-$VERSION-macos.dmg\` and drag **CB File Hub** into **Applications**" >> release_notes.md
+          echo "1. Open the \`macos-arm64.dmg\` (Apple Silicon) or \`macos-x64.dmg\` (Intel) and drag **CB File Hub** into **Applications**" >> release_notes.md
           echo "2. Open the app; when macOS says it cannot verify it, click **Done**" >> release_notes.md
           echo "3. Go to **System Settings → Privacy & Security** and click **Open Anyway** next to the CB File Hub message" >> release_notes.md
           echo "4. Confirm **Open Anyway** and enter your password" >> release_notes.md
@@ -298,11 +303,17 @@ jobs:
   # Build Windows
   build-windows:
     runs-on: windows-latest
-    needs: generate-release-notes
+    needs: [generate-release-notes, windows-ffmpeg]
     timeout-minutes: 90
     steps:
       - name: Checkout code
         uses: actions/checkout@v7.0.1
+
+      - name: Download source-built FFmpeg
+        uses: actions/download-artifact@v8.0.1
+        with:
+          name: windows-ffmpeg-runtime
+          path: cb_file_manager/windows/ffmpeg-slim
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -344,7 +355,17 @@ jobs:
           CB_BUILD_NUMBER: ${{ needs.generate-release-notes.outputs.version_code }}
         run: ./scripts/build.sh windows-portable
 
-      - name: Rename Portable ZIP
+      - name: Download synthetic media fixtures
+        uses: actions/download-artifact@v8.0.1
+        with:
+          name: windows-media-fixtures
+          path: cb_file_manager/build/windows-media-fixtures
+
+      - name: Check video codecs, thumbnails and subtitle decoding
+        shell: pwsh
+        run: ./scripts/check_windows_media.ps1
+
+      - name: Rename Portable archives
         shell: bash
         run: |
           VERSION="${{ needs.generate-release-notes.outputs.version_name }}"
@@ -368,21 +389,30 @@ jobs:
           if [ "$SOURCE_FILE" != "$TARGET_FILE" ]; then
             mv "$SOURCE_FILE" "$TARGET_FILE"
           fi
+          mv "$OUTPUT_DIR/CBFileHub-Portable.7z" "$OUTPUT_DIR/CBFileHub-$VERSION-windows-portable.7z"
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v7.0.1
         with:
           name: windows-build
-          path: ${{ env.PROJECT_DIR }}/build/windows/portable/*.zip
+          path: |
+            ${{ env.PROJECT_DIR }}/build/windows/portable/*.zip
+            ${{ env.PROJECT_DIR }}/build/windows/portable/*.7z
 
   # Build Windows MSI
   build-windows-msi:
     runs-on: windows-latest
-    needs: generate-release-notes
+    needs: [generate-release-notes, windows-ffmpeg]
     timeout-minutes: 90
     steps:
       - name: Checkout code
         uses: actions/checkout@v7.0.1
+
+      - name: Download source-built FFmpeg
+        uses: actions/download-artifact@v8.0.1
+        with:
+          name: windows-ffmpeg-runtime
+          path: cb_file_manager/windows/ffmpeg-slim
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -464,7 +494,7 @@ jobs:
   # Build Windows MSIX
   build-windows-msix:
     runs-on: windows-latest
-    needs: [generate-release-notes, validate-store-listings]
+    needs: [generate-release-notes, validate-store-listings, windows-ffmpeg]
     environment: Production
     timeout-minutes: 90
     outputs:
@@ -472,6 +502,12 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v7.0.1
+
+      - name: Download source-built FFmpeg
+        uses: actions/download-artifact@v8.0.1
+        with:
+          name: windows-ffmpeg-runtime
+          path: cb_file_manager/windows/ffmpeg-slim
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -596,7 +632,7 @@ jobs:
           node-version: "22"
 
       - name: Verify subtitle bundle layout and code signing
-        run: node --test scripts/tests/macos_subtitle_bundle.test.mjs
+        run: node --test scripts/tests/macos_subtitle_bundle.test.mjs scripts/tests/macos_arch_bundle.test.mjs
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -666,14 +702,16 @@ jobs:
             security delete-keychain "$MACOS_SIGNING_KEYCHAIN" || true
           fi
 
-      - name: Check DMG name
+      - name: Check architecture-specific DMGs
         run: |
-          DMG="${{ env.PROJECT_DIR }}/build/macos/dmg/CBFileHub-${{ needs.generate-release-notes.outputs.version_name }}-macos.dmg"
-          if [ ! -f "$DMG" ]; then
-            echo "::error::DMG not found at $DMG"
-            ls -la "${{ env.PROJECT_DIR }}/build/macos/dmg" || true
-            exit 1
-          fi
+          for arch in arm64 x64; do
+            DMG="${{ env.PROJECT_DIR }}/build/macos/dmg/CBFileHub-${{ needs.generate-release-notes.outputs.version_name }}-macos-$arch.dmg"
+            if [ ! -f "$DMG" ]; then
+              echo "::error::DMG not found at $DMG"
+              ls -la "${{ env.PROJECT_DIR }}/build/macos/dmg" || true
+              exit 1
+            fi
+          done
 
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v7.0.1
@@ -756,7 +794,7 @@ jobs:
           BASE="CBFileHub-$VERSION-linux${SUFFIX:+-$SUFFIX}"
           OUT="${{ env.PROJECT_DIR }}/build/linux/portable"
           ls -la "$OUT"
-          for f in "$OUT/$BASE-x64.tar.gz" "$OUT/$BASE-amd64.deb"; do
+          for f in "$OUT/$BASE-x64.tar.gz" "$OUT/$BASE-x64.tar.xz" "$OUT/$BASE-amd64.deb"; do
             if [ ! -f "$f" ]; then
               echo "::error::Missing $f"
               exit 1
@@ -772,6 +810,7 @@ jobs:
           path: |
             ${{ env.PROJECT_DIR }}/build/linux/portable/*.deb
             ${{ env.PROJECT_DIR }}/build/linux/portable/*.tar.gz
+            ${{ env.PROJECT_DIR }}/build/linux/portable/*.tar.xz
 
   # Install each .deb on clean images of the distros it is meant for. Fails
   # when apt cannot meet Depends or a bundled library stays unresolved.
@@ -853,7 +892,7 @@ jobs:
       - name: Build APK
         run: |
           cd ${{ env.PROJECT_DIR }}
-          flutter build apk --release --split-per-abi --build-name ${{ needs.generate-release-notes.outputs.version_name }} --build-number ${{ needs.resolve-android-version-code.outputs.version_code }} --dart-define=GOOGLE_DRIVE_CLIENT_ID="$GOOGLE_DRIVE_CLIENT_ID" --dart-define=GOOGLE_DRIVE_CLIENT_SECRET="$GOOGLE_DRIVE_CLIENT_SECRET" --dart-define=GOOGLE_DRIVE_SERVER_CLIENT_ID="$GOOGLE_DRIVE_SERVER_CLIENT_ID" --dart-define=DROPBOX_APP_KEY="$DROPBOX_APP_KEY" --dart-define=ONEDRIVE_CLIENT_ID="$ONEDRIVE_CLIENT_ID"
+          flutter build apk --release --split-per-abi --target-platform android-arm64,android-x64 --build-name ${{ needs.generate-release-notes.outputs.version_name }} --build-number ${{ needs.resolve-android-version-code.outputs.version_code }} --dart-define=GOOGLE_DRIVE_CLIENT_ID="$GOOGLE_DRIVE_CLIENT_ID" --dart-define=GOOGLE_DRIVE_CLIENT_SECRET="$GOOGLE_DRIVE_CLIENT_SECRET" --dart-define=GOOGLE_DRIVE_SERVER_CLIENT_ID="$GOOGLE_DRIVE_SERVER_CLIENT_ID" --dart-define=DROPBOX_APP_KEY="$DROPBOX_APP_KEY" --dart-define=ONEDRIVE_CLIENT_ID="$ONEDRIVE_CLIENT_ID"
 
       - name: Rename APK files
         run: |
@@ -863,11 +902,21 @@ jobs:
           for file in *.apk; do
             if [[ $file == *"arm64-v8a"* ]]; then
               mv "$file" "CBFileHub-$VERSION-arm64-v8a.apk"
-            elif [[ $file == *"armeabi-v7a"* ]]; then
-              mv "$file" "CBFileHub-$VERSION-armeabi-v7a.apk"
             elif [[ $file == *"x86_64"* ]]; then
               mv "$file" "CBFileHub-$VERSION-x86_64.apk"
             fi
+          done
+
+      # Plugin JNI libraries can otherwise leak another ABI into a split APK.
+      - name: Verify split APK native ABIs
+        run: |
+          for apk in "${{ env.PROJECT_DIR }}"/build/app/outputs/flutter-apk/*.apk; do
+            case "$apk" in
+              *arm64-v8a.apk) abi=arm64-v8a ;;
+              *x86_64.apk) abi=x86_64 ;;
+              *) echo "::error::Unexpected APK $apk"; exit 1 ;;
+            esac
+            python scripts/audit_bundle_size.py "$apk" --expect-abis "$abi" --json "$apk.size.json"
           done
 
       - name: Upload APK artifacts
@@ -968,7 +1017,7 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           cd ${{ env.PROJECT_DIR }}
-          flutter build appbundle --release --build-name ${{ needs.generate-release-notes.outputs.version_name }} --build-number ${{ needs.resolve-android-version-code.outputs.version_code }} --dart-define=GOOGLE_DRIVE_CLIENT_ID="$GOOGLE_DRIVE_CLIENT_ID" --dart-define=GOOGLE_DRIVE_CLIENT_SECRET="$GOOGLE_DRIVE_CLIENT_SECRET" --dart-define=GOOGLE_DRIVE_SERVER_CLIENT_ID="$GOOGLE_DRIVE_SERVER_CLIENT_ID" --dart-define=DROPBOX_APP_KEY="$DROPBOX_APP_KEY" --dart-define=ONEDRIVE_CLIENT_ID="$ONEDRIVE_CLIENT_ID"
+          flutter build appbundle --release --target-platform android-arm64,android-x64 --build-name ${{ needs.generate-release-notes.outputs.version_name }} --build-number ${{ needs.resolve-android-version-code.outputs.version_code }} --dart-define=GOOGLE_DRIVE_CLIENT_ID="$GOOGLE_DRIVE_CLIENT_ID" --dart-define=GOOGLE_DRIVE_CLIENT_SECRET="$GOOGLE_DRIVE_CLIENT_SECRET" --dart-define=GOOGLE_DRIVE_SERVER_CLIENT_ID="$GOOGLE_DRIVE_SERVER_CLIENT_ID" --dart-define=DROPBOX_APP_KEY="$DROPBOX_APP_KEY" --dart-define=ONEDRIVE_CLIENT_ID="$ONEDRIVE_CLIENT_ID"
 
       - name: Verify Android 16 KB page size support
         run: |
@@ -1025,12 +1074,14 @@ jobs:
           prerelease: false
           files: |
             artifacts/windows-build/*.zip
+            artifacts/windows-build/*.7z
             artifacts/windows-msi/*.msi
             artifacts/macos-dmg/*.dmg
             artifacts/android-apk/*.apk
             artifacts/android-aab/*.aab
             artifacts/linux-*/*.deb
             artifacts/linux-*/*.tar.gz
+            artifacts/linux-*/*.tar.xz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

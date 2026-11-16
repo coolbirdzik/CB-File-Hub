@@ -6,6 +6,12 @@ import path from 'node:path';
 import { test } from 'node:test';
 import { describeAsset } from '../../website/scripts/fetch-releases.mjs';
 
+test('Windows solid portable archive is listed as a Windows download', () => {
+  assert.deepEqual(describeAsset('CBFileHub-1.1.33-windows-portable.7z'), {
+    platform: 'windows', label: 'Portable (7z)', ext: '7z',
+  });
+});
+
 test('Linux downloads identify the distro for each FFmpeg ABI', () => {
   const variants = [
     ['', 'Debian 12'],
@@ -19,6 +25,17 @@ test('Linux downloads identify the distro for each FFmpeg ABI', () => {
     });
     assert.deepEqual(describeAsset(`CBFileHub-1.1.31-linux${suffix}-x64.tar.gz`), {
       platform: 'linux', label: `Linux portable (${distro})`, ext: 'tar.gz',
+    });
+    assert.deepEqual(describeAsset(`CBFileHub-1.1.33-linux${suffix}-x64.tar.xz`), {
+      platform: 'linux', label: `Linux portable (${distro}, tar.xz)`, ext: 'tar.xz',
+    });
+  }
+});
+
+test('macOS downloads distinguish Apple Silicon, Intel and legacy packages', () => {
+  for (const [suffix, label] of [['-arm64', 'macOS (Apple Silicon)'], ['-x64', 'macOS (Intel)'], ['', 'macOS DMG']]) {
+    assert.deepEqual(describeAsset(`CBFileHub-1.1.33-macos${suffix}.dmg`), {
+      platform: 'macos', label, ext: 'dmg',
     });
   }
 });

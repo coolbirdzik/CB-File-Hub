@@ -163,14 +163,45 @@ install(FILES
 # Copy the native assets provided by the build.dart from all packages.
 # This directory may not exist if there are no native assets for the platform.
 # Lossless export uses the CLI from the already pinned FFmpeg runtime. The CLI
-# also needs avfilter/avdevice, beyond the thumbnail helper's linked DLLs.
+# also needs avfilter, beyond the thumbnail helper's linked DLLs.
 install(PROGRAMS "${COOLBIRD_FFMPEG_DIR}/bin/ffmpeg.exe"
-  DESTINATION "${INSTALL_BUNDLE_LIB_DIR}/ffmpeg" COMPONENT Runtime)
+  DESTINATION "${INSTALL_BUNDLE_LIB_DIR}" COMPONENT Runtime)
 install(DIRECTORY "${COOLBIRD_FFMPEG_DIR}/bin/"
-  DESTINATION "${INSTALL_BUNDLE_LIB_DIR}/ffmpeg" COMPONENT Runtime
+  DESTINATION "${INSTALL_BUNDLE_LIB_DIR}" COMPONENT Runtime
   FILES_MATCHING PATTERN "*.dll")
 install(FILES "${COOLBIRD_FFMPEG_DIR}/LICENSE.txt"
-  DESTINATION "${INSTALL_BUNDLE_LIB_DIR}/ffmpeg" COMPONENT Runtime)
+  DESTINATION "${INSTALL_BUNDLE_LIB_DIR}" RENAME LICENSE-FFmpeg.txt COMPONENT Runtime)
+if(EXISTS "${COOLBIRD_FFMPEG_DIR}/licenses")
+  install(DIRECTORY "${COOLBIRD_FFMPEG_DIR}/licenses/"
+    DESTINATION "${INSTALL_BUNDLE_LIB_DIR}/licenses/ffmpeg" COMPONENT Runtime)
+endif()
+file(GLOB _current_ffmpeg_devices "${COOLBIRD_FFMPEG_DIR}/bin/avdevice-*.dll")
+if(NOT _current_ffmpeg_devices)
+  # The slim CLI has no capture-device dependency. Remove the obsolete DLL
+  # when updating an existing full-runtime installation.
+  install(CODE "file(GLOB obsolete_devices \"${INSTALL_BUNDLE_LIB_DIR}/avdevice-*.dll\")
+    if(obsolete_devices)
+      file(REMOVE \${obsolete_devices})
+    endif()" COMPONENT Runtime)
+endif()
+
+# Repair incremental installs of the former three-copy FFmpeg layout. Only
+# remove the known runtime files; the subtitle executable and its Vulkan
+# loader must stay isolated from Flutter's app-root Vulkan loader.
+install(CODE "
+  file(GLOB legacy_ffmpeg_dlls
+    \"${INSTALL_BUNDLE_LIB_DIR}/ffmpeg/av*-*.dll\"
+    \"${INSTALL_BUNDLE_LIB_DIR}/ffmpeg/sw*-*.dll\"
+    \"${INSTALL_BUNDLE_LIB_DIR}/subtitles/avcodec-*.dll\"
+    \"${INSTALL_BUNDLE_LIB_DIR}/subtitles/avformat-*.dll\"
+    \"${INSTALL_BUNDLE_LIB_DIR}/subtitles/avutil-*.dll\"
+    \"${INSTALL_BUNDLE_LIB_DIR}/subtitles/swresample-*.dll\")
+  if(legacy_ffmpeg_dlls)
+    file(REMOVE \${legacy_ffmpeg_dlls})
+  endif()
+  file(REMOVE \"${INSTALL_BUNDLE_LIB_DIR}/ffmpeg/ffmpeg.exe\"
+    \"${INSTALL_BUNDLE_LIB_DIR}/ffmpeg/LICENSE.txt\")
+" COMPONENT Runtime)
 
 set(NATIVE_ASSETS_DIR "${PROJECT_BUILD_DIR}/native_assets/windows")
 if(EXISTS "${NATIVE_ASSETS_DIR}")

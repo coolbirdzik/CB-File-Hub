@@ -49,6 +49,10 @@ fetch-llama:
 fetch-aria2:
     bash scripts/fetch_aria2_runtime.sh
 
+# Build the smaller Windows FFmpeg runtime (Linux cross compiler; WSL on Windows).
+build-windows-ffmpeg:
+    {{if os() == "windows" { "wsl.exe -- bash scripts/build_windows_ffmpeg.sh" } else { "bash scripts/build_windows_ffmpeg.sh" }}}
+
 # Run flutter doctor
 doctor:
     {{flutter}} doctor -v

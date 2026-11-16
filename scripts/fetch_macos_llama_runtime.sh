@@ -15,7 +15,9 @@ hash_file() {
     fi
 }
 
-for arch in arm64 x86_64; do
+archs="${CB_LLAMA_MACOS_ARCHS:-${ARCHS:-arm64 x86_64}}"
+for arch in $archs; do
+    case "$arch" in arm64|x86_64) ;; *) echo "error: Unsupported llama architecture $arch" >&2; exit 1 ;; esac
     if [ "$arch" = arm64 ]; then
         asset_arch=arm64
         expected=7d692df9e1e386e62f1c12b843903218041e6cd74c9415aa39a7ed3176f9eaa2

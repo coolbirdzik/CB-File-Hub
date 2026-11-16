@@ -111,10 +111,6 @@ if(WIN32)
       "${CB_SUBTITLE_VULKAN_TOOLS}/LICENSE-VulkanRT.txt"
       DESTINATION "${CB_SUBTITLE_INSTALL_DIR}" COMPONENT Runtime)
   endif()
-  file(GLOB CB_SUBTITLE_FFMPEG_DLLS
-    "${CB_SUBTITLE_FFMPEG_DIR}/bin/avcodec-*.dll"
-    "${CB_SUBTITLE_FFMPEG_DIR}/bin/avformat-*.dll"
-    "${CB_SUBTITLE_FFMPEG_DIR}/bin/avutil-*.dll"
-    "${CB_SUBTITLE_FFMPEG_DIR}/bin/swresample-*.dll")
-  install(FILES ${CB_SUBTITLE_FFMPEG_DLLS} DESTINATION "${CB_SUBTITLE_INSTALL_DIR}" COMPONENT Runtime)
+  # FFmpeg is shared at the app root. SubtitleWorker adds that directory to
+  # this child's DLL search path while keeping the real Vulkan loader here.
 endif()

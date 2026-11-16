@@ -67,6 +67,9 @@ void main() {
   final ffmpeg =
       Platform.environment['CB_TEST_FFMPEG'] ??
       p.join(Directory.current.path, 'windows', 'ffmpeg', 'bin', 'ffmpeg.exe');
+  // The production runtime needs decoding and stream copy, not fixture encoders.
+  final fixtureFfmpeg =
+      Platform.environment['CB_TEST_FIXTURE_FFMPEG'] ?? ffmpeg;
   final ffprobe = p.join(
     p.dirname(ffmpeg),
     Platform.isWindows ? 'ffprobe.exe' : 'ffprobe',
@@ -122,7 +125,7 @@ void main() {
             () async {
               final output = File(p.join(destination.path, 'cancel.mkv'));
               final process = NativeMediaProcess.start(
-                executable: ffmpeg,
+                executable: fixtureFfmpeg,
                 arguments: [
                   '-nostdin',
                   '-loglevel',
@@ -174,7 +177,7 @@ void main() {
           await subtitles.writeAsString(
             '1\n00:00:01,000 --> 00:00:06,000\nSubtitle track\n',
           );
-          await run(ffmpeg, [
+          await run(fixtureFfmpeg, [
             '-hide_banner',
             '-loglevel',
             'error',

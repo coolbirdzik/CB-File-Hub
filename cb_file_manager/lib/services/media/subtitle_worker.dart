@@ -76,6 +76,16 @@ class SubtitleWorker {
       path,
       arguments,
       workingDirectory: File(path).parent.path,
+      // Imported FFmpeg DLLs live at the app root. Keep the executable and
+      // real Vulkan loader in subtitles/: moving them beside Flutter's
+      // vulkan-1.dll would load the incompatible ANGLE loader.
+      environment: Platform.isWindows
+          ? {
+              'PATH':
+                  '${File(Platform.resolvedExecutable).parent.path};'
+                  '${Platform.environment['PATH'] ?? ''}',
+            }
+          : null,
     );
     if (_stopped) {
       process.kill();

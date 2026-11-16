@@ -1,16 +1,23 @@
 import 'package:cb_file_manager/design_system/fluent_surface_tokens.dart';
 import 'package:cb_file_manager/design_system/fluent_chrome_surface.dart';
 import 'package:cb_file_manager/services/windowing/window_startup_payload.dart';
+import 'package:cb_file_manager/ui/components/common/window_caption_buttons.dart';
 import 'package:cb_file_manager/ui/tab_manager/desktop/desktop_tab_drag_data.dart';
 import 'package:cb_file_manager/ui/tab_manager/desktop/scrollable_tab_bar.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 class _TabBarHarness extends StatefulWidget {
   final bool titleRow;
-  const _TabBarHarness({super.key, this.titleRow = false});
+  final bool showWindowControls;
+  const _TabBarHarness({
+    super.key,
+    this.titleRow = false,
+    this.showWindowControls = true,
+  });
 
   @override
   State<_TabBarHarness> createState() => _TabBarHarnessState();
@@ -52,6 +59,7 @@ class _TabBarHarnessState extends State<_TabBarHarness>
               blurSigma: 18,
               borderRadius: BorderRadius.circular(12),
               child: ScrollableTabBar(
+                showWindowControls: widget.showWindowControls,
                 controller: controller,
                 tabs: [for (final id in tabIds) Text(id)],
                 draggableTabs: [
@@ -79,6 +87,73 @@ class _TabBarHarnessState extends State<_TabBarHarness>
 }
 
 void main() {
+  const windowChannel = MethodChannel('window_manager');
+
+  tearDown(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(windowChannel, null);
+  });
+
+  testWidgets('Linux title bar exposes working window controls', (
+    tester,
+  ) async {
+    final calls = <String>[];
+    var maximized = false;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(windowChannel, (call) async {
+          calls.add(call.method);
+          switch (call.method) {
+            case 'isMaximized':
+              return maximized;
+            case 'maximize':
+              maximized = true;
+            case 'unmaximize':
+              maximized = false;
+          }
+          return true;
+        });
+
+    await tester.pumpWidget(const _TabBarHarness());
+    await tester.pump();
+
+    final caption = find.byType(WindowCaptionButtons);
+    Finder captionIcon(IconData icon) =>
+        find.descendant(of: caption, matching: find.byIcon(icon));
+    expect(caption, findsOneWidget);
+    await tester.tap(captionIcon(PhosphorIconsLight.minus));
+    await tester.pump();
+    expect(calls, contains('minimize'));
+
+    await tester.tap(captionIcon(PhosphorIconsLight.cornersOut));
+    await tester.pump();
+    expect(calls, contains('maximize'));
+    await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .handlePlatformMessage(
+          windowChannel.name,
+          windowChannel.codec.encodeMethodCall(
+            const MethodCall('onEvent', {'eventName': 'maximize'}),
+          ),
+          (_) {},
+        );
+    await tester.pump();
+    expect(captionIcon(PhosphorIconsLight.cornersIn), findsOneWidget);
+
+    await tester.tap(captionIcon(PhosphorIconsLight.cornersIn));
+    await tester.pump();
+    expect(calls, contains('unmaximize'));
+    await tester.tap(captionIcon(PhosphorIconsLight.x));
+    await tester.pump();
+    expect(calls, contains('close'));
+    expect(tester.takeException(), isNull);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.linux));
+
+  testWidgets('Linux native-frame tabs can opt out of caption buttons', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const _TabBarHarness(showWindowControls: false));
+    expect(find.byType(WindowCaptionButtons), findsNothing);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.linux));
+
   testWidgets('macOS title row fits complete tabs and clickable controls', (
     tester,
   ) async {

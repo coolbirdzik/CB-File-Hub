@@ -432,7 +432,10 @@ void main() {
           for (final group in AppCleanGroup.of(entryOf(report, 'xcode')))
             for (final target in group.targets) target.path: target.label,
         };
-        expect(labels[p.join(derived, runner)], 'Runner · ~/Code/app/ios');
+        expect(
+          labels[p.join(derived, runner)],
+          'Runner · ~/${p.join('Code', 'app', 'ios')}',
+        );
         // No workspace to name it: the hash still tells it apart.
         expect(labels[hashed], 'Other-gbnlvvootdekcsaxzyvzymzkaeaf');
         expect(

@@ -20,6 +20,8 @@ return here for narrative background.
 14. [14-desktop-default-file-manager.md](14-desktop-default-file-manager.md) — Windows, macOS and Linux default-folder integration, opening requests and verification limits.
 15. [15-local-live-subtitles-research.md](15-local-live-subtitles-research.md) — Model research and design; see [desktop local subtitles](../features/12-local-ai-subtitles.md) for the implemented baseline and its limits.
 16. [16-local-subtitle-performance.md](16-local-subtitle-performance.md) — Native acceleration, bounded scheduling, streamed translation and component benchmarks.
+17. [17-bundle-size-audit.md](17-bundle-size-audit.md) — Measured Windows/Linux bundle sizes and reduction opportunities across Windows, macOS, Android and Linux.
+18. [18-bundle-packaging.md](18-bundle-packaging.md) — Shared Windows runtimes, optional Intel NPU, architecture-specific macOS packages and Android size measurement.
 
 The implementation is authoritative. When a technical page conflicts with the
 Agent Graph or source, update the page as part of the same change.

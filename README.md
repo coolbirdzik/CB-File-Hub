@@ -153,7 +153,7 @@ Heavy work (disk scans, search, thumbnails, hashing, archives) runs on Rust work
 | Platform | Get CB File Hub |
 |----------|-----------------|
 | **Windows** | [Microsoft Store](https://apps.microsoft.com/detail/9nchpzkc4m5c), or the [MSI installer / portable ZIP](https://github.com/coolbirdzik/cb-file-hub/releases/latest) |
-| **macOS 12+** | [Universal DMG](https://github.com/coolbirdzik/cb-file-hub/releases/latest) for Apple Silicon and Intel |
+| **macOS 12+** | [DMGs](https://github.com/coolbirdzik/cb-file-hub/releases/latest): `macos-arm64` for Apple Silicon, `macos-x64` for Intel |
 | **Linux** | [.deb for Debian/Ubuntu, or tar.gz](https://github.com/coolbirdzik/cb-file-hub/releases/latest) |
 | **Android** | [Google Play](https://play.google.com/store/apps/details?id=com.cbv.filehub) or [APK](https://github.com/coolbirdzik/cb-file-hub/releases/latest) |
 

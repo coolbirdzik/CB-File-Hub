@@ -39,6 +39,7 @@ lib/generated_plugin_registrant.dart
 /windows/llama/
 /windows/aria2/
 /windows/subtitle-vulkan/
+/windows/ffmpeg-slim/
 
 # Exceptions to above rules.
 !/packages/flutter_tools/test/data/dart_dependencies_test/**/.packages

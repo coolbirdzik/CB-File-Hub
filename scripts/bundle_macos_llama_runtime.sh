@@ -6,8 +6,12 @@ CACHE="${CB_LLAMA_MACOS_CACHE:-$SCRIPT_DIR/../cb_file_manager/build/llama-runtim
 : "${TARGET_BUILD_DIR:?Xcode TARGET_BUILD_DIR is required}"
 : "${CONTENTS_FOLDER_PATH:?Xcode CONTENTS_FOLDER_PATH is required}"
 
-bash "$SCRIPT_DIR/fetch_macos_llama_runtime.sh"
-for arch in arm64 x86_64; do
+archs="${ARCHS:-arm64 x86_64}"
+CB_LLAMA_MACOS_ARCHS="$archs" bash "$SCRIPT_DIR/fetch_macos_llama_runtime.sh"
+license_arch=""
+for arch in $archs; do
+    case "$arch" in arm64|x86_64) ;; *) echo "error: Unsupported llama architecture $arch" >&2; exit 1 ;; esac
+    license_arch=$arch
     dest="$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Helpers/llama/$arch"
     mkdir -p "$dest"
     cp "$CACHE/runtime/$arch/llama-server" "$dest/llama-server"
@@ -22,5 +26,5 @@ for arch in arm64 x86_64; do
     fi
 done
 mkdir -p "$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Resources"
-cp "$CACHE/runtime/arm64/LICENSE" \
+cp "$CACHE/runtime/$license_arch/LICENSE" \
     "$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Resources/llama-runtime-LICENSE.txt"

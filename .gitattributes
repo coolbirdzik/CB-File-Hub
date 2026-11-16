@@ -1,0 +1,2 @@
+# This file is hashed to select the matching cross-built FFmpeg runtime.
+scripts/build_windows_ffmpeg.sh text eol=lf

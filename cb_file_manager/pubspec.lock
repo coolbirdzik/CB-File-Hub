@@ -469,10 +469,9 @@ packages:
   flutter_edge_ai_litertlm:
     dependency: "direct main"
     description:
-      name: flutter_edge_ai_litertlm
-      sha256: "2b76ab41db0293b21719fe4656a41b268fe9a1dfc87c4c991960b3f6668a0309"
-      url: "https://pub.dev"
-    source: hosted
+      path: "third_party/flutter_edge_ai_litertlm"
+      relative: true
+    source: path
     version: "1.17.0"
   flutter_lints:
     dependency: "direct dev"

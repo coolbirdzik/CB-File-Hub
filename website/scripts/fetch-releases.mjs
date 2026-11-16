@@ -78,17 +78,23 @@ function parseCommits(body) {
 export function describeAsset(name) {
   const lower = name.toLowerCase();
   if (lower.endsWith(".zip")) return { platform: "windows", label: "Portable", ext: "zip" };
+  if (lower.endsWith(".7z")) return { platform: "windows", label: "Portable (7z)", ext: "7z" };
   if (lower.endsWith(".msi")) return { platform: "windows", label: "Installer", ext: "msi" };
   if (lower.endsWith(".msix")) return { platform: "windows", label: "MSIX", ext: "msix" };
-  if (lower.endsWith(".dmg")) return { platform: "macos", label: "macOS DMG", ext: "dmg" };
-  if (lower.includes("linux") && (lower.endsWith(".deb") || lower.endsWith(".tar.gz"))) {
+  if (lower.endsWith(".dmg")) {
+    const label = lower.endsWith("-macos-arm64.dmg") ? "macOS (Apple Silicon)"
+      : lower.endsWith("-macos-x64.dmg") ? "macOS (Intel)" : "macOS DMG";
+    return { platform: "macos", label, ext: "dmg" };
+  }
+  if (lower.includes("linux") && (lower.endsWith(".deb") || lower.endsWith(".tar.gz") || lower.endsWith(".tar.xz"))) {
     // The subtitle worker links the distro's FFmpeg ABI directly.
     const distro = lower.includes("ubuntu22.04") ? "Ubuntu 22.04 / Mint 21"
       : lower.includes("ubuntu24.04") ? "Ubuntu 24.04 / Mint 22"
       : lower.includes("debian13") ? "Debian 13" : "Debian 12";
-    const ext = lower.endsWith(".deb") ? "deb" : "tar.gz";
+    const ext = lower.endsWith(".deb") ? "deb" : lower.endsWith(".tar.xz") ? "tar.xz" : "tar.gz";
     const label = ext === "deb"
-      ? `${distro} (.deb)` : `Linux portable (${distro})`;
+      ? `${distro} (.deb)` : ext === "tar.xz"
+        ? `Linux portable (${distro}, tar.xz)` : `Linux portable (${distro})`;
     return { platform: "linux", label, ext };
   }
   if (lower.endsWith(".apk")) {

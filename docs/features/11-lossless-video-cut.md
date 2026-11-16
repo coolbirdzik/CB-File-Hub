@@ -111,7 +111,7 @@ range. Subtitle cues overlapping a cut boundary and some codecs/containers may
 need special handling. Unsupported tracks fail with FFmpeg diagnostics; try
 the source format or MKV instead of MP4. The app never silently re-encodes.
 
-Windows packages install `ffmpeg/ffmpeg.exe`, its shared DLLs and license from
+Windows packages install `ffmpeg.exe`, shared DLLs and `LICENSE-FFmpeg.txt` at the app root from
 the existing pinned FFmpeg download. macOS/Linux search PATH and common
 Homebrew locations; the panel also permits choosing an installed executable.
 No FFmpeg CLI is bundled for mobile.

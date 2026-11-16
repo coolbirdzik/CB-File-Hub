@@ -180,6 +180,21 @@ verify_windows_release_bundle() {
 
     [ -f "$release_dir/cb_file_hub.exe" ] || missing_files+=("cb_file_hub.exe")
     [ -f "$release_dir/flutter_windows.dll" ] || missing_files+=("flutter_windows.dll")
+    [ -f "$release_dir/ffmpeg.exe" ] || missing_files+=("ffmpeg.exe")
+
+    # The hook maps Native Assets to these canonical PE-import filenames.
+    local runtime
+    for runtime in LiteRtLm.dll libLiteRt.dll libGemmaModelConstraintProvider.dll \
+        libLiteRtTopKWebGpuSampler.dll libLiteRtWebGpuAccelerator.dll webgpu_dawn.dll; do
+        [ -f "$release_dir/$runtime" ] || missing_files+=("$runtime")
+    done
+    for runtime in LiteRt.dll GemmaModelConstraintProvider.dll LiteRtTopKWebGpuSampler.dll \
+        LiteRtWebGpuAccelerator.dll libwebgpu_dawn.dll; do
+        if [ -f "$release_dir/$runtime" ]; then
+            print_error "Obsolete duplicate LiteRT DLL: $runtime. Rebuild a clean bundle."
+            return 1
+        fi
+    done
 
     local ffmpeg_patterns=(
         "avcodec-*.dll"
@@ -548,8 +563,14 @@ build_windows_portable() {
             return 0
         fi
         
+        print_info "Creating solid 7z package..."
+        if ! python "$SCRIPT_DIR/package_windows_7z.py" "$RELEASE_DIR" "$PORTABLE_DIR/CBFileHub-Portable.7z"; then
+            cd ..
+            return 1
+        fi
         print_success "Windows Portable build completed!"
         print_info "Output: $OUTPUT_ZIP"
+        print_info "Output: $PORTABLE_DIR/CBFileHub-Portable.7z"
     else
         print_error "Windows build failed!"
         cd ..
@@ -840,7 +861,7 @@ build_android_apk() {
     local VERSION_CODE
     VERSION_NAME=$(get_version_name)
     VERSION_CODE=$(get_version_code)
-    flutter build apk --release --split-per-abi --build-name "$VERSION_NAME" --build-number "$VERSION_CODE" "${CLOUD_DEFINES[@]}"
+    flutter build apk --release --split-per-abi --target-platform android-arm64,android-x64 --build-name "$VERSION_NAME" --build-number "$VERSION_CODE" "${CLOUD_DEFINES[@]}"
     
     if [ $? -eq 0 ]; then
         print_success "Android APK build completed!"
@@ -865,7 +886,7 @@ build_android_aab() {
     local VERSION_CODE
     VERSION_NAME=$(get_version_name)
     VERSION_CODE=$(get_version_code)
-    flutter build appbundle --release --build-name "$VERSION_NAME" --build-number "$VERSION_CODE" "${CLOUD_DEFINES[@]}"
+    flutter build appbundle --release --target-platform android-arm64,android-x64 --build-name "$VERSION_NAME" --build-number "$VERSION_CODE" "${CLOUD_DEFINES[@]}"
     
     if [ $? -eq 0 ]; then
         if ! node ../scripts/check_android_page_sizes.mjs build/app/outputs/bundle/release/app-release.aab; then
@@ -965,8 +986,12 @@ build_linux() {
     staging="$(mktemp -d)"
     cp -a "$bundle" "$staging/cb-file-hub"
     tar -C "$staging" -czf "$out/$base-$flutter_arch.tar.gz" cb-file-hub
+    # Keep gzip compatibility and also offer the smaller xz download. The
+    # installed files and per-distro dependency requirements are identical.
+    tar -C "$staging" -cJf "$out/$base-$flutter_arch.tar.xz" cb-file-hub
     rm -rf "$staging"
     print_info "Output: $out/$base-$flutter_arch.tar.gz"
+    print_info "Output: $out/$base-$flutter_arch.tar.xz"
 
     if command -v dpkg-deb >/dev/null 2>&1; then
         print_info "Creating .deb package..."
@@ -1085,36 +1110,42 @@ build_macos() {
     else
         print_info "Signing $(basename "$APP_PATH") with \"$MACOS_SIGN_IDENTITY\"..."
     fi
-    sign_macos_app "$APP_PATH" "$PROJECT_DIR/macos/Runner/Release.entitlements" "$SIGN_IDENTITY"
-
-    print_info "Creating DMG..."
+    print_info "Creating architecture-specific DMGs..."
     local DMG_DIR="$BUILD_DIR/macos/dmg"
-    local STAGE_DIR="$BUILD_DIR/macos/dmg-stage"
-    local DMG_PATH="$DMG_DIR/CBFileHub-$VERSION_NAME-macos.dmg"
-    rm -rf "$STAGE_DIR" "$DMG_DIR"
-    mkdir -p "$STAGE_DIR" "$DMG_DIR"
-    ditto "$APP_PATH" "$STAGE_DIR/$(basename "$APP_PATH")"
-    ln -s /Applications "$STAGE_DIR/Applications"
-    cp "$REPO_DIR/installer/macos/README.txt" "$STAGE_DIR/How to open - Cach mo.txt"
+    mkdir -p "$DMG_DIR"
+    local arch label STAGE_DIR STAGED_APP DMG_PATH
+    for arch in arm64 x86_64; do
+      label=$arch
+      [ "$arch" != x86_64 ] || label=x64
+      STAGE_DIR="$(mktemp -d "$BUILD_DIR/macos/dmg-stage.XXXXXX")"
+      STAGED_APP="$STAGE_DIR/$(basename "$APP_PATH")"
+      DMG_PATH="$DMG_DIR/CBFileHub-$VERSION_NAME-macos-$label.dmg"
+      bash "$SCRIPT_DIR/stage_macos_arch_bundle.sh" "$APP_PATH" "$STAGED_APP" "$arch"
+      # Thinning invalidates signatures. Sign every staged helper/framework and
+      # then the outer app, using the same identity across architectures/updates.
+      sign_macos_app "$STAGED_APP" "$PROJECT_DIR/macos/Runner/Release.entitlements" "$SIGN_IDENTITY"
+      ln -s /Applications "$STAGE_DIR/Applications"
+      cp "$REPO_DIR/installer/macos/README.txt" "$STAGE_DIR/How to open - Cach mo.txt"
 
-    # hdiutil intermittently fails with "Resource busy" on CI runners.
-    local attempt
-    for attempt in 1 2 3; do
-        if hdiutil create -volname "CB File Hub" -srcfolder "$STAGE_DIR" \
-            -fs HFS+ -format UDZO -ov "$DMG_PATH"; then
-            break
-        fi
-        if [ "$attempt" -eq 3 ]; then
-            print_error "hdiutil failed to create the DMG"
-            return 1
-        fi
-        print_warning "hdiutil failed (attempt $attempt), retrying..."
-        sleep 5
+      # hdiutil intermittently fails with "Resource busy" on CI runners.
+      local attempt
+      for attempt in 1 2 3; do
+          if hdiutil create -volname "CB File Hub" -srcfolder "$STAGE_DIR" \
+              -fs HFS+ -format UDZO -ov "$DMG_PATH"; then
+              break
+          fi
+          if [ "$attempt" -eq 3 ]; then
+              print_error "hdiutil failed to create the DMG"
+              return 1
+          fi
+          print_warning "hdiutil failed (attempt $attempt), retrying..."
+          sleep 5
+      done
+      rm -rf "$STAGE_DIR"
+
+      print_info "Output: $DMG_PATH"
     done
-    rm -rf "$STAGE_DIR"
-
-    print_success "macOS build completed!"
-    print_info "Output: $DMG_PATH"
+    print_success "macOS builds completed!"
 }
 
 # Build iOS

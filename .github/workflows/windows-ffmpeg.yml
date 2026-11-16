@@ -1,0 +1,37 @@
+name: Build shared Windows FFmpeg
+on:
+  workflow_call:
+jobs:
+  ffmpeg:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Restore recipe-specific runtime
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: cb_file_manager/windows/ffmpeg-slim
+          key: windows-ffmpeg-${{ hashFiles('scripts/build_windows_ffmpeg.sh') }}
+      - name: Install cross compiler
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends gcc libc6-dev gcc-mingw-w64-x86-64-posix g++-mingw-w64-x86-64-posix make nasm pkg-config meson ninja-build curl ca-certificates xz-utils
+      - name: Build pinned sources
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: bash scripts/build_windows_ffmpeg.sh
+      - uses: actions/upload-artifact@v7.0.1
+        with:
+          name: windows-ffmpeg-runtime
+          path: cb_file_manager/windows/ffmpeg-slim/
+          include-hidden-files: true
+          if-no-files-found: error
+      - name: Generate synthetic codec fixtures
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ffmpeg
+          python3 scripts/create_media_fixtures.py --output cb_file_manager/build/windows-media-fixtures
+      - uses: actions/upload-artifact@v7.0.1
+        with:
+          name: windows-media-fixtures
+          path: cb_file_manager/build/windows-media-fixtures/

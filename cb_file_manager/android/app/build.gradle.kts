@@ -29,6 +29,21 @@ val hasReleaseSigningConfig = listOf(
     releaseKeyPassword,
 ).all { !it.isNullOrBlank() }
 
+// Flutter's target-platform chooses Dart/engine artifacts, but plugin JARs and
+// generated JNI executables can otherwise still package other architectures.
+// Filter packaging too, without NDK abiFilters (which conflict with ABI splits).
+val requestedNativeAbis = (findProperty("target-platform") as? String
+    ?: "android-arm64,android-x64").split(',').mapNotNull {
+    when (it.trim()) {
+        "android-arm64" -> "arm64-v8a"
+        "android-x64" -> "x86_64"
+        else -> null
+    }
+}.distinct()
+check(requestedNativeAbis.isNotEmpty()) {
+    "CB File Hub requires android-arm64 or android-x64 native runtimes."
+}
+
 android {
     namespace = "com.cbv.filehub"
     // flutter.compileSdkVersion is still 36; flutter_secure_storage 11 and
@@ -58,7 +73,7 @@ android {
             cmake {
                 // Match the existing packaging exclusion without setting NDK
                 // filters, which conflict with Flutter's split-per-ABI builds.
-                abiFilters += listOf("arm64-v8a", "x86_64")
+                abiFilters += requestedNativeAbis
                 arguments += listOf(
                     "-DANDROID_STL=c++_static",
                     "-DCB_LLAMA_PACKAGE_ROOT=${layout.buildDirectory.dir("generated/llamaJniLibs").get().asFile.invariantSeparatorsPath}",
@@ -82,7 +97,9 @@ android {
 
     packaging {
         jniLibs {
-            excludes += "**/armeabi-v7a/**"
+            for (abi in listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")) {
+                if (abi !in requestedNativeAbis) excludes += "**/$abi/**"
+            }
             // Process.start needs the executable in nativeLibraryDir. Executing
             // a binary copied into writable app storage is blocked on Android 10+.
             useLegacyPackaging = true

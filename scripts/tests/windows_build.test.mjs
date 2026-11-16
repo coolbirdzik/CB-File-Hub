@@ -22,7 +22,7 @@ const bash = process.platform === 'win32'
   ? path.join(process.env.ProgramFiles || 'C:/Program Files', 'Git/bin/bash.exe')
   : 'bash';
 
-function runBuild(t, failures) {
+function runBuild(t, failures, fail7z = false) {
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'cb-windows-build-'));
   t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
   const project = path.join(temporary, 'app');
@@ -53,6 +53,7 @@ get_windows_version_code() { echo 1; }
 sleep() { :; }
 verify_windows_release_bundle() { :; }
 zip() { touch "$PACKAGED"; }
+python() { ${fail7z ? 'return 1' : 'touch "$PACKAGED.7z"'}; }
 flutter() {
   local attempt=0
   if [ -f "$COUNTER" ]; then attempt=$(cat "$COUNTER"); fi
@@ -78,6 +79,7 @@ build_windows_portable
     output: result.stdout + result.stderr,
     attempts: Number(fs.readFileSync(path.join(temporary, 'count'), 'utf8')),
     packaged: fs.existsSync(path.join(temporary, 'packaged')),
+    packaged7z: fs.existsSync(path.join(temporary, 'packaged.7z')),
   };
 }
 
@@ -108,6 +110,14 @@ test('successful initial build packages without retry', (t) => {
   assert.equal(result.status, 0, result.output);
   assert.equal(result.attempts, 1);
   assert.equal(result.packaged, true);
+  assert.equal(result.packaged7z, true);
+});
+
+test('7z packaging failure fails the build after ZIP succeeds', (t) => {
+  const result = runBuild(t, [], true);
+  assert.notEqual(result.status, 0, result.output);
+  assert.equal(result.packaged, true);
+  assert.equal(result.packaged7z, false);
 });
 
 // Run the real CMake resolver against a tiny developer archive and loopback

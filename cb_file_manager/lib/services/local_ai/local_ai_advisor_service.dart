@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ffi' show Abi;
 import 'dart:io';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -201,6 +202,13 @@ class LocalAiAdvisorService {
   /// Models offered on this platform. iOS cannot start llama-server, so it
   /// gets LiteRT-LM bundles only; Android lists them before its CPU-only GGUF.
   static List<HuggingFaceModelEntry> get _curatedCatalog {
+    // The pinned LiteRT runtime has no macOS Intel binary. The Intel package
+    // retains llama.cpp and its matching model catalog instead.
+    if (Platform.isMacOS && Abi.current() == Abi.macosX64) {
+      return _curatedModels
+          .where((entry) => entry.artifactFileName.endsWith('.gguf'))
+          .toList();
+    }
     if (!(Platform.isAndroid || Platform.isIOS)) return _curatedModels;
     bool liteRt(HuggingFaceModelEntry e) =>
         e.artifactFileName.endsWith('.litertlm');
@@ -215,7 +223,10 @@ class LocalAiAdvisorService {
     (model) =>
         model.compatible &&
         model.artifactFileName.endsWith(
-          Platform.isWindows ? '.gguf' : '.litertlm',
+          Platform.isWindows ||
+                  (Platform.isMacOS && Abi.current() == Abi.macosX64)
+              ? '.gguf'
+              : '.litertlm',
         ),
   );
 

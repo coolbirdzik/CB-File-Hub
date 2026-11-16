@@ -2,11 +2,14 @@ import data from "../data/releases.json";
 
 const github = "https://github.com/coolbirdzik/CB-File-Hub";
 
-// macOS ships only as a DMG on GitHub Releases: link the newest one straight to the file.
+// Architecture-specific macOS DMGs need a choice, like distro-specific Linux
+// packages. Keep a direct link while the latest release has one legacy DMG.
 // Windows gets the same treatment with the MSI installer, next to the Microsoft Store listing.
 // The snapshot is refreshed on every release build, so these track the latest version.
 const assets = data.releases.flatMap((r) => r.assets);
-const latestDmg = assets.find((a) => a.platform === "macos");
+const latestMacAssets = data.releases.find((r) => r.assets.some((a) => a.platform === "macos"))
+  ?.assets.filter((a) => a.platform === "macos") ?? [];
+const latestDmg = latestMacAssets[0];
 const latestMsi = assets.find((a) => a.platform === "windows" && a.ext === "msi");
 // Linux packages have different FFmpeg ABIs. Let users choose their distro on
 // the releases page instead of sending everyone the Debian 12 package.
@@ -16,7 +19,7 @@ export const links = {
   microsoftStore: "https://apps.microsoft.com/detail/9nchpzkc4m5c",
   googlePlay: "https://play.google.com/store/apps/details?id=com.cbv.filehub",
   windows: latestMsi?.url ?? `${github}/releases/latest`,
-  macos: latestDmg?.url ?? `${github}/releases/latest`,
+  macos: latestMacAssets.length > 1 ? "/releases/" : latestDmg?.url ?? `${github}/releases/latest`,
   linux: hasLinuxPackage ? "/releases/" : undefined,
   privacy: "/privacy",
   terms: "/terms",

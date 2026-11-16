@@ -1,10 +1,10 @@
 #include "ffmpeg_thumbnail_helper.h"
-#include "fc_native_video_thumbnail_plugin.h"
 
 #include <atlbase.h>
 #include <atlimage.h>
 #include <codecvt>
 #include <locale>
+#include <mutex>
 #include <stdexcept>
 #include <vector>
 

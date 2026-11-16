@@ -142,18 +142,22 @@ class _ScrollableTabBarState extends State<ScrollableTabBar> {
         widget.activeTabBackgroundColor ?? tabBackgroundColor;
     final hoverColor = theme.colorScheme.surfaceContainerHigh;
 
-    final customTitleBar = Platform.isWindows && widget.showWindowControls;
+    final platform = theme.platform;
+    // Linux also hides its native title bar at startup. macOS keeps native
+    // traffic lights, while Windows and Linux need the app's caption buttons.
+    final usesCustomCaptionButtons =
+        platform == TargetPlatform.windows || platform == TargetPlatform.linux;
+    final customTitleBar =
+        usesCustomCaptionButtons && widget.showWindowControls;
     Widget windowCaptionButtons = customTitleBar
         ? WindowCaptionButtons(theme: theme)
         : const SizedBox.shrink();
 
     // Main container for the entire bar
     return Container(
-      height: Platform.isWindows
-          ? 50
-          : null, // Provide a specific height for the custom title bar on Windows
+      height: usesCustomCaptionButtons ? 50 : null,
       decoration: BoxDecoration(color: tabBackgroundColor, boxShadow: const []),
-      margin: Platform.isWindows || Platform.isMacOS
+      margin: usesCustomCaptionButtons || platform == TargetPlatform.macOS
           ? EdgeInsets.zero
           : const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       padding: EdgeInsets.zero,
@@ -164,7 +168,7 @@ class _ScrollableTabBarState extends State<ScrollableTabBar> {
             const DragToMoveArea(
               child: SizedBox(width: 12, height: double.infinity),
             )
-          else if (Platform.isWindows)
+          else if (usesCustomCaptionButtons)
             const SizedBox(width: 12),
           // Tab strip area (not draggable) so tab drag gestures can win.
           Expanded(
@@ -238,7 +242,8 @@ class _ScrollableTabBarState extends State<ScrollableTabBar> {
                         activeTabIndex: widget.activeTabIndex,
                         hasCustomTitleBar:
                             widget.showWindowControls &&
-                            (Platform.isWindows || Platform.isMacOS),
+                            (usesCustomCaptionButtons ||
+                                platform == TargetPlatform.macOS),
                         theme: theme,
                       ),
                     ),
@@ -389,7 +394,7 @@ class _ModernTabBarState extends State<_ModernTabBar> {
   static const Duration _doubleClickTimeout = Duration(milliseconds: 350);
   static const double _doubleClickSlop = 22.0;
 
-  // Windows and macOS hide the native title bar, so the blank strip stands in
+  // Desktop windows hide the native title bar, so the blank strip stands in
   // for it: drag to move the window, double-click to maximize/zoom.
   bool get _hasCustomTitleBar => widget.hasCustomTitleBar;
 

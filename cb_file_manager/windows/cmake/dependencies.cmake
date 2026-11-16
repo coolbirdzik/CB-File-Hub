@@ -18,6 +18,12 @@ set(
 # Month-end builds are retained for two years; daily builds expire in 14 days.
 set(COOLBIRD_FFMPEG_SHA256 "0a41f31caff48e3035b48f09f5d840bd8d1863008240fc43e457f15e589cf5b3")
 
+# Linux/WSL builds and CI stage the smaller source-built distribution here.
+# Include the recipe in the marker so old caches cannot silently win.
+file(READ "${CMAKE_CURRENT_LIST_DIR}/../../../scripts/build_windows_ffmpeg.sh" _coolbird_ffmpeg_recipe)
+string(REPLACE "\r\n" "\n" _coolbird_ffmpeg_recipe "${_coolbird_ffmpeg_recipe}")
+string(SHA256 COOLBIRD_FFMPEG_SLIM_VERSION "${_coolbird_ffmpeg_recipe}")
+
 function(coolbird_ensure_nuget)
   if(DEFINED NUGET AND EXISTS "${NUGET}")
     set(NUGET "${NUGET}" CACHE FILEPATH "Path to nuget.exe" FORCE)
@@ -74,6 +80,25 @@ function(coolbird_resolve_ffmpeg_dir OUT_VAR)
   if(DEFINED FFMPEG_DIR AND EXISTS "${FFMPEG_DIR}/include/libavcodec/avcodec.h")
     set(${OUT_VAR} "${FFMPEG_DIR}" PARENT_SCOPE)
     message(STATUS "Using configured FFmpeg directory: ${FFMPEG_DIR}")
+    return()
+  endif()
+
+  set(_coolbird_slim "${CMAKE_SOURCE_DIR}/ffmpeg-slim")
+  if(EXISTS "${_coolbird_slim}/.runtime-version")
+    file(READ "${_coolbird_slim}/.runtime-version" _coolbird_slim_version)
+    string(STRIP "${_coolbird_slim_version}" _coolbird_slim_version)
+    if(NOT _coolbird_slim_version STREQUAL COOLBIRD_FFMPEG_SLIM_VERSION)
+      message(FATAL_ERROR "FFmpeg source-build recipe changed. Rerun scripts/build_windows_ffmpeg.sh before building.")
+    endif()
+    foreach(_required IN ITEMS include/libavcodec/avcodec.h lib/avcodec.lib bin/ffmpeg.exe
+        bin/avcodec-62.dll bin/avformat-62.dll bin/avutil-60.dll bin/avfilter-11.dll
+        bin/swscale-9.dll bin/swresample-6.dll LICENSE.txt)
+      if(NOT EXISTS "${_coolbird_slim}/${_required}")
+        message(FATAL_ERROR "Incomplete source-built FFmpeg: ${_coolbird_slim}/${_required}")
+      endif()
+    endforeach()
+    set(${OUT_VAR} "${_coolbird_slim}" PARENT_SCOPE)
+    message(STATUS "Using source-built FFmpeg directory: ${_coolbird_slim}")
     return()
   endif()
 

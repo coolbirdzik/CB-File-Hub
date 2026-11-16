@@ -29,6 +29,26 @@ prepare_release:
     reports:
       dotenv: $RELEASE_OUTPUT_DIR/release.env
 
+build_windows_ffmpeg:
+  stage: prepare
+  image: ubuntu:24.04
+  before_script:
+    - apt-get update
+    - apt-get install -y --no-install-recommends gcc libc6-dev gcc-mingw-w64-x86-64-posix g++-mingw-w64-x86-64-posix make nasm pkg-config meson ninja-build curl ca-certificates xz-utils ffmpeg
+  script:
+    - bash scripts/build_windows_ffmpeg.sh
+    - python3 scripts/create_media_fixtures.py --output ci/windows-media-fixtures
+  cache:
+    key:
+      files:
+        - scripts/build_windows_ffmpeg.sh
+    paths:
+      - cb_file_manager/windows/ffmpeg-slim/
+  artifacts:
+    paths:
+      - cb_file_manager/windows/ffmpeg-slim/
+      - ci/windows-media-fixtures/
+
 build_android_release:
   stage: build
   # Versioned container tags can lag SDK releases; pin the SDK below instead.
@@ -75,6 +95,8 @@ build_windows_release:
   needs:
     - job: prepare_release
       artifacts: true
+    - job: build_windows_ffmpeg
+      artifacts: true
   script:
     - '$ErrorActionPreference = "Stop"'
     - '$gitBashCandidates = @("$env:ProgramFiles\\Git\\bin\\bash.exe", "${env:ProgramFiles(x86)}\\Git\\bin\\bash.exe")'
@@ -83,9 +105,12 @@ build_windows_release:
     - '$env:Path += ";C:\\ProgramData\\chocolatey\\bin"'
     - 'if (-not (Get-Command make.exe -ErrorAction SilentlyContinue)) { choco install make -y }'
     - 'if (-not (Get-Command iscc.exe -ErrorAction SilentlyContinue)) { choco install innosetup -y }'
+    - 'if (-not (Test-Path "$env:ProgramFiles\\7-Zip\\7z.exe")) { choco install 7zip -y }'
     - '& $gitBash -lc "export PATH=\"/c/ProgramData/chocolatey/bin:$PATH\"; make windows-exe"'
+    - '& ./scripts/check_windows_media.ps1 -Fixtures ci/windows-media-fixtures'
     - 'New-Item -ItemType Directory -Force -Path "$env:RELEASE_OUTPUT_DIR\\windows" | Out-Null'
     - 'Copy-Item "cb_file_manager\\build\\windows\\portable\\CBFileHub-Portable.zip" "$env:RELEASE_OUTPUT_DIR\\windows\\CBFileHub-$env:RELEASE_VERSION-windows-portable.zip" -Force'
+    - 'Copy-Item "cb_file_manager\\build\\windows\\portable\\CBFileHub-Portable.7z" "$env:RELEASE_OUTPUT_DIR\\windows\\CBFileHub-$env:RELEASE_VERSION-windows-portable.7z" -Force'
     - 'Copy-Item "cb_file_manager\\build\\windows\\installer\\CBFileHub-Setup.exe" "$env:RELEASE_OUTPUT_DIR\\windows\\CBFileHub-Setup-$env:RELEASE_VERSION.exe" -Force'
   artifacts:
     paths:
@@ -120,7 +145,7 @@ build_linux_release:
     - if [ "$LINUX_DISTRO" != "debian12" ]; then export LINUX_ARTIFACT_SUFFIX="$LINUX_DISTRO"; fi
     - bash scripts/build.sh linux
     - mkdir -p "$RELEASE_OUTPUT_DIR/linux"
-    - cp cb_file_manager/build/linux/portable/*.deb cb_file_manager/build/linux/portable/*.tar.gz "$RELEASE_OUTPUT_DIR/linux/"
+    - cp cb_file_manager/build/linux/portable/*.deb cb_file_manager/build/linux/portable/*.tar.gz cb_file_manager/build/linux/portable/*.tar.xz "$RELEASE_OUTPUT_DIR/linux/"
   artifacts:
     paths:
       - $RELEASE_OUTPUT_DIR/linux/
