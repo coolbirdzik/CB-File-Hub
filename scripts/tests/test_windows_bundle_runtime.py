@@ -103,6 +103,10 @@ class WindowsBundleRuntimeTest(unittest.TestCase):
         names = ['webgpu_dawn.dll', 'libLiteRt.dll', 'libGemmaModelConstraintProvider.dll',
                  'libLiteRtTopKWebGpuSampler.dll', 'libLiteRtWebGpuAccelerator.dll',
                  'LiteRtLm.dll']
+        for name in names:
+            self.assertTrue((self.bundle / name).is_file(),
+                            f'Missing bundled native asset: {name}. '
+                            'Check the native-assets CMake install rule and Flutter hook output.')
         for alias in ['libwebgpu_dawn.dll', 'LiteRt.dll', 'GemmaModelConstraintProvider.dll',
                       'LiteRtTopKWebGpuSampler.dll', 'LiteRtWebGpuAccelerator.dll']:
             self.assertFalse((self.bundle / alias).exists())

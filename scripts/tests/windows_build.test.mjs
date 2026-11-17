@@ -22,6 +22,50 @@ const bash = process.platform === 'win32'
   ? path.join(process.env.ProgramFiles || 'C:/Program Files', 'Git/bin/bash.exe')
   : 'bash';
 
+test('clean Windows configure installs native assets produced later by Flutter', (t) => {
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'cb-native-assets-install-'));
+  t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
+  const cmakeSource = fs.readFileSync(new URL('../../cb_file_manager/windows/CMakeLists.txt', import.meta.url), 'utf8')
+    .replaceAll('\r\n', '\n');
+  const start = cmakeSource.indexOf('set(NATIVE_ASSETS_DIR ');
+  const end = cmakeSource.indexOf('\n# Fully re-copy the assets directory', start);
+  assert.ok(start >= 0 && end > start);
+  fs.writeFileSync(path.join(temporary, 'CMakeLists.txt'), `
+cmake_minimum_required(VERSION 3.14)
+# No compilation or make invocation: only generate and execute cmake_install.cmake.
+set(CMAKE_MAKE_PROGRAM "\${CMAKE_COMMAND}" CACHE FILEPATH "Unused by this install-only fixture")
+project(native_assets_install NONE)
+set(PROJECT_BUILD_DIR "\${CMAKE_BINARY_DIR}/flutter-assemble")
+set(INSTALL_BUNDLE_LIB_DIR "\${CMAKE_BINARY_DIR}/bundle")
+${cmakeSource.slice(start, end)}
+`);
+  const build = path.join(temporary, 'build');
+  const configure = spawnSync('cmake', ['-S', temporary, '-B', build, '-G', 'Unix Makefiles'], {
+    encoding: 'utf8', timeout: 30_000,
+  });
+  assert.ifError(configure.error);
+  assert.equal(configure.status, 0, configure.stdout + configure.stderr);
+  const nativeAssets = path.join(build, 'flutter-assemble/native_assets/windows');
+  assert.equal(fs.existsSync(nativeAssets), false);
+  const emptyInstall = spawnSync('cmake', ['--install', build, '--component', 'Runtime'], {
+    encoding: 'utf8', timeout: 30_000,
+  });
+  assert.ifError(emptyInstall.error);
+  assert.equal(emptyInstall.status, 0, emptyInstall.stdout + emptyInstall.stderr);
+  // flutter_assemble runs after CMake configure and before INSTALL.vcxproj.
+  fs.mkdirSync(nativeAssets, { recursive: true });
+  const files = ['webgpu_dawn.dll', 'libLiteRt.dll', 'LiteRtLm.dll', 'native_assets.json'];
+  for (const name of files) fs.writeFileSync(path.join(nativeAssets, name), `fixture: ${name}`);
+  const install = spawnSync('cmake', ['--install', build, '--component', 'Runtime'], {
+    encoding: 'utf8', timeout: 30_000,
+  });
+  assert.ifError(install.error);
+  assert.equal(install.status, 0, install.stdout + install.stderr);
+  for (const name of files) {
+    assert.equal(fs.readFileSync(path.join(build, 'bundle', name), 'utf8'), `fixture: ${name}`);
+  }
+});
+
 function runBuild(t, failures, fail7z = false) {
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'cb-windows-build-'));
   t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));

@@ -204,12 +204,13 @@ install(CODE "
 " COMPONENT Runtime)
 
 set(NATIVE_ASSETS_DIR "${PROJECT_BUILD_DIR}/native_assets/windows")
-if(EXISTS "${NATIVE_ASSETS_DIR}")
-  # Trailing slash copies the contents of the directory.
-  install(DIRECTORY "${NATIVE_ASSETS_DIR}/"
-     DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
-     COMPONENT Runtime)
-endif()
+# flutter_assemble produces this directory AFTER CMake configures a clean
+# build. Always register the install rule; OPTIONAL checks for its presence
+# at install time for configurations without bundled native assets.
+# Trailing slash copies the contents of the directory.
+install(DIRECTORY "${NATIVE_ASSETS_DIR}/"
+   DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
+   COMPONENT Runtime OPTIONAL)
 
 # Fully re-copy the assets directory on each build to avoid having stale files
 # from a previous install.

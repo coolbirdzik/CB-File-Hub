@@ -33,6 +33,15 @@ Dawn deliberately has no `lib` prefix: both WebGPU companions import
 No native binaries are rewritten and no symlinks or hardlinks are required.
 The original archive checksums and runtime versions remain pinned upstream.
 
+On a clean Windows build, CMake configures before `flutter_assemble` creates
+`build/native_assets/windows`. The directory install rule must be registered
+unconditionally; `OPTIONAL` handles absence at install time. A configure-time
+`if(EXISTS ...)` silently omits every bundled native asset on a fresh checkout,
+even though incremental builds can pass. The build-script regression test
+configures without that directory, creates assets afterward, and checks the
+installed DLLs. Runtime component checks report missing filenames before trying
+to load their dependencies.
+
 Intel NPU is an optional distribution component. CPU/GPU and both model
 formats remain available in the default Windows build. To ship the Intel
 OpenVINO/TBB stack, set this in `cb_file_manager/pubspec.yaml` and rebuild:
