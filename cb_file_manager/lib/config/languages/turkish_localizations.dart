@@ -986,6 +986,16 @@ class TurkishLocalizations implements AppLocalizations {
   @override
   String get sshClearTerminal => 'Terminali temizle';
   @override
+  String get sshCopyLink => 'SSH bağlantısını kopyala';
+  @override
+  String get sshCopyCommand => 'SSH komutunu kopyala';
+  @override
+  String get sshCopiedCommandWithKey =>
+      'Özel anahtarlı komut kopyalandı. Yalnızca güvenilir bir terminale yapıştırın.';
+  @override
+  String get sshCommandProxyUnsupported =>
+      'Uygulama proxy ayarları henüz bağımsız SSH komutlarına aktarılamıyor.';
+  @override
   String get sshVaultHint =>
       'Parolalar ve özel anahtarlar bu cihazdaki güvenli depolamada saklanır.';
   @override

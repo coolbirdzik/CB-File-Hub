@@ -990,6 +990,16 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get sshClearTerminal => 'Clear terminal';
   @override
+  String get sshCopyLink => 'Copy SSH link';
+  @override
+  String get sshCopyCommand => 'Copy SSH command';
+  @override
+  String get sshCopiedCommandWithKey =>
+      'Copied command with private key. Paste only into a trusted terminal.';
+  @override
+  String get sshCommandProxyUnsupported =>
+      'App proxies cannot yet be exported as standalone SSH commands.';
+  @override
   String get sshVaultHint =>
       'Passwords and private keys are saved in secure storage on this device.';
   @override

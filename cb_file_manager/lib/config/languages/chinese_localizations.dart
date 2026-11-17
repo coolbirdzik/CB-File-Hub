@@ -895,6 +895,14 @@ class ChineseLocalizations implements AppLocalizations {
   @override
   String get sshClearTerminal => '清除终端';
   @override
+  String get sshCopyLink => '复制 SSH 链接';
+  @override
+  String get sshCopyCommand => '复制 SSH 命令';
+  @override
+  String get sshCopiedCommandWithKey => '已复制包含私钥的命令。请仅粘贴到可信终端。';
+  @override
+  String get sshCommandProxyUnsupported => '暂不支持将应用代理导出为独立 SSH 命令。';
+  @override
   String get sshVaultHint => '密码和私钥保存在此设备的安全存储中。';
   @override
   String get ftpSecurity => '连接安全';

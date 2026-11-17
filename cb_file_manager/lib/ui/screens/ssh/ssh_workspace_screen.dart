@@ -11,10 +11,12 @@ import '../../../design_system/cb_design_system.dart';
 import '../../../services/network_browsing/network_service_registry.dart';
 import '../../../services/ssh/local_ssh_discovery.dart';
 import '../../../services/ssh/ssh_profile_store.dart';
+import '../../../services/ssh/ssh_command_export.dart';
 import '../../tab_manager/core/tab_manager.dart';
 import '../../utils/route.dart';
 import '../../utils/platform_utils.dart';
 import '../../components/common/app_toast.dart';
+import '../../components/common/shared_file_context_menu.dart';
 import '../../components/common/grid_list_collection.dart';
 import '../../components/common/collection_view_scale_controller.dart';
 import '../../components/common/search_text_field.dart';
@@ -97,6 +99,29 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
       ValueNotifier<({List<SshProfile> profiles, bool cut})?>(null);
 
   bool _selected(String id) => _selection.state.isPathSelected(id);
+
+  Future<void> _copyConnectionText(
+    SshProfile profile, {
+    bool command = false,
+  }) => _run(() async {
+    if (command && profile.proxyId != null) {
+      throw StateError(context.tr.sshCommandProxyUnsupported);
+    }
+    final key = store.keys.where((key) => key.id == profile.keyId).firstOrNull;
+    if (command && profile.keyId != null && key == null) {
+      throw StateError(context.tr.sshImportMissingKey);
+    }
+    final text = command ? buildSshCommand(profile, key: key) : profile.sshLink;
+    await Clipboard.setData(ClipboardData(text: text));
+    if (mounted) {
+      AppToast.success(
+        context,
+        command && key != null
+            ? context.tr.sshCopiedCommandWithKey
+            : context.tr.copiedToClipboard(profile.name),
+      );
+    }
+  });
 
   List<SshProfile> get _selectedProfiles => _hostEntries
       .whereType<_ProfileEntry>()
@@ -1160,28 +1185,75 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
             : null,
         showTerminalAction: !widget.sftpOnly,
         menuTooltip: tr.moreOptions,
-        menuBuilder: (menuContext) => [
-          _menuItem(
-            menuContext,
+        menuBuilder: (menuContext) => _hostMenuSections(menuContext, p),
+      ),
+    );
+  }
+
+  List<ContextMenuSection> _hostMenuSections(
+    BuildContext context,
+    SshProfile p,
+  ) {
+    final tr = context.tr;
+    ContextMenuAction action(
+      String id,
+      IconData icon,
+      String label,
+      FutureOr<void> Function() run, {
+      bool enabled = true,
+      bool danger = false,
+    }) => ContextMenuAction(
+      id: id,
+      label: label,
+      icon: icon,
+      isEnabled: enabled,
+      isDestructive: danger,
+      onSelected: (_) => run(),
+    );
+
+    return [
+      ContextMenuSection(
+        actions: [
+          action(
+            'ssh_open_terminal',
             PhosphorIconsLight.terminalWindow,
             tr.sshOpenTerminal,
             () => _openTerminal(p),
           ),
-          _menuItem(
-            menuContext,
+          action(
+            'ssh_open_terminal_new_tab',
             PhosphorIconsLight.arrowSquareOut,
             '${tr.sshOpenTerminal} (${tr.openInNewTab})',
             () => _openTerminalInNewTab(p),
           ),
-          const PopupMenuDivider(),
-          _menuItem(menuContext, PhosphorIconsLight.copy, tr.copy, () {
+        ],
+      ),
+      ContextMenuSection(
+        actions: [
+          action(
+            'ssh_copy_link',
+            PhosphorIconsLight.link,
+            tr.sshCopyLink,
+            () => _copyConnectionText(p),
+          ),
+          action(
+            'ssh_copy_command',
+            PhosphorIconsLight.terminalWindow,
+            tr.sshCopyCommand,
+            () => _copyConnectionText(p, command: true),
+          ),
+        ],
+      ),
+      ContextMenuSection(
+        actions: [
+          action('copy', PhosphorIconsLight.copy, tr.copy, () {
             if (!_selected(p.id)) {
               _clipboard.value = (profiles: [p], cut: false);
             } else {
               _holdProfiles(false);
             }
           }),
-          _menuItem(menuContext, PhosphorIconsLight.scissors, tr.cut, () {
+          action('cut', PhosphorIconsLight.scissors, tr.cut, () {
             if (!_selected(p.id)) {
               _clipboard.value = (profiles: [p], cut: true);
             } else {
@@ -1189,42 +1261,52 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
             }
           }),
           if (_clipboard.value != null)
-            _menuItem(
-              menuContext,
+            action(
+              'paste',
               PhosphorIconsLight.clipboardText,
               tr.pasteHere,
               _pasteProfiles,
             ),
-          const PopupMenuDivider(),
-          _menuItem(
-            menuContext,
+          action(
+            'delete',
+            PhosphorIconsLight.trash,
+            tr.delete,
+            () => _deleteProfiles(_selected(p.id) ? _selectedProfiles : [p]),
+            danger: true,
+          ),
+        ],
+      ),
+      ContextMenuSection(
+        actions: [
+          action(
+            'ssh_browse',
             PhosphorIconsLight.folderOpen,
             _connecting == p.id ? tr.sshConnecting : tr.sshBrowseFiles,
             () => _browse(p),
             enabled: _connecting == null,
           ),
-          _menuItem(
-            menuContext,
+          action(
+            'ssh_browse_new_tab',
             PhosphorIconsLight.arrowSquareOut,
             '${tr.sshBrowseFiles} (${tr.openInNewTab})',
             () => _browse(p, openInNewTab: true),
             enabled: _connecting == null,
           ),
-          _menuItem(
-            menuContext,
+          action(
+            'ssh_transfer',
             PhosphorIconsLight.arrowsLeftRight,
             tr.sshFileTransfer,
             () => _openTransfer(p),
           ),
-          _menuItem(
-            menuContext,
+          action(
+            'ssh_transfer_new_tab',
             PhosphorIconsLight.arrowSquareOut,
             '${tr.sshFileTransfer} (${tr.openInNewTab})',
             () => _openTransfer(p, true),
           ),
           if (!widget.sftpOnly)
-            _menuItem(
-              menuContext,
+            action(
+              'ssh_add_forward',
               PhosphorIconsLight.plus,
               tr.sshAddForward,
               () {
@@ -1236,61 +1318,19 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
                 showSshForwardDialog(context, store, profileId: p.id);
               },
             ),
-          const PopupMenuDivider(),
-          _menuItem(
-            menuContext,
+        ],
+      ),
+      ContextMenuSection(
+        actions: [
+          action(
+            'edit',
             PhosphorIconsLight.pencilSimple,
             tr.edit,
             () => _edit(p),
           ),
-          _menuItem(
-            menuContext,
-            PhosphorIconsLight.trash,
-            tr.delete,
-            () => _deleteProfiles(_selected(p.id) ? _selectedProfiles : [p]),
-            danger: true,
-          ),
         ],
       ),
-    );
-  }
-
-  PopupMenuItem<void> _menuItem(
-    BuildContext context,
-    IconData icon,
-    String label,
-    VoidCallback onTap, {
-    bool enabled = true,
-    bool danger = false,
-  }) {
-    final c = context.cbColors;
-    final color = !enabled
-        ? c.textDisabled
-        : danger
-        ? c.status.danger
-        : c.textPrimary;
-    return PopupMenuItem<void>(
-      enabled: enabled,
-      onTap: onTap,
-      height: CbSizes.controlMd + CbSpacing.xs,
-      child: Row(
-        children: [
-          Icon(
-            icon,
-            size: CbSizes.iconMd,
-            color: danger && enabled ? color : c.iconSubtle,
-          ),
-          const SizedBox(width: CbSpacing.md),
-          Flexible(
-            child: Text(
-              label,
-              style: CbTypography.body.copyWith(color: color),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
-      ),
-    );
+    ];
   }
 
   Widget _keysSection(BuildContext context, {required bool compact}) {

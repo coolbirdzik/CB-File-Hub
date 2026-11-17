@@ -976,6 +976,16 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get sshClearTerminal => 'Xóa màn hình terminal';
   @override
+  String get sshCopyLink => 'Sao chép link SSH';
+  @override
+  String get sshCopyCommand => 'Sao chép lệnh SSH';
+  @override
+  String get sshCopiedCommandWithKey =>
+      'Đã sao chép lệnh kèm private key. Chỉ dán vào terminal tin cậy.';
+  @override
+  String get sshCommandProxyUnsupported =>
+      'Chưa thể xuất proxy của app thành lệnh SSH độc lập.';
+  @override
   String get sshVaultHint =>
       'Mật khẩu và private key được lưu trong kho bảo mật trên thiết bị này.';
   @override

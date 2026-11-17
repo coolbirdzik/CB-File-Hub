@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
@@ -5,6 +7,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../design_system/cb_design_system.dart';
 import '../../components/common/optimized_interaction_handler.dart';
+import '../../components/common/shared_file_context_menu.dart';
 import '../../utils/item_interaction_style.dart';
 import '../../widgets/compact_list_content.dart';
 import 'ssh_connection_status.dart';
@@ -59,7 +62,7 @@ class SshHostListItem extends StatefulWidget {
   final VoidCallback? onOpen, onOpenInNewTab, onBrowse, onBrowseInNewTab;
   final bool showTerminalAction;
   final bool isDetails;
-  final PopupMenuItemBuilder<void> menuBuilder;
+  final List<ContextMenuSection> Function(BuildContext) menuBuilder;
 
   @override
   State<SshHostListItem> createState() => _SshHostListItemState();
@@ -67,7 +70,6 @@ class SshHostListItem extends StatefulWidget {
 
 class _SshHostListItemState extends State<SshHostListItem> {
   final _focus = FocusNode();
-  final _menu = GlobalKey<PopupMenuButtonState<void>>();
   bool _hovering = false;
   bool _showFocus = false;
 
@@ -458,14 +460,23 @@ class _SshHostListItemState extends State<SshHostListItem> {
     child: OptimizedInteractionLayer(
       onTap: widget.isDesktop ? _select : () => widget.onOpen?.call(),
       onDoubleTap: widget.isDesktop ? widget.onOpen : null,
-      onSecondaryTapUp: (_) {
+      onSecondaryTapUp: (details) {
         _focus.requestFocus();
         if (!widget.isSelected) widget.onSelect();
-        _menu.currentState?.showButtonMenu();
+        unawaited(_showMenu(details.globalPosition));
       },
       child: child,
     ),
   );
+
+  Future<void> _showMenu(Offset position) async {
+    await showContextMenuPopup(
+      context: context,
+      globalPosition: position,
+      sections: widget.menuBuilder(context),
+    );
+    if (mounted) _focus.requestFocus();
+  }
 
   Widget _openInNewTabOnMiddleClick({
     required Widget child,
@@ -482,20 +493,17 @@ class _SshHostListItemState extends State<SshHostListItem> {
   Widget _menuButton({bool compact = false, double? extent}) => SizedBox(
     width: extent ?? (compact ? CbSizes.controlMd : CbSizes.controlSm),
     height: extent ?? (compact ? CbSizes.controlMd : CbSizes.controlSm),
-    child: PopupMenuButton<void>(
-      key: _menu,
-      tooltip: widget.menuTooltip,
-      padding: EdgeInsets.zero,
-      iconSize: CbSizes.iconSm,
-      popUpAnimationStyle: AnimationStyle.noAnimation,
-      enableFeedback: false,
-      style: const ButtonStyle(
-        overlayColor: WidgetStatePropertyAll(Colors.transparent),
-        splashFactory: NoSplash.splashFactory,
-        animationDuration: Duration.zero,
+    child: Builder(
+      builder: (buttonContext) => CbButton.icon(
+        key: const ValueKey('ssh-host-menu'),
+        icon: PhosphorIconsLight.dotsThree,
+        tooltip: widget.menuTooltip,
+        size: CbButtonSize.sm,
+        onPressed: () {
+          final box = buttonContext.findRenderObject() as RenderBox;
+          unawaited(_showMenu(box.localToGlobal(Offset(0, box.size.height))));
+        },
       ),
-      icon: const Icon(PhosphorIconsLight.dotsThree),
-      itemBuilder: widget.menuBuilder,
     ),
   );
 }

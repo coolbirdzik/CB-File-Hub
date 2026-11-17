@@ -2,10 +2,54 @@ import 'package:cb_file_manager/services/ssh/ssh_profile_store.dart';
 import 'package:dartssh2/dartssh2.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/foundation.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUp(() => FlutterSecureStorage.setMockInitialValues({}));
+  test('SSH links preserve ports and IPv6 without vault credentials', () {
+    const profile = SshProfile(
+      id: '1',
+      name: 'Work',
+      host: '2001:db8::1',
+      username: 'alice',
+      port: 2222,
+      password: 'secret',
+      keyId: 'vault-key',
+      proxyId: 'vault-proxy',
+    );
+    expect(profile.sshLink, 'ssh://alice@[2001:db8::1]:2222');
+    expect(profile.sshCommand, "ssh -p 2222 -l 'alice' -- '2001:db8::1'");
+    expect(profile.sshCommand, isNot(contains('secret')));
+    expect(profile.sshCommand, isNot(contains('vault')));
+  });
+  test('SSH link encodes usernames as one URI and shell argument', () {
+    const username = "domain\\o'connor@work;\u0024(test)";
+    const profile = SshProfile(
+      id: '2',
+      name: 'Test',
+      host: 'example.test',
+      username: username,
+    );
+    final uri = Uri.parse(profile.sshLink);
+    expect(Uri.decodeComponent(uri.userInfo), username);
+    expect(uri.port, 22);
+    expect(profile.sshLink, isNot(contains("'")));
+    expect(profile.sshLink, isNot(contains(';')));
+    expect(profile.sshLink, isNot(contains('\u0024')));
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+    expect(
+      profile.sshCommand,
+      r"ssh -p 22 -l 'domain\o''connor@work;$(test)' -- 'example.test'",
+    );
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    expect(
+      profile.sshCommand,
+      r'''ssh -p 22 -l 'domain\o'"'"'connor@work;$(test)' -- 'example.test' '''
+          .trim(),
+    );
+  });
   test(
     'generated Ed25519 key imports and retains the same public identity',
     () {

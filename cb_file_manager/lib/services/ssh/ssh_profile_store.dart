@@ -15,6 +15,16 @@ export 'ssh_forward.dart';
 export 'ssh_proxy.dart';
 export 'ssh_proxy_socket.dart' show SshConnectPhase, SshPhaseListener;
 
+String quoteSshShellArgument(String value, {TargetPlatform? platform}) {
+  final escaped = value.replaceAll(
+    "'",
+    (platform ?? defaultTargetPlatform) == TargetPlatform.windows
+        ? "''"
+        : "'\"'\"'",
+  );
+  return "'$escaped'";
+}
+
 class SshProfile {
   final String id, name, host, username, password, group;
   final int port;
@@ -32,6 +42,22 @@ class SshProfile {
   });
   String get authority =>
       Uri(userInfo: username, host: host, port: port).authority;
+
+  /// OpenSSH destination URI. Credentials and app-managed keys/proxies stay
+  /// in the vault; an external client uses its own authentication and routing.
+  String get sshLink => Uri(
+    scheme: 'ssh',
+    userInfo: Uri.encodeComponent(username),
+    host: host,
+    port: port,
+  ).toString().replaceAll("'", '%27');
+
+  /// Use separate arguments because some Windows OpenSSH clients reject IPv6
+  /// destination URIs. Quote for PowerShell on Windows and POSIX shells elsewhere.
+  String get sshCommand {
+    return 'ssh -p $port -l ${quoteSshShellArgument(username)} -- ${quoteSshShellArgument(host)}';
+  }
+
   Map<String, dynamic> toJson() => {
     'id': id,
     'name': name,

@@ -185,13 +185,25 @@ void main() {
                   .isSelected,
               isFalse,
             );
+            final hostMenu = find.descendant(
+              of: find.byType(SshHostListItem),
+              matching: find.byKey(const ValueKey('ssh-host-menu')),
+            );
+            expect(hostMenu, findsOneWidget);
+            await tester.tap(hostMenu);
+            await tester.pumpAndSettle();
             expect(
-              find.descendant(
-                of: find.byType(SshHostListItem),
-                matching: find.byType(PopupMenuButton<void>),
+              find.byKey(const ValueKey('context-menu-quick-actions')),
+              findsOneWidget,
+            );
+            expect(
+              find.byKey(
+                const ValueKey('context-menu-action-ssh_copy_command'),
               ),
               findsOneWidget,
             );
+            await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+            await tester.pumpAndSettle();
             await selectViewMode(tester, ViewMode.list);
             expect(
               find.byKey(const ValueKey('grid-list-collection-list')),

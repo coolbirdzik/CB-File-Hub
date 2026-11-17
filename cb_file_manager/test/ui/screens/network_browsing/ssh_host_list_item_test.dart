@@ -2,6 +2,8 @@ import 'package:cb_file_manager/config/languages/english_localizations.dart';
 import 'package:cb_file_manager/services/ssh/ssh_profile_store.dart';
 import 'package:cb_file_manager/ui/screens/ssh/ssh_connection_status.dart';
 import 'package:cb_file_manager/ui/screens/ssh/ssh_host_list_item.dart';
+import 'package:cb_file_manager/ui/components/common/shared_file_context_menu.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -35,9 +37,17 @@ void main() {
               terminalTooltip: 'Open terminal',
               browseTooltip: 'Browse SFTP',
               menuBuilder: (_) => [
-                PopupMenuItem<void>(
-                  onTap: () => edited++,
-                  child: const Text('Edit'),
+                ContextMenuSection(
+                  actions: [
+                    ContextMenuAction(
+                      id: 'edit',
+                      label: 'Edit',
+                      icon: PhosphorIconsLight.pencilSimple,
+                      onSelected: (_) {
+                        edited++;
+                      },
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -60,17 +70,27 @@ void main() {
       buttons: kMiddleMouseButton,
     );
     expect(openedInNewTab, 1);
-    expect(
-      tester
-          .widget<PopupMenuButton<void>>(find.byType(PopupMenuButton<void>))
-          .popUpAnimationStyle,
-      AnimationStyle.noAnimation,
-    );
     await tester.tap(find.byTooltip('More options'));
     await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('context-menu-action-edit')),
+      findsOneWidget,
+    );
     await tester.tap(find.text('Edit'));
     await tester.pumpAndSettle();
     expect(edited, 1);
+    await tester.tap(
+      find.text('Development server'),
+      buttons: kSecondaryMouseButton,
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('context-menu-action-edit')),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Edit'));
+    await tester.pumpAndSettle();
+    expect(edited, 2);
     expect(tester.takeException(), isNull);
   });
 

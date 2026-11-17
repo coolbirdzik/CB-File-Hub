@@ -31,9 +31,32 @@ SSH and SFTP host lists share one collection, so pasting a cut host there keeps
 its identity and forwarding rules. Escape cancels a pending cut. The clipboard
 stays in memory; passwords are never put on the system text clipboard. Built-in
 section folders are navigation entries and cannot be deleted as hosts.
+The host menu also offers **Copy SSH link** (`ssh://user@host:port`) and
+**Copy SSH command** (`ssh -p 2222 -l 'user' -- 'host'`) for an external OpenSSH
+client in PowerShell on Windows or a POSIX shell on other platforms. IPv6 links
+retain their brackets; commands use separate user/host/port arguments, since some
+Windows OpenSSH clients reject IPv6 destination URIs.
+Copy SSH link contains only the destination. For a host with a managed key,
+Copy SSH command includes that private key as base64 in one shell command.
+Pasting it creates a temporary identity, restricts access to the current user
+(Windows ACLs or POSIX umask 077), runs OpenSSH with that key, and removes the
+identity and temporary directory on exit or failure. The Windows command is
+for PowerShell; other platforms use their POSIX shell. It requires OpenSSH but
+no Python, ssh-agent setup or manual key export. It ignores external SSH config
+for key-based connections; normal host-key verification remains enabled.
+The app reports that the copied command contains a private key: clipboard and
+terminal history now contain a secret. Saved passwords are not included, and
+password-based hosts still prompt in OpenSSH. App-managed proxies cannot yet be
+exported: copying a command for those hosts reports an error instead of copying
+an incomplete direct connection. The destination URI follows the
+[OpenSSH destination syntax](https://man.openbsd.org/ssh.1).
 Toolbar Delete, keyboard Delete and context-menu Delete act on the complete
 selection. Right-clicking an already-selected host preserves the selection;
 keyboard file actions also remain available when a toolbar control has focus.
+Host and terminal context menus use the shared `showContextMenuPopup` and
+`ContextMenuSection` components from the file browser and SFTP transfer panes,
+including quick actions, hover treatment, icons and theme surfaces. Right-click
+opens at the pointer; each host's More button opens the same menu.
 
 ## SSH and SFTP
 
@@ -47,6 +70,12 @@ fallback.
 Terminal tabs resize the remote PTY, retain their session while switching desktop
 tabs, and close the transport when their tab is closed or navigates elsewhere.
 Reconnect, disconnect, clear, Home and SSH workspace controls remain available.
+Terminal text can be copied or pasted with toolbar buttons or its right-click
+menu. Ctrl+Shift+C/Ctrl+Shift+V and Cmd+C/Cmd+V are supported, as are Ctrl+Insert
+and Shift+Insert. Ctrl+C copies when text is selected and otherwise interrupts
+the remote command; Ctrl+V pastes. Paste honors bracketed-paste mode and is
+disabled while disconnected. Select All in the menu includes scrollback;
+Ctrl+A remains a shell shortcut (Ctrl+Shift+A selects terminal text).
 
 `SshProfileStore` keeps profiles, passwords, private keys and trusted fingerprints
 in `FlutterSecureStorage`. SSH secrets are not stored in `network_credentials`.

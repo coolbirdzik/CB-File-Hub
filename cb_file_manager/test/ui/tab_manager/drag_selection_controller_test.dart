@@ -40,6 +40,24 @@ void main() {
     await selection.close();
   });
 
+  testWidgets('disposal cancels a pending selection frame and late callbacks', (
+    tester,
+  ) async {
+    controller.start(Offset.zero);
+    controller.update(const Offset(60, 20));
+    controller.dispose();
+    // A queued frame or retained pointer route must never notify disposed
+    // notifiers, restart selection, or send events to the screen's bloc.
+    controller.end();
+    controller.start(Offset.zero);
+    controller.update(const Offset(60, 20));
+    await tester.pump();
+    expect(selection.rectangleEvents, 0);
+    expect(selection.state.selectedFilePaths, isEmpty);
+    expect(selection.state.selectedFolderPaths, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('registers nested folder kinds and removes detached rows', (
     tester,
   ) async {

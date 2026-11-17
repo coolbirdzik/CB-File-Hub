@@ -15,6 +15,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
 import 'network_recovery_test.dart' show host;
 import 'ssh_connection_dialog_test.dart' show FixtureSshDiscovery;
@@ -29,9 +30,25 @@ class _CountingSort extends SshHostSortController {
 }
 
 void main() {
+  String? clipboard;
   setUp(() {
+    clipboard = null;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+          if (call.method == 'Clipboard.setData') {
+            clipboard = (call.arguments as Map)['text'] as String?;
+          }
+          if (call.method == 'Clipboard.getData') {
+            return clipboard == null ? null : {'text': clipboard};
+          }
+          return null;
+        });
     SharedPreferences.setMockInitialValues({});
     FlutterSecureStorage.setMockInitialValues({});
+  });
+  tearDown(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, null);
   });
 
   Future<SshProfileStore> pumpWorkspace(
@@ -126,6 +143,65 @@ void main() {
   });
 
   for (final mode in [ViewMode.list, ViewMode.details, ViewMode.grid]) {
+    testWidgets('SSH ${mode.name} copies a complete command for a saved key', (
+      tester,
+    ) async {
+      final store = await pumpWorkspace(tester, mode);
+      final key = SshStoredKey.generate('Work');
+      await store.saveKey(key);
+      final profile = store.profiles.firstWhere((p) => p.id == 'Alpha');
+      await store.saveProfile(
+        SshProfile.fromJson({...profile.toJson(), 'keyId': key.id}),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Alpha'), buttons: kSecondaryMouseButton);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Copy SSH command'));
+      await tester.pumpAndSettle();
+      expect(clipboard, contains(base64Encode(utf8.encode(key.pem))));
+      expect(clipboard, contains('IdentitiesOnly=yes'));
+      expect(clipboard, isNot(contains('secret')));
+      expect(
+        find.text(
+          'Copied command with private key. Paste only into a trusted terminal.',
+        ),
+        findsOneWidget,
+      );
+      await tester.pump(const Duration(seconds: 3));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Alpha'), buttons: kSecondaryMouseButton);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Copy SSH link'));
+      await tester.pumpAndSettle();
+      expect(clipboard, 'ssh://user@alpha.example.test:2222');
+      await tester.pump(const Duration(seconds: 3));
+      await tester.pumpAndSettle();
+    });
+    for (final command in [false, true]) {
+      testWidgets(
+        'SSH ${mode.name} copies ${command ? 'command' : 'link'} to system clipboard',
+        (tester) async {
+          final store = await pumpWorkspace(tester, mode);
+          await tester.tap(find.text('Alpha'), buttons: kSecondaryMouseButton);
+          await tester.pumpAndSettle();
+          await tester.tap(
+            find.text(command ? 'Copy SSH command' : 'Copy SSH link'),
+          );
+          await tester.pumpAndSettle();
+          final copied = await Clipboard.getData(Clipboard.kTextPlain);
+          expect(
+            copied?.text,
+            command
+                ? "ssh -p 2222 -l 'user' -- 'Alpha.example.test'"
+                : 'ssh://user@alpha.example.test:2222',
+          );
+          expect(store.profiles, hasLength(3));
+          expect(copied?.text, isNot(contains('secret')));
+          await tester.pump(const Duration(seconds: 3));
+          await tester.pumpAndSettle();
+        },
+      );
+    }
     testWidgets(
       'SSH ${mode.name} context Delete keeps the complete selection',
       (tester) async {

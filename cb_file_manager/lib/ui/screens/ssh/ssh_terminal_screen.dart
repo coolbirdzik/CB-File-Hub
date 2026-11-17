@@ -15,6 +15,7 @@ import '../../tab_manager/core/tab_manager.dart';
 import '../network_browsing/components/network_navigation_bar.dart';
 import 'ssh_connection_status.dart';
 import 'ssh_host_dialog.dart';
+import 'ssh_terminal_view.dart';
 
 class SshTerminalScreen extends StatefulWidget {
   final String tabId, profileId;
@@ -29,6 +30,8 @@ class SshTerminalScreen extends StatefulWidget {
 
 class _SshTerminalScreenState extends State<SshTerminalScreen> {
   final _terminal = Terminal(maxLines: 10000);
+  final _terminalController = TerminalController();
+  final _terminalView = GlobalKey<SshTerminalViewState>();
   final _focus = FocusNode();
   SSHClient? _client;
   SSHSession? _session;
@@ -180,6 +183,7 @@ class _SshTerminalScreenState extends State<SshTerminalScreen> {
   void dispose() {
     _disconnect();
     _focus.dispose();
+    _terminalController.dispose();
     super.dispose();
   }
 
@@ -223,6 +227,25 @@ class _SshTerminalScreenState extends State<SshTerminalScreen> {
         ],
       ),
       actions: [
+        ListenableBuilder(
+          listenable: _terminalController,
+          builder: (context, _) => CbButton.icon(
+            icon: PhosphorIconsLight.copy,
+            tooltip: tr.copy,
+            onPressed:
+                _terminalController.selection == null ||
+                    _terminalController.selection!.isCollapsed
+                ? null
+                : () => _terminalView.currentState?.copySelection(),
+          ),
+        ),
+        CbButton.icon(
+          icon: PhosphorIconsLight.clipboardText,
+          tooltip: tr.pasteHere,
+          onPressed: _session == null
+              ? null
+              : () => _terminalView.currentState?.pasteText(),
+        ),
         CbButton.icon(
           icon: PhosphorIconsLight.arrowClockwise,
           tooltip: tr.sshReconnect,
@@ -272,11 +295,11 @@ class _SshTerminalScreenState extends State<SshTerminalScreen> {
                 ),
               ),
             Expanded(
-              child: TerminalView(
-                _terminal,
+              child: SshTerminalView(
+                key: _terminalView,
+                terminal: _terminal,
+                controller: _terminalController,
                 focusNode: _focus,
-                autofocus: true,
-                padding: const EdgeInsets.all(12),
                 readOnly: _session == null,
               ),
             ),

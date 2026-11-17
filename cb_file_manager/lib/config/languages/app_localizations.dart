@@ -343,6 +343,10 @@ abstract class AppLocalizations {
   String get sshStatusFailed;
   String get sshStatusAuthFailed;
   String get sshClearTerminal;
+  String get sshCopyLink;
+  String get sshCopyCommand;
+  String get sshCopiedCommandWithKey;
+  String get sshCommandProxyUnsupported;
   String get sshVaultHint;
   String get ftpSecurity;
   String get ftpPlain;

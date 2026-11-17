@@ -46,6 +46,7 @@ class TabbedFolderDragSelectionController {
   Set<String>? _lastFolders;
   int? _selectionFrame;
   bool _selectionPending = false;
+  bool _disposed = false;
 
   // Auto-clear item positions whenever the folder state changes (navigation,
   // new files created, refresh, etc.) so that stale rects cannot ghost-select
@@ -68,6 +69,11 @@ class TabbedFolderDragSelectionController {
   }
 
   void dispose() {
+    if (_disposed) return;
+    // Flutter retains pointer routes until up/cancel, even after navigation
+    // removes the screen. Those routes can still invoke this controller.
+    _disposed = true;
+    _selectionPending = false;
     _folderListSub?.cancel();
     _folderListSub = null;
     _cancelSelectionFrame();
@@ -84,12 +90,14 @@ class TabbedFolderDragSelectionController {
   }
 
   void registerItemPosition(String path, Rect position) {
+    if (_disposed) return;
     _itemPositions[path] = position;
   }
 
   /// Items register once. Read their final bounds only during selection,
   /// rather than scheduling a measurement for every tile on every resize frame.
   void registerItemRenderBox(String path, RenderBox box, {bool? isFolder}) {
+    if (_disposed) return;
     _itemRenderBoxes[path] = box;
     if (isFolder == null) {
       _itemIsFolder.remove(path);
@@ -135,6 +143,7 @@ class TabbedFolderDragSelectionController {
   }
 
   String? hitTestItem(Offset globalPosition, {Set<String>? allowedPaths}) {
+    if (_disposed) return null;
     final entries = _currentItemPositions.toList(growable: false).reversed;
     for (final entry in entries) {
       if (allowedPaths != null && !allowedPaths.contains(entry.key)) {
@@ -148,7 +157,7 @@ class TabbedFolderDragSelectionController {
   }
 
   void start(Offset position) {
-    if (isDragging.value) return;
+    if (_disposed || isDragging.value) return;
 
     // Always capture a baseline, including an empty selection. Modifiers may
     // change while dragging, but each update must resolve against drag-start.
@@ -170,7 +179,7 @@ class TabbedFolderDragSelectionController {
   }
 
   void update(Offset position) {
-    if (!isDragging.value) return;
+    if (_disposed || !isDragging.value) return;
 
     dragCurrentPosition.value = position;
 
@@ -184,7 +193,7 @@ class TabbedFolderDragSelectionController {
   }
 
   void _flushSelection() {
-    if (!_selectionPending || !isDragging.value) return;
+    if (_disposed || !_selectionPending || !isDragging.value) return;
     _selectionPending = false;
     final start = dragStartPosition.value;
     final current = dragCurrentPosition.value;
@@ -202,6 +211,7 @@ class TabbedFolderDragSelectionController {
   }
 
   void end() {
+    if (_disposed) return;
     _cancelSelectionFrame();
     // Preserve the last pointer move even if release arrives before a frame.
     _flushSelection();
