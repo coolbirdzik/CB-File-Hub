@@ -494,6 +494,27 @@ void main() {
     },
   );
 
+  test('search matches info hashes only by an 8+ digit prefix', () async {
+    final info = TorrentMetainfo.parse(torrentBytes(name: 'Movie.mkv'));
+    await repo.import(info, '/a', '/a', 0, 1);
+    final hash = info.hash.toLowerCase();
+    // A short run inside the hash (e.g. "222") must not match the torrent.
+    final inner = hash.substring(10, 13);
+    expect((await repo.page(query: inner)).total, 0);
+    expect((await repo.page(query: inner, useRegex: true)).total, 0);
+    expect((await repo.page(query: hash.substring(0, 7))).total, 0);
+    expect((await repo.page(query: hash.substring(0, 8))).total, 1);
+    expect(
+      (await repo.page(query: hash.substring(0, 12).toUpperCase())).total,
+      1,
+    );
+    expect(
+      (await repo.page(query: hash.substring(0, 12), useRegex: true)).total,
+      1,
+    );
+    expect((await repo.page(query: 'movie ${hash.substring(0, 8)}')).total, 1);
+  });
+
   test(
     'shared Unicode search handles word order, groups, metadata updates and regex',
     () async {

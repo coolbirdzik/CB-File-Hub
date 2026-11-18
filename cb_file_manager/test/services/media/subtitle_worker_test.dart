@@ -26,6 +26,15 @@ Future<void> main(List<String> args) async {
     final event = jsonDecode(line) as Map<String,dynamic>;
     if (event['command'] == 'init') {
       gpu = event['gpu'] == true;
+      if (gpu && args[0] == 'wait') {
+        // Make the file-created / trace-written race deterministic. The
+        // parent must wait for the init record, not merely this empty file.
+        trace.createSync();
+        final resume = File('${trace.path}.resume');
+        while (!await resume.exists()) {
+          await Future<void>.delayed(const Duration(milliseconds: 5));
+        }
+      }
       trace.writeAsStringSync('$gpu\n',mode:FileMode.append);
       if (gpu && args[0] == 'reject') {
         stdout.writeln(jsonEncode({'id':event['id'],'error':'GPU upload failed'})); continue;
@@ -106,13 +115,28 @@ Future<void> main(List<String> args) async {
   test(
     'cancellation during GPU initialization does not launch a CPU replacement',
     () async {
+      Future<void> waitForTrace(bool Function(String) ready) async {
+        final elapsed = Stopwatch()..start();
+        while (elapsed.elapsed < const Duration(seconds: 30)) {
+          if (await trace.exists() && ready(await trace.readAsString())) {
+            return;
+          }
+          await Future<void>.delayed(const Duration(milliseconds: 20));
+        }
+        fail(
+          'Subtitle fixture did not reach the GPU initialization checkpoint',
+        );
+      }
+
       final w = worker('wait');
       final starting = w.start('model.bin');
       final check = expectLater(starting, throwsStateError);
-      for (var i = 0; i < 100 && !await trace.exists(); i++) {
-        await Future<void>.delayed(const Duration(milliseconds: 20));
-      }
-      expect(await trace.exists(), isTrue);
+      await waitForTrace((_) => true);
+      expect(await trace.readAsString(), isEmpty);
+      await File('${trace.path}.resume').writeAsString('continue');
+      // Creation alone isn't readiness: stop only after the worker has
+      // committed the GPU init record, while its init response stays pending.
+      await waitForTrace((text) => text == 'true\n');
       await w.stop();
       await check;
       expect(await trace.readAsLines(), ['true']);

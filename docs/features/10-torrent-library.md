@@ -198,7 +198,7 @@ Move mode or retrying **Organize torrent files** requires the same confirmation.
 New imports continue to follow the selected storage policy; F5 remains add-only.
 Progress, cancellation and scan errors remain visible.
 Users can edit a group for each entry and search by name,
-group, or full info-hash. Content categories are derived from file extensions.
+group, or info-hash (full or a prefix of at least 8 hex digits). Content categories are derived from file extensions.
 
 The central index uses `torrents` and `torrent_sources` tables in the existing
 `CBFileHub_v2/cb_file_hub.sqlite` app database. It retains source paths, fingerprints,
@@ -297,9 +297,12 @@ column) is when the entry first joined CB File Hub. This timestamp never changes
 on merges, reimports, metadata updates or qBittorrent imports; source metainfo
 creation dates and qBittorrent's original added time do not replace it.
 Magnets use the index timestamp until metainfo is imported. Literal search uses
-the shared Unicode/accent folding, separator and word-order rules across name,
-group and hash. Regex searches each original field independently, preserving
-anchors and regex syntax; it scans bounded batches and discards cancelled queries.
+the shared Unicode/accent folding, separator and word-order rules across name
+and group. A word matches the info hash only as a prefix of 8+ hex digits, since
+short digit runs such as `222` occur inside about 1% of hashes and would flood
+the results. Regex searches name and group independently, preserving anchors
+and regex syntax (the hash only by the same plain 8+ hex prefix); it scans
+bounded batches and discards cancelled queries.
 
 All 28 torrent metadata columns also sort through their headers or the sort
 menu, including progress, traffic, seeds/peers, ETA, share ratio, tracker data,

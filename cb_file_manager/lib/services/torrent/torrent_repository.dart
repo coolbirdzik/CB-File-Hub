@@ -570,9 +570,17 @@ class TorrentRepository {
       for (final word in TextUtils.searchKey(
         query,
       ).split(' ').where((s) => s.isNotEmpty)) {
+        final n = args.length + 1;
+        final text =
+            "instr(COALESCE(search_name, lower(name)) || ' ' || "
+            "COALESCE(search_group, lower(group_name)), ?$n) > 0";
+        // Short digit runs like "222" occur somewhere in ~1% of hex info
+        // hashes, so a substring match on the hash floods results with
+        // unrelated torrents. Only a hash prefix of 8+ hex digits counts.
         where.add(
-          "instr(COALESCE(search_name, lower(name)) || ' ' || "
-          "COALESCE(search_group, lower(group_name)) || ' ' || hash, ?${args.length + 1}) > 0",
+          _isHashPrefix(word)
+              ? '($text OR lower(substr(hash, 1, length(?$n))) = ?$n)'
+              : text,
         );
         args.add(word);
       }
@@ -606,6 +614,8 @@ class TorrentRepository {
     final start = offset < 0 ? 0 : offset;
     final take = limit.clamp(1, maxPageSize);
     if (regex != null) {
+      final trimmed = query.trim().toLowerCase();
+      final hashPrefix = _isHashPrefix(trimmed) ? trimmed : null;
       return db.transaction((txn) async {
         final entries = <TorrentEntry>[];
         var count = 0, scanned = 0;
@@ -618,11 +628,13 @@ class TorrentRepository {
           if (rows.isEmpty) break;
           scanned += rows.length;
           for (final row in rows) {
+            final hash = row['hash'] as String;
             if (![
-              'name',
-              'group_name',
-              'hash',
-            ].any((field) => regex.hasMatch(row[field] as String))) {
+                  'name',
+                  'group_name',
+                ].any((field) => regex.hasMatch(row[field] as String)) &&
+                !(hashPrefix != null &&
+                    hash.toLowerCase().startsWith(hashPrefix))) {
               continue;
             }
             if (count >= start && entries.length < take) {
@@ -653,6 +665,10 @@ class TorrentRepository {
       rows.first['_page_total'] as int,
     );
   }
+
+  static final _hashPrefixPattern = RegExp(r'^[0-9a-f]{8,}$');
+
+  static bool _isHashPrefix(String word) => _hashPrefixPattern.hasMatch(word);
 
   Future<TorrentEntry?> get(String hash) async {
     final rows = await db.query(

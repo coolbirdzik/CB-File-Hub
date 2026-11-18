@@ -96,6 +96,27 @@ the full event stream is in `cb_file_manager/build/unit_test_report.jsonl`. Use
 Local checks use the host OS; the CI
 analyze job runs on Ubuntu, so platform-specific failures still need a Linux run.
 
+### Required final verification
+
+- Before reporting a task complete, run **full-project** `flutter analyze --no-pub`
+  from `cb_file_manager/` using the pinned Flutter version. Run formatting and
+  applicable tests first; analyze must be the final code-verification step
+  after the last edit. An analysis limited to changed files does not satisfy
+  this requirement.
+- Before **any commit or push**, run `just analyze` from the repo root. This
+  must pass format checking, full-project analysis and the complete unit/widget
+  suite. Targeted tests, `just lint` and `just verify` do not replace this gate.
+  Follow it with full-project `flutter analyze --no-pub` as the final check.
+- Fix every failure and rerun the affected checks. Any edit after verification
+  invalidates the earlier result; rerun the required gate on the final content
+  before committing or pushing. Do not commit or push with failing checks.
+- Report the checks actually run and their results. If a required check cannot
+  run, state the blocker and leave the task unverified; do not report it as
+  complete or proceed with commit/push. Local Windows checks do not establish
+  that Ubuntu CI passes.
+- This rule does **not** authorize E2E execution. The E2E execution policy above
+  still requires explicit authorization in the current user request.
+
 ## Architecture notes
 
 - **State management:** BLoC (`flutter_bloc`) + Provider + GetIt (service locator in `lib/core/service_locator.dart`)
