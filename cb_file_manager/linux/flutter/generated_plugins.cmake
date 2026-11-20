@@ -4,13 +4,13 @@
 
 list(APPEND FLUTTER_PLUGIN_LIST
   desktop_drop
-  flutter_edge_ai
   flutter_secure_storage_linux
+  flutter_edge_ai
   media_kit_libs_linux
-  media_kit_video
   mobile_smb_native
   screen_retriever_linux
   url_launcher_linux
+  media_kit_video
   window_manager
 )
 

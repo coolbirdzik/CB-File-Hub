@@ -5,17 +5,17 @@
 list(APPEND FLUTTER_PLUGIN_LIST
   connectivity_plus
   desktop_drop
-  flutter_edge_ai
   flutter_secure_storage_windows
   gal
+  flutter_edge_ai
   media_kit_libs_windows_video
-  media_kit_video
   mobile_smb_native
   pdfx
   permission_handler_windows
   screen_retriever_windows
-  share_plus
   url_launcher_windows
+  share_plus
+  media_kit_video
   window_manager
 )
 
