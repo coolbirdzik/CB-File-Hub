@@ -158,6 +158,21 @@ void main() {
     expect(PlaybackPlayer.isHardwareDecodeError('No such file'), isFalse);
   });
 
+  test('a corrupt audio packet is recoverable, a missing file is not', () {
+    expect(
+      PlaybackPlayer.isRecoverableAudioDecodeError('Error decoding audio.'),
+      isTrue,
+    );
+    expect(
+      PlaybackPlayer.isRecoverableAudioDecodeError('No such file'),
+      isFalse,
+    );
+    expect(
+      PlaybackPlayer.isRecoverableAudioDecodeError('Error decoding video.'),
+      isFalse,
+    );
+  });
+
   test('keyframe seeks fall back to a regular seek off libmpv', () async {
     final native = DelayedPlayer();
     final player = PlaybackPlayer(player: mk.Player(platformPlayer: native));

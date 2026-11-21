@@ -958,6 +958,12 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
         return;
       }
 
+      // Corrupt audio packets ("Error decoding audio.") are skipped by mpv and
+      // playback continues, so keep the player instead of showing an error.
+      if (PlaybackPlayer.isRecoverableAudioDecodeError(error)) {
+        return;
+      }
+
       // Hardware (D3D11/Direct3D) decoding can fail on some Windows
       // GPUs/drivers or under GPU-memory pressure. We do NOT recreate the
       // VideoController here: another D3D11 device creation against a failing

@@ -93,6 +93,12 @@ class PlaybackPlayer {
         lower.contains('gpu');
   }
 
+  /// mpv reports every undecodable audio packet as an error, then carries on
+  /// with the next one. A damaged stretch of audio is a glitch, not a reason to
+  /// replace the playing video with an error screen.
+  static bool isRecoverableAudioDecodeError(String error) =>
+      error.toLowerCase().contains('error decoding audio');
+
   /// Long edge from which [PlaybackVideoConfiguration.gpuDecodeLargeVideos]
   /// switches to hardware decoding.
   static const largeVideoLongEdge = 3840;
