@@ -56,10 +56,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_11
     }
 
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_11.toString()
-    }
-
     defaultConfig {
         applicationId = System.getenv("ANDROID_APPLICATION_ID")?.takeIf { it.isNotBlank() }
             ?: "com.cbv.filehub"
@@ -90,9 +86,9 @@ android {
         }
     }
     sourceSets {
-        getByName("debug").jniLibs.srcDir(layout.buildDirectory.dir("generated/llamaJniLibs/debug"))
-        getByName("profile").jniLibs.srcDir(layout.buildDirectory.dir("generated/llamaJniLibs/profile"))
-        getByName("release").jniLibs.srcDir(layout.buildDirectory.dir("generated/llamaJniLibs/release"))
+        getByName("debug").jniLibs.srcDir(layout.buildDirectory.dir("generated/llamaJniLibs/debug").get().asFile)
+        getByName("profile").jniLibs.srcDir(layout.buildDirectory.dir("generated/llamaJniLibs/profile").get().asFile)
+        getByName("release").jniLibs.srcDir(layout.buildDirectory.dir("generated/llamaJniLibs/release").get().asFile)
     }
 
     packaging {
@@ -134,6 +130,12 @@ tasks.configureEach {
     if (name.startsWith("merge") && name.endsWith("JniLibFolders")) {
         val variant = name.removePrefix("merge").removeSuffix("JniLibFolders")
         dependsOn("externalNativeBuild$variant")
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11
     }
 }
 
