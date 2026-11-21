@@ -145,13 +145,20 @@ class SelectionTagsController extends ChangeNotifier {
     await reload();
   }
 
-  Future<void> reload() async {
+  Future<void> reload() => _reload(announce: true);
+
+  /// [announce] false is the confirmation read after a write: the optimistic
+  /// state is already on screen, so it neither flips [loading] nor notifies;
+  /// the caller notifies once when it retires the pending edit.
+  Future<void> _reload({required bool announce}) async {
     if (_disposed) return;
     final generation = ++_generation;
     final selected = paths;
-    loading = selected.isNotEmpty;
-    loadError = null;
-    _emit();
+    if (announce) {
+      loading = selected.isNotEmpty;
+      loadError = null;
+      _emit();
+    }
     final loaded = <String, List<String>>{};
     Object? error;
     for (final path in selected) {
@@ -167,7 +174,7 @@ class SelectionTagsController extends ChangeNotifier {
     _syncTagOrder();
     loading = false;
     loadError = error;
-    _emit();
+    if (announce) _emit();
   }
 
   Future<void> add(String input) {
@@ -239,7 +246,13 @@ class SelectionTagsController extends ChangeNotifier {
         );
       }
       try {
-        if (!_disposed) await reload();
+        if (!_disposed) {
+          await _reload(announce: false);
+          // Our own write broadcast a tag change that this controller also
+          // hears; the read above already reflects it, so drop the echo
+          // instead of reloading (and rebuilding the whole pane) again.
+          _refreshTimer?.cancel();
+        }
       } finally {
         // Keep the optimistic chip through the confirmation read as well.
         // Failed paths roll back to that snapshot and remain retryable above.

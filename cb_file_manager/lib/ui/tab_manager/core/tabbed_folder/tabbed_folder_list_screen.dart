@@ -91,6 +91,28 @@ part 'tabbed_folder_list_screen.mobile_actions.dart';
 part 'tabbed_folder_list_screen.refresh.dart';
 
 /// Data class carrying the widgets needed to render the shared appbar in split-pane mode.
+/// Scroll offset and focused item of a folder, remembered when the user
+/// leaves it so that going back restores the same view.
+class _FolderViewMemory {
+  const _FolderViewMemory({required this.scrollOffset, this.focusedPath});
+
+  final double scrollOffset;
+  final String? focusedPath;
+}
+
+/// A restore that is waiting for the destination folder to finish loading.
+class _PendingViewRestore {
+  const _PendingViewRestore({
+    required this.normalizedPath,
+    this.scrollOffset,
+    this.focusedPath,
+  });
+
+  final String normalizedPath;
+  final double? scrollOffset;
+  final String? focusedPath;
+}
+
 class SplitPaneAppBarData {
   final Widget titleWidget;
   final List<Widget> actions;
@@ -148,6 +170,18 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
   // Add flag for lazy loading drives
   bool _isLazyLoadingDrives = false;
   String? _pendingHighlightedFileName;
+
+  // Per-tab memory of each visited folder's scroll offset and focused item,
+  // keyed by normalized path. Static so it survives the screen being rebuilt
+  // when the tab switches between folder / drives / other screens.
+  static const int _maxViewMemoryTabs = 30;
+  static const int _maxViewMemoryFolders = 50;
+  static final Map<String, Map<String, _FolderViewMemory>> _viewMemoryByTab =
+      <String, Map<String, _FolderViewMemory>>{};
+  _PendingViewRestore? _pendingViewRestore;
+  int _viewRestoreGeneration = 0;
+  bool _freshNavigation = false;
+  String? _viewStateCapturedFor;
   String? _highlightedScrollTargetPath;
   int _highlightedScrollAttempts = 0;
   final _propertiesPaneFocusNode = FocusNode(debugLabel: 'properties pane');
@@ -1178,12 +1212,179 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
   }
 
   void _navigateToPath(String path) {
-    _navigationController.navigateToPath(
-      context,
-      path,
-      _pathController,
-      (p) => _keyboardController.clearFocus(),
+    // Capture before NavigationController clears the keyboard focus, and flag
+    // this as a fresh drill-in (opens at the top) rather than a history move.
+    _rememberViewState();
+    _viewStateCapturedFor = _normalizePath(_currentPath);
+    _freshNavigation = true;
+    try {
+      _navigationController.navigateToPath(
+        context,
+        path,
+        _pathController,
+        (p) => _keyboardController.clearFocus(),
+      );
+    } finally {
+      _freshNavigation = false;
+      _viewStateCapturedFor = null;
+    }
+  }
+
+  Map<String, _FolderViewMemory> get _viewMemory {
+    if (!_viewMemoryByTab.containsKey(widget.tabId) &&
+        _viewMemoryByTab.length >= _maxViewMemoryTabs) {
+      _viewMemoryByTab.remove(_viewMemoryByTab.keys.first);
+    }
+    return _viewMemoryByTab.putIfAbsent(
+      widget.tabId,
+      () => <String, _FolderViewMemory>{},
     );
+  }
+
+  bool _isRestorableViewPath(String value) =>
+      value.isNotEmpty && !value.startsWith('#') && !_isDrivesPathValue(value);
+
+  /// Saves the scroll offset and focused item of the folder being left.
+  void _rememberViewState() {
+    if (!_isRestorableViewPath(_currentPath)) return;
+    final key = _normalizePath(_currentPath);
+    final memory = _viewMemory;
+    final previous = memory.remove(key);
+    final scroll = _keyboardController.scrollController;
+    memory[key] = _FolderViewMemory(
+      scrollOffset: scroll.hasClients
+          ? scroll.offset
+          : (previous?.scrollOffset ?? 0.0),
+      focusedPath: _keyboardController.focusedPath,
+    );
+    while (memory.length > _maxViewMemoryFolders) {
+      memory.remove(memory.keys.first);
+    }
+  }
+
+  /// Runs when the visible folder is about to change: stores the old folder's
+  /// view and, when returning to a remembered folder (or to the parent of the
+  /// one just left), schedules restoring its scroll position and focus.
+  void _prepareViewRestore(String newPath) {
+    final oldPath = _currentPath;
+    final oldKey = _normalizePath(oldPath);
+    final newKey = _normalizePath(newPath);
+    if (oldKey == newKey) return;
+
+    if (_viewStateCapturedFor != oldKey) _rememberViewState();
+    _viewStateCapturedFor = null;
+    final fresh = _freshNavigation;
+    _freshNavigation = false;
+
+    // Never let the previous folder's focused item leak into the next one.
+    _keyboardController.clearFocus();
+    _viewRestoreGeneration++;
+    _pendingViewRestore = null;
+
+    if (!_isRestorableViewPath(newPath)) return;
+    final highlight = _pendingHighlightedFileName;
+    if (highlight != null && highlight.isNotEmpty) return;
+
+    final memory = fresh ? null : _viewMemory[newKey];
+    var focusTarget = memory?.focusedPath;
+    // Going up (or back) to the parent: focus the folder we just came from.
+    if (focusTarget == null &&
+        _isRestorableViewPath(oldPath) &&
+        _normalizePath(path.dirname(oldPath)) == newKey) {
+      focusTarget = oldPath;
+    }
+    if (memory == null && focusTarget == null) return;
+
+    _pendingViewRestore = _PendingViewRestore(
+      normalizedPath: newKey,
+      scrollOffset: memory?.scrollOffset,
+      focusedPath: focusTarget,
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _maybeApplyPendingViewRestore(_folderListBloc.state);
+    });
+  }
+
+  void _maybeApplyPendingViewRestore(FolderListState state) {
+    final pending = _pendingViewRestore;
+    if (pending == null) return;
+    if (state.isLoading || state.isRefreshing) return;
+    if (_normalizePath(state.currentPath.path) != pending.normalizedPath) {
+      return;
+    }
+    _pendingViewRestore = null;
+
+    final items = <FileSystemEntity>[
+      ...state.folders.whereType<FileSystemEntity>(),
+      ...state.files.whereType<FileSystemEntity>(),
+    ];
+    final focusKey = pending.focusedPath == null
+        ? null
+        : _normalizePath(pending.focusedPath!);
+    final focusIndex = focusKey == null
+        ? -1
+        : items.indexWhere((e) => _normalizePath(e.path) == focusKey);
+    final generation = _viewRestoreGeneration;
+
+    if (focusIndex != -1) {
+      // The list shows focus as a selection, so do what a plain click does.
+      final target = items[focusIndex];
+      if (target is Directory) {
+        _toggleFolderSelection(target.path);
+      } else {
+        _toggleFileSelection(target.path);
+      }
+    }
+
+    final offset = pending.scrollOffset;
+    if (offset != null && offset.isFinite) {
+      _restoreScrollOffset(offset, generation, 0);
+    } else if (focusIndex != -1) {
+      final isGridLayout =
+          state.viewMode == ViewMode.grid ||
+          state.viewMode == ViewMode.tiles ||
+          (state.viewMode == ViewMode.list && isDesktopPlatform);
+      final crossAxisCount = isGridLayout
+          ? (_gridCrossAxisCount ??
+                    (state.viewMode == ViewMode.list ? 1 : state.gridZoomLevel))
+                .clamp(1, 999)
+                .toInt()
+          : 1;
+      _keyboardController.ensurePathVisible(
+        items[focusIndex].path,
+        index: focusIndex,
+        crossAxisCount: crossAxisCount,
+        itemMainAxisExtent: _resolvedItemMainAxisExtent(state, crossAxisCount),
+      );
+    }
+  }
+
+  /// Jumps to [offset] once the list has laid out enough content; retries for
+  /// a few frames because lazy grids settle their extent after the first one.
+  void _restoreScrollOffset(double offset, int generation, int attempt) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || generation != _viewRestoreGeneration) return;
+      final scroll = _keyboardController.scrollController;
+      final laidOut = scroll.hasClients && scroll.position.hasContentDimensions;
+      if ((!laidOut || scroll.position.maxScrollExtent < offset - 0.5) &&
+          attempt < 8) {
+        Future<void>.delayed(const Duration(milliseconds: 60), () {
+          if (mounted && generation == _viewRestoreGeneration) {
+            _restoreScrollOffset(offset, generation, attempt + 1);
+          }
+        });
+        return;
+      }
+      if (!laidOut) return;
+      scroll.jumpTo(
+        offset
+            .clamp(
+              scroll.position.minScrollExtent,
+              scroll.position.maxScrollExtent,
+            )
+            .toDouble(),
+      );
+    });
   }
 
   void _handlePathSubmit(String path) {
@@ -1401,6 +1602,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
 
   void _handleCurrentPathChanged(String path) {
     if (!mounted) return;
+    _prepareViewRestore(path);
     setState(() {
       if (_isDrivesMode() != _isDrivesPathValue(path)) {
         _driveSearchQuery = '';
@@ -1831,6 +2033,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
                 _maybeApplyFocusAfterDelete(folderState);
                 _maybeStartPendingCreatedFileRename(folderState);
                 _maybeScrollToHighlightedFile(folderState);
+                _maybeApplyPendingViewRestore(folderState);
 
                 // Clear the refocus restore flag once the folder list bloc
                 // has finished loading. We watch both isLoading and

@@ -147,10 +147,14 @@ Future<void> main(List<String> args) async {
       final preparing = r.prepareModel(model: installed);
       final check = expectLater(preparing, throwsStateError);
       final trace = File('${installed.localPath}.trace');
-      for (var i = 0; i < 100 && !await trace.exists(); i++) {
+      // The stub creates the file and then appends; wait for the content, not
+      // just existence, or a slow runner can observe an empty file.
+      Future<bool> hasTrace() async =>
+          await trace.exists() && (await trace.readAsString()).isNotEmpty;
+      for (var i = 0; i < 250 && !await hasTrace(); i++) {
         await Future<void>.delayed(const Duration(milliseconds: 20));
       }
-      expect(await trace.exists(), isTrue);
+      expect(await hasTrace(), isTrue);
       await r.dispose();
       await check;
       expect(await trace.readAsLines(), ['99']);

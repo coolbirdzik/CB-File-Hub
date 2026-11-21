@@ -140,6 +140,17 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
     } catch (_) {}
   }
 
+  /// Databases whose schema this provider already verified. Reads such as
+  /// [getStandaloneTags] ensure the schema as a migration safeguard, which
+  /// otherwise sent a dozen DDL round trips to the SQLite worker on every call.
+  final Expando<bool> _schemaEnsured = Expando<bool>('schemaEnsured');
+
+  Future<void> _ensureSchema(Database db) async {
+    if (_schemaEnsured[db] == true) return;
+    await _createSchema(db);
+    _schemaEnsured[db] = true;
+  }
+
   Future<void> _createSchema(DatabaseExecutor db) async {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS file_tags (
@@ -754,7 +765,7 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
   Future<Set<String>> getStandaloneTags() async {
     try {
       final database = await getDatabase();
-      await _createSchema(database);
+      await _ensureSchema(database);
       final rows = await database.query(
         'standalone_tags',
         columns: <String>['tag'],
@@ -780,7 +791,7 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
 
     try {
       final database = await getDatabase();
-      await _createSchema(database);
+      await _ensureSchema(database);
       await database.runAppTransaction((txn) async {
         await txn.delete('standalone_tags');
 
