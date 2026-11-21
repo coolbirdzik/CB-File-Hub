@@ -142,9 +142,14 @@ inline void RestoreMaximizeBit(HWND hwnd) {
 // DefWindowProc itself, so guarding only the runner's fallback is too late.
 template <typename Dispatch>
 LRESULT DispatchCustomFrameMessage(HWND hwnd, UINT message, WPARAM /*wparam*/,
-                                   LPARAM lparam, Dispatch&& dispatch) {
+                                   LPARAM lparam, Dispatch&& dispatch,
+                                   bool custom_frame_without_caption = false) {
   const LONG_PTR style = ::GetWindowLongPtrW(hwnd, GWL_STYLE);
-  if ((style & WS_CAPTION) != WS_CAPTION) return dispatch(lparam);
+  if ((style & WS_CAPTION) != WS_CAPTION &&
+      (!custom_frame_without_caption ||
+       (style & (WS_THICKFRAME | WS_MAXIMIZEBOX)) == 0)) {
+    return dispatch(lparam);
+  }
 
   switch (message) {
     case WM_NCCALCSIZE: {

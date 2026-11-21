@@ -14,7 +14,19 @@
 #include <cstdlib>
 
 #include "flutter_window.h"
+#include "shared_window_frame.h"
 #include "utils.h"
+
+// Called on the merged UI/platform thread while the new HWND is still hidden.
+extern "C" __declspec(dllexport) BOOL CBConfigureSharedWindowFrame(HWND hwnd) {
+  const HWND view = ::FindWindowExW(hwnd, nullptr, L"FLUTTERVIEW", nullptr);
+  return view && InstallSharedWindowFrame(hwnd, view);
+}
+
+extern "C" __declspec(dllexport) void CBStartSharedWindowDrag(HWND hwnd) {
+  // Run the Windows move loop after returning from Flutter's input callback.
+  ::PostMessageW(hwnd, kStartSharedWindowDrag, 0, 0);
+}
 
 namespace EngineWindowHost {
 namespace {

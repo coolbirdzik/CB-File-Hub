@@ -13,6 +13,7 @@ import '../../components/common/window_caption_buttons.dart';
 import 'desktop_tab_drag_data.dart';
 import 'external_tab_drop_controller.dart';
 import 'package:cb_file_manager/config/translation_helper.dart';
+import 'package:cb_file_manager/services/windowing/windows_shared_engine_windows.dart';
 
 /// Asks to move a dragged tab to its own window. [geometry] says where the
 /// tab is and where the pointer should sit in the new window, so the tab stays
@@ -147,9 +148,9 @@ class _ScrollableTabBarState extends State<ScrollableTabBar> {
     // traffic lights, while Windows and Linux need the app's caption buttons.
     final usesCustomCaptionButtons =
         platform == TargetPlatform.windows || platform == TargetPlatform.linux;
-    final customTitleBar =
+    final showCaptionButtons =
         usesCustomCaptionButtons && widget.showWindowControls;
-    Widget windowCaptionButtons = customTitleBar
+    final windowCaptionButtons = showCaptionButtons
         ? WindowCaptionButtons(theme: theme)
         : const SizedBox.shrink();
 
@@ -164,13 +165,13 @@ class _ScrollableTabBarState extends State<ScrollableTabBar> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          if (customTitleBar)
-            const DragToMoveArea(
+          if (showCaptionButtons)
+            const _TitleBarDragArea(
               child: SizedBox(width: 12, height: double.infinity),
             )
           else if (usesCustomCaptionButtons)
             const SizedBox(width: 12),
-          // Tab strip area (not draggable) so tab drag gestures can win.
+          // Only empty space in the strip moves the window.
           Expanded(
             child: LayoutBuilder(
               builder: (context, constraints) {
@@ -252,13 +253,12 @@ class _ScrollableTabBarState extends State<ScrollableTabBar> {
               },
             ),
           ),
-          if (customTitleBar && widget.leadingCaptionActions.isEmpty)
-            const DragToMoveArea(
-              child: SizedBox(width: 84, height: double.infinity),
-            ),
-          if (customTitleBar && widget.leadingCaptionActions.isNotEmpty)
-            const DragToMoveArea(
-              child: SizedBox(width: 24, height: double.infinity),
+          if (showCaptionButtons)
+            _TitleBarDragArea(
+              child: SizedBox(
+                width: widget.leadingCaptionActions.isEmpty ? 84 : 24,
+                height: double.infinity,
+              ),
             ),
           if (widget.leadingCaptionActions.isNotEmpty)
             Row(
@@ -271,6 +271,44 @@ class _ScrollableTabBarState extends State<ScrollableTabBar> {
       ),
     );
   }
+}
+
+void _startTitleBarDrag(BuildContext context) {
+  final window = WindowsSharedEngineScope.of(context);
+  if (window?.isAdditional == true) {
+    window!.startDragging?.call();
+  } else {
+    unawaited(windowManager.startDragging());
+  }
+}
+
+Future<void> _toggleTitleBarMaximize(BuildContext context) async {
+  final window = WindowsSharedEngineScope.of(context);
+  if (window?.isAdditional == true) {
+    window!.toggleMaximized();
+    return;
+  }
+  try {
+    if (await windowManager.isMaximized()) {
+      await windowManager.unmaximize();
+    } else {
+      await windowManager.maximize();
+    }
+  } catch (_) {}
+}
+
+class _TitleBarDragArea extends StatelessWidget {
+  const _TitleBarDragArea({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    behavior: HitTestBehavior.translucent,
+    onPanStart: (_) => _startTitleBarDrag(context),
+    onDoubleTap: () => unawaited(_toggleTitleBarMaximize(context)),
+    child: child,
+  );
 }
 
 class _NoMouseDragScrollBehavior extends MaterialScrollBehavior {
@@ -397,18 +435,6 @@ class _ModernTabBarState extends State<_ModernTabBar> {
   // Desktop windows hide the native title bar, so the blank strip stands in
   // for it: drag to move the window, double-click to maximize/zoom.
   bool get _hasCustomTitleBar => widget.hasCustomTitleBar;
-
-  Future<void> _toggleMaximizeRestore() async {
-    if (!_hasCustomTitleBar) return;
-    try {
-      final isMax = await windowManager.isMaximized();
-      if (isMax) {
-        await windowManager.unmaximize();
-      } else {
-        await windowManager.maximize();
-      }
-    } catch (_) {}
-  }
 
   bool _isBlankStripPosition(Offset globalPosition) {
     if (!_hasCustomTitleBar) return false;
@@ -805,7 +831,7 @@ class _ModernTabBarState extends State<_ModernTabBar> {
           _lastBlankTapAt = null;
           _lastBlankTapGlobal = null;
           _resetBlankDrag();
-          unawaited(windowManager.startDragging());
+          _startTitleBarDrag(context);
         },
         onPointerUp: (e) {
           if (!_hasCustomTitleBar) {
@@ -828,7 +854,7 @@ class _ModernTabBarState extends State<_ModernTabBar> {
               _lastBlankTapAt = null;
               _lastBlankTapGlobal = null;
               _resetBlankDrag();
-              unawaited(_toggleMaximizeRestore());
+              unawaited(_toggleTitleBarMaximize(context));
               return;
             }
 

@@ -23,6 +23,7 @@ import '../../../services/windowing/window_startup_payload.dart';
 import '../../../services/desktop_integration/folder_open_bridge.dart';
 import '../../../services/windowing/windows_native_tab_drag_drop_service.dart';
 import '../../../services/windowing/windows_engine_host.dart';
+import '../../../services/windowing/windows_shared_engine_windows.dart';
 import 'tab_manager.dart';
 import 'tab_screen.dart';
 
@@ -60,6 +61,7 @@ class _TabMainScreenState extends State<TabMainScreen> {
 
   late TabManagerBloc _tabManagerBloc;
   late NetworkBrowsingBloc _networkBrowsingBloc;
+  late final bool _sharedEngineChild;
   bool _checkedPerms = false;
   OverlayEntry? _operationProgressOverlayEntry;
   OverlayEntry? _nativeDropHighlightOverlayEntry;
@@ -68,17 +70,19 @@ class _TabMainScreenState extends State<TabMainScreen> {
   @override
   void initState() {
     super.initState();
+    _sharedEngineChild =
+        WindowsSharedEngineScope.of(context)?.isAdditional ?? false;
     _tabManagerBloc = TabManagerBloc();
     _networkBrowsingBloc = NetworkBrowsingBloc();
 
-    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+    if (!_sharedEngineChild && _isDesktopPlatform()) {
       _desktopWindowing = locator<DesktopWindowingService>();
       unawaited(_desktopWindowing!.attachTabBloc(_tabManagerBloc));
       locator<DesktopAppIconProgressService>().start(
         locator<OperationProgressController>(),
       );
     }
-    if (Platform.isWindows) {
+    if (Platform.isWindows && !_sharedEngineChild) {
       WindowsNativeTabDragDropService.isDragHoveringWindow.addListener(
         _handleNativeDropHoverChanged,
       );
@@ -88,16 +92,18 @@ class _TabMainScreenState extends State<TabMainScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
 
-      unawaited(
-        FolderOpenBridge.attach(_tabManagerBloc, (paths) {
-          if (mounted) {
-            AppToast.error(
-              context,
-              '${AppLocalizations.of(context)!.folderOpenFailed}\n${paths.join('\n')}',
-            );
-          }
-        }),
-      );
+      if (!_sharedEngineChild) {
+        unawaited(
+          FolderOpenBridge.attach(_tabManagerBloc, (paths) {
+            if (mounted) {
+              AppToast.error(
+                context,
+                '${AppLocalizations.of(context)!.folderOpenFailed}\n${paths.join('\n')}',
+              );
+            }
+          }),
+        );
+      }
 
       final payload = widget.startupPayload;
       if (payload != null && payload.tabs.isNotEmpty) {
@@ -146,6 +152,7 @@ class _TabMainScreenState extends State<TabMainScreen> {
   }
 
   bool _isSecondaryDesktopWindow() {
+    if (_sharedEngineChild) return true;
     if (!_isDesktopPlatform()) return false;
     return WindowsEngineHost.environment[WindowStartupPayload
             .envSecondaryWindowKey] ==
@@ -272,8 +279,8 @@ class _TabMainScreenState extends State<TabMainScreen> {
 
   @override
   void dispose() {
-    FolderOpenBridge.detach(_tabManagerBloc);
-    if (Platform.isWindows) {
+    if (!_sharedEngineChild) FolderOpenBridge.detach(_tabManagerBloc);
+    if (Platform.isWindows && !_sharedEngineChild) {
       WindowsNativeTabDragDropService.isDragHoveringWindow.removeListener(
         _handleNativeDropHoverChanged,
       );
@@ -283,14 +290,14 @@ class _TabMainScreenState extends State<TabMainScreen> {
     _operationProgressOverlayEntry?.remove();
     _operationProgressOverlayEntry = null;
     unawaited(_desktopWindowing?.dispose());
-    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+    if (_desktopWindowing != null) {
       // Guard against locator already being reset during E2E teardown — the
       // widget tree can still be unmounting when locator.reset() completes.
       try {
         unawaited(locator<DesktopAppIconProgressService>().stop());
       } catch (_) {}
     }
-    _tabManagerBloc.close();
+    unawaited(_tabManagerBloc.closeWindow());
     _networkBrowsingBloc.close();
     super.dispose();
   }

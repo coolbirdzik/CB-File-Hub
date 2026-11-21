@@ -68,6 +68,7 @@ import 'services/desktop_integration/windows_folder_elevation.dart';
 import 'services/desktop_integration/folder_open_bridge.dart';
 import 'services/windowing/windows_engine_host.dart';
 import 'services/windowing/windows_tab_window_launch.dart';
+import 'services/windowing/windows_shared_engine_windows.dart';
 import 'services/windowing/engine_window_lifetime.dart';
 import 'services/local_ai/local_model_downloads.dart';
 import 'ui/controllers/operation_progress_controller.dart';
@@ -219,6 +220,9 @@ void main(List<String> args) {
 /// Shared entry for production [main] and for `integration_test` (with `--dart-define=CB_E2E=true`).
 Future<void> runCbFileApp() async {
   final startupStopwatch = Stopwatch()..start();
+  final sharedWindowCount = kCbE2E
+      ? 0
+      : WindowsSharedEngineWindows.enableBeforeBinding();
   WidgetsFlutterBinding.ensureInitialized();
   await WindowsEngineHost.initialize();
   WindowsEngineHost.beforeProcessExit =
@@ -880,7 +884,36 @@ Future<void> runCbFileApp() async {
   } catch (e) {
     debugPrint('Error loading saved appearance; using the default theme: $e');
   }
-  runApp(mainApp);
+  final sharedWindows = sharedWindowCount > 0
+      ? WindowsSharedEngineWindows()
+      : null;
+  if (sharedWindows == null) {
+    runApp(mainApp);
+  } else {
+    locator<DesktopWindowingService>().openSharedWindow = sharedWindows.open;
+    runWidget(
+      sharedWindows.host(
+        primary: mainApp,
+        buildWindow: (payload) => ChangeNotifierProvider.value(
+          value: locator<ThemeProvider>(),
+          child: CBFileApp(
+            startupPayload: payload,
+            windowAcrylicService: windowAcrylicService,
+          ),
+        ),
+      ),
+    );
+  }
+
+  void openInitialSharedWindows() {
+    if (sharedWindows == null) return;
+    final payload = WindowStartupPayload(
+      tabs: [WindowTabPayload(path: '#home', name: currentL10n.homeTab)],
+    );
+    for (var index = 1; index < sharedWindowCount; index++) {
+      if (!sharedWindows.open(payload)) break;
+    }
+  }
 
   void startSecondaryServices() {
     for (final initializer in deferredSecondaryInitializers) {
@@ -925,6 +958,7 @@ Future<void> runCbFileApp() async {
         }
         await tabWindowLaunch?.markReady();
         if (deferSecondaryServicesUntilShown) startSecondaryServices();
+        openInitialSharedWindows();
       } catch (e) {
         debugPrint('Error revealing the first app frame: $e');
         if (tabWindowLaunch != null) await WindowsEngineHost.closeOrExit(1);
@@ -935,7 +969,14 @@ Future<void> runCbFileApp() async {
       await WidgetsBinding.instance.waitUntilFirstFrameRasterized;
       await tabWindowLaunch?.markReady();
       if (deferSecondaryServicesUntilShown) startSecondaryServices();
+      openInitialSharedWindows();
     }());
+  } else if (sharedWindows != null && sharedWindowCount > 1) {
+    unawaited(
+      WidgetsBinding.instance.waitUntilFirstFrameRasterized.then((_) {
+        openInitialSharedWindows();
+      }),
+    );
   }
 
   debugPrint('Startup: runApp after ${startupStopwatch.elapsedMilliseconds}ms');
@@ -1078,6 +1119,8 @@ class CBFileApp extends StatefulWidget {
 class _CBFileAppState extends State<CBFileApp>
     with WidgetsBindingObserver, WindowListener {
   final LanguageController _languageController = locator<LanguageController>();
+  late final bool _isAdditionalWindow;
+  late final GlobalKey<NavigatorState> _navigatorKey;
   int _acrylicSyncGeneration = 0;
   int _windowMutationAcrylicGeneration = 0;
   bool? _lastAppliedNativeBackdropDarkMode;
@@ -1088,8 +1131,13 @@ class _CBFileAppState extends State<CBFileApp>
   @override
   void initState() {
     super.initState();
+    _isAdditionalWindow =
+        WindowsSharedEngineScope.of(context)?.isAdditional ?? false;
+    _navigatorKey = _isAdditionalWindow
+        ? GlobalKey<NavigatorState>()
+        : navigatorKey;
     WidgetsBinding.instance.addObserver(this);
-    if (Platform.isWindows || Platform.isMacOS) {
+    if (!_isAdditionalWindow && (Platform.isWindows || Platform.isMacOS)) {
       windowManager.addListener(this);
     }
 
@@ -1097,7 +1145,7 @@ class _CBFileAppState extends State<CBFileApp>
       FrameTimingOptimizer().optimizeBeforeHeavyOperation();
     });
 
-    if (Platform.isWindows) {
+    if (Platform.isWindows && !_isAdditionalWindow) {
       SchedulerBinding.instance.addPostFrameCallback((_) {
         _handleLaunchFiles();
       });
@@ -1109,9 +1157,7 @@ class _CBFileAppState extends State<CBFileApp>
     }
 
     _localeNotifier = _languageController.languageNotifier;
-    _localeNotifier?.addListener(() {
-      setState(() {});
-    });
+    _localeNotifier?.addListener(_handleLocaleChanged);
 
     if (_useDesktopAcrylicVisuals) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1124,6 +1170,8 @@ class _CBFileAppState extends State<CBFileApp>
     }
   }
 
+  void _handleLocaleChanged() => setState(() {});
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed && Platform.isAndroid) {
@@ -1133,11 +1181,11 @@ class _CBFileAppState extends State<CBFileApp>
 
   @override
   void dispose() {
-    if (Platform.isWindows || Platform.isMacOS) {
+    if (!_isAdditionalWindow && (Platform.isWindows || Platform.isMacOS)) {
       windowManager.removeListener(this);
     }
     WidgetsBinding.instance.removeObserver(this);
-    _localeNotifier?.removeListener(() {});
+    _localeNotifier?.removeListener(_handleLocaleChanged);
     super.dispose();
   }
 
@@ -1252,6 +1300,7 @@ class _CBFileAppState extends State<CBFileApp>
       !DesignSystemConfig.enableLegacyMaterialDesktopShell;
 
   bool get _useDesktopAcrylicVisuals =>
+      !_isAdditionalWindow &&
       (Platform.isWindows || Platform.isLinux || Platform.isMacOS) &&
       DesignSystemConfig.enableDesktopAcrylicWindowBackground;
 
@@ -1408,7 +1457,7 @@ class _CBFileAppState extends State<CBFileApp>
     return MaterialApp(
       title: 'CB File Hub',
       home: TabMainScreen(startupPayload: widget.startupPayload),
-      navigatorKey: navigatorKey,
+      navigatorKey: _navigatorKey,
       theme: resolvedLightTheme,
       darkTheme: resolvedDarkTheme,
       themeMode: themeProvider.themeMode,
@@ -1443,7 +1492,7 @@ class _CBFileAppState extends State<CBFileApp>
     return fluent.FluentApp(
       title: 'CB File Hub',
       home: TabMainScreen(startupPayload: widget.startupPayload),
-      navigatorKey: navigatorKey,
+      navigatorKey: _navigatorKey,
       theme: _resolveFluentLightTheme(themeProvider),
       darkTheme: _resolveFluentDarkTheme(themeProvider),
       themeMode: switch (themeProvider.themeMode) {
@@ -1539,11 +1588,17 @@ class _CBFileAppState extends State<CBFileApp>
       _lastBackdropMode ??= backdropMode;
     }
 
-    final appContent = SafeNavigationWrapper(
-      child: _useDesktopFluentShell
-          ? _buildFluentHostApp(themeProvider)
-          : _buildMaterialHostApp(themeProvider),
-    );
+    final shell = _useDesktopFluentShell
+        ? _buildFluentHostApp(themeProvider)
+        : _buildMaterialHostApp(themeProvider);
+    final appContent = _isAdditionalWindow
+        ? ColoredBox(
+            color: themeProvider.themeData.scaffoldBackgroundColor.withValues(
+              alpha: 1,
+            ),
+            child: shell,
+          )
+        : SafeNavigationWrapper(child: shell);
     final app = isDevOverlayEnabled
         ? DevOverlay(child: appContent)
         : appContent;

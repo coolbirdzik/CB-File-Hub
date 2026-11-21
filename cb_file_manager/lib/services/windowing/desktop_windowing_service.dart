@@ -520,6 +520,13 @@ class DesktopWindowingService {
     if (!isDesktop) return false;
 
     if (Platform.isWindows) {
+      if (!startDragging &&
+          sourcePointerPosition == null &&
+          clientOrigin == null &&
+          tabs.every((tab) => tab.session == null) &&
+          openSharedWindow?.call(WindowStartupPayload(tabs: tabs)) == true) {
+        return true;
+      }
       final allowForeground =
           WindowsNativeTabDragDropService.allowForegroundWindow();
       // With no spare configured, launch directly even if the window registry
@@ -569,6 +576,9 @@ class DesktopWindowingService {
     _scheduleSpareWarmup(delay: _spareRewarmDelay);
     return created;
   }
+
+  /// Creates a regular tab window on the current Flutter engine when enabled.
+  bool Function(WindowStartupPayload payload)? openSharedWindow;
 
   /// Shows [target]. A [dragAnchor] makes it follow the cursor until the mouse
   /// button is released, with that point of its content under the cursor.

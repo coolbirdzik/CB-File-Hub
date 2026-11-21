@@ -3,6 +3,7 @@
 #include <windows.h>
 
 #include "flutter_window.h"
+#include "priority_message_loop.h"
 #include "utils.h"
 #include "d3d11_threading_guard.h"
 #include "torrent_launch.h"
@@ -250,12 +251,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   }
   window.SetQuitOnClose(true);
 
-  ::MSG msg;
-  while (::GetMessage(&msg, nullptr, 0, 0))
-  {
-    ::TranslateMessage(&msg);
-    ::DispatchMessage(&msg);
-  }
+  RunPriorityMessageLoop();
 
   EngineWindowHost::Shutdown();
   window.Destroy();

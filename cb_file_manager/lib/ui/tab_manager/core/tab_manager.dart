@@ -234,6 +234,13 @@ class TabManagerBloc extends Bloc<TabEvent, TabManagerState> {
     on<CloseSplitPane>(_onCloseSplitPane);
   }
 
+  /// Releases a window's tabs after the current widget teardown and after any
+  /// earlier tab events. Activity listeners in other windows can then rebuild.
+  Future<void> closeWindow() {
+    if (!isClosed) add(CloseAllTabs());
+    return close();
+  }
+
   void _onAddTab(AddTab event, Emitter<TabManagerState> emit) {
     final transferredId = event.windowPayload?.session?['id'];
     if (transferredId is String &&

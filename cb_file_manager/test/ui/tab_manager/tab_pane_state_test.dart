@@ -33,4 +33,18 @@ void main() {
     expect(TabPaneState.previewVisible('tab-b'), isFalse);
     expect(TabPaneState.previewVisible('tab-b_split'), isFalse);
   });
+
+  test('forgetting a tab preserves pane state in another window', () {
+    TabPaneState.setPreviewVisible('tab-a', true);
+    TabPaneState.setPropertiesVisible('tab-a_split', true);
+    TabPaneState.setPreviewVisible('tab-b', false);
+    TabPaneState.setPropertiesVisible('tab-b_split', false);
+
+    TabPaneState.forget('tab-a');
+
+    expect(TabPaneState.previewVisible('tab-a'), isNull);
+    expect(TabPaneState.propertiesVisible('tab-a_split'), isNull);
+    expect(TabPaneState.previewVisible('tab-b'), isFalse);
+    expect(TabPaneState.propertiesVisible('tab-b_split'), isFalse);
+  });
 }

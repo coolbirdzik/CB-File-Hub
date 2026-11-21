@@ -22,6 +22,7 @@ HRESULT WINAPI ObserveDwmSetWindowAttribute(HWND hwnd, DWORD attribute,
 #include "../custom_frame_message.h"
 #undef DwmSetWindowAttribute
 #include "../flutter_mouse_input_guard.h"
+#include "../shared_window_frame.h"
 
 namespace {
 struct Events {
@@ -124,6 +125,112 @@ HWND CreateReceiver(Events* events) {
   Check(hwnd != nullptr, "Could not create native test window");
   SetWindowLongPtrW(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(events));
   return hwnd;
+}
+
+LRESULT CALLBACK UsePrimaryLayout(HWND hwnd, UINT message, WPARAM wp, LPARAM lp,
+                                  UINT_PTR, DWORD_PTR reference) {
+  // Like window_manager in a shared engine, this delegate reads the primary's
+  // maximize state while calculating the secondary HWND's client area.
+  if (message == WM_NCCALCSIZE && wp && IsZoomed(reinterpret_cast<HWND>(reference))) {
+    auto* params = reinterpret_cast<NCCALCSIZE_PARAMS*>(lp);
+    RECT work{};
+    WorkAreaOf(params->rgrc[0], &work);
+    params->rgrc[0].top = work.top;
+    return 0;
+  }
+  return DefSubclassProc(hwnd, message, wp, lp);
+}
+
+void CheckSharedWindowFrame() {
+  Events primary_events;
+  Events secondary_events;
+  const HWND primary = CreateReceiver(&primary_events);
+  const HWND secondary = CreateReceiver(&secondary_events);
+  SetWindowLongPtrW(primary, GWL_STYLE,
+                    GetWindowLongPtrW(primary, GWL_STYLE) | WS_MAXIMIZE);
+  Check(IsZoomed(primary) && !IsZoomed(secondary),
+        "Shared frame test needs a maximized primary and restored secondary");
+  Check(SetWindowSubclass(secondary, UsePrimaryLayout, 1,
+                         reinterpret_cast<DWORD_PTR>(primary)) != FALSE,
+        "Could not add test plugin delegate");
+
+  RECT work{};
+  Check(WorkAreaOf(RECT{0, 0, 1, 1}, &work), "Could not find monitor work area");
+  const RECT proposed{work.left + 40, work.top + 60, work.left + 400,
+                      work.top + 320};
+  NCCALCSIZE_PARAMS params{};
+  params.rgrc[0] = proposed;
+  SendMessageW(secondary, WM_NCCALCSIZE, TRUE,
+               reinterpret_cast<LPARAM>(&params));
+  Check(params.rgrc[0].top == work.top,
+        "Test plugin did not reproduce the secondary's clipped top");
+
+  const HWND view = CreateWindowExW(0, L"STATIC", L"",
+                                    WS_CHILD | SS_NOTIFY, 0, 0, 1, 1,
+                                    secondary, nullptr, GetModuleHandleW(nullptr),
+                                    nullptr);
+  Check(view != nullptr, "Could not create the shared window's embedded view");
+  Check(InstallSharedWindowFrame(secondary, view),
+        "Could not install shared frame");
+  params.rgrc[0] = proposed;
+  SendMessageW(secondary, WM_NCCALCSIZE, TRUE,
+               reinterpret_cast<LPARAM>(&params));
+  Check(EqualRect(&params.rgrc[0], &proposed),
+        "The restored shared window reserves a native border");
+  const LONG_PTR style = GetWindowLongPtrW(secondary, GWL_STYLE);
+  Check((style & WS_CAPTION) == 0 && (style & WS_THICKFRAME) != 0,
+        "Shared frame must hide the native caption and keep resize grips");
+  Check(IsZoomed(primary) && !IsZoomed(secondary),
+        "Installing the shared frame changed the window states");
+
+  SetWindowPos(secondary, nullptr, proposed.left, proposed.top,
+               proposed.right - proposed.left, proposed.bottom - proposed.top,
+               SWP_NOZORDER | SWP_NOACTIVATE);
+  RECT client{};
+  POINT client_origin{};
+  Check(GetClientRect(secondary, &client) &&
+            ClientToScreen(secondary, &client_origin),
+        "Could not measure the restored shared window's client");
+  MoveWindow(view, 0, 0, client.right, client.bottom, FALSE);
+  OffsetRect(&client, client_origin.x, client_origin.y);
+  Check(EqualRect(&client, &proposed),
+        "Restored shared window has a gap between its client and frame");
+  const LPARAM top_edge =
+      MAKELPARAM((proposed.left + proposed.right) / 2, proposed.top + 1);
+  Check(SendMessageW(secondary, WM_NCHITTEST, 0, top_edge) == HTTOP &&
+            SendMessageW(view, WM_NCHITTEST, 0, top_edge) == HTTRANSPARENT,
+        "The embedded view blocked resizing at the shared window's top");
+
+  ShowWindow(secondary, SW_SHOWMAXIMIZED);
+  RECT maximized{};
+  Check(IsZoomed(secondary) && GetWindowRect(secondary, &maximized),
+        "Could not maximize the shared window for the drag test");
+  RECT maximized_work{};
+  Check(WorkAreaOf(maximized, &maximized_work) &&
+            EqualRect(&maximized, &maximized_work),
+        "The maximized shared window overlaps the taskbar or a monitor edge");
+  client = {};
+  client_origin = {};
+  Check(GetClientRect(secondary, &client) &&
+            ClientToScreen(secondary, &client_origin),
+        "Could not measure the maximized shared window's client");
+  OffsetRect(&client, client_origin.x, client_origin.y);
+  Check(EqualRect(&client, &maximized_work),
+        "The maximized shared window's content does not fill the work area");
+  const LONG full_width = maximized.right - maximized.left;
+  const POINT cursor{maximized.left + full_width * 3 / 4,
+                     maximized.top + 24};
+  RestoreSharedWindowForDrag(secondary, cursor);
+  RECT restored{};
+  Check(!IsZoomed(secondary) && GetWindowRect(secondary, &restored),
+        "Dragging did not restore the shared window");
+  const LONG grip = MulDiv(cursor.x - maximized.left,
+                           restored.right - restored.left, full_width);
+  Check(restored.left == cursor.x - grip && restored.top == cursor.y - 24,
+        "The restored window lost the cursor's grip on its title bar");
+  Check(IsZoomed(primary), "Restoring the shared window changed the primary");
+  DestroyWindow(secondary);
+  DestroyWindow(primary);
 }
 
 void CheckClientAndResize(HWND hwnd, Events& events) {
@@ -315,6 +422,7 @@ int main() {
     Events first, second;
     const HWND windows[] = {CreateReceiver(&first), CreateReceiver(&second)};
     CheckClientAndResize(windows[0], first);
+    CheckSharedWindowFrame();
     CheckMaximizedBounds();
     first.sizes = 0;
     const COLORREF visible_border = RGB(255, 0, 0);

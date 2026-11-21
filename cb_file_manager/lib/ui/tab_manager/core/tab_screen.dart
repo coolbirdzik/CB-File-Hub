@@ -42,6 +42,7 @@ import 'package:cb_file_manager/services/windowing/desktop_windowing_service.dar
 import 'package:cb_file_manager/services/windowing/window_startup_payload.dart';
 import 'package:cb_file_manager/services/windowing/windows_native_tab_drag_drop_service.dart';
 import 'package:cb_file_manager/services/windowing/windows_engine_host.dart';
+import 'package:cb_file_manager/services/windowing/windows_shared_engine_windows.dart';
 import 'tab_window_transfer.dart';
 import 'package:cb_file_manager/ui/widgets/drawer/cubit/drawer_cubit.dart';
 import 'package:cb_file_manager/ui/widgets/thumbnail_loader.dart';
@@ -96,10 +97,11 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
       DesignSystemConfig.enableFluentDesktopShell &&
       !DesignSystemConfig.enableLegacyMaterialDesktopShell;
   bool get _isSecondaryDesktopWindow =>
-      _isDesktop &&
-      WindowsEngineHost.environment[WindowStartupPayload
-              .envSecondaryWindowKey] ==
-          '1';
+      WindowsSharedEngineScope.of(context)?.isAdditional == true ||
+      (_isDesktop &&
+          WindowsEngineHost.environment[WindowStartupPayload
+                  .envSecondaryWindowKey] ==
+              '1');
 
   final TabDragOverlayController _windowDropOverlay =
       TabDragOverlayController();
@@ -622,6 +624,9 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
+    final sharedEngineChild =
+        WindowsSharedEngineScope.of(context)?.isAdditional ?? false;
+    final useNativeTabDrag = Platform.isWindows && !sharedEngineChild;
     // Apply frame timing optimization before building the tabbed interface
     // This helps prevent the "Reported frame time is older than the last one" error
     FrameTimingOptimizer().optimizeBeforeHeavyOperation();
@@ -1042,11 +1047,11 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                                                               }
                                                             : null,
                                                         onNativeTabDragRequested:
-                                                            Platform.isWindows
+                                                            useNativeTabDrag
                                                             ? _handleNativeTabDrag
                                                             : null,
                                                         externalTabDrop:
-                                                            (Platform.isWindows
+                                                            (useNativeTabDrag
                                                             ? WindowsNativeTabDragDropService
                                                                   .externalTabDrop
                                                             : null),
@@ -1361,7 +1366,9 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
     final liveIds = currentIds;
     _tabContentCache.removeWhere((id, _) => !liveIds.contains(id));
     // Closing a tab forgets its preview/properties pane toggles.
-    TabPaneState.retainTabs(liveIds);
+    if (WindowsSharedEngineScope.of(context) == null) {
+      TabPaneState.retainTabs(liveIds);
+    }
 
     // Focus scopes of closed tabs are dropped here, but only disposed after the
     // frame: their FocusScope widget is still mounted while this build runs.
@@ -1586,12 +1593,9 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
   void _handleNewWindow() {
     if (!_isDesktop || !mounted) return;
     unawaited(HapticFeedback.mediumImpact());
+    final tabs = [WindowTabPayload(path: '#home', name: context.tr.homeTab)];
     // An idle window may have no upcoming frame to run a post-frame callback.
-    unawaited(
-      locator<DesktopWindowingService>().openNewWindow(
-        tabs: [WindowTabPayload(path: '#home', name: context.tr.homeTab)],
-      ),
-    );
+    unawaited(locator<DesktopWindowingService>().openNewWindow(tabs: tabs));
   }
 
   void _handleAddNewTab() {

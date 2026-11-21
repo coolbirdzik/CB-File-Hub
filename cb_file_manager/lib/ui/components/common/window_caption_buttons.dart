@@ -7,6 +7,8 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:cb_file_manager/config/translation_helper.dart';
 
+import '../../../services/windowing/windows_shared_engine_windows.dart';
+
 /// Reusable Windows/Mac/Linux window caption buttons: Minimize, Maximize/Restore, Close
 /// Matches styling used in the tabbed UI's title bar.
 class WindowCaptionButtons extends StatelessWidget {
@@ -33,6 +35,8 @@ class WindowCaptionButtons extends StatelessWidget {
     }
 
     final ThemeData effectiveTheme = theme ?? Theme.of(context);
+    final window = WindowsSharedEngineScope.of(context);
+    final captionChanges = window?.captionChanges;
 
     return Padding(
       padding: padding ?? EdgeInsets.zero,
@@ -44,28 +48,48 @@ class WindowCaptionButtons extends StatelessWidget {
             icon: PhosphorIconsLight.minus,
             tooltip: context.tr.minimize,
             theme: effectiveTheme,
-            onPressed: () async {
-              try {
-                await windowManager.minimize();
-              } catch (_) {}
-            },
+            onPressed: window?.isAdditional == true
+                ? window!.minimize
+                : () async {
+                    try {
+                      await windowManager.minimize();
+                    } catch (_) {}
+                  },
           ),
-          _CaptionButton(
-            icon: PhosphorIconsLight.square, // Will be replaced dynamically
-            tooltip: context.tr.maximize,
-            theme: effectiveTheme,
-            listensMaximize: true,
-            onPressed: () async {
-              try {
-                final isMax = await windowManager.isMaximized();
-                if (isMax) {
-                  await windowManager.unmaximize();
-                } else {
-                  await windowManager.maximize();
-                }
-              } catch (_) {}
-            },
-          ),
+          if (captionChanges != null)
+            ListenableBuilder(
+              listenable: captionChanges,
+              builder: (context, _) {
+                final isMaximized = window!.isMaximized;
+                return _CaptionButton(
+                  icon: isMaximized
+                      ? PhosphorIconsLight.cornersIn
+                      : PhosphorIconsLight.cornersOut,
+                  tooltip: isMaximized
+                      ? context.tr.restoreTooltip
+                      : context.tr.maximize,
+                  theme: effectiveTheme,
+                  onPressed: window.toggleMaximized,
+                );
+              },
+            )
+          else
+            _CaptionButton(
+              icon: PhosphorIconsLight.square, // Will be replaced dynamically
+              tooltip: context.tr.maximize,
+              theme: effectiveTheme,
+              listensMaximize: true,
+              onPressed: () async {
+                try {
+                  final isMax = await windowManager.isMaximized();
+                  if (isMax) {
+                    await windowManager.unmaximize();
+                  } else {
+                    await windowManager.maximize();
+                  }
+                } catch (_) {}
+              },
+            ),
           _CaptionButton(
             icon: PhosphorIconsLight.x,
             tooltip: context.tr.close,
@@ -75,6 +99,8 @@ class WindowCaptionButtons extends StatelessWidget {
               try {
                 if (onClose != null) {
                   onClose!();
+                } else if (window?.isAdditional == true) {
+                  window!.closeWindow();
                 } else {
                   await windowManager.close();
                 }

@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <windows.h>
 
+#include <cwchar>
 #include <iostream>
 
 void CreateAndAttachConsole() {
@@ -42,9 +43,32 @@ std::vector<std::string> GetCommandLineArguments() {
 }
 
 flutter::UIThreadPolicy PreferredUIThreadPolicy() {
-  wchar_t value[8];
-  const DWORD length = ::GetEnvironmentVariableW(L"CB_MERGED_UI_THREAD", value, 8);
-  return length == 1 && value[0] == L'1'
+  const auto has_flag = [](const wchar_t* name) {
+    wchar_t flag[2] = {};
+    return ::GetEnvironmentVariableW(name, flag, ARRAYSIZE(flag)) == 1 &&
+           flag[0] == L'1';
+  };
+  wchar_t role[32] = {};
+  const DWORD role_length =
+      ::GetEnvironmentVariableW(L"CB_WINDOW_ROLE", role, ARRAYSIZE(role));
+  const bool tab_window = role_length == 0 ||
+                          (role_length < ARRAYSIZE(role) &&
+                           std::wcscmp(role, L"normal") == 0);
+  if (tab_window && !has_flag(L"CB_START_HIDDEN") &&
+      !has_flag(L"CB_START_DRAGGING") && !has_flag(L"CB_PIP_MODE") &&
+      !has_flag(L"CB_VIDEO_WINDOW")) {
+    wchar_t count[32] = {};
+    const DWORD length =
+        ::GetEnvironmentVariableW(L"CB_SHARED_ENGINE_WINDOWS", count,
+                                  ARRAYSIZE(count));
+    wchar_t* end = count;
+    const long value =
+        length < ARRAYSIZE(count) ? std::wcstol(count, &end, 10) : 0;
+    if (end == count || *end != L'\0' || value > 0) {
+      return flutter::UIThreadPolicy::RunOnPlatformThread;
+    }
+  }
+  return has_flag(L"CB_MERGED_UI_THREAD")
              ? flutter::UIThreadPolicy::RunOnPlatformThread
              : flutter::UIThreadPolicy::RunOnSeparateThread;
 }

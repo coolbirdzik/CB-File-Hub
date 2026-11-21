@@ -99,6 +99,7 @@ abstract final class WindowsEngineHost {
     'CB_MERGED_UI_THREAD',
     'CB_FRAME_STATS',
     'CB_D3D11_DRIVER_THREADS',
+    'CB_SHARED_ENGINE_WINDOWS',
   };
 
   /// Starts a detached copy of this executable with exactly [environment].

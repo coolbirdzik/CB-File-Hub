@@ -6,11 +6,16 @@ window's tab strip to move it there.
 
 ## Architecture on Windows
 
-Tab windows, torrent options, video players, PiP and progress windows each
-launch a separate process with one Flutter engine. A crash opening a tab window
-was traced to `ANGLE StateManager11::updateState` on the raster thread. Engines
-in one process share ANGLE's D3D11 display. Process isolation gives each window
-its own display and keeps a renderer failure local to that window.
+New browser windows opened from the app share one Flutter engine by default.
+Each gets its own Windows window, view, tab manager and navigator. The engine
+stays alive while any of these windows is open. Set `CB_SHARED_ENGINE_WINDOWS=0`
+before launching the app to use separate processes for browser windows.
+
+Native tab tear-off, session transfers, torrent options, dedicated video, PiP
+and progress windows use separate processes. Shared-engine browser windows
+currently support tab reordering within their own window. Native drag-and-drop
+between windows uses the separate-process tab transfer path. Process isolation
+also gives each separate engine its own ANGLE D3D11 display.
 
 `WindowsTabWindowLaunch` sends startup tabs over an authenticated loopback
 connection so large session snapshots can exceed Windows environment variable

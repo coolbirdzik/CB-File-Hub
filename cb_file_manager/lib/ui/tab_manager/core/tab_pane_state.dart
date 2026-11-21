@@ -21,6 +21,13 @@ class TabPaneState {
     _propertiesVisible[tabId] = visible;
   }
 
+  static void forget(String tabId) {
+    _previewVisible.remove(tabId);
+    _previewVisible.remove('${tabId}_split');
+    _propertiesVisible.remove(tabId);
+    _propertiesVisible.remove('${tabId}_split');
+  }
+
   /// Drops state of tabs that are no longer open. A split view's right pane
   /// uses `<tabId>_split` and lives as long as its tab.
   static void retainTabs(Set<String> openTabIds) {

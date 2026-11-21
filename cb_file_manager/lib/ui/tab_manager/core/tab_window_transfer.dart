@@ -32,6 +32,7 @@ abstract final class TabWindowTransfer {
   static void forget(String id) {
     _pending.remove(id);
     _pending.remove('${id}_split');
+    TabPaneState.forget(id);
   }
 
   static WindowTabPayload capture(TabData tab) {
