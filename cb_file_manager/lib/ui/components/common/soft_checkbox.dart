@@ -76,7 +76,7 @@ class SoftCheckbox extends StatelessWidget {
         onChanged?.call(true);
       }
     } else {
-      onChanged?.call!(value != true);
+      onChanged?.call(value != true);
     }
   }
 

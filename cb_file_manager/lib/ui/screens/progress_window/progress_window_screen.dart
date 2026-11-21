@@ -36,6 +36,12 @@ class _ProgressWindowScreenState extends State<ProgressWindowScreen>
   Socket? _socket;
   StreamSubscription<String>? _lineSub;
   Timer? _reconnectTimer;
+
+  /// The window runs in its own process, so it no longer dies with its opener.
+  /// An opener that never answers (it quit or crashed first) ends the window
+  /// after this many attempts instead of leaving a hidden process behind.
+  static const int _maxFailedConnects = 10;
+  int _failedConnects = 0;
   Timer? _autoDismissTimer;
   bool _connecting = false;
   bool _dismissed = false;
@@ -85,6 +91,7 @@ class _ProgressWindowScreenState extends State<ProgressWindowScreen>
         timeout: const Duration(seconds: 5),
       );
       _socket = socket;
+      _failedConnects = 0;
       _lineSub = socket
           .cast<List<int>>()
           .transform(utf8.decoder)
@@ -96,6 +103,10 @@ class _ProgressWindowScreenState extends State<ProgressWindowScreen>
             cancelOnError: true,
           );
     } catch (_) {
+      if (++_failedConnects >= _maxFailedConnects) {
+        unawaited(_closeWindow());
+        return;
+      }
       // Retry sau 500ms nếu process cha chưa sẵn sàng
       _scheduleReconnect();
     } finally {

@@ -500,6 +500,7 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
         isLoading: navState.isLoading,
         isRefreshing: navState.isRefreshing,
         error: navState.error,
+        directoryAccessDenied: navState.directoryAccessDenied,
         currentPath: navState.currentPath,
         folders: navState.folders,
         files: navState.files,

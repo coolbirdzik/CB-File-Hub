@@ -25,7 +25,9 @@ class PipWindowService {
       env['CB_WINDOW_ROLE'] = 'pip';
       env.remove('CB_STARTUP_TABS');
       env.remove('CB_VIDEO_WINDOW');
-      if (Platform.isWindows) return await WindowsEngineHost.open(env);
+      if (Platform.isWindows) {
+        return await WindowsEngineHost.startWindowProcess(env);
+      }
 
       // Resolve current runner executable and use its directory as CWD.
       // Forward only safe args (filter out debug service flags that can collide).

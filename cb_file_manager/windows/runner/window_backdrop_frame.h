@@ -3,6 +3,8 @@
 
 #include <windows.h>
 
+#include <optional>
+
 namespace WindowBackdrop {
 constexpr UINT kResizeFrameReady = WM_APP + 0x48;
 constexpr wchar_t kResizeFramePending[] = L"CBFileHub.BackdropResizeFramePending";
@@ -30,9 +32,15 @@ class ResizeFrameSync {
     return pending_;
   }
 
-  WPARAM generation() const { return generation_; }
+  std::optional<WPARAM> RequestFrame() {
+    if (!pending_ || requested_generation_) return std::nullopt;
+    requested_generation_ = generation_;
+    return requested_generation_;
+  }
 
   bool OnFrame(HWND hwnd, WPARAM generation) {
+    if (requested_generation_ != generation) return false;
+    requested_generation_.reset();
     if (!pending_ || generation != generation_) return false;
     pending_ = false;
     ::RemovePropW(hwnd, kResizeFramePending);
@@ -45,6 +53,7 @@ class ResizeFrameSync {
   WPARAM type_ = SIZE_RESTORED;
   LPARAM size_ = 0;
   WPARAM generation_ = 0;
+  std::optional<WPARAM> requested_generation_;
 };
 }  // namespace WindowBackdrop
 

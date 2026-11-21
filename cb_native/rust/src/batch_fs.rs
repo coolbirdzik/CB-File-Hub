@@ -38,6 +38,48 @@ pub fn start_exists(port: i64, config: &[u8]) -> Option<Arc<Job>> {
     }))
 }
 
+pub fn start_file_created(port: i64, config: &[u8]) -> Option<Arc<Job>> {
+    let mut r = Reader::new(config);
+    let path = r.str()?;
+    if !r.is_empty() {
+        return None;
+    }
+    Some(Job::spawn(port, "cb_file_created", move |job| {
+        if let Some(created) = file_created_ms(&path) {
+            let mut out = Writer::default();
+            out.i64(created);
+            job.append(&out.into_bytes());
+        }
+        Ok(())
+    }))
+}
+
+#[cfg(not(target_os = "android"))]
+fn file_created_ms(path: &str) -> Option<i64> {
+    let metadata = fs::metadata(path).ok()?;
+    if !metadata.is_file() {
+        return None;
+    }
+    let created = metadata.created().ok()?;
+    Some(crate::fsx::epoch_ms(Ok(created)))
+}
+
+#[cfg(target_os = "android")]
+fn file_created_ms(path: &str) -> Option<i64> {
+    use rustix::fs::{statx, AtFlags, FileType, StatxFlags, CWD};
+
+    // Rust's Metadata::created does not read statx birth times on Android.
+    let wanted = StatxFlags::TYPE | StatxFlags::BTIME;
+    let stat = statx(CWD, path, AtFlags::empty(), wanted).ok()?;
+    if stat.stx_mask & wanted.bits() != wanted.bits()
+        || FileType::from_raw_mode(stat.stx_mode.into()) != FileType::RegularFile
+    {
+        return None;
+    }
+    let created = stat.stx_btime;
+    Some(created.tv_sec * 1000 + i64::from(created.tv_nsec) / 1_000_000)
+}
+
 fn u64_at(bytes: &[u8], at: usize) -> Option<u64> {
     Some(u64::from_le_bytes(bytes.get(at..at + 8)?.try_into().ok()?))
 }

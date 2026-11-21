@@ -18,6 +18,7 @@ class FolderContentBuilder {
     required bool isNetworkPath,
     required bool isDesktopPlatform,
     required VoidCallback onRetry,
+    VoidCallback? onOpenAsAdministrator,
     required Function(String) onNavigateToPath,
     required String tabId,
     required bool showFileTags,
@@ -58,6 +59,7 @@ class FolderContentBuilder {
         isDesktopPlatform: isDesktopPlatform,
         currentPath: currentPath,
         onRetry: onRetry,
+        onOpenAsAdministrator: onOpenAsAdministrator,
         onGoBack: () => _handleGoBack(
           context,
           currentPath,
@@ -117,6 +119,7 @@ class FolderContentBuilder {
     required bool isDesktopPlatform,
     required String currentPath,
     required VoidCallback onRetry,
+    required VoidCallback? onOpenAsAdministrator,
     required VoidCallback onGoBack,
   }) {
     return FluentBackground.container(
@@ -128,6 +131,7 @@ class FolderContentBuilder {
         errorMessage: errorMessage,
         isNetworkPath: isNetworkPath,
         onRetry: onRetry,
+        onOpenAsAdministrator: onOpenAsAdministrator,
         onGoBack: onGoBack,
       ),
     );

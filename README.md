@@ -161,7 +161,7 @@ Some features depend on the platform; see the [installation guide](docs/guides/0
 
 ## Build from source
 
-Requires **Flutter 3.47.8 stable** and [`just`](https://github.com/casey/just):
+Requires **Flutter 3.50.1 stable** and [`just`](https://github.com/casey/just):
 
 ```bash
 git clone https://github.com/coolbirdzik/cb-file-hub.git

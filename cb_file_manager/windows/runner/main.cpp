@@ -4,6 +4,7 @@
 
 #include "flutter_window.h"
 #include "utils.h"
+#include "d3d11_threading_guard.h"
 #include "torrent_launch.h"
 #include "folder_defaults.h"
 #include "fc_native_video_thumbnail_plugin.h"
@@ -159,26 +160,12 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   // Initialize COM, so that it is available for use in the library and/or
   // plugins.
   ::CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+  // Before the first engine creates its ANGLE D3D11 device.
+  InstallD3D11ThreadingGuard();
 
   flutter::DartProject project(L"data");
   project.set_ui_thread_policy(PreferredUIThreadPolicy());
   project.set_impeller_switch(PreferredImpellerSwitch());
-
-  // The dedicated video player (CB_WINDOW_ROLE=video, which a PiP window
-  // spawned from it inherits) is a fresh process, so engine startup sits
-  // between the user's click and the first video frame. Impeller's GLES
-  // backend takes ~1.1s to initialize here versus ~0.2s for Skia, and the
-  // player's video-plus-controls UI gains nothing from it. The small torrent
-  // options form uses the same lightweight renderer startup path.
-  {
-    wchar_t role[32];
-    DWORD role_len = GetEnvironmentVariableW(L"CB_WINDOW_ROLE", role, 32);
-    if (role_len > 0 && role_len < 32 &&
-        (wcscmp(role, L"video") == 0 || wcscmp(role, L"torrent-options") == 0))
-    {
-      project.set_impeller_switch(flutter::ImpellerSwitch::Disabled);
-    }
-  }
 
   project.set_dart_entrypoint_arguments(std::move(command_line_arguments));
 

@@ -90,19 +90,15 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
 
     final databasePath = path.join(databaseDirectory.path, _databaseFileName);
     final databaseFactory = _resolveDatabaseFactory();
-    return databaseFactory.openDatabase(
-      databasePath,
-      options: OpenDatabaseOptions(
-        version: 4,
-        onConfigure: (db) async {
-          await _configureDatabase(db);
-        },
-        onCreate: (db, version) async {
-          await _createSchema(db);
-        },
-        onUpgrade: (db, oldVersion, newVersion) async {
-          await _onUpgrade(db, oldVersion, newVersion);
-        },
+    return DesktopDatabaseFactory.withTransactionLifetime(
+      () => databaseFactory.openDatabase(
+        databasePath,
+        options: OpenDatabaseOptions(
+          version: 4,
+          onConfigure: _configureDatabase,
+          onCreate: (db, _) => _createSchema(db),
+          onUpgrade: _onUpgrade,
+        ),
       ),
     );
   }
@@ -572,7 +568,7 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
     final positions = <int>[];
     try {
       final database = await getDatabase();
-      await database.transaction((txn) async {
+      await database.runAppTransaction((txn) async {
         final batch = txn.batch();
         final now = _now();
         for (var i = 0; i < rows.length; i++) {
@@ -688,7 +684,7 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
     }
     try {
       final database = await getDatabase();
-      await database.transaction((txn) async {
+      await database.runAppTransaction((txn) async {
         await txn.delete(
           'file_tags',
           where: 'file_path = ?',
@@ -785,7 +781,7 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
     try {
       final database = await getDatabase();
       await _createSchema(database);
-      await database.transaction((txn) async {
+      await database.runAppTransaction((txn) async {
         await txn.delete('standalone_tags');
 
         for (final entry in uniqueTags.entries) {
@@ -987,7 +983,7 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
   Future<bool> removeAllHierarchyForTag(String normalizedTag) async {
     try {
       final database = await getDatabase();
-      await database.transaction((txn) async {
+      await database.runAppTransaction((txn) async {
         await txn.delete(
           'tag_hierarchy',
           where: 'parent_normalized_tag = ? OR child_normalized_tag = ?',

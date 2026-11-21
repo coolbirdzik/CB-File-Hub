@@ -27,6 +27,7 @@ class FlutterWindow : public Win32Window {
                          LPARAM const lparam) noexcept override;
 
  private:
+  void RequestBackdropResizeFrame(HWND hwnd);
   LRESULT DispatchMessageToPlugins(HWND window, UINT message, WPARAM wparam,
                                   LPARAM lparam) noexcept;
 

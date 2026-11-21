@@ -180,7 +180,7 @@ Recommended order:
 4. Add macOS architecture-specific packaging and profile Android native libs.
 5. Evaluate optional desktop AI components and smaller download formats.
 
-Use Flutter 3.47.8 from `cb_file_manager/`. For Dart/native attribution,
+Use Flutter 3.50.1 from `cb_file_manager/`. For Dart/native attribution,
 `flutter build <windows|macos|linux> --release --analyze-size` and
 `flutter build apk --release --analyze-size --target-platform=android-arm64`
 produce reports. Save separate debug symbols and inspect native libraries too:

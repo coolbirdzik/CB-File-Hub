@@ -6993,8 +6993,10 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String fnInvalidRegex(String error) => 'Regex không hợp lệ: $error';
   @override
-  String get fnAccessDeniedAdmin =>
-      'Truy cập bị từ chối. Hãy thử chạy với quyền quản trị.';
+  String folderAccessDenied(String path) =>
+      'Không có quyền truy cập thư mục: $path';
+  @override
+  String get openInAdministratorWindow => 'Mở với quyền quản trị';
   @override
   String tsErrorLoadingTags(String error) => 'Lỗi khi tải tag: $error';
   @override

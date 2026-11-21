@@ -1,3 +1,25 @@
+/// Converts a virtual network folder path to the address shown in the UI.
+String networkAddress(String path, {bool includeUserInfo = true}) {
+  if (!path.startsWith('#network/')) return path;
+  final parts = path.split('/');
+  if (parts.length < 3 || parts[2].isEmpty) return path;
+  try {
+    final protocol = parts[1].toLowerCase();
+    var authority = Uri.decodeComponent(parts[2]);
+    if (!includeUserInfo) {
+      authority = authority.substring(authority.lastIndexOf('@') + 1);
+    }
+    if (protocol == 'sftp') {
+      return Uri.parse(
+        'sftp://$authority',
+      ).replace(pathSegments: ['', ...parts.skip(3)]).toString();
+    }
+    return '$protocol://$authority/${parts.skip(3).join('/')}';
+  } on FormatException {
+    return path;
+  }
+}
+
 /// Utility functions for safe URI operations
 class UriUtils {
   /// Safely decode a URI component with fallback to original string

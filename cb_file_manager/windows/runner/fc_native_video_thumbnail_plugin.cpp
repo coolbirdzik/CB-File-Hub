@@ -27,6 +27,7 @@
 #include <filesystem>
 #include <fstream>
 #include <algorithm>
+#include <cmath>
 #include <thread>
 
 const std::string kGetThumbnailFailedExtraction = "Failed extraction";
@@ -534,43 +535,20 @@ namespace fc_native_video_thumbnail
     Gdiplus::ImageAttributes imgAttributes;
     imgAttributes.SetColorMatrix(&enhancementMatrix, Gdiplus::ColorMatrixFlagsDefault, Gdiplus::ColorAdjustTypeBitmap);
 
-    // Smart thumbnail sizing based on original video resolution
-    int thumbnailWidth, thumbnailHeight;
-
-    if (width <= 0)
+    // |width| is the longest edge in physical pixels: fit the frame inside a
+    // width x width box, keep the aspect ratio and never upscale. (This used
+    // to keep 1/2 or 1/3 of 4K/HD sources, writing images far larger than
+    // the tile, which cost scaling, encoding and decoding time.)
+    int thumbnailWidth = static_cast<int>(videoWidth);
+    int thumbnailHeight = static_cast<int>(videoHeight);
+    const int longestEdge = (std::max)(thumbnailWidth, thumbnailHeight);
+    if (width > 0 && longestEdge > width)
     {
-      // Use original resolution
-      thumbnailWidth = videoWidth;
-      thumbnailHeight = videoHeight;
-    }
-    else if (width < 0)
-    {
-      // Use percentage of original
-      float percentage = abs(width) / 100.0f;
-      thumbnailWidth = (int)(videoWidth * percentage);
-      thumbnailHeight = (int)(videoHeight * percentage);
-    }
-    else
-    {
-      // Fixed width with intelligent scaling for high-resolution content
-      if (videoWidth > 1920 && width < static_cast<int>(videoWidth / 2))
-      {
-        // For 4K+ videos, ensure at least 50% of original to preserve detail
-        thumbnailWidth = static_cast<int>(videoWidth / 2);
-        thumbnailHeight = static_cast<int>(videoHeight / 2);
-      }
-      else if (videoWidth > 1280 && width < static_cast<int>(videoWidth / 3))
-      {
-        // For HD videos, ensure at least 33% of original
-        thumbnailWidth = static_cast<int>(videoWidth / 3);
-        thumbnailHeight = static_cast<int>(videoHeight / 3);
-      }
-      else
-      {
-        // Standard scaling - maintain aspect ratio
-        thumbnailWidth = width;
-        thumbnailHeight = (int)(((float)videoHeight / videoWidth) * width);
-      }
+      const double scale = static_cast<double>(width) / longestEdge;
+      thumbnailWidth = (std::max)(
+          1, static_cast<int>(std::llround(thumbnailWidth * scale)));
+      thumbnailHeight = (std::max)(
+          1, static_cast<int>(std::llround(thumbnailHeight * scale)));
     }
 
     // Safety checks

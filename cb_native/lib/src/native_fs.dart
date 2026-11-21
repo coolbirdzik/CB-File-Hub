@@ -188,6 +188,21 @@ class NativeJunkResult {
 /// native library is unavailable (or the call was cancelled), so callers
 /// keep their Dart code as the fallback.
 abstract final class NativeFs {
+  /// Reads a regular file's creation time when the filesystem reports one.
+  static Future<DateTime?> fileCreated(String path) async {
+    final config = WireWriter()..str(path);
+    final job = NativeJob.start(b.jobFileCreated, config.takeBytes());
+    if (job == null) return null;
+    final Uint8List? out;
+    try {
+      out = await job.result();
+    } on NativeJobException {
+      return null;
+    }
+    if (out == null || out.length != 8) return null;
+    return DateTime.fromMillisecondsSinceEpoch(WireReader(out).i64());
+  }
+
   /// File.exists for a batch, preserving input order, with bounded workers.
   static Future<List<bool>?> filesExist(List<String> paths) async {
     final config = WireWriter()..strs(paths);

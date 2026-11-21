@@ -333,7 +333,9 @@ class FcNativeVideoThumbnail {
   /// - [videoPath]: Path to the video file
   /// - [outputPath]: Where to save the thumbnail
   /// - [percentage]: Position in video as percentage (0.0 to 100.0)
-  /// - [width]: Width of the thumbnail (0 = use original width)
+  /// - [width]: Longest edge of the output in physical pixels. The frame is
+  ///   scaled to fit inside a `width` x `width` box, keeping its aspect ratio,
+  ///   and is never upscaled.
   /// - [format]: Image format, either 'png' or 'jpg'
   /// - [quality]: Image quality for JPEG format (1-100, default 95)
   ///

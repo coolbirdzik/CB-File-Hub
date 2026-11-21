@@ -17,6 +17,7 @@ import 'window_startup_payload.dart';
 import 'windows_native_tab_drag_drop_service.dart';
 import '../torrent/torrent_launch_request.dart';
 import '../desktop_integration/folder_launch_request.dart';
+import '../desktop_integration/windows_folder_elevation.dart';
 import '../torrent/torrent_service.dart';
 import '../torrent/torrent_background_receiver.dart';
 import '../../core/service_locator.dart';
@@ -128,6 +129,14 @@ class DesktopWindowingService {
   // A debug engine can take seconds to boot; release ones well under one.
   static const Duration _spareBootTimeout = Duration(seconds: 10);
 
+  /// Whether a hidden spare engine is kept warm in the background. Every
+  /// Windows engine in this process shares one ANGLE/D3D11 display; a spare
+  /// booting beside the main window crashed the raster thread in ANGLE's
+  /// StateManager11 (Skia and Impeller alike) in about a third of launches
+  /// on a folder of video thumbnails, and cost ~400 MB. A spare is now only
+  /// started when a window is actually requested.
+  static const bool _keepSpareWarm = false;
+
   ServerSocket? _peerServer;
   int? _peerPort;
   StreamSubscription<Socket>? _peerSub;
@@ -147,8 +156,11 @@ class DesktopWindowingService {
 
   String get windowId => _windowId;
 
+  // An elevated folder window must not participate in the unelevated window
+  // registry or accept its peer commands and native tab transfers.
   bool get isDesktop =>
-      Platform.isWindows || Platform.isLinux || Platform.isMacOS;
+      !WindowsFolderElevation.isFolderWindow &&
+      (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
 
   Future<void> attachTabBloc(TabManagerBloc tabBloc) async {
     if (!isDesktop) return;
@@ -185,15 +197,8 @@ class DesktopWindowingService {
       _updateTorrentLaunchRouting();
     }
 
-    if (!const bool.fromEnvironment('CB_E2E') &&
-        !_allowE2EPeers &&
-        Platform.isWindows &&
-        !_isSecondaryWindow &&
-        _windowRole != 'spare') {
-      // Pre-warm as early as possible so "new window" feels instant.
-      unawaited(ensureSpareWindow());
-      _scheduleSpareWarmup();
-    }
+    // No spare is pre-warmed at startup (see [_keepSpareWarm]); "new window"
+    // and tab tear-off boot one on demand.
   }
 
   Future<void> dispose() async {
@@ -339,7 +344,8 @@ class DesktopWindowingService {
     if (!Platform.isWindows || tabs.isEmpty) return null;
     final spare = await _findSpareWindow();
     if (spare == null) {
-      unawaited(ensureSpareWindow());
+      // The drop then opens a fresh window instead (openNewWindow).
+      if (_keepSpareWarm) unawaited(ensureSpareWindow());
       return null;
     }
     final response = await _sendPeerMessage(
@@ -520,7 +526,9 @@ class DesktopWindowingService {
       final allowForeground =
           WindowsNativeTabDragDropService.allowForegroundWindow();
       DesktopWindowInfo? spare = await _findSpareWindow();
-      if (spare == null) {
+      // Without a warm spare, booting one here and then a fresh window when
+      // it misses the wait would start two engines at once.
+      if (spare == null && _keepSpareWarm) {
         // If the user triggers "new window" very quickly after startup,
         // wait briefly for the pre-warmed spare to come online.
         unawaited(ensureSpareWindow());
@@ -633,6 +641,7 @@ class DesktopWindowingService {
   void _scheduleSpareWarmup({
     Duration delay = const Duration(milliseconds: 200),
   }) {
+    if (!_keepSpareWarm) return;
     if (_spareWarmupTimer != null) return;
     _spareWarmupTimer = Timer(delay, () {
       _spareWarmupTimer = null;

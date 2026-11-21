@@ -208,7 +208,8 @@ int main() {
       Check(frames.OnSize(root, size_type, size) &&
                 WindowBackdrop::IsResizeFramePending(root),
             "Resize did not defer backdrop repair until its rendered frame");
-      const WPARAM stale = frames.generation();
+      const auto stale = frames.RequestFrame();
+      Check(stale.has_value(), "First resize did not request a frame");
       materials.clear();
       state.material_lost = true;
       Check(!WindowBackdrop::ShouldDeferSizeMoveRepair(state, true),
@@ -218,22 +219,26 @@ int main() {
         WindowBackdrop::Sync(state, root, child, 26100, true, true, true);
       }
       Check(materials.empty(), "Timer rebuilt acrylic before the resize frame");
-      // A second size supersedes the first callback, and presentation resets
-      // both alpha receivers (the opaque surface that hides the material).
+      // A second size must wait for the first callback, then request its own
+      // frame. Registering both at once can enqueue an empty Flutter task.
       const LPARAM final_size = MAKELPARAM(LOWORD(size) - 1, HIWORD(size));
       frames.OnSize(root, size_type, final_size);
+      Check(!frames.RequestFrame(), "Resize registered overlapping callbacks");
       alpha[root] = alpha[child] = FALSE;
-      Check(!frames.OnFrame(root, stale) &&
+      Check(!frames.OnFrame(root, *stale) &&
                 WindowBackdrop::IsResizeFramePending(root),
             "Stale frame prematurely released backdrop repair");
-      Check(frames.OnFrame(root, frames.generation()) &&
+      const auto current = frames.RequestFrame();
+      Check(current && *current != *stale && !frames.RequestFrame(),
+            "New size did not request a single replacement frame");
+      Check(frames.OnFrame(root, *current) &&
                 !WindowBackdrop::IsResizeFramePending(root),
             "Rendered resize frame did not release backdrop repair");
       Check(WindowBackdrop::Sync(state, root, child, 26100, true, true, true) &&
                 alpha[root] && alpha[child] && materials.empty() && accents[root] == 4 &&
                 accent_disables[root] == disables_before_resize,
             "Rendered maximize/restore did not recover material and alpha");
-      Check(!frames.OnFrame(root, frames.generation()) &&
+      Check(!frames.OnFrame(root, *current) && !frames.RequestFrame() &&
                 !frames.OnSize(root, size_type, final_size),
             "Repeated frame or same-size title refresh invalidated acrylic");
       materials.clear();
@@ -245,9 +250,10 @@ int main() {
     Check(WindowBackdrop::ShouldDeferSizeMoveRepair(system_fallback, true) &&
               !WindowBackdrop::ShouldDeferSizeMoveRepair(system_fallback, false),
           "System material fallback did not wait for the native drag to finish");
-    const WPARAM before_minimize = frames.generation();
+    const auto before_minimize = frames.RequestFrame();
+    Check(before_minimize.has_value(), "Maximize did not request a frame");
     Check(!frames.OnSize(root, SIZE_MINIMIZED, 0) &&
-              !frames.OnFrame(root, before_minimize) &&
+              !frames.OnFrame(root, *before_minimize) && !frames.RequestFrame() &&
               !WindowBackdrop::IsResizeFramePending(root),
           "Minimize left a pending frame or accepted an older callback");
     // Activation may invalidate only the child. Repair once without replacing

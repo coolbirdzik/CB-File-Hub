@@ -10,6 +10,7 @@ import 'package:sqflite_common/sqlite_api.dart';
 import '../helpers/core/filesystem_utils.dart';
 import '../helpers/core/text_utils.dart';
 import '../helpers/files/file_type_registry.dart';
+import '../models/database/desktop_database_factory.dart';
 import '../models/database/sqlite_database_provider.dart';
 import '../models/objectbox/album.dart';
 import '../models/objectbox/album_config.dart';
@@ -172,7 +173,7 @@ class AlbumService {
       final database = await _getDatabase();
       final config = await getAlbumConfig(albumId);
 
-      await database.transaction((txn) async {
+      await database.runAppTransaction((txn) async {
         await txn.delete(
           'album_files',
           where: 'album_id = ?',
@@ -301,7 +302,7 @@ class AlbumService {
 
     final candidatePaths = candidates.toList();
     // Batch SQL without changing the import's all-or-nothing behavior.
-    final successCount = await database.transaction((txn) async {
+    final successCount = await database.runAppTransaction((txn) async {
       var nextOrderIndex =
           sqflite.Sqflite.firstIntValue(
             await txn.rawQuery(

@@ -269,7 +269,9 @@ class FileNavigationBloc
 
     try {
       final directory = Directory(event.path);
-      if (!await directory.exists()) {
+      final exists = await _directoryExistsForNavigation(directory);
+      if (isClosed || state.currentPath.path != event.path) return;
+      if (!exists) {
         emit(
           state.copyWith(
             isLoading: false,
@@ -491,7 +493,9 @@ class FileNavigationBloc
 
     try {
       final directory = Directory(event.path);
-      if (!await directory.exists()) {
+      final exists = await _directoryExistsForNavigation(directory);
+      if (isClosed || state.currentPath.path != event.path) return;
+      if (!exists) {
         emit(
           state.copyWith(isRefreshing: false, error: currentL10n.fnDirNotExist),
         );
@@ -1264,33 +1268,50 @@ class FileNavigationBloc
     );
   }
 
+  Future<bool> _directoryExistsForNavigation(Directory directory) async {
+    if (await directory.exists()) return true;
+    if (!Platform.isWindows) return false;
+
+    // On Windows exists() can turn a denied metadata lookup into false.
+    // A failed listing retains the OS error, and an empty listing is valid.
+    try {
+      await directory.list(followLinks: false).isEmpty;
+      return true;
+    } on PathNotFoundException {
+      return false;
+    } on FileSystemException catch (error) {
+      if (error.osError?.errorCode == 267) return false; // ERROR_DIRECTORY
+      rethrow;
+    }
+  }
+
   void _emitPermissionError(
     Emitter<FileNavigationState> emit,
     Object e,
     String path,
   ) {
-    final msg = e.toString().toLowerCase();
-    if (msg.contains('permission denied') || msg.contains('access denied')) {
-      emit(
-        state.copyWith(
-          isLoading: false,
-          isRefreshing: false,
-          error: currentL10n.fnAccessDeniedAdmin,
-          folders: [],
-          files: [],
-        ),
-      );
-    } else {
-      emit(
-        state.copyWith(
-          isLoading: false,
-          isRefreshing: false,
-          error: e.toString(),
-          folders: [],
-          files: [],
-        ),
-      );
-    }
+    if (isClosed || state.currentPath.path != path) return;
+    final accessDenied =
+        e is PathAccessException ||
+        (Platform.isWindows &&
+            e is FileSystemException &&
+            e.osError?.errorCode == 5); // ERROR_ACCESS_DENIED
+    final message = e.toString();
+    final lowerMessage = message.toLowerCase();
+    final permissionError =
+        accessDenied ||
+        lowerMessage.contains('permission denied') ||
+        lowerMessage.contains('access denied');
+    emit(
+      state.copyWith(
+        isLoading: false,
+        isRefreshing: false,
+        error: permissionError ? currentL10n.folderAccessDenied(path) : message,
+        directoryAccessDenied: accessDenied,
+        folders: [],
+        files: [],
+      ),
+    );
   }
 
   Future<T?> _safeCall<T>(Future<T> Function() fn) async {

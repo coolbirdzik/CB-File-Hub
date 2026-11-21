@@ -1,8 +1,11 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
+
+import 'frame_stats_logger.dart';
 
 /// A helper class to optimize frame timing and prevent the
 /// "Reported frame time is older than the last one" error
@@ -20,9 +23,14 @@ class FrameTimingOptimizer {
   /// Track if optimization has been initialized
   bool _initialized = false;
 
-  /// Maximum resource cache size for Skia in bytes
-  /// This helps prevent memory issues with large images/thumbnails
-  static const int _maxResourceCacheBytes = 512 * 1024 * 1024; // 512MB
+  /// Maximum resource cache size for Skia in bytes. `CB_SKIA_CACHE_MB`
+  /// overrides it for memory/smoothness measurements.
+  static int get _maxResourceCacheBytes {
+    final override = int.tryParse(
+      Platform.environment['CB_SKIA_CACHE_MB'] ?? '',
+    );
+    return (override ?? 512) * 1024 * 1024;
+  }
 
   /// Initialize frame timing optimizations
   Future<void> initialize() async {
@@ -44,6 +52,7 @@ class FrameTimingOptimizer {
       });
 
       _initialized = true;
+      FrameStatsLogger.startIfEnabled();
       debugPrint('FrameTimingOptimizer: Initialized successfully');
     } catch (e) {
       debugPrint('FrameTimingOptimizer: Initialization error: $e');

@@ -124,7 +124,11 @@ class DesktopWindowProcessLauncher {
                 .toList(growable: false)
           : const <String>[];
 
-      if (Platform.isWindows) return await WindowsEngineHost.open(env);
+      // Progress talks to its opener over IPC only, so it runs in its own
+      // process rather than beside the copying window's engine.
+      if (Platform.isWindows) {
+        return await WindowsEngineHost.startWindowProcess(env);
+      }
 
       await Process.start(
         executable,

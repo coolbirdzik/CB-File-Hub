@@ -175,6 +175,22 @@ void main() {
       // advanced-menu, and fullscreen portals. None may be lost to merging.
       expect(_tooltipTraversalParents(tester).length, greaterThanOrEqualTo(8));
 
+      final volumeSlider = find.byType(VideoPlayerVolumeSlider);
+      tester.widget<VideoPlayerVolumeSlider>(volumeSlider).onChanged(37);
+      await tester.pump();
+      tester.widget<VideoPlayerVolumeSlider>(volumeSlider).onChanged(0);
+      await tester.pump();
+      expect(tester.widget<VideoPlayerVolumeSlider>(volumeSlider).value, 0);
+
+      final unmute = find.byWidgetPredicate(
+        (widget) =>
+            widget is VideoPlayerControlButton && widget.tooltip == 'Unmute',
+      );
+      await tester.tap(unmute);
+      await tester.pump();
+      expect(tester.widget<VideoPlayerVolumeSlider>(volumeSlider).value, 37);
+      expect(unmute, findsNothing);
+
       for (var i = 0; i < 6; i++) {
         await mouse.moveTo(Offset(300 + i * 20, 240));
         await tester.pump(const Duration(milliseconds: 300));

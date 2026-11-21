@@ -43,6 +43,9 @@ private:
         std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result);
 
     flutter::PluginRegistrarWindows *registrar_;
+    // Captured while the view exists: the destructor runs after the engine
+    // has destroyed the view, so it must not query the registrar's view.
+    HWND top_level_hwnd_ = nullptr;
     std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> channel_;
     HWND drop_target_hwnd_ = nullptr;
     IDropTarget *drop_target_ = nullptr;

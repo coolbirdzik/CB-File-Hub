@@ -457,8 +457,6 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
                         ),
                       ),
 
-                      const SizedBox(height: 8),
-
                       // Tags section
                       DrawerNavigationItem(
                         icon: PhosphorIconsLight.tag,
@@ -723,7 +721,6 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
                             context.tr.videoHubTitle,
                           ),
                         ),
-                        const SizedBox(height: _FluentDrawerTokens.groupGap),
                         _fluentNavigationItem(
                           context,
                           icon: PhosphorIconsLight.tag,

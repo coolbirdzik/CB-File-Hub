@@ -86,6 +86,7 @@ const JOB_SYNTAX: u32 = 27;
 const JOB_PERMANENT_DELETE: u32 = 28;
 const JOB_ROOT_SIZES: u32 = 29;
 const JOB_FFMPEG_PROCESS: u32 = 30;
+const JOB_FILE_CREATED: u32 = 31;
 
 unsafe fn str_arg<'a>(ptr: *const u8, len: usize) -> Option<&'a str> {
     if len == 0 {
@@ -380,6 +381,7 @@ pub unsafe extern "C" fn cb_job_start(
         JOB_PERMANENT_DELETE => deletion::start(port, &config),
         JOB_ROOT_SIZES => walk::start_root_sizes(port, &config),
         JOB_FFMPEG_PROCESS => media_process::start(port, &config),
+        JOB_FILE_CREATED => batch_fs::start_file_created(port, &config),
         _ => None,
     };
     match job {

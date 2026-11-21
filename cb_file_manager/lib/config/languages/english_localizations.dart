@@ -7015,8 +7015,10 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String fnInvalidRegex(String error) => 'Invalid regex: $error';
   @override
-  String get fnAccessDeniedAdmin =>
-      'Access denied. Try running as administrator.';
+  String folderAccessDenied(String path) =>
+      'Access to this folder was denied: $path';
+  @override
+  String get openInAdministratorWindow => 'Open in administrator window';
   @override
   String tsErrorLoadingTags(String error) => 'Error loading tags: $error';
   @override

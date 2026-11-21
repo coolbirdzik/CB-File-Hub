@@ -3008,7 +3008,8 @@ abstract class AppLocalizations {
   String get fnStoragePermission;
   String fnErrorSorting(String error);
   String fnInvalidRegex(String error);
-  String get fnAccessDeniedAdmin;
+  String folderAccessDenied(String path);
+  String get openInAdministratorWindow;
   String tsErrorLoadingTags(String error);
   String tsErrorAddingTag(String error);
   String tsErrorRemovingTag(String error);

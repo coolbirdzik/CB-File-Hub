@@ -24,8 +24,9 @@ std::vector<std::string> GetCommandLineArguments();
 // policy so the app can be checked against it before then.
 flutter::UIThreadPolicy PreferredUIThreadPolicy();
 
-// Allows renderer A/B profiling without changing the deployed default.
-// Dedicated lightweight windows still enforce their existing Skia policy.
+// Impeller for every window by default (Skia loses its EGL context under the
+// D3D11 threading guard). CB_WINDOWS_RENDERER=skia|impeller overrides it for
+// renderer A/B profiling and diagnostics.
 flutter::ImpellerSwitch PreferredImpellerSwitch();
 
 #endif  // RUNNER_UTILS_H_

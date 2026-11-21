@@ -1,5 +1,7 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/helpers/core/uri_utils.dart';
+import 'package:cb_file_manager/helpers/files/archive_path_utils.dart';
 import 'package:cb_file_manager/services/torrent/torrent_launch_request.dart';
 
 /// A class that represents tab data in the file manager
@@ -7,11 +9,32 @@ class TabData {
   /// The unique identifier for this tab
   final String id;
 
-  /// The display name of the tab (usually the folder name)
+  /// The short name of the tab or the name of a system screen.
   final String name;
 
   /// The current path being displayed in the tab
   final String path;
+
+  /// The current location for folder tabs, or the name of a system screen.
+  String get displayLabel {
+    if (path.isEmpty) return name;
+    if (!path.startsWith('#')) return path;
+    if (ArchivePathUtils.isArchiveBrowsePath(path)) {
+      try {
+        final address = ArchivePathUtils.displayPath(path);
+        return address == path ? name : address;
+      } on FormatException {
+        return name;
+      } on ArgumentError {
+        return name;
+      }
+    }
+    if (path.startsWith('#network/')) {
+      final address = networkAddress(path, includeUserInfo: false);
+      return address == path ? name : address;
+    }
+    return name;
+  }
 
   /// File-association requests waiting for this torrent tab to handle them.
   final List<TorrentLaunchRequest> pendingTorrentSources;

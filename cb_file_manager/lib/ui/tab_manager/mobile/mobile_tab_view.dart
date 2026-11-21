@@ -1,4 +1,5 @@
 import 'package:cb_file_manager/design_system/primitives/cb_popover_transition.dart';
+import 'package:cb_file_manager/design_system/primitives/cb_tooltip.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // Thêm import cho SystemUiOverlayStyle
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -389,11 +390,7 @@ class MobileTabView extends StatelessWidget {
                       ),
                       body: updatedState.tabs.isEmpty
                           ? _buildEmptyTabsState(context, localizations)
-                          : _buildTabsGrid(
-                              context,
-                              updatedState,
-                              localizations,
-                            ),
+                          : _buildTabsGrid(updatedState),
                     );
                   },
                 ),
@@ -455,11 +452,7 @@ class MobileTabView extends StatelessWidget {
     );
   }
 
-  Widget _buildTabsGrid(
-    BuildContext context,
-    TabManagerState state,
-    AppLocalizations localizations,
-  ) {
+  Widget _buildTabsGrid(TabManagerState state) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
@@ -484,7 +477,6 @@ class MobileTabView extends StatelessWidget {
               context: context,
               tab: tab,
               isActive: isActive,
-              localizations: localizations,
             );
           },
         );
@@ -496,9 +488,9 @@ class MobileTabView extends StatelessWidget {
     required BuildContext context,
     required TabData tab,
     required bool isActive,
-    required AppLocalizations localizations,
   }) {
     final theme = Theme.of(context);
+    final label = tab.displayLabel;
 
     return Material(
       color: Colors.transparent,
@@ -536,16 +528,20 @@ class MobileTabView extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Text(
-                      tab.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: isActive
-                            ? theme.colorScheme.primary
-                            : theme.colorScheme.onSurface,
+                    child: CbTooltip(
+                      message: label,
+                      excludeFromSemantics: true,
+                      child: Text(
+                        label,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: isActive
+                              ? theme.colorScheme.primary
+                              : theme.colorScheme.onSurface,
+                        ),
                       ),
                     ),
                   ),
@@ -607,34 +603,11 @@ class MobileTabView extends StatelessWidget {
                         ),
                 ),
               ),
-              const SizedBox(height: 12),
-              // Path
-              Text(
-                tab.path.isEmpty || isDrivesPath(tab.path)
-                    ? localizations.drives
-                    : _shortenPath(tab.path),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
             ],
           ),
         ),
       ),
     );
-  }
-
-  String _shortenPath(String p) {
-    final parts = p
-        .split(Platform.pathSeparator)
-        .where((e) => e.isNotEmpty)
-        .toList();
-    if (parts.isEmpty) return p;
-    if (parts.length == 1) return parts.first;
-    return '${parts[parts.length - 2]}/${parts.last}';
   }
 
   IconData _getPreviewIcon(String path) {

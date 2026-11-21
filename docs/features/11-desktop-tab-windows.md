@@ -9,8 +9,23 @@ window's tab strip to move it there.
 Windows uses the public Windows embedder API. `engine_window_host.cpp` owns
 secondary `FlutterWindow`s, each with its own `FlutterViewController`, engine
 and Dart isolate. There are no imports of Flutter's internal windowing APIs.
-All tab, player, PiP, progress and torrent-options windows are created inside
-the existing process. macOS and Linux retain their process launchers.
+Tab and torrent-options windows are created inside the existing process.
+Player, PiP and progress windows start their own process
+(`WindowsEngineHost.startWindowProcess`): every engine in one process shares a
+single ANGLE/D3D11 display, and a video drawing beside a scrolling thumbnail
+grid corrupted ANGLE's state and crashed the raster thread. Those windows only
+talk to their opener over sockets. macOS and Linux retain their process
+launchers.
+
+Rendering on Windows defaults to Impeller (`PreferredImpellerSwitch`;
+`CB_WINDOWS_RENDERER=skia` for comparisons — under the guard below Skia lost
+its EGL context and stopped drawing). `InstallD3D11ThreadingGuard`
+(`windows/runner/d3d11_threading_guard.cpp`) makes ANGLE create its D3D11
+devices with `D3D11_CREATE_DEVICE_PREVENT_INTERNAL_THREADING_OPTIMIZATIONS`:
+the NVIDIA driver's internal worker threads crashed (`nvwgf2umx`) while a
+video-thumbnail grid scrolled, under either renderer.
+`CB_D3D11_DRIVER_THREADS=1` restores the driver default for comparison, and
+`CB_FRAME_STATS=1` prints build/raster frame percentiles every 5 s.
 
 - `WindowsEngineHost` (`lib/services/windowing/windows_engine_host.dart`)
   reads an engine-specific startup context over `cb_file_manager/engine_windows`.
@@ -32,7 +47,11 @@ the existing process. macOS and Linux retain their process launchers.
   rather than switching to the mobile tab view.
 - The existing peer/registry sockets carry serialized tab payloads between
   engines. Native HWND-based preview and merge keep the drag responsive.
-  A hidden pre-warmed spare engine supplies the next tear-off window.
+  No spare engine is pre-warmed (`_keepSpareWarm` is false): every engine in
+  the process shares one ANGLE/D3D11 display, and a spare booting beside the
+  main window crashed the raster thread in ANGLE's `StateManager11` (Skia and
+  Impeller alike). Tear-off and "new window" start a fresh engine on demand;
+  the spare flow below applies only when a spare exists.
 - Each engine runs its UI isolate on its own thread
   (`UIThreadPolicy::RunOnSeparateThread`, `PreferredUIThreadPolicy()` in
   `windows/runner/utils.cpp`). Merged threads would put every window's Dart on
@@ -163,8 +182,8 @@ The tabs stay in the source window until the drop, as in Chrome:
    - **the source's own strip**: the tab returns and moves to the gap it
      opened. Escape cancels.
 5. Spare replacement is left to the registry host when a spare becomes
-   `normal` (1.5 s later). A spare with no normal window for two heartbeats
-   exits.
+   `normal` (1.5 s later), and only while `_keepSpareWarm` is true. A spare
+   with no normal window for two heartbeats exits.
 
 When the preview cannot start, the older path is used: the spare is shown
 cloaked with the tabs, follows the cursor itself, and uncloaks once its

@@ -824,7 +824,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
       ).wait;
       // Disposed while loading preferences: don't create an orphaned player.
       if (!mounted) return;
-      _lastVolume = savedVolume > 0 ? savedVolume : _lastVolume;
+      if (savedVolume > 0.1) _lastVolume = savedVolume;
 
       setState(() {
         _savedVolume = savedVolume.clamp(0.0, 100.0);
@@ -2671,25 +2671,19 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
   }
 
   Widget _buildVolumeControl() {
+    final volume = _currentEffectiveVolume0to100();
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         if (_player != null)
-          Builder(
-            builder: (context) {
-              final volume = _isMuted ? 0.0 : _savedVolume;
-              final isMuted = volume <= 0.1;
-              return VideoPlayerControlButton(
-                icon: isMuted
-                    ? PhosphorIconsLight.speakerSlash
-                    : volume < 50
-                    ? PhosphorIconsLight.speakerLow
-                    : PhosphorIconsLight.speakerHigh,
-                onPressed: _toggleMute,
-                enabled: true,
-                tooltip: isMuted ? 'Unmute' : 'Mute',
-              );
-            },
+          VideoPlayerControlButton(
+            icon: _isMuted
+                ? PhosphorIconsLight.speakerSlash
+                : volume < 50
+                ? PhosphorIconsLight.speakerLow
+                : PhosphorIconsLight.speakerHigh,
+            onPressed: _toggleMute,
+            tooltip: _isMuted ? 'Unmute' : 'Mute',
           )
         else
           const SizedBox.shrink(),
@@ -2698,7 +2692,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
           SizedBox(
             width: 80,
             child: VideoPlayerVolumeSlider(
-              value: _isMuted ? 0.0 : _savedVolume,
+              value: volume,
               onChanged: (v) => _setVolumeFromUser(v),
             ),
           ),

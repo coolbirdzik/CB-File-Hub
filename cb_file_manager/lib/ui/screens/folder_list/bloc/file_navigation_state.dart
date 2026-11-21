@@ -7,6 +7,7 @@ class FileNavigationState extends Equatable {
   final bool isLoading;
   final bool isRefreshing;
   final String? error;
+  final bool directoryAccessDenied;
   final Directory currentPath;
   final List<FileSystemEntity> folders;
   final List<FileSystemEntity> files;
@@ -29,6 +30,7 @@ class FileNavigationState extends Equatable {
     this.isLoading = false,
     this.isRefreshing = false,
     this.error,
+    this.directoryAccessDenied = false,
     this.folders = const [],
     this.files = const [],
     this.searchResults = const [],
@@ -55,6 +57,7 @@ class FileNavigationState extends Equatable {
     bool? isLoading,
     bool? isRefreshing,
     Object? error = _unset,
+    bool? directoryAccessDenied,
     Directory? currentPath,
     List<FileSystemEntity>? folders,
     List<FileSystemEntity>? files,
@@ -77,6 +80,9 @@ class FileNavigationState extends Equatable {
       isLoading: isLoading ?? this.isLoading,
       isRefreshing: isRefreshing ?? this.isRefreshing,
       error: error is String ? error : (error == _unset ? this.error : null),
+      directoryAccessDenied:
+          directoryAccessDenied ??
+          (error == _unset && this.directoryAccessDenied),
       folders: folders ?? this.folders,
       files: files ?? this.files,
       searchResults: searchResults ?? this.searchResults,
@@ -109,6 +115,7 @@ class FileNavigationState extends Equatable {
     isLoading,
     isRefreshing,
     error,
+    directoryAccessDenied,
     currentPath.path,
     folders,
     files,

@@ -27,11 +27,13 @@ void main() {
   final messenger =
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
   final calls = <MethodCall>[];
+  final processes = <Map<String, String>>[];
   var primary = false;
   var failCreate = false;
 
   setUp(() {
     calls.clear();
+    processes.clear();
     primary = false;
     failCreate = false;
     messenger.setMockMethodCallHandler(WindowsEngineHost.channel, (call) async {
@@ -55,6 +57,9 @@ void main() {
       }
       return null;
     });
+    // Set after resetForTesting() in tearDown restored the real starter.
+    WindowsEngineHost.processStarter = (environment) async =>
+        processes.add(environment);
   });
   tearDown(() {
     WindowsEngineHost.resetForTesting();
@@ -78,46 +83,45 @@ void main() {
     );
   });
 
-  test(
-    'tab and progress launchers ask the existing host for new engines',
-    () async {
-      await WindowsEngineHost.initializeForTesting();
-      expect(
-        await DesktopWindowProcessLauncher.openWindow(
-          tabs: const [WindowTabPayload(path: r'C:\Music')],
-          startHidden: true,
-          windowRole: 'spare',
-        ),
-        isTrue,
-      );
-      expect(
-        await DesktopWindowProcessLauncher.openProgressWindow(
-          ipcPort: 12345,
-          title: 'Copy',
-          total: 12,
-        ),
-        isTrue,
-      );
-      final launches = calls.where((c) => c.method == 'create').toList();
-      expect(launches, hasLength(2));
-      final spare = (launches.first.arguments as Map)['environment'] as Map;
-      expect(spare['CB_WINDOW_ROLE'], 'spare');
-      expect(spare['CB_START_HIDDEN'], '1');
-      expect(spare['CB_STARTUP_TABS'], contains(r'C:\\Music'));
-      expect(spare.containsKey('CB_PIP_MODE'), isFalse);
-      expect(spare.containsKey('CB_VIDEO_WINDOW'), isFalse);
-      expect(
-        spare.keys.every((key) => (key as String).startsWith('CB_')),
-        isTrue,
-      );
-      final progress = (launches.last.arguments as Map)['environment'] as Map;
-      expect(progress['CB_WINDOW_ROLE'], 'progress');
-      expect(progress['CB_PROGRESS_IPC_PORT'], '12345');
-      expect(progress['CB_PROGRESS_TOTAL'], '12');
-      expect(progress.containsKey('CB_STARTUP_TABS'), isFalse);
-    },
-    skip: !Platform.isWindows,
-  );
+  test('tab windows get host engines; progress gets its own process', () async {
+    await WindowsEngineHost.initializeForTesting();
+    expect(
+      await DesktopWindowProcessLauncher.openWindow(
+        tabs: const [WindowTabPayload(path: r'C:\Music')],
+        startHidden: true,
+        windowRole: 'spare',
+      ),
+      isTrue,
+    );
+    expect(
+      await DesktopWindowProcessLauncher.openProgressWindow(
+        ipcPort: 12345,
+        title: 'Copy',
+        total: 12,
+      ),
+      isTrue,
+    );
+    final launches = calls.where((c) => c.method == 'create').toList();
+    expect(launches, hasLength(1));
+    expect(processes, hasLength(1));
+    final spare = (launches.first.arguments as Map)['environment'] as Map;
+    expect(spare['CB_WINDOW_ROLE'], 'spare');
+    expect(spare['CB_START_HIDDEN'], '1');
+    expect(spare['CB_STARTUP_TABS'], contains(r'C:\\Music'));
+    expect(spare.containsKey('CB_PIP_MODE'), isFalse);
+    expect(spare.containsKey('CB_VIDEO_WINDOW'), isFalse);
+    expect(
+      spare.keys.every((key) => (key as String).startsWith('CB_')),
+      isTrue,
+    );
+    final progress = processes.single;
+    // A whole environment for a fresh process, not engine overrides.
+    expect(progress.keys.any((key) => key.toUpperCase() == 'PATH'), isTrue);
+    expect(progress['CB_WINDOW_ROLE'], 'progress');
+    expect(progress['CB_PROGRESS_IPC_PORT'], '12345');
+    expect(progress['CB_PROGRESS_TOTAL'], '12');
+    expect(progress.containsKey('CB_STARTUP_TABS'), isFalse);
+  }, skip: !Platform.isWindows);
 
   test(
     'failed engine creation is reported without spawning a process',
@@ -131,7 +135,7 @@ void main() {
   );
 
   test(
-    'video and PiP also create engines in the existing Windows host',
+    'video and PiP start processes of their own, not host engines',
     () async {
       await WindowsEngineHost.initializeForTesting();
       VideoWindowService.reuseRequesterForTesting = (_) async => false;
@@ -145,9 +149,10 @@ void main() {
         }),
         isTrue,
       );
-      final launches = calls.where((c) => c.method == 'create').toList();
-      final video = (launches.first.arguments as Map)['environment'] as Map;
-      final pip = (launches.last.arguments as Map)['environment'] as Map;
+      expect(calls.where((c) => c.method == 'create'), isEmpty);
+      expect(processes, hasLength(2));
+      final video = processes.first;
+      final pip = processes.last;
       expect(video['CB_WINDOW_ROLE'], 'video');
       expect(video.containsKey('CB_PIP_MODE'), isFalse);
       expect(video.containsKey('CB_STARTUP_TABS'), isFalse);

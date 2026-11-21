@@ -8,6 +8,7 @@ class ErrorView extends StatelessWidget {
   final String errorMessage;
   final VoidCallback onRetry;
   final VoidCallback onGoBack;
+  final VoidCallback? onOpenAsAdministrator;
   final bool isNetworkPath;
 
   const ErrorView({
@@ -15,6 +16,7 @@ class ErrorView extends StatelessWidget {
     required this.errorMessage,
     required this.onRetry,
     required this.onGoBack,
+    this.onOpenAsAdministrator,
     this.isNetworkPath = false,
   });
 
@@ -39,18 +41,27 @@ class ErrorView extends StatelessWidget {
             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 24),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 8,
+            runSpacing: 8,
             children: [
               OutlinedButton(
                 onPressed: onGoBack,
                 child: Text(isNetworkPath ? l10n.closeConnection : l10n.goBack),
               ),
-              const SizedBox(width: 8),
-              ElevatedButton(
-                onPressed: onRetry,
-                child: Text(isNetworkPath ? l10n.tryAgain : l10n.retry),
-              ),
+              if (onOpenAsAdministrator == null)
+                ElevatedButton(
+                  onPressed: onRetry,
+                  child: Text(isNetworkPath ? l10n.tryAgain : l10n.retry),
+                )
+              else ...[
+                OutlinedButton(onPressed: onRetry, child: Text(l10n.retry)),
+                ElevatedButton(
+                  onPressed: onOpenAsAdministrator,
+                  child: Text(l10n.openInAdministratorWindow),
+                ),
+              ],
             ],
           ),
           if (isNetworkPath) ...[

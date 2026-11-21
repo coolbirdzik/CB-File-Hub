@@ -95,6 +95,24 @@ void main() {
     skip: skip,
   );
 
+  test('creation date reports only filesystem creation metadata', () async {
+    final file = await File(
+      p.join(root.path, 'Tiếng Việt.txt'),
+    ).writeAsString('x');
+    await file.setLastModified(DateTime(2000));
+    final stat = await file.stat();
+    final created = await NativeFs.fileCreated(file.path);
+    if (Platform.isWindows) {
+      expect(
+        created?.millisecondsSinceEpoch,
+        stat.changed.millisecondsSinceEpoch,
+      );
+    }
+    if (created != null) expect(created, isNot(stat.modified));
+    expect(await NativeFs.fileCreated(root.path), isNull);
+    expect(await NativeFs.fileCreated('${file.path}.missing'), isNull);
+  }, skip: skip);
+
   test(
     'JPEG transcode flattens transparent pixels onto white like Dart',
     () async {

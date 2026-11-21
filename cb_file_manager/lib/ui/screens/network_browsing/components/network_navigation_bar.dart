@@ -3,26 +3,13 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../../config/languages/app_localizations.dart';
+import '../../../../helpers/core/uri_utils.dart';
 import '../../../components/common/breadcrumb_address_bar.dart';
 import '../../../tab_manager/components/navigation_bar.dart';
 import '../../../tab_manager/core/tab_manager.dart';
 import '../../ssh/ssh_section.dart';
 
-String networkAddress(String path) {
-  if (!path.startsWith('#network/')) return path;
-  final parts = path.split('/');
-  if (parts.length < 3) return path;
-  try {
-    if (parts[1] == 'SFTP') {
-      return Uri.parse(
-        'sftp://${Uri.decodeComponent(parts[2])}',
-      ).replace(pathSegments: ['', ...parts.skip(3)]).toString();
-    }
-    return '${parts[1].toLowerCase()}://${Uri.decodeComponent(parts[2])}/${parts.skip(3).join('/')}';
-  } on FormatException {
-    return path;
-  }
-}
+export '../../../../helpers/core/uri_utils.dart' show networkAddress;
 
 String networkPathFromAddress(String address) {
   final path = address.trim();

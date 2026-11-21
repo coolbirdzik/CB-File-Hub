@@ -226,4 +226,82 @@ void main() {
     expect(generated, hasLength(1));
     await finish(tester);
   }, skip: !Platform.isWindows);
+
+  group('focused folder fill', () {
+    tearDown(() {
+      VideoThumbnailHelper.clearFocusedFolderFill('tab-a');
+      VideoThumbnailHelper.clearFocusedFolderFill('tab-b');
+    });
+
+    List<String> normalized(Iterable<String> source) =>
+        source.map(VideoThumbnailHelper.getNormalizedPath).toList();
+
+    testWidgets('generates every video in display order without a viewport', (
+      tester,
+    ) async {
+      final folder = paths.sublist(10, 18);
+      VideoThumbnailHelper.setFocusedFolderFill('tab-a', folder);
+      await drain(tester);
+      expect(generated, normalized(folder));
+      await finish(tester);
+    }, skip: !Platform.isWindows);
+
+    testWidgets('viewport syncs do not cancel the fill', (tester) async {
+      final folder = paths.sublist(20, 26);
+      VideoThumbnailHelper.setFocusedFolderFill('tab-a', folder);
+      // The listing scrolls to item 50: its viewport sync cancels everything
+      // viewport-scoped that is not near 50.
+      await tester.pumpWidget(listing());
+      VisibilityDetectorController.instance.notifyNow();
+      // The ten tiles around item 50 go first, then the fill.
+      await drain(tester, rounds: 800);
+      expect(generated, containsAll(normalized(folder)));
+      expect(generated.toSet().length, generated.length);
+      await finish(tester);
+    }, skip: !Platform.isWindows);
+
+    testWidgets('a new owner replaces the fill; a hidden tab cannot clear it', (
+      tester,
+    ) async {
+      blockDecoder = Completer<void>();
+      VideoThumbnailHelper.setFocusedFolderFill('tab-a', paths.sublist(30, 38));
+      for (var i = 0; i < 200 && generated.isEmpty; i++) {
+        await drain(tester, rounds: 1);
+      }
+      expect(generated, normalized([paths[30]]));
+
+      final next = paths.sublist(40, 44);
+      VideoThumbnailHelper.setFocusedFolderFill('tab-b', next);
+      VideoThumbnailHelper.clearFocusedFolderFill('tab-a');
+      expect(VideoThumbnailHelper.focusedFolderFillOwner, 'tab-b');
+
+      blockDecoder!.complete();
+      await drain(tester, rounds: 400);
+      // The decode already running for tab-a finishes; the rest of its
+      // folder is dropped.
+      expect(generated, normalized([paths[30], ...next]));
+      await finish(tester);
+    }, skip: !Platform.isWindows);
+    testWidgets('queue clears and other folders loading keep the fill', (
+      tester,
+    ) async {
+      blockDecoder = Completer<void>();
+      final folder = paths.sublist(60, 68);
+      VideoThumbnailHelper.setFocusedFolderFill('tab-a', folder);
+      for (var i = 0; i < 200 && generated.isEmpty; i++) {
+        await drain(tester, rounds: 1);
+      }
+      expect(generated, isNotEmpty);
+      // A background tab loads another folder, and something drops the
+      // pending queue, while the fill's window is queued.
+      VideoThumbnailHelper.setCurrentDirectory(
+        '${root.path}${Platform.pathSeparator}elsewhere',
+      );
+      VideoThumbnailHelper.cancelPendingRequests();
+      blockDecoder!.complete();
+      await drain(tester, rounds: 400);
+      expect(generated, normalized(folder));
+      await finish(tester);
+    }, skip: !Platform.isWindows);
+  });
 }

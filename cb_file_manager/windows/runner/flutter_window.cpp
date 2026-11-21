@@ -64,7 +64,12 @@ FlutterWindow::FlutterWindow(const flutter::DartProject &project,
                              EngineWindowHost::Environment environment)
     : project_(project), environment_(std::move(environment)) {}
 
-FlutterWindow::~FlutterWindow() {}
+// Tear down here, while every member is alive. Left to member destruction,
+// ~unique_ptr deletes the controller without clearing flutter_controller_;
+// destroying the view's child HWND then sends messages to this still-live
+// top-level window, and MessageHandler forwards them to a controller whose
+// view is gone (null deref in FlutterWindowsView::GetEngine on exit).
+FlutterWindow::~FlutterWindow() { Destroy(); }
 
 bool FlutterWindow::OnCreate()
 {
@@ -203,8 +208,25 @@ void FlutterWindow::OnDestroy()
   {
     flutter_controller_ = nullptr;
   }
+  backdrop_frame_sync_ = {};
 
   Win32Window::OnDestroy();
+}
+
+void FlutterWindow::RequestBackdropResizeFrame(HWND hwnd) {
+  if (!flutter_controller_) return;
+  const auto generation = backdrop_frame_sync_.RequestFrame();
+  if (!generation) return;
+
+  WindowBackdrop::Trace("resize-frame-requested", hwnd,
+                        flutter_controller_->view()->GetNativeWindow());
+  // Flutter keeps one next-frame callback per engine. Wait for the posted
+  // message before registering again, so both callback slots have cleared.
+  flutter_controller_->engine()->SetNextFrameCallback(
+      [hwnd, generation = *generation]() {
+        ::PostMessageW(hwnd, WindowBackdrop::kResizeFrameReady, generation, 0);
+      });
+  flutter_controller_->ForceRedraw();
 }
 
 LRESULT
@@ -215,10 +237,10 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
   if (message == WindowBackdrop::kResizeFrameReady) {
     WindowBackdrop::Trace("resize-frame-received", hwnd,
         flutter_controller_ ? flutter_controller_->view()->GetNativeWindow() : nullptr);
-  }
-  if (message == WindowBackdrop::kResizeFrameReady &&
-      !backdrop_frame_sync_.OnFrame(hwnd, wparam)) {
-    return 0;  // Ignore a rendered frame superseded by a newer size/minimize.
+    if (!backdrop_frame_sync_.OnFrame(hwnd, wparam)) {
+      RequestBackdropResizeFrame(hwnd);
+      return 0;  // A newer size or minimize superseded the rendered frame.
+    }
   }
   const bool await_resize_frame = message == WM_SIZE && flutter_controller_ &&
       backdrop_frame_sync_.OnSize(hwnd, wparam, lparam);
@@ -226,17 +248,7 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
       hwnd, message, wparam, lparam, [&](LPARAM forwarded_lparam) {
         return DispatchMessageToPlugins(hwnd, message, wparam, forwarded_lparam);
       });
-  if (await_resize_frame && flutter_controller_) {
-    WindowBackdrop::Trace("resize-frame-requested", hwnd,
-                         flutter_controller_->view()->GetNativeWindow());
-    const WPARAM generation = backdrop_frame_sync_.generation();
-    // Register after child layout, then request a frame at the final size.
-    // The engine invokes this once on the platform thread after drawing.
-    flutter_controller_->engine()->SetNextFrameCallback([hwnd, generation]() {
-      ::PostMessageW(hwnd, WindowBackdrop::kResizeFrameReady, generation, 0);
-    });
-    flutter_controller_->ForceRedraw();
-  }
+  if (await_resize_frame) RequestBackdropResizeFrame(hwnd);
   return result;
 }
 
@@ -264,7 +276,7 @@ LRESULT FlutterWindow::DispatchMessageToPlugins(HWND hwnd, UINT message,
   switch (message)
   {
   case WM_FONTCHANGE:
-    flutter_controller_->engine()->ReloadSystemFonts();
+    if (flutter_controller_) flutter_controller_->engine()->ReloadSystemFonts();
     break;
   case WM_SYSCOMMAND:
   {

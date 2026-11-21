@@ -4,6 +4,7 @@ import 'dart:collection';
 import 'dart:convert';
 import 'dart:math';
 import 'package:crypto/crypto.dart';
+import 'package:ffi/ffi.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -15,6 +16,7 @@ import 'package:cb_file_manager/helpers/core/app_path_helper.dart';
 import 'package:cb_file_manager/ui/utils/scroll_velocity_notifier.dart';
 import 'package:cb_file_manager/ui/widgets/thumbnail_listing_gate.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:win32/win32.dart' as win32;
 
 import 'fc_native_video_thumbnail.dart';
 import 'thumbnail_viewport_policy.dart';
@@ -392,9 +394,188 @@ class VideoThumbnailHelper {
   // Moderate size for good quality thumbnails
   static const int maxThumbnailSize = 240;
 
+  /// Longest edge, in physical pixels, of the frame the Windows custom
+  /// (FFmpeg) mode writes. The cache file name is path-only, so one file serves
+  /// every grid zoom level; it must cover the largest tile at HiDPI. The native
+  /// side fits the frame in this box, keeps the aspect ratio and never
+  /// upscales.
+  static const int _customModeGenerationSize = 640;
+
+  /// Cap on parallel generations in Windows custom mode, where each one is a
+  /// full multi-threaded FFmpeg decode. The user preference still applies when
+  /// it is lower.
+  static const int _customModeWindowsMaxConcurrency = 4;
+
+  /// Prefix of the current on-disk thumbnail file name. Bumped from `thumb_`
+  /// when custom mode started writing larger frames, so files written by older
+  /// builds are regenerated once.
+  static const String _cacheFilePrefix = 'thumb_v2_';
+
+  /// File names written by builds before [_cacheFilePrefix] was versioned.
+  /// Indexed ones are dropped and deleted when the index loads; any others are
+  /// deleted by [_cleanupOldTempFiles].
+  static final RegExp _legacyCacheFileName = RegExp(
+    r'^thumb_[0-9a-f]{32}\.jpg$',
+  );
+
   static bool get _isWindows => Platform.isWindows;
 
+  /// Parallel generation limit for the current mode and platform.
+  static int get _effectiveMaxConcurrency =>
+      (_thumbnailMode == ThumbnailMode.custom && _isWindows)
+      ? min(_maxConcurrency, _customModeWindowsMaxConcurrency)
+      : _maxConcurrency;
+
+  /// Whether [thumbnailPath] was written by a build that predates the
+  /// versioned cache file name.
+  @visibleForTesting
+  static bool isLegacyCacheFile(String thumbnailPath) =>
+      _legacyCacheFileName.hasMatch(path.basename(thumbnailPath));
+
   static DateTime _lastCleanupTime = DateTime.now();
+
+  /// How long a cache file that dropped out of the in-memory index is kept.
+  static const Duration _unindexedCacheFileRetention = Duration(days: 30);
+
+  // ── Focused-folder fill ────────────────────────────────────────────────────
+  // The focused tab's folder gets every video thumbnail generated, not only
+  // the tiles near the viewport. Visible tiles still go first: fill requests
+  // run below every other priority, keep one concurrency slot free, and are
+  // fed a few at a time so a new visible request never waits behind the
+  // whole folder.
+
+  /// Below [_defaultPriority], so every tile and prefetch request goes first.
+  static const int _fillPriority = -10;
+
+  /// Fill requests queued or running at once.
+  static const int _fillWindow = 4;
+
+  static Object? _fillOwner;
+  static List<String> _fillPaths = const [];
+  static int _fillCursor = 0;
+  static int _fillGeneration = 0;
+  static int _fillInFlight = 0;
+
+  /// Generation of the pump that is running, if any. A new fill starts its
+  /// own pump instead of waiting for a stale one parked on an await.
+  static int? _fillPumpGeneration;
+  static bool _fillPumpDirty = false;
+
+  /// Size and quality of the last tile request, so filled files match what
+  /// the grid asks for (the cache file name does not include the size).
+  static int _fillThumbnailSize = 200;
+  static int _fillQuality = 55;
+
+  /// Generates thumbnails for every video in [videoPaths] (display order)
+  /// for the focused tab [owner]. Replaces any previous fill, from this or
+  /// another owner. Paths that are virtual (`#...`), unsupported or cloud
+  /// placeholders (reading them would download the file) are skipped.
+  static void setFocusedFolderFill(Object owner, List<String> videoPaths) {
+    final paths = <String>[
+      for (final videoPath in videoPaths)
+        if (!videoPath.startsWith('#') && isSupportedVideoFormat(videoPath))
+          _cacheKeyForPath(videoPath),
+    ];
+    if (owner == _fillOwner && listEquals(paths, _fillPaths)) return;
+    _cancelFill();
+    _fillOwner = owner;
+    _fillPaths = paths;
+    _scheduleFillPump();
+  }
+
+  /// Stops the fill if [owner] started it; a hidden tab cannot stop the
+  /// focused tab's fill.
+  static void clearFocusedFolderFill(Object owner) {
+    if (_fillOwner != owner) return;
+    _cancelFill();
+    _fillOwner = null;
+    _fillPaths = const [];
+  }
+
+  static void _cancelFill() {
+    _fillGeneration++;
+    _fillCursor = 0;
+    _fillInFlight = 0;
+    _cancelPendingWhere((request) => request.fill);
+  }
+
+  @visibleForTesting
+  static Object? get focusedFolderFillOwner => _fillOwner;
+
+  static void _scheduleFillPump() {
+    if (_fillPumpGeneration == _fillGeneration) {
+      _fillPumpDirty = true;
+      return;
+    }
+    unawaited(_runFillPump(_fillGeneration));
+  }
+
+  static Future<void> _runFillPump(int generation) async {
+    _fillPumpGeneration = generation;
+    try {
+      do {
+        _fillPumpDirty = false;
+        await _pumpFill(generation);
+      } while (_fillPumpDirty && generation == _fillGeneration);
+    } finally {
+      if (_fillPumpGeneration == generation) _fillPumpGeneration = null;
+    }
+  }
+
+  static Future<void> _pumpFill(int generation) async {
+    bool stale() => generation != _fillGeneration;
+
+    await initializeCache();
+    while (!stale() &&
+        _fillInFlight < _fillWindow &&
+        _fillCursor < _fillPaths.length) {
+      final videoPath = _fillPaths[_fillCursor++];
+      if (!ThumbnailListingGate.instance.isReadyFor(videoPath)) {
+        final ready = Completer<void>();
+        ThumbnailListingGate.instance.whenReady(
+          () => ready.complete(),
+          source: videoPath,
+        );
+        await ready.future;
+        if (stale()) return;
+      }
+      if (await getFromCache(videoPath) != null) continue;
+      if (stale()) return;
+      if (_isCloudPlaceholder(videoPath)) continue;
+
+      _fillInFlight++;
+      unawaited(
+        _requestThumbnail(
+          videoPath,
+          priority: _fillPriority,
+          quality: _fillQuality,
+          thumbnailSize: _fillThumbnailSize,
+          fill: true,
+        ).whenComplete(() {
+          if (generation != _fillGeneration) return;
+          _fillInFlight--;
+          _scheduleFillPump();
+        }),
+      );
+    }
+  }
+
+  /// OneDrive/iCloud "online-only" files: reading one downloads it. Same
+  /// attributes as the content search checks (OFFLINE, RECALL_ON_OPEN,
+  /// RECALL_ON_DATA_ACCESS). UNC paths are not checked (network round trip).
+  static bool _isCloudPlaceholder(String videoPath) {
+    if (!Platform.isWindows || videoPath.startsWith(r'\\')) return false;
+    final pathPtr = videoPath.toNativeUtf16();
+    try {
+      final attributes = win32.GetFileAttributes(win32.PCWSTR(pathPtr)).value;
+      return attributes != 0xFFFFFFFF &&
+          attributes & (0x1000 | 0x40000 | 0x400000) != 0;
+    } catch (_) {
+      return false;
+    } finally {
+      malloc.free(pathPtr);
+    }
+  }
 
   static String _currentDirectory = '';
 
@@ -421,9 +602,12 @@ class VideoThumbnailHelper {
     _viewportPrefetched.clear();
     if (_userPrefs.videoThumbnailViewportOnly.value) {
       final wanted = _viewport.wantedPaths;
-      _cancelPendingWhere((request) => !wanted.contains(request.videoPath));
+      // The focused folder's fill is owned by its tab, not by the viewport.
+      _cancelPendingWhere(
+        (request) => !request.fill && !wanted.contains(request.videoPath),
+      );
       for (final request in _pendingQueue) {
-        request.viewportScoped = true;
+        if (!request.fill) request.viewportScoped = true;
       }
       _scheduleViewportSync();
     } else if (_preloadPaths.isNotEmpty) {
@@ -860,7 +1044,10 @@ class VideoThumbnailHelper {
     // Clear pending queue for other directories
     final List<_ThumbnailRequest> requestsToRemove = [];
 
+    // Every tab's directory load lands here, including background tabs; the
+    // focused tab's fill is replaced only through setFocusedFolderFill.
     for (final request in _pendingQueue) {
+      if (request.fill) continue;
       final requestDir = path.dirname(request.videoPath);
       if (!_isSameOrWithinDirectory(dirPath, requestDir)) {
         if (!request.completer.isCompleted) {
@@ -876,6 +1063,7 @@ class VideoThumbnailHelper {
     // Also cancel any currently processing thumbnails
     final List<_ThumbnailRequest> processingsToRemove = [];
     for (final request in _processingQueue) {
+      if (request.fill) continue;
       final requestDir = path.dirname(request.videoPath);
       if (!_isSameOrWithinDirectory(dirPath, requestDir)) {
         if (!request.completer.isCompleted) {
@@ -956,10 +1144,20 @@ class VideoThumbnailHelper {
           .toList();
 
       for (final file in files) {
+        // Files from before the cache name was versioned are never read again.
+        if (isLegacyCacheFile(file.path)) {
+          try {
+            await file.delete();
+          } catch (_) {}
+          continue;
+        }
         if (!_fileCache.values.contains(file.path)) {
+          // The in-memory index keeps only the newest entries, so most files
+          // of a filled folder are unindexed but still served from disk by
+          // getFromCache. Keep them for a month, not a day.
           try {
             final stat = await file.stat();
-            if (now.difference(stat.modified).inHours > 24) {
+            if (now.difference(stat.modified) > _unindexedCacheFileRetention) {
               await file.delete();
             }
           } catch (_) {}
@@ -1015,19 +1213,35 @@ class VideoThumbnailHelper {
           continue;
         }
 
-        // Fill up to _maxConcurrency parallel generation slots.
+        // Fill up to _effectiveMaxConcurrency parallel generation slots (the
+        // user preference, capped in Windows custom mode). Read every pass
+        // because the mode can change at runtime.
         // Priority order is maintained: highest-priority items are taken first
         // from the already-sorted _pendingQueue. Parallelism means the first N
         // items start simultaneously instead of waiting for each other.
+        final concurrencyLimit = _effectiveMaxConcurrency;
+        // Fill requests leave one slot free so a tile that scrolls into view
+        // starts at once instead of waiting for a fill decode to finish.
+        final fillLimit = max(1, concurrencyLimit - 1);
+        var activeFill = _processingQueue.where((r) => r.fill).length;
         final batch = <_ThumbnailRequest>[];
-        while (batch.length < (_maxConcurrency - _activeGenerations) &&
-            _pendingQueue.isNotEmpty) {
-          batch.add(_pendingQueue.removeAt(0));
+        var index = 0;
+        while (batch.length < (concurrencyLimit - _activeGenerations) &&
+            index < _pendingQueue.length) {
+          final request = _pendingQueue[index];
+          if (request.fill && activeFill >= fillLimit) {
+            index++;
+            continue;
+          }
+          _pendingQueue.removeAt(index);
+          if (request.fill) activeFill++;
+          batch.add(request);
         }
 
         if (batch.isEmpty) {
-          // All concurrency slots full — wait a bit and retry.
-          await Future.delayed(const Duration(milliseconds: 50));
+          // All usable slots are busy: wait until a request finishes or a new
+          // one arrives (either can change what may start).
+          await (_queueWake ??= Completer<void>()).future;
           continue;
         }
 
@@ -1036,43 +1250,11 @@ class VideoThumbnailHelper {
           _processingQueue.add(request);
         }
 
-        // Launch all batch items in parallel.
-        await Future.wait(
-          batch.map((request) async {
-            try {
-              final result = await _generateThumbnailInternal(
-                request.videoPath,
-                forceRegenerate: request.forceRegenerate,
-                quality: request.quality,
-                thumbnailSize: request.thumbnailSize,
-              );
-
-              if (result != null) {
-                _fileCache[request.videoPath] = result;
-                if (!request.completer.isCompleted) {
-                  request.completer.complete(result);
-                }
-                try {
-                  _thumbnailReadyController.add(request.videoPath);
-                } catch (_) {}
-              } else {
-                if (!request.completer.isCompleted) {
-                  request.completer.complete(null);
-                }
-              }
-            } catch (e) {
-              debugPrint(
-                'VideoThumbnail: Error processing request for ${request.videoPath}: $e',
-              );
-              if (!request.completer.isCompleted) {
-                request.completer.complete(null);
-              }
-            } finally {
-              _processingQueue.remove(request);
-              _activeGenerations--;
-            }
-          }),
-        );
+        // Each request runs on its own, so a slot freed by a fast one is
+        // reused on the next pass rather than after the slowest of the batch.
+        for (final request in batch) {
+          unawaited(_runQueuedRequest(request));
+        }
 
         // Yield to event loop between batches.
         if (_pendingQueue.isNotEmpty) {
@@ -1088,6 +1270,53 @@ class VideoThumbnailHelper {
     }
   }
 
+  /// Completed when a running request finishes or a new one is queued, to
+  /// resume a queue loop that is waiting for a usable slot.
+  static Completer<void>? _queueWake;
+
+  static void _wakeQueue() {
+    final wake = _queueWake;
+    _queueWake = null;
+    if (wake != null && !wake.isCompleted) wake.complete();
+  }
+
+  static Future<void> _runQueuedRequest(_ThumbnailRequest request) async {
+    try {
+      final result = await _generateThumbnailInternal(
+        request.videoPath,
+        forceRegenerate: request.forceRegenerate,
+        quality: request.quality,
+        thumbnailSize: request.thumbnailSize,
+      );
+
+      if (result != null) {
+        _fileCache[request.videoPath] = result;
+        if (!request.completer.isCompleted) {
+          request.completer.complete(result);
+        }
+        try {
+          _thumbnailReadyController.add(request.videoPath);
+        } catch (_) {}
+      } else {
+        if (!request.completer.isCompleted) {
+          request.completer.complete(null);
+        }
+      }
+    } catch (e) {
+      debugPrint(
+        'VideoThumbnail: Error processing request for ${request.videoPath}: $e',
+      );
+      if (!request.completer.isCompleted) {
+        request.completer.complete(null);
+      }
+    } finally {
+      _processingQueue.remove(request);
+      _activeGenerations--;
+      _wakeQueue();
+      if (_pendingQueue.isNotEmpty) Timer.run(_processQueue);
+    }
+  }
+
   static Future<String?> _requestThumbnail(
     String videoPath, {
     int priority = _defaultPriority,
@@ -1095,6 +1324,7 @@ class VideoThumbnailHelper {
     int? quality,
     int? thumbnailSize,
     bool viewportScoped = false,
+    bool fill = false,
   }) {
     final cacheKey = _cacheKeyForPath(videoPath);
 
@@ -1103,7 +1333,7 @@ class VideoThumbnailHelper {
     // This ensures thumbnails load in display order even when the OS listed
     // them in a different (file-system) order.
     final displayIndex = _displayIndexByPath[cacheKey];
-    if (displayIndex != null && !viewportScoped) {
+    if (displayIndex != null && !viewportScoped && !fill) {
       if (displayIndex < 20) {
         priority = _visiblePriority - displayIndex; // 100, 99, ..., 81
       } else if (displayIndex < 60) {
@@ -1134,6 +1364,13 @@ class VideoThumbnailHelper {
     if (existingPending.videoPath.isNotEmpty) {
       oldRequest = existingPending;
       _pendingQueue.remove(existingPending);
+      // A tile asking for a queued fill item raises its priority, but the
+      // item stays part of the fill: scrolling past the tile must not cancel
+      // it.
+      if (existingPending.fill) {
+        fill = true;
+        viewportScoped = false;
+      }
     }
 
     final completer = Completer<String?>();
@@ -1146,6 +1383,7 @@ class VideoThumbnailHelper {
       quality: quality,
       thumbnailSize: thumbnailSize,
       viewportScoped: viewportScoped,
+      fill: fill,
     );
 
     _pendingQueue.add(newRequest);
@@ -1156,6 +1394,7 @@ class VideoThumbnailHelper {
       return a.timestamp.compareTo(b.timestamp);
     });
 
+    _wakeQueue();
     Timer.run(_processQueue);
 
     if (oldRequest != null && !oldRequest.completer.isCompleted) {
@@ -1467,7 +1706,9 @@ class VideoThumbnailHelper {
                 videoPath: absoluteVideoPath,
                 outputPath: thumbnailPath,
                 percentage: percentage.toDouble(),
-                width: maxSize,
+                // One cache file serves every tile size, so request a frame
+                // large enough for the biggest HiDPI tile instead of [maxSize].
+                width: _customModeGenerationSize,
                 format: 'jpg',
                 quality: quality,
               );
@@ -1539,7 +1780,7 @@ class VideoThumbnailHelper {
   static String _createCacheFilename(String videoPath) {
     final bytes = utf8.encode(videoPath);
     final digest = md5.convert(bytes);
-    return 'thumb_${digest.toString()}.jpg';
+    return '$_cacheFilePrefix${digest.toString()}.jpg';
   }
 
   static void _saveCacheToDiskThrottled() {
@@ -1608,19 +1849,37 @@ class VideoThumbnailHelper {
         final cacheData = jsonDecode(jsonData) as Map<String, dynamic>;
         int validCount = 0;
         int invalidCount = 0;
+        final legacyFiles = <String>[];
         for (final entry in cacheData.entries) {
           final thumbnailPath = entry.value as String?;
           final videoPath = entry.key;
-          if (thumbnailPath != null) {
+          if (thumbnailPath == null) {
+            invalidCount++;
+          } else if (isLegacyCacheFile(thumbnailPath)) {
+            // Written before the cache name was versioned (sized for one grid
+            // zoom level). Drop it so it is regenerated.
+            legacyFiles.add(thumbnailPath);
+          } else {
             _fileCache[videoPath] = thumbnailPath;
             validCount++;
-          } else {
-            invalidCount++;
           }
         }
         _log(
-          'VideoThumbnail: Loaded $validCount entries from disk index (ignored $invalidCount invalid).',
+          'VideoThumbnail: Loaded $validCount entries from disk index (ignored $invalidCount invalid, ${legacyFiles.length} legacy).',
         );
+        if (legacyFiles.isNotEmpty) {
+          // Persist the pruned index so later launches skip the legacy entries,
+          // and delete the indexed legacy files in the background. Unindexed
+          // ones are removed by _cleanupOldTempFiles.
+          _saveCacheToDiskThrottled();
+          unawaited(() async {
+            for (final legacyPath in legacyFiles) {
+              try {
+                await File(legacyPath).delete();
+              } catch (_) {}
+            }
+          }());
+        }
       } catch (e) {
         _log(
           'VideoThumbnail: Error decoding cache JSON: $e. Deleting corrupt index.',
@@ -1678,6 +1937,10 @@ class VideoThumbnailHelper {
     // Choose sensible defaults if not provided
     final effectiveQuality = quality ?? (isPriority ? 55 : 45);
     final effectiveSize = thumbnailSize ?? (isPriority ? 200 : 160);
+    if (viewportOwner != null) {
+      _fillThumbnailSize = effectiveSize;
+      _fillQuality = effectiveQuality;
+    }
 
     final result = await _requestThumbnail(
       videoPath,
@@ -1952,11 +2215,13 @@ class VideoThumbnailHelper {
           );
           content = fallbackBuilder?.call() ?? defaultFallback();
         } else if (thumbnailPath != null) {
+          // Decode at physical pixels so HiDPI screens get a sharp image.
+          final dpr = MediaQuery.maybeDevicePixelRatioOf(context) ?? 1.0;
           final int? cWidth = (width.isFinite && width > 0)
-              ? width.toInt()
+              ? (width * dpr).round()
               : null;
           final int? cHeight = (height.isFinite && height > 0)
-              ? height.toInt()
+              ? (height * dpr).round()
               : null;
           content = Image(
             image: ResizeImage(
@@ -2139,7 +2404,20 @@ class VideoThumbnailHelper {
       _shouldStopProcessing = false;
       _viewportPrefetched.clear();
       _scheduleViewportSync();
+      _restartFill();
     }
+  }
+
+  /// Runs the focused folder's fill again from the top, e.g. after the cache
+  /// was cleared because the thumbnail mode or position changed.
+  static void _restartFill() {
+    final owner = _fillOwner;
+    if (owner == null) return;
+    final paths = _fillPaths;
+    _cancelFill();
+    _fillOwner = owner;
+    _fillPaths = paths;
+    _scheduleFillPump();
   }
 
   static Future<void> trimCache() async {
@@ -2182,8 +2460,9 @@ class VideoThumbnailHelper {
       'VideoThumbnail: Proactively generating ${videoPaths.length} thumbnails for $directoryPath',
     );
 
-    // Clear pending queue to prioritize new directory
-    _pendingQueue.clear();
+    // Clear pending queue to prioritize new directory (the focused folder's
+    // fill stays; dropped requests are completed so no caller hangs).
+    _cancelPendingWhere((request) => !request.fill);
 
     // Add ALL videos to queue with decreasing priority based on position
     // Priority decreases by 1 for each position, ensuring top items are processed first
@@ -2307,8 +2586,10 @@ class VideoThumbnailHelper {
   }
 
   /// Hủy tất cả các yêu cầu đang chờ xử lý
+  /// The focused folder's fill is kept; it is replaced or stopped only
+  /// through [setFocusedFolderFill] / [clearFocusedFolderFill].
   static void cancelPendingRequests() {
-    _pendingQueue.clear();
+    _cancelPendingWhere((request) => !request.fill);
   }
 
   /// Flag to mark a thumbnail as attempted for generation
@@ -2583,6 +2864,12 @@ class _ThumbnailRequest {
   final int? thumbnailSize;
   bool viewportScoped;
 
+  /// Part of the focused tab's whole-folder fill (see
+  /// [VideoThumbnailHelper.setFocusedFolderFill]). Fill requests run at the
+  /// lowest priority, never become viewport-scoped and are only cancelled
+  /// when the fill itself is replaced or cleared.
+  final bool fill;
+
   _ThumbnailRequest.empty()
     : videoPath = '',
       priority = -1,
@@ -2591,7 +2878,8 @@ class _ThumbnailRequest {
       forceRegenerate = false,
       quality = null,
       thumbnailSize = null,
-      viewportScoped = false;
+      viewportScoped = false,
+      fill = false;
 
   _ThumbnailRequest({
     required this.videoPath,
@@ -2602,5 +2890,6 @@ class _ThumbnailRequest {
     this.quality,
     this.thumbnailSize,
     this.viewportScoped = false,
+    this.fill = false,
   });
 }

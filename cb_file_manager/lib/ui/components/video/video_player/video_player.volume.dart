@@ -44,10 +44,8 @@ mixin _VideoPlayerVolumeMixin on _VideoPlayerVolumeHost {
 
   double _currentEffectiveVolume0to100() {
     if (_isMuted) return 0.0;
-    final v = _savedVolume > 0
-        ? _savedVolume
-        : (_lastVolume > 0 ? _lastVolume : 70.0);
-    return v.clamp(0.0, 100.0);
+    final volume = _savedVolume > 0.1 ? _savedVolume : _lastVolume;
+    return volume.clamp(0.0, 100.0);
   }
 
   Future<void> _applyVolumeToActiveController({bool updateUi = true}) async {

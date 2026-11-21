@@ -1149,6 +1149,8 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                                                           ...state.tabs.map((
                                                             tab,
                                                           ) {
+                                                            final label = tab
+                                                                .displayLabel;
                                                             return Tab(
                                                               height: 38,
                                                               child: Padding(
@@ -1190,10 +1192,20 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                                                                       width: 8,
                                                                     ),
                                                                     Flexible(
-                                                                      child: Text(
-                                                                        tab.name,
-                                                                        overflow:
-                                                                            TextOverflow.ellipsis,
+                                                                      child: CbTooltip(
+                                                                        message:
+                                                                            label,
+                                                                        preferBelow:
+                                                                            true,
+                                                                        excludeFromSemantics:
+                                                                            true,
+                                                                        child: Text(
+                                                                          label,
+                                                                          maxLines:
+                                                                              1,
+                                                                          overflow:
+                                                                              TextOverflow.ellipsis,
+                                                                        ),
                                                                       ),
                                                                     ),
                                                                     const SizedBox(

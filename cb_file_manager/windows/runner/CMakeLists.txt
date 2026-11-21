@@ -13,6 +13,8 @@ add_executable(${BINARY_NAME} WIN32
   "flutter_mouse_input_guard.h"
   "engine_window_host.cpp"
   "engine_window_host.h"
+  "d3d11_threading_guard.cpp"
+  "d3d11_threading_guard.h"
   "main.cpp"
   "utils.cpp"
   "torrent_launch.cpp"

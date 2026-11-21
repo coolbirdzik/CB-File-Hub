@@ -264,6 +264,13 @@ class _BrowserLikeFileSurfaceState extends State<BrowserLikeFileSurface> {
     _keyboardController.syncFromSelection(widget.selectionState);
     _keyboardController.pruneItemKeys(widget.visiblePaths);
 
+    final summary = SelectionSummaryTooltip.isVisibleFor(widget.selectionState)
+        ? SelectionSummaryTooltip.forSelection(
+            widget.selectionState,
+            totalSizeOverride: widget.selectionTotalSize,
+            allowWrap: !widget.isDesktop,
+          )
+        : null;
     final scaffold = ScreenScaffold(
       selectionState: widget.selectionState,
       body: FileViewShell(
@@ -285,6 +292,7 @@ class _BrowserLikeFileSurfaceState extends State<BrowserLikeFileSurface> {
       isDesktop: widget.isDesktop,
       selectionModeFloatingActionButton:
           widget.selectionModeFloatingActionButton,
+      mobileSelectionSummary: widget.isDesktop ? null : summary,
       showAppBar: widget.showAppBar,
       showSearchBar: widget.showSearchBar,
       searchBar: widget.searchBar,
@@ -308,23 +316,8 @@ class _BrowserLikeFileSurfaceState extends State<BrowserLikeFileSurface> {
           alignment: Alignment.bottomCenter,
           children: [
             scaffold,
-            if (widget.selectionState.isSelectionMode && widget.isDesktop)
-              Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
-                child: SelectionSummaryTooltip(
-                  totalSizeOverride: widget.selectionTotalSize,
-                  selectedFileCount:
-                      widget.selectionState.selectedFilePaths.length,
-                  selectedFolderCount:
-                      widget.selectionState.selectedFolderPaths.length,
-                  selectedFilePaths: widget.selectionState.selectedFilePaths
-                      .toList(),
-                  selectedFolderPaths: widget.selectionState.selectedFolderPaths
-                      .toList(),
-                ),
-              ),
+            if (widget.isDesktop && summary != null)
+              Positioned(bottom: 0, left: 0, right: 0, child: summary),
           ],
         ),
       ),

@@ -133,9 +133,6 @@ bool Create(const Environment& env) {
   project.set_ui_thread_policy(PreferredUIThreadPolicy());
   project.set_impeller_switch(PreferredImpellerSwitch());
   const auto role = Value(env, "CB_WINDOW_ROLE", "normal");
-  if (role == "video" || role == "torrent-options" || role == "progress") {
-    project.set_impeller_switch(flutter::ImpellerSwitch::Disabled);
-  }
   auto window = std::make_unique<FlutterWindow>(project, env);
   window->SetProgressWindow(role == "progress");
   Win32Window::Size size(1200, 800);

@@ -55,7 +55,7 @@ class VideoCutPanelState extends State<VideoCutPanel> {
   bool _includeSubtitles = false;
   bool _showExportOptions = false;
   final _optionsKey = GlobalKey();
-  VideoCutTimestampMode _timestampMode = VideoCutTimestampMode.exportTime;
+  VideoCutTimestampMode _timestampMode = VideoCutTimestampMode.sourceTime;
   String _container = 'source';
   bool _busy = false;
   double _progress = 0;

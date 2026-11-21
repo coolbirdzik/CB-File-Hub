@@ -12,6 +12,7 @@ import 'dart:math' as math;
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/config/translation_helper.dart';
 import 'package:cb_file_manager/helpers/ui/frame_timing_optimizer.dart';
+import 'package:cb_file_manager/services/desktop_integration/windows_folder_elevation.dart';
 import 'package:cb_file_manager/services/file_drag_drop/file_drag_drop_move_service.dart';
 import 'package:cb_file_manager/services/windowing/windows_explorer_drag_drop_service.dart';
 import 'package:cb_file_manager/ui/components/common/browser_like_action_handlers.dart';
@@ -84,6 +85,7 @@ import 'package:cb_file_manager/ui/utils/route.dart';
 import 'package:cb_file_manager/ui/widgets/slim_progress_bar.dart';
 import 'package:cb_file_manager/core/service_locator.dart';
 import 'package:cb_file_manager/services/tab_activity/tab_activity_manager.dart';
+import 'package:cb_file_manager/helpers/media/video_thumbnail_helper.dart';
 
 part 'tabbed_folder_list_screen.mobile_actions.dart';
 part 'tabbed_folder_list_screen.refresh.dart';
@@ -586,6 +588,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
 
   @override
   void dispose() {
+    VideoThumbnailHelper.clearFocusedFolderFill(widget.tabId);
     TabWindowTransfer.unregister(widget.tabId, _captureWindowState);
     _transferRestoreSubscription?.cancel();
     // Clean up resources
@@ -1129,6 +1132,24 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
     }
   }
 
+  /// Back on a search that found nothing leaves the search: the query is
+  /// cleared, the folder listing comes back and the search bar closes.
+  /// Returns whether it consumed the back action.
+  bool _exitEmptySearch() {
+    final state = _folderListBloc.state;
+    if (!state.isSearchActive ||
+        state.searchResults.isNotEmpty ||
+        _currentPath.startsWith('#search?tag=')) {
+      return false;
+    }
+    _folderListBloc.add(const ClearSearchAndFilters());
+    _folderListBloc.add(FolderListLoad(_currentPath));
+    // The mobile search dialog keeps its own copy of the query.
+    MobileFileActionsController.forTab(widget.tabId).currentSearchQuery = null;
+    if (_showSearchBar) _closeSearchBar();
+    return true;
+  }
+
   Widget _buildSearchBar() {
     final drives = _isDrivesMode();
     return tab_components.SearchBar(
@@ -1173,6 +1194,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
   }
 
   Future<bool> _handleBackButton() async {
+    if (_exitEmptySearch()) return false;
     return await _navigationController.handleBackButton(
       context,
       _currentPath,
@@ -1503,10 +1525,67 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
               tabManagerState.activeTabId == widget.tabId) {
             _maybeReloadIfRefocused();
           }
+          // Path changes reach the fill through the FolderListBloc listener
+          // once the new listing is loaded; here only focus changes matter.
+          final isActive = tabManagerState.activeTabId == widget.tabId;
+          if (isActive != _fillActive) {
+            _syncFocusedFolderFill(_folderListBloc.state, isActive: isActive);
+          }
         },
         child: _buildContentForCurrentPath(context),
       ),
     );
+  }
+
+  List<FileSystemEntity>? _fillFiles;
+  String? _fillPath;
+  bool _fillActive = false;
+
+  /// Keeps the whole-folder thumbnail fill on the focused tab's folder: while
+  /// this tab is the active one, every video in its listing gets a thumbnail
+  /// without waiting for the user to scroll to it. Losing focus hands the
+  /// fill to whichever tab gains it (or stops it).
+  void _syncFocusedFolderFill(FolderListState state, {bool? isActive}) {
+    if (!mounted || !isDesktopPlatform) return;
+    final active =
+        isActive ??
+        context.read<TabManagerBloc>().state.activeTabId == widget.tabId;
+    if (!active) {
+      if (_fillActive) {
+        VideoThumbnailHelper.clearFocusedFolderFill(widget.tabId);
+        _fillActive = false;
+        _fillFiles = null;
+        _fillPath = null;
+      }
+      return;
+    }
+    // A listing that is still loading keeps the running fill; a virtual one
+    // (home, search, tags, network, archives) stops it.
+    if (state.isLoading) return;
+    final folderPath = state.currentPath.path;
+    if (_currentPath.startsWith('#') ||
+        folderPath.startsWith('#') ||
+        ArchivePathUtils.isArchiveBrowsePath(folderPath)) {
+      if (_fillActive) {
+        VideoThumbnailHelper.clearFocusedFolderFill(widget.tabId);
+        _fillActive = false;
+        _fillFiles = null;
+        _fillPath = null;
+      }
+      return;
+    }
+    if (_fillActive &&
+        identical(state.files, _fillFiles) &&
+        _fillPath == folderPath) {
+      return;
+    }
+    _fillActive = true;
+    _fillFiles = state.files;
+    _fillPath = folderPath;
+    VideoThumbnailHelper.setFocusedFolderFill(widget.tabId, [
+      for (final file in state.files)
+        if (file is File && FileTypeUtils.isVideoFile(file.path)) file.path,
+    ]);
   }
 
   /// Triggers a fresh folder load if the tab activity manager flagged this
@@ -1626,7 +1705,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
             currentFilter: _currentFilter,
             gridCrossAxisCount: _gridCrossAxisCount,
             onBackInTabHistory: () {
-              if (!mounted) return;
+              if (!mounted || _exitEmptySearch()) return;
               final tabManagerBloc = context.read<TabManagerBloc>();
               if (tabManagerBloc.canTabNavigateBack(widget.tabId)) {
                 tabManagerBloc.backNavigationToPath(widget.tabId);
@@ -1731,6 +1810,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
             value: _folderListBloc,
             child: BlocListener<FolderListBloc, FolderListState>(
               listener: (context, folderState) {
+                _syncFocusedFolderFill(folderState);
                 final error = folderState.error;
                 if (error == null) {
                   _lastShownFolderError = null;
@@ -1870,6 +1950,12 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
           });
         }
 
+        final summary = SelectionSummaryTooltip.isVisibleFor(selectionState)
+            ? SelectionSummaryTooltip.forSelection(
+                selectionState,
+                allowWrap: !isDesktopPlatform,
+              )
+            : null;
         return Stack(
           alignment: Alignment.bottomCenter,
           children: [
@@ -1890,6 +1976,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
                   _showDeleteConfirmationDialog(context),
               isDesktop: isDesktopPlatform,
               selectionModeFloatingActionButton: null,
+              mobileSelectionSummary: isDesktopPlatform ? null : summary,
               // When notifier is provided, suppress own appbar – parent renders it.
               showAppBar: notifier != null ? false : widget.showAppBar,
               // In split mode, search bar is shown in shared bar above; suppress it here.
@@ -1916,20 +2003,8 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
               ),
               actions: _getAppBarActions(),
             ),
-            if (selectionState.isSelectionMode && isDesktopPlatform)
-              Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
-                child: SelectionSummaryTooltip(
-                  selectedFileCount: selectionState.selectedFilePaths.length,
-                  selectedFolderCount:
-                      selectionState.selectedFolderPaths.length,
-                  selectedFilePaths: selectionState.selectedFilePaths.toList(),
-                  selectedFolderPaths: selectionState.selectedFolderPaths
-                      .toList(),
-                ),
-              ),
+            if (isDesktopPlatform && summary != null)
+              Positioned(bottom: 0, left: 0, right: 0, child: summary),
           ],
         );
       },
@@ -2130,6 +2205,26 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
       onRetry: () {
         _folderListBloc.add(FolderListLoad(_currentPath));
       },
+      onOpenAsAdministrator:
+          state.directoryAccessDenied &&
+              state.currentPath.path == _currentPath &&
+              !isNetworkPath &&
+              Platform.isWindows &&
+              !WindowsFolderElevation.isElevated
+          ? () async {
+              final path = state.currentPath.path;
+              try {
+                await WindowsFolderElevation.open(path);
+              } catch (error) {
+                if (context.mounted) {
+                  AppToast.error(
+                    context,
+                    '${context.tr.folderOpenFailed}\n$path\n$error',
+                  );
+                }
+              }
+            }
+          : null,
       onNavigateToPath: _navigateToPath,
       tabId: widget.tabId,
       showFileTags: showFileTags,
@@ -2352,6 +2447,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
 
   // Method to handle mouse back button press
   void _handleMouseBackButton() {
+    if (_exitEmptySearch()) return;
     _navigationController.handleMouseBackButton(
       context,
       _currentPath,

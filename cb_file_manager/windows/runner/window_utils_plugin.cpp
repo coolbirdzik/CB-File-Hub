@@ -1827,11 +1827,11 @@ void WindowUtilsPlugin::RegisterWithRegistrar(
 }
 
 WindowUtilsPlugin::WindowUtilsPlugin(flutter::PluginRegistrarWindows *registrar)
-    : registrar_(registrar) {}
+    : registrar_(registrar), top_level_hwnd_(GetTopLevelWindow(registrar)) {}
 
 WindowUtilsPlugin::~WindowUtilsPlugin()
 {
-  fullscreen_states.erase(GetTopLevelWindow(registrar_));
+  if (top_level_hwnd_) fullscreen_states.erase(top_level_hwnd_);
   RemoveTorrentNotification();
   RemoveTabStripRect();
   if (torrent_launch_hwnd_)

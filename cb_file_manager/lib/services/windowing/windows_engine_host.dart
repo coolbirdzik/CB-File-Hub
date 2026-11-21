@@ -16,6 +16,12 @@ abstract final class WindowsEngineHost {
   static Map<String, String>? _environment;
   static bool _closed = false;
   static Future<void> Function()? onCloseRequested;
+
+  /// Runs once the host has decided to quit the process, after media is
+  /// released and before every engine is torn down. Closing SQLite here keeps
+  /// its statement finalizers from running at isolate shutdown, where one ran
+  /// `sqlite3_finalize` against an already freed connection and crashed exit.
+  static Future<void> Function()? beforeProcessExit;
   static final _retained = <String, bool>{};
 
   static bool get isAvailable => _available;
@@ -49,6 +55,8 @@ abstract final class WindowsEngineHost {
     _environment = null;
     _closed = false;
     onCloseRequested = null;
+    beforeProcessExit = null;
+    processStarter = _startDetachedProcess;
     _retained.clear();
   }
 
@@ -67,7 +75,10 @@ abstract final class WindowsEngineHost {
     channel.setMethodCallHandler((call) async {
       // The host asks every engine before the process quits and tears them
       // all down.
-      if (call.method == 'releaseMedia') return _releaseMedia();
+      if (call.method == 'releaseMedia') {
+        await _releaseMedia();
+        return _runBeforeProcessExit();
+      }
       if (call.method == 'closeRequested') {
         final handler = onCloseRequested;
         try {
@@ -79,6 +90,51 @@ abstract final class WindowsEngineHost {
         await close();
       }
     });
+  }
+
+  /// Runner settings that apply to a whole process; a window started in its
+  /// own process inherits them from this one.
+  static const _processWideKeys = <String>{
+    'CB_WINDOWS_RENDERER',
+    'CB_MERGED_UI_THREAD',
+    'CB_FRAME_STATS',
+    'CB_D3D11_DRIVER_THREADS',
+  };
+
+  /// Starts a detached copy of this executable with exactly [environment].
+  @visibleForTesting
+  static Future<void> Function(Map<String, String> environment) processStarter =
+      _startDetachedProcess;
+
+  /// Starts a window (video player, PiP, progress) in a process of its own.
+  ///
+  /// Every engine in this process shares one ANGLE/D3D11 display. Two engines
+  /// drawing at once (a playing video beside a scrolling thumbnail grid)
+  /// corrupted ANGLE's shared state and crashed the raster thread, so windows
+  /// that only talk to their opener over sockets run in separate processes.
+  /// Tab windows stay in this host: native tab merge needs them here.
+  static Future<bool> startWindowProcess(
+    Map<String, String> environment,
+  ) async {
+    await processStarter({
+      for (final key in _processWideKeys) key: ?Platform.environment[key],
+      ...environment,
+    });
+    return true;
+  }
+
+  static Future<void> _startDetachedProcess(
+    Map<String, String> environment,
+  ) async {
+    final executable = Platform.resolvedExecutable;
+    await Process.start(
+      executable,
+      const <String>[],
+      environment: environment,
+      includeParentEnvironment: false,
+      workingDirectory: File(executable).parent.path,
+      mode: ProcessStartMode.detached,
+    );
   }
 
   static Future<bool> open(Map<String, String> environment) async {
@@ -103,6 +159,16 @@ abstract final class WindowsEngineHost {
   /// destroys any other engine.
   static bool get _destroyedWhenClosed =>
       !_primary && !_retained.containsValue(true);
+
+  static Future<void> _runBeforeProcessExit() async {
+    final hook = beforeProcessExit;
+    if (hook == null) return;
+    try {
+      await hook();
+    } catch (e, st) {
+      debugPrint('Pre-exit cleanup failed: $e\n$st');
+    }
+  }
 
   /// Native callbacks into a destroyed isolate abort the whole process.
   static Future<void> _releaseMedia() async {

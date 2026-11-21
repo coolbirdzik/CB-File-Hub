@@ -16,6 +16,7 @@ class ScreenScaffold extends StatelessWidget {
   final void Function(BuildContext) showManageAllTagsDialog;
   final void Function(BuildContext) showDeleteConfirmationDialog;
   final Widget? selectionModeFloatingActionButton;
+  final Widget? mobileSelectionSummary;
   final bool isDesktop;
 
   // Normal mode params
@@ -36,6 +37,7 @@ class ScreenScaffold extends StatelessWidget {
     required this.showManageAllTagsDialog,
     required this.showDeleteConfirmationDialog,
     this.selectionModeFloatingActionButton,
+    this.mobileSelectionSummary,
     this.isDesktop = false,
     required this.showAppBar,
     required this.showSearchBar,
@@ -124,6 +126,9 @@ class ScreenScaffold extends StatelessWidget {
           isNetworkPath: isNetworkPath,
         ),
         body: body,
+        bottomNavigationBar: mobileSelectionSummary == null
+            ? null
+            : SafeArea(top: false, child: mobileSelectionSummary!),
         floatingActionButton: fab,
       );
     }

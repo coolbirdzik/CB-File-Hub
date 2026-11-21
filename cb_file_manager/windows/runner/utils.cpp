@@ -61,7 +61,13 @@ flutter::ImpellerSwitch PreferredImpellerSwitch() {
       return flutter::ImpellerSwitch::Enabled;
     }
   }
-  return flutter::ImpellerSwitch::Default;
+  // Impeller for every window. Scrolling a folder of video thumbnails in a
+  // release build: without InstallD3D11ThreadingGuard both renderers crashed
+  // in the NVIDIA driver; with it, Skia repeatedly lost its EGL context
+  // ("Context Lost", the window stops drawing) while Impeller ran clean.
+  // Enabled (not Default) keeps this independent of the engine's per-version
+  // default; CB_WINDOWS_RENDERER=skia remains for comparisons.
+  return flutter::ImpellerSwitch::Enabled;
 }
 
 std::string Utf8FromUtf16(const wchar_t* utf16_string) {

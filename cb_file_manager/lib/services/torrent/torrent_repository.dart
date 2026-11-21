@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:path/path.dart' as p;
 
 import '../../helpers/core/text_utils.dart';
+import '../../models/database/desktop_database_factory.dart';
 import '../../ui/screens/folder_list/folder_list_state.dart';
 
 import 'torrent_entry.dart';
@@ -66,7 +67,7 @@ class TorrentRepository {
       completed_bytes INTEGER NOT NULL DEFAULT 0,
       download_speed INTEGER NOT NULL DEFAULT 0, error TEXT,
       added_at INTEGER NOT NULL, source_uri TEXT)''');
-    final pendingMigrations = await db.transaction((txn) async {
+    final pendingMigrations = await db.runAppTransaction((txn) async {
       final columns = await txn.rawQuery('PRAGMA table_info(torrents)');
       final existing = columns.map((column) => column['name']).toSet();
       for (final definition in _additionalColumns.entries) {
@@ -177,7 +178,7 @@ class TorrentRepository {
     while (true) {
       // A batch inside one outer transaction still holds SQLite's lock for
       // the entire library. Commit each page so preferences/tags can proceed.
-      final hasMore = await db.transaction((txn) async {
+      final hasMore = await db.runAppTransaction((txn) async {
         final progress = (await txn.query(
           'torrent_index_migrations',
           where: 'name = ?',
@@ -332,7 +333,7 @@ class TorrentRepository {
   }
 
   Future<TorrentEntry> importMagnet(MagnetLink link, {bool touch = false}) =>
-      db.transaction((txn) async {
+      db.runAppTransaction((txn) async {
         final rows = await txn.query(
           'torrents',
           where: 'hash = ?',
@@ -401,7 +402,7 @@ class TorrentRepository {
       Uri.parse(uri).queryParametersAll['tr'] ?? const [];
 
   Future<void> recordSourceUri(String hash, String uri) =>
-      db.transaction((txn) async {
+      db.runAppTransaction((txn) async {
         final rows = await txn.query(
           'torrents',
           where: 'hash = ?',
@@ -460,7 +461,7 @@ class TorrentRepository {
     String source,
     int modified,
     int size,
-  ) => db.transaction((txn) async {
+  ) => db.runAppTransaction((txn) async {
     final previousRows = await txn.query(
       'torrents',
       where: 'hash = ?',
@@ -616,7 +617,7 @@ class TorrentRepository {
     if (regex != null) {
       final trimmed = query.trim().toLowerCase();
       final hashPrefix = _isHashPrefix(trimmed) ? trimmed : null;
-      return db.transaction((txn) async {
+      return db.runAppTransaction((txn) async {
         final entries = <TorrentEntry>[];
         var count = 0, scanned = 0;
         while (true) {
@@ -734,7 +735,7 @@ class TorrentRepository {
     limit: 200,
   )).map((r) => r['path'] as String).toList();
 
-  Future<void> remove(String hash) => db.transaction((txn) async {
+  Future<void> remove(String hash) => db.runAppTransaction((txn) async {
     await txn.delete('torrent_sources', where: 'hash = ?', whereArgs: [hash]);
     await txn.delete('torrents', where: 'hash = ?', whereArgs: [hash]);
   });

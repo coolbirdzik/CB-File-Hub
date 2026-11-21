@@ -585,6 +585,7 @@ class FolderListState extends Equatable {
   final bool isLoading;
   final bool isRefreshing;
   final String? error;
+  final bool directoryAccessDenied;
   final Directory currentPath;
   final List<FileSystemEntity> folders;
   final List<FileSystemEntity> files;
@@ -617,6 +618,7 @@ class FolderListState extends Equatable {
     this.isLoading = false,
     this.isRefreshing = false,
     this.error,
+    this.directoryAccessDenied = false,
     List<FileSystemEntity>? folders,
     List<FileSystemEntity>? files,
     List<FileSystemEntity>? searchResults,
@@ -664,6 +666,7 @@ class FolderListState extends Equatable {
     bool? isLoading,
     bool? isRefreshing,
     Object? error = _unset,
+    bool? directoryAccessDenied,
     Directory? currentPath,
     List<FileSystemEntity>? folders,
     List<FileSystemEntity>? files,
@@ -694,6 +697,9 @@ class FolderListState extends Equatable {
       isLoading: isLoading ?? this.isLoading,
       isRefreshing: isRefreshing ?? this.isRefreshing,
       error: error == _unset ? this.error : error as String?,
+      directoryAccessDenied:
+          directoryAccessDenied ??
+          (error == _unset && this.directoryAccessDenied),
       folders: folders ?? this.folders,
       files: files ?? this.files,
       searchResults: searchResults ?? this.searchResults,
@@ -737,6 +743,7 @@ class FolderListState extends Equatable {
     isLoading,
     isRefreshing,
     error,
+    directoryAccessDenied,
     currentPath.path,
     folders,
     files,

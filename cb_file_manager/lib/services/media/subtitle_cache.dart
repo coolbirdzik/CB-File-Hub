@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:sqflite_common/sqlite_api.dart';
 
+import '../../models/database/desktop_database_factory.dart';
 import '../../models/database/sqlite_database_provider.dart';
 import 'media_kit_playback.dart';
 import 'subtitle_progress.dart';
@@ -62,7 +63,7 @@ class SubtitleCache {
         )).isNotEmpty) {
       return db;
     }
-    await db.transaction((txn) async {
+    await db.runAppTransaction((txn) async {
       await txn.execute('''CREATE TABLE IF NOT EXISTS subtitle_cache_meta (
         id INTEGER PRIMARY KEY CHECK(id = 1), revision INTEGER NOT NULL)''');
       await txn.rawInsert(
@@ -127,7 +128,7 @@ class SubtitleCache {
   ) async {
     final payload = jsonEncode(cues.map((c) => c.toJson()).toList());
     final db = await _database();
-    return db.transaction((txn) async {
+    return db.runAppTransaction((txn) async {
       if (await _revision(txn) != revision) return false;
       // Concurrent players must reuse the first completed result.
       final overlap = await txn.query(
@@ -151,7 +152,7 @@ class SubtitleCache {
 
   Future<void> clear({String? key}) async {
     final db = await _database();
-    await db.transaction((txn) async {
+    await db.runAppTransaction((txn) async {
       await txn.delete(
         'subtitle_cache_chunks',
         where: key == null ? null : 'cache_key = ?',

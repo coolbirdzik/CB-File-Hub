@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:isolate';
 import 'dart:ui';
 
 import 'package:cb_file_manager/models/database/desktop_database_factory.dart';
 import 'package:cb_file_manager/models/database/sqlite_database_provider.dart';
+import 'package:cb_file_manager/services/windowing/windows_engine_host.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -102,4 +104,66 @@ void main() {
       expect((await db.query('counter')).single['value'], before + 4);
     },
   );
+
+  test('closing a window retains it through commit and rollback', () async {
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    final lifecycle = <String>[];
+    messenger.setMockMethodCallHandler(WindowsEngineHost.channel, (call) async {
+      if (call.method == 'startup') {
+        return {'primary': false, 'engineId': '2', 'environment': {}};
+      }
+      if (call.method == 'retain') {
+        final arguments = call.arguments as Map;
+        expect(arguments['keepsProcess'], isTrue);
+        lifecycle.add(arguments['busy'] == true ? 'retain' : 'release');
+      }
+      if (call.method == 'close') lifecycle.add('close');
+      return null;
+    });
+    addTearDown(() {
+      WindowsEngineHost.resetForTesting();
+      messenger.setMockMethodCallHandler(WindowsEngineHost.channel, null);
+    });
+    await WindowsEngineHost.initializeForTesting();
+
+    final client = await DesktopDatabaseFactory.createSharedFactory(
+      workerName,
+    ).openDatabase(dbPath);
+    final before = (await db.query('counter')).single['value'] as int;
+    final firstWrite = Completer<void>();
+    final finishCommit = Completer<void>();
+    final secondWrite = Completer<void>();
+    final finishRollback = Completer<void>();
+
+    final committing = client.runAppTransaction((txn) async {
+      await txn.rawUpdate('UPDATE counter SET value = value + 1');
+      firstWrite.complete();
+      await finishCommit.future;
+    });
+    await firstWrite.future;
+    final rollingBack = client.runAppTransaction<void>((txn) async {
+      await txn.rawUpdate('UPDATE counter SET value = value + 100');
+      secondWrite.complete();
+      await finishRollback.future;
+      throw StateError('cancel write');
+    });
+    final rollbackCheck = expectLater(rollingBack, throwsStateError);
+    try {
+      await WindowsEngineHost.close();
+      expect(lifecycle, ['retain', 'close']);
+
+      finishCommit.complete();
+      await secondWrite.future;
+      expect(lifecycle, ['retain', 'close']);
+    } finally {
+      if (!finishCommit.isCompleted) finishCommit.complete();
+      finishRollback.complete();
+      await committing;
+      await rollbackCheck;
+    }
+
+    expect(lifecycle, ['retain', 'close', 'release']);
+    expect((await db.query('counter')).single['value'], before + 1);
+  });
 }

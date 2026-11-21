@@ -7062,8 +7062,9 @@ class TurkishLocalizations implements AppLocalizations {
   @override
   String fnInvalidRegex(String error) => 'Geçersiz regex: $error';
   @override
-  String get fnAccessDeniedAdmin =>
-      'Erişim reddedildi. Yönetici olarak çalıştırmayı deneyin.';
+  String folderAccessDenied(String path) => 'Klasöre erişim reddedildi: $path';
+  @override
+  String get openInAdministratorWindow => 'Yönetici penceresinde aç';
   @override
   String tsErrorLoadingTags(String error) =>
       'Etiketler yüklenirken hata: $error';

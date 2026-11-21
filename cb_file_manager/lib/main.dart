@@ -23,6 +23,7 @@ import 'helpers/media/video_thumbnail_helper.dart';
 import 'helpers/ui/frame_timing_optimizer.dart';
 import 'helpers/tags/batch_tag_manager.dart';
 import 'models/database/database_manager.dart';
+import 'models/database/sqlite_database_provider.dart';
 import 'services/network_credentials_service.dart';
 import 'services/preferences/windows_preferences_store.dart';
 import 'services/torrent/torrent_service.dart';
@@ -38,6 +39,7 @@ import 'design_system/desktop_acrylic_theme_bridge.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'config/language_controller.dart';
 import 'config/languages/app_localizations_delegate.dart';
+import 'config/languages/current_localizations.dart';
 import 'services/streaming_service_manager.dart';
 import 'ui/utils/safe_navigation_wrapper.dart';
 import 'ui/utils/desktop_acrylic_backdrop.dart';
@@ -59,6 +61,7 @@ import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
 import 'package:cb_file_manager/helpers/files/external_app_helper.dart';
 import 'services/windowing/window_startup_payload.dart';
 import 'services/desktop_integration/folder_launch_request.dart';
+import 'services/desktop_integration/windows_folder_elevation.dart';
 import 'services/desktop_integration/folder_open_bridge.dart';
 import 'services/windowing/windows_engine_host.dart';
 import 'services/windowing/engine_window_lifetime.dart';
@@ -214,6 +217,8 @@ Future<void> runCbFileApp() async {
   final startupStopwatch = Stopwatch()..start();
   WidgetsFlutterBinding.ensureInitialized();
   await WindowsEngineHost.initialize();
+  WindowsEngineHost.beforeProcessExit =
+      SqliteDatabaseProvider.closeSharedDatabase;
 
   // Engines and external app instances have separate preference caches. Merge
   // writes under a file lock so one cannot revert another's newer settings.
@@ -259,15 +264,25 @@ Future<void> runCbFileApp() async {
     await runTorrentOptionsWindow(env);
     return;
   }
+  final elevatedFolderPath = WindowsFolderElevation.takeStartupPath(
+    _launchPaths,
+  );
+  final isElevatedFolderWindow = WindowsFolderElevation.isFolderWindow;
   final torrentSources = Platform.isWindows
       ? TorrentLaunchRequest.takeArguments(_launchPaths)
       : <String>[];
-  final folderLaunch =
-      (Platform.isWindows || Platform.isMacOS || Platform.isLinux)
+  final folderLaunch = elevatedFolderPath != null
+      ? FolderLaunchRequest(
+          [WindowTabPayload(path: elevatedFolderPath)],
+          [],
+          true,
+        )
+      : (Platform.isWindows || Platform.isMacOS || Platform.isLinux)
       ? await FolderLaunchRequest.takeArguments(_launchPaths)
       : const FolderLaunchRequest([], [], false);
   FolderOpenBridge.pendingRejections.addAll(folderLaunch.rejected);
   if (!kCbE2E &&
+      !isElevatedFolderWindow &&
       folderLaunch.tabs.isNotEmpty &&
       folderLaunch.rejected.isEmpty &&
       await DesktopWindowingService().openFoldersInExistingWindow(
@@ -320,6 +335,7 @@ Future<void> runCbFileApp() async {
   final startupVideoPath = environmentVideoPath ?? commandLineVideoPath;
   final isDedicatedVideoWindow = startupVideoPath != null;
   final isSecondaryWindow =
+      isElevatedFolderWindow ||
       env[WindowStartupPayload.envSecondaryWindowKey] == '1' ||
       isDedicatedVideoWindow;
 
@@ -468,6 +484,9 @@ Future<void> runCbFileApp() async {
       final isRunnerPlacedVideoWindow =
           VideoWindowService.startupPlacedByRunner();
       final windowOptions = WindowOptions(
+        title: isElevatedFolderWindow
+            ? 'CB File Hub (${currentL10n.adminAccess})'
+            : null,
         center: initialWindowPosition == null && !isRunnerPlacedVideoWindow,
         // The player gets no acrylic backdrop (below), so paint it black like
         // its first frame rather than leaving a see-through window meanwhile.
@@ -593,13 +612,9 @@ Future<void> runCbFileApp() async {
     } catch (_) {}
   }
 
-  // Platform-specific optimizations
-  if (isDesktopPlatform) {
-    SystemChannels.skia.invokeMethod<void>(
-      'Skia.setResourceCacheMaxBytes',
-      512 * 1024 * 1024,
-    );
-  } else if (Platform.isAndroid || Platform.isIOS) {
+  // Platform-specific optimizations. The Skia resource cache limit is set by
+  // FrameTimingOptimizer.initialize() above.
+  if (Platform.isAndroid || Platform.isIOS) {
     SystemChrome.setEnabledSystemUIMode(
       SystemUiMode.manual,
       overlays: [SystemUiOverlay.top, SystemUiOverlay.bottom],

@@ -26,7 +26,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  FLUTTER_VERSION: "3.47.8"
+  FLUTTER_VERSION: "3.50.1"
   PROJECT_DIR: "cb_file_manager"
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
   # OAuth client ids for Backup & Sync. scripts/build.sh forwards them as

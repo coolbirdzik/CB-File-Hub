@@ -136,9 +136,9 @@ class VideoWindowService {
     required String workingDirectory,
   }) async {
     if (Platform.isWindows) {
-      if (!await WindowsEngineHost.open(environment)) {
-        throw StateError('Failed to create window engine');
-      }
+      // Its own process: a playing video must not share ANGLE with the
+      // browser windows (see WindowsEngineHost.startWindowProcess).
+      await WindowsEngineHost.startWindowProcess(environment);
       return;
     }
     await Process.start(

@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:sqflite_common/sqlite_api.dart';
 
+import '../../models/database/desktop_database_factory.dart';
+
 /// All pin mutations share a SQLite transaction, including the one-time macOS
 /// defaults. Opening another window cannot seed over a concurrent manual pin.
 class SidebarPinsRepository {
@@ -73,7 +75,7 @@ class SidebarPinsRepository {
   Future<bool> setPinned(String path, {required bool pinned}) async {
     final target = path.trim();
     if (target.isEmpty || target.startsWith('#')) return false;
-    return database.transaction((txn) async {
+    return database.runAppTransaction((txn) async {
       final existing = _decode(await _read(txn, pathsKey));
       if (pinned && existing.any((value) => _samePath(value, target))) {
         return true;
@@ -92,7 +94,7 @@ class SidebarPinsRepository {
   Future<bool> seedMacosDefaults(List<String> defaults) async {
     final candidates = defaults.where((value) => p.isAbsolute(value)).toList();
     if (candidates.isEmpty) return false;
-    return database.transaction((txn) async {
+    return database.runAppTransaction((txn) async {
       if (await _read(txn, _macosDefaultsKey) == '1') return false;
       final existing = _decode(await _read(txn, pathsKey));
       final merged = <String>[];

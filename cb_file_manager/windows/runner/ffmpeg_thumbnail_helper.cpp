@@ -2,7 +2,10 @@
 
 #include <atlbase.h>
 #include <atlimage.h>
+#include <chrono>
+#include <cmath>
 #include <codecvt>
+#include <cstdio>
 #include <locale>
 #include <mutex>
 #include <stdexcept>
@@ -56,6 +59,203 @@ namespace fc_native_video_thumbnail
         }
         return false;
     }
+
+    // Decoding one picture above 4K (8K VR video) takes hundreds of MB. Four
+    // thumbnail workers doing that at once pushed the app to several GB, so
+    // such decodes run one at a time; 4K and smaller stay parallel.
+    static std::mutex g_largeDecodeMutex;
+
+    static std::unique_lock<std::mutex> LockIfLargePicture(
+        const AVCodecParameters *params)
+    {
+        std::unique_lock<std::mutex> lock(g_largeDecodeMutex, std::defer_lock);
+        if (params &&
+            static_cast<int64_t>(params->width) * params->height >
+                3840LL * 2160LL)
+        {
+            lock.lock();
+        }
+        return lock;
+    }
+
+    // Thumbnail output size. maxEdge is the longest edge in physical pixels:
+    // the result fits a maxEdge x maxEdge box, keeps the aspect ratio
+    // (portrait stays portrait) and never upscales. maxEdge <= 0 keeps the
+    // source size.
+    static void ComputeThumbnailOutputSize(int srcWidth,
+                                           int srcHeight,
+                                           int maxEdge,
+                                           int *outWidth,
+                                           int *outHeight)
+    {
+        *outWidth = srcWidth;
+        *outHeight = srcHeight;
+        if (maxEdge <= 0 || srcWidth <= 0 || srcHeight <= 0) return;
+        if (srcWidth <= maxEdge && srcHeight <= maxEdge) return;
+
+        if (srcWidth >= srcHeight)
+        {
+            *outWidth = maxEdge;
+            *outHeight = static_cast<int>(std::llround(
+                static_cast<double>(srcHeight) * maxEdge / srcWidth));
+        }
+        else
+        {
+            *outHeight = maxEdge;
+            *outWidth = static_cast<int>(std::llround(
+                static_cast<double>(srcWidth) * maxEdge / srcHeight));
+        }
+        if (*outWidth < 1) *outWidth = 1;
+        if (*outHeight < 1) *outHeight = 1;
+    }
+
+    // ============================================================================
+    // PER-PHASE TIMING - enabled with the environment variable CB_THUMB_TIMING=1
+    // ============================================================================
+    static bool ThumbTimingEnabled()
+    {
+        static const bool enabled = []()
+        {
+            wchar_t value[4] = {};
+            const DWORD length =
+                GetEnvironmentVariableW(L"CB_THUMB_TIMING", value, 4);
+            return length == 1 && value[0] == L'1';
+        }();
+        return enabled;
+    }
+
+    // Records how long each extraction phase took and prints one line per
+    // extraction to stderr and the debugger. When timing is disabled every
+    // call returns at once without reading the clock or formatting text.
+    namespace
+    {
+    class ThumbTiming
+    {
+    public:
+        enum Phase
+        {
+            kOpen,
+            kProbe,
+            kLock,
+            kSeek,
+            kDecode,
+            kScale,
+            kSave,
+            kPhaseCount
+        };
+
+        // path must outlive this object.
+        ThumbTiming(const char *mode, const std::string &path)
+            : enabled_(ThumbTimingEnabled()), mode_(mode), path_(&path)
+        {
+            for (int i = 0; i < kPhaseCount; ++i) phaseMs_[i] = -1.0;
+            if (enabled_)
+            {
+                start_ = Clock::now();
+                last_ = start_;
+            }
+        }
+
+        ~ThumbTiming()
+        {
+            if (enabled_ && !finished_) Emit("\"unfinished\"");
+        }
+
+        ThumbTiming(const ThumbTiming &) = delete;
+        ThumbTiming &operator=(const ThumbTiming &) = delete;
+
+        // Ends the phase that started at the previous Mark (or construction).
+        void Mark(Phase phase)
+        {
+            if (!enabled_) return;
+            const Clock::time_point now = Clock::now();
+            phaseMs_[phase] =
+                std::chrono::duration<double, std::milli>(now - last_).count();
+            last_ = now;
+        }
+
+        void SetSizes(int srcWidth, int srcHeight, int outWidth, int outHeight)
+        {
+            if (!enabled_) return;
+            srcWidth_ = srcWidth;
+            srcHeight_ = srcHeight;
+            outWidth_ = outWidth;
+            outHeight_ = outHeight;
+        }
+
+        // Logs the extraction result (empty = success) and passes it through.
+        std::string Finish(std::string result)
+        {
+            if (enabled_ && !finished_)
+            {
+                finished_ = true;
+                if (result.empty())
+                {
+                    Emit("ok");
+                }
+                else
+                {
+                    const std::string quoted = "\"" + result + "\"";
+                    Emit(quoted.c_str());
+                }
+            }
+            return result;
+        }
+
+    private:
+        using Clock = std::chrono::steady_clock;
+
+        void Emit(const char *result) const
+        {
+            static const char *const kNames[kPhaseCount] = {
+                "open", "probe", "lock", "seek", "decode", "scale", "save"};
+            const double totalMs = std::chrono::duration<double, std::milli>(
+                                       Clock::now() - start_)
+                                       .count();
+
+            std::string line = "CB_THUMB_TIMING mode=";
+            line += mode_;
+            char buffer[160];
+            for (int i = 0; i < kPhaseCount; ++i)
+            {
+                if (phaseMs_[i] < 0.0)
+                {
+                    std::snprintf(buffer, sizeof(buffer), " %s=-", kNames[i]);
+                }
+                else
+                {
+                    std::snprintf(buffer, sizeof(buffer), " %s=%.1fms",
+                                  kNames[i], phaseMs_[i]);
+                }
+                line += buffer;
+            }
+            std::snprintf(buffer, sizeof(buffer),
+                          " total=%.1fms src=%dx%d out=%dx%d result=", totalMs,
+                          srcWidth_, srcHeight_, outWidth_, outHeight_);
+            line += buffer;
+            line += result;
+            line += " path=";
+            line += *path_;
+            line += "\n";
+
+            std::fputs(line.c_str(), stderr);
+            std::fflush(stderr);
+            OutputDebugStringA(line.c_str());
+        }
+
+        const bool enabled_;
+        const char *const mode_;
+        const std::string *const path_;
+        bool finished_ = false;
+        Clock::time_point start_;
+        Clock::time_point last_;
+        double phaseMs_[kPhaseCount];
+        int srcWidth_ = 0;
+        int srcHeight_ = 0;
+        int outWidth_ = 0;
+        int outHeight_ = 0;
+    };
+    } // namespace
 
     // ============================================================================
     // SHARED GDI+ SINGLETON - Eliminates per-call init/shutdown overhead
@@ -289,6 +489,7 @@ namespace fc_native_video_thumbnail
     {
         (void)useHwAccel; // Ignored - pure software decoding for reliability
         const std::string srcFileUtf8 = WideToUtf8(srcFile);
+        ThumbTiming timing("pct", srcFileUtf8);
         AVFormatContext *formatContext = nullptr;
         AVCodecContext *codecContext = nullptr;
         AVPacket *packet = nullptr;
@@ -309,9 +510,10 @@ namespace fc_native_video_thumbnail
             if (avformat_open_input(&formatContext, srcFileUtf8.c_str(), nullptr, &opts) != 0)
             {
                 av_dict_free(&opts);
-                return "Failed to open input file";
+                return timing.Finish("Failed to open input file");
             }
             av_dict_free(&opts);
+            timing.Mark(ThumbTiming::kOpen);
 
             // ================================================================
             // STEP 2: FAST STREAM INFO - Limited analysis
@@ -322,9 +524,10 @@ namespace fc_native_video_thumbnail
             {
                 av_dict_free(&streamOpts);
                 avformat_close_input(&formatContext);
-                return "Failed to find stream info";
+                return timing.Finish("Failed to find stream info");
             }
             av_dict_free(&streamOpts);
+            timing.Mark(ThumbTiming::kProbe);
 
             // Find the first video stream
             int videoStreamIndex = -1;
@@ -340,7 +543,7 @@ namespace fc_native_video_thumbnail
             if (videoStreamIndex == -1)
             {
                 avformat_close_input(&formatContext);
-                return "No video stream found";
+                return timing.Finish("No video stream found");
             }
 
             // Get duration
@@ -381,6 +584,9 @@ namespace fc_native_video_thumbnail
 
             // Get the codec parameters
             AVCodecParameters *codecParams = formatContext->streams[videoStreamIndex]->codecpar;
+            // Held until this function returns and the decoder is freed.
+            const auto largePictureLock = LockIfLargePicture(codecParams);
+            timing.Mark(ThumbTiming::kLock);
 
             // Use PURE SOFTWARE decoding for maximum compatibility
             // Hardware decoders (D3D11VA/DXVA2) fail on corrupted/mixed-reference streams
@@ -390,7 +596,7 @@ namespace fc_native_video_thumbnail
             if (!codec)
             {
                 avformat_close_input(&formatContext);
-                return "Unsupported codec";
+                return timing.Finish("Unsupported codec");
             }
 
             // Create codec context
@@ -398,7 +604,7 @@ namespace fc_native_video_thumbnail
             if (!codecContext)
             {
                 avformat_close_input(&formatContext);
-                return "Failed to allocate codec context";
+                return timing.Finish("Failed to allocate codec context");
             }
 
             // Copy parameters
@@ -406,12 +612,15 @@ namespace fc_native_video_thumbnail
             {
                 avcodec_free_context(&codecContext);
                 avformat_close_input(&formatContext);
-                return "Failed to copy codec parameters";
+                return timing.Finish("Failed to copy codec parameters");
             }
 
-            // Enable multithreaded decoding
+            // Slice threading only: a thumbnail needs one picture. Frame
+            // threading held back output until four packets were decoded and
+            // gave each thread its own picture buffers, so four workers on
+            // 4K/8K videos peaked at several GB.
             codecContext->thread_count = 4;
-            codecContext->thread_type = FF_THREAD_FRAME | FF_THREAD_SLICE;
+            codecContext->thread_type = FF_THREAD_SLICE;
 
             // ================================================================
             // STEP 3: RELIABLE SEEKING - Always use AVSEEK_FLAG_BACKWARD
@@ -427,7 +636,7 @@ namespace fc_native_video_thumbnail
             {
                 avcodec_free_context(&codecContext);
                 avformat_close_input(&formatContext);
-                return "Failed to seek to timestamp";
+                return timing.Finish("Failed to seek to timestamp");
             }
 
             // Open the codec
@@ -435,11 +644,12 @@ namespace fc_native_video_thumbnail
             {
                 avcodec_free_context(&codecContext);
                 avformat_close_input(&formatContext);
-                return "Failed to open codec";
+                return timing.Finish("Failed to open codec");
             }
 
             // Flush decoder buffers
             avcodec_flush_buffers(codecContext);
+            timing.Mark(ThumbTiming::kSeek);
 
             // ================================================================
             // STEP 4: FAST FRAME DECODING - Limited search
@@ -455,46 +665,22 @@ namespace fc_native_video_thumbnail
                 av_packet_free(&packet);
                 avcodec_free_context(&codecContext);
                 avformat_close_input(&formatContext);
-                return "Failed to find video frame";
+                return timing.Finish("Failed to find video frame");
             }
+            timing.Mark(ThumbTiming::kDecode);
 
             // ================================================================
-            // STEP 5: CALCULATE OUTPUT SIZE - Target thumbnail size
+            // STEP 5: CALCULATE OUTPUT SIZE - width is the longest edge
             // ================================================================
             int originalWidth = codecContext->width;
             int originalHeight = codecContext->height;
 
             // Calculate output dimensions - we scale during swscale, not in codec
-            int outputWidth, outputHeight;
-
-            if (width <= 0)
-            {
-                outputWidth = originalWidth;
-                outputHeight = originalHeight;
-            }
-            else
-            {
-                // For thumbnail speed, scale to thumbnail size directly
-                // This avoids decoding full resolution and then scaling
-                if (originalWidth > 1920 && width < originalWidth / 2)
-                {
-                    outputWidth = originalWidth / 2;
-                    outputHeight = originalHeight / 2;
-                }
-                else if (originalWidth > 1280 && width < originalWidth / 3)
-                {
-                    outputWidth = originalWidth / 3;
-                    outputHeight = originalHeight / 3;
-                }
-                else
-                {
-                    outputWidth = width;
-                    outputHeight = (int)(((float)originalHeight / originalWidth) * width);
-                }
-            }
-
-            if (outputWidth <= 0) outputWidth = originalWidth;
-            if (outputHeight <= 0) outputHeight = originalHeight;
+            int outputWidth = 0;
+            int outputHeight = 0;
+            ComputeThumbnailOutputSize(originalWidth, originalHeight, width,
+                                       &outputWidth, &outputHeight);
+            timing.SetSizes(originalWidth, originalHeight, outputWidth, outputHeight);
 
             // ================================================================
             // STEP 6: ALLOCATE RGB FRAME
@@ -506,7 +692,7 @@ namespace fc_native_video_thumbnail
                 av_packet_free(&packet);
                 avcodec_free_context(&codecContext);
                 avformat_close_input(&formatContext);
-                return "Failed to allocate RGB frame";
+                return timing.Finish("Failed to allocate RGB frame");
             }
 
             int bufferSize = av_image_get_buffer_size(AV_PIX_FMT_RGB24, outputWidth, outputHeight, 1);
@@ -518,19 +704,20 @@ namespace fc_native_video_thumbnail
                 av_packet_free(&packet);
                 avcodec_free_context(&codecContext);
                 avformat_close_input(&formatContext);
-                return "Failed to allocate RGB buffer";
+                return timing.Finish("Failed to allocate RGB buffer");
             }
 
             av_image_fill_arrays(rgbFrame->data, rgbFrame->linesize, buffer,
                                  AV_PIX_FMT_RGB24, outputWidth, outputHeight, 1);
 
             // ================================================================
-            // STEP 7: SCALE AND CONVERT - Use SWS_FAST_BILINEAR for speed
+            // STEP 7: SCALE AND CONVERT - SWS_AREA: large downscales alias
+            // badly with SWS_FAST_BILINEAR
             // ================================================================
             swsContext = sws_getContext(
                 originalWidth, originalHeight, codecContext->pix_fmt,
                 outputWidth, outputHeight, AV_PIX_FMT_RGB24,
-                SWS_FAST_BILINEAR, nullptr, nullptr, nullptr);
+                SWS_AREA, nullptr, nullptr, nullptr);
 
             if (!swsContext)
             {
@@ -540,12 +727,13 @@ namespace fc_native_video_thumbnail
                 av_packet_free(&packet);
                 avcodec_free_context(&codecContext);
                 avformat_close_input(&formatContext);
-                return "Failed to create scaling context";
+                return timing.Finish("Failed to create scaling context");
             }
 
             // Perform scaling
             sws_scale(swsContext, frame->data, frame->linesize, 0, originalHeight,
                       rgbFrame->data, rgbFrame->linesize);
+            timing.Mark(ThumbTiming::kScale);
 
             // ================================================================
             // STEP 8: SAVE - Try fast save first, fallback to normal
@@ -557,6 +745,7 @@ namespace fc_native_video_thumbnail
             {
                 saveResult = SaveImage(rgbFrame, outputWidth, outputHeight, destFile, format, quality);
             }
+            timing.Mark(ThumbTiming::kSave);
 
             // Cleanup
             sws_freeContext(swsContext);
@@ -569,10 +758,10 @@ namespace fc_native_video_thumbnail
 
             if (!saveResult)
             {
-                return "Failed to save image";
+                return timing.Finish("Failed to save image");
             }
 
-            return ""; // Success
+            return timing.Finish(""); // Success
         }
         catch (const std::exception &e)
         {
@@ -583,7 +772,7 @@ namespace fc_native_video_thumbnail
             if (packet) av_packet_free(&packet);
             if (codecContext) avcodec_free_context(&codecContext);
             if (formatContext) avformat_close_input(&formatContext);
-            return std::string("Exception: ") + e.what();
+            return timing.Finish(std::string("Exception: ") + e.what());
         }
         catch (...)
         {
@@ -594,7 +783,7 @@ namespace fc_native_video_thumbnail
             if (packet) av_packet_free(&packet);
             if (codecContext) avcodec_free_context(&codecContext);
             if (formatContext) avformat_close_input(&formatContext);
-            return "Unknown exception occurred";
+            return timing.Finish("Unknown exception occurred");
         }
     }
 
@@ -637,6 +826,7 @@ namespace fc_native_video_thumbnail
         // Convert timeSeconds to percentage
         // For simplicity, use timeSeconds directly in fast internal function
         const std::string srcFileUtf8 = WideToUtf8(srcFile);
+        ThumbTiming timing("sec", srcFileUtf8);
         AVFormatContext *formatContext = nullptr;
         AVCodecContext *codecContext = nullptr;
         AVPacket *packet = nullptr;
@@ -655,15 +845,17 @@ namespace fc_native_video_thumbnail
             if (avformat_open_input(&formatContext, srcFileUtf8.c_str(), nullptr, &opts) != 0)
             {
                 av_dict_free(&opts);
-                return "Failed to open input file";
+                return timing.Finish("Failed to open input file");
             }
             av_dict_free(&opts);
+            timing.Mark(ThumbTiming::kOpen);
 
             if (avformat_find_stream_info(formatContext, nullptr) < 0)
             {
                 avformat_close_input(&formatContext);
-                return "Failed to find stream info";
+                return timing.Finish("Failed to find stream info");
             }
+            timing.Mark(ThumbTiming::kProbe);
 
             // Find video stream
             int videoStreamIndex = -1;
@@ -679,7 +871,7 @@ namespace fc_native_video_thumbnail
             if (videoStreamIndex == -1)
             {
                 avformat_close_input(&formatContext);
-                return "No video stream found";
+                return timing.Finish("No video stream found");
             }
 
             // Get duration
@@ -691,11 +883,13 @@ namespace fc_native_video_thumbnail
 
             // Get codec
             AVCodecParameters *codecParams = formatContext->streams[videoStreamIndex]->codecpar;
+            const auto largePictureLock = LockIfLargePicture(codecParams);
+            timing.Mark(ThumbTiming::kLock);
             const AVCodec *codec = avcodec_find_decoder(codecParams->codec_id);
             if (!codec)
             {
                 avformat_close_input(&formatContext);
-                return "Unsupported codec";
+                return timing.Finish("Unsupported codec");
             }
 
             // Create codec context
@@ -703,19 +897,19 @@ namespace fc_native_video_thumbnail
             if (!codecContext)
             {
                 avformat_close_input(&formatContext);
-                return "Failed to allocate codec context";
+                return timing.Finish("Failed to allocate codec context");
             }
 
             if (avcodec_parameters_to_context(codecContext, codecParams) < 0)
             {
                 avcodec_free_context(&codecContext);
                 avformat_close_input(&formatContext);
-                return "Failed to copy codec parameters";
+                return timing.Finish("Failed to copy codec parameters");
             }
 
-            // Enable multithreaded decoding
+            // Slice threading only, as in the path above.
             codecContext->thread_count = 4;
-            codecContext->thread_type = FF_THREAD_FRAME | FF_THREAD_SLICE;
+            codecContext->thread_type = FF_THREAD_SLICE;
 
             // Seek - always use BACKWARD for reliable keyframe seeking
             int64_t seekTarget = static_cast<int64_t>(timeSeconds) * AV_TIME_BASE;
@@ -726,17 +920,18 @@ namespace fc_native_video_thumbnail
             {
                 avcodec_free_context(&codecContext);
                 avformat_close_input(&formatContext);
-                return "Failed to seek to timestamp";
+                return timing.Finish("Failed to seek to timestamp");
             }
 
             if (avcodec_open2(codecContext, codec, nullptr) < 0)
             {
                 avcodec_free_context(&codecContext);
                 avformat_close_input(&formatContext);
-                return "Failed to open codec";
+                return timing.Finish("Failed to open codec");
             }
 
             avcodec_flush_buffers(codecContext);
+            timing.Mark(ThumbTiming::kSeek);
 
             // Read frames
             packet = av_packet_alloc();
@@ -750,46 +945,18 @@ namespace fc_native_video_thumbnail
                 av_packet_free(&packet);
                 avcodec_free_context(&codecContext);
                 avformat_close_input(&formatContext);
-                return "Failed to find video frame";
+                return timing.Finish("Failed to find video frame");
             }
+            timing.Mark(ThumbTiming::kDecode);
 
-            // Calculate output size
+            // Calculate output size - width is the longest edge
             int originalWidth = codecContext->width;
             int originalHeight = codecContext->height;
-            int outputWidth, outputHeight;
-
-            if (width <= 0)
-            {
-                outputWidth = originalWidth;
-                outputHeight = originalHeight;
-            }
-            else if (width < 0)
-            {
-                float percentage = abs(width) / 100.0f;
-                outputWidth = (int)(originalWidth * percentage);
-                outputHeight = (int)(originalHeight * percentage);
-            }
-            else
-            {
-                if (originalWidth > 1920 && width < originalWidth / 2)
-                {
-                    outputWidth = originalWidth / 2;
-                    outputHeight = originalHeight / 2;
-                }
-                else if (originalWidth > 1280 && width < originalWidth / 3)
-                {
-                    outputWidth = originalWidth / 3;
-                    outputHeight = originalHeight / 3;
-                }
-                else
-                {
-                    outputWidth = width;
-                    outputHeight = (int)(((float)originalHeight / originalWidth) * width);
-                }
-            }
-
-            if (outputWidth <= 0) outputWidth = originalWidth;
-            if (outputHeight <= 0) outputHeight = originalHeight;
+            int outputWidth = 0;
+            int outputHeight = 0;
+            ComputeThumbnailOutputSize(originalWidth, originalHeight, width,
+                                       &outputWidth, &outputHeight);
+            timing.SetSizes(originalWidth, originalHeight, outputWidth, outputHeight);
 
             // Allocate RGB frame
             rgbFrame = av_frame_alloc();
@@ -799,7 +966,7 @@ namespace fc_native_video_thumbnail
                 av_packet_free(&packet);
                 avcodec_free_context(&codecContext);
                 avformat_close_input(&formatContext);
-                return "Failed to allocate RGB frame";
+                return timing.Finish("Failed to allocate RGB frame");
             }
 
             int bufferSize = av_image_get_buffer_size(AV_PIX_FMT_RGB24, outputWidth, outputHeight, 1);
@@ -811,17 +978,17 @@ namespace fc_native_video_thumbnail
                 av_packet_free(&packet);
                 avcodec_free_context(&codecContext);
                 avformat_close_input(&formatContext);
-                return "Failed to allocate RGB buffer";
+                return timing.Finish("Failed to allocate RGB buffer");
             }
 
             av_image_fill_arrays(rgbFrame->data, rgbFrame->linesize, buffer,
                                  AV_PIX_FMT_RGB24, outputWidth, outputHeight, 1);
 
-            // Scale
+            // Scale (SWS_AREA, as in the path above)
             swsContext = sws_getContext(
                 originalWidth, originalHeight, codecContext->pix_fmt,
                 outputWidth, outputHeight, AV_PIX_FMT_RGB24,
-                SWS_FAST_BILINEAR, nullptr, nullptr, nullptr);
+                SWS_AREA, nullptr, nullptr, nullptr);
 
             if (!swsContext)
             {
@@ -831,11 +998,12 @@ namespace fc_native_video_thumbnail
                 av_packet_free(&packet);
                 avcodec_free_context(&codecContext);
                 avformat_close_input(&formatContext);
-                return "Failed to create scaling context";
+                return timing.Finish("Failed to create scaling context");
             }
 
             sws_scale(swsContext, frame->data, frame->linesize, 0, originalHeight,
                       rgbFrame->data, rgbFrame->linesize);
+            timing.Mark(ThumbTiming::kScale);
 
             // Save
             bool saveResult = SaveImageFast(rgbFrame, outputWidth, outputHeight, destFile, format, quality);
@@ -843,6 +1011,7 @@ namespace fc_native_video_thumbnail
             {
                 saveResult = SaveImage(rgbFrame, outputWidth, outputHeight, destFile, format, quality);
             }
+            timing.Mark(ThumbTiming::kSave);
 
             // Cleanup
             sws_freeContext(swsContext);
@@ -855,10 +1024,10 @@ namespace fc_native_video_thumbnail
 
             if (!saveResult)
             {
-                return "Failed to save image";
+                return timing.Finish("Failed to save image");
             }
 
-            return "";
+            return timing.Finish("");
         }
         catch (const std::exception &e)
         {
@@ -869,7 +1038,7 @@ namespace fc_native_video_thumbnail
             if (packet) av_packet_free(&packet);
             if (codecContext) avcodec_free_context(&codecContext);
             if (formatContext) avformat_close_input(&formatContext);
-            return std::string("Exception: ") + e.what();
+            return timing.Finish(std::string("Exception: ") + e.what());
         }
         catch (...)
         {
@@ -880,7 +1049,7 @@ namespace fc_native_video_thumbnail
             if (packet) av_packet_free(&packet);
             if (codecContext) avcodec_free_context(&codecContext);
             if (formatContext) avformat_close_input(&formatContext);
-            return "Unknown exception occurred";
+            return timing.Finish("Unknown exception occurred");
         }
     }
 

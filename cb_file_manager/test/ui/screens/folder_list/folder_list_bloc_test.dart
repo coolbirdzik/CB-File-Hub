@@ -62,6 +62,44 @@ void main() {
       }
     }
   });
+
+  test(
+    'Windows folder access denied is distinct from a missing folder',
+    () async {
+      final root = await Directory.systemTemp.createTemp('cb_nav_denied_');
+      final bloc = FolderListBloc();
+      const everyone = '*S-1-1-0';
+      try {
+        final denied = await Process.run('icacls.exe', [
+          root.path,
+          '/deny',
+          '$everyone:(RD)',
+        ]);
+        expect(denied.exitCode, 0, reason: '${denied.stdout}${denied.stderr}');
+
+        final deniedState = bloc.stream.firstWhere(
+          (state) => state.currentPath.path == root.path && state.error != null,
+        );
+        bloc.add(FolderListLoad(root.path));
+        final blocked = await deniedState;
+        expect(blocked.directoryAccessDenied, isTrue);
+        expect(blocked.error, contains(root.path));
+
+        final missing = '${root.path}_missing';
+        final missingState = bloc.stream.firstWhere(
+          (state) => state.currentPath.path == missing && state.error != null,
+        );
+        bloc.add(FolderListLoad(missing));
+        expect((await missingState).directoryAccessDenied, isFalse);
+      } finally {
+        await bloc.close();
+        await Process.run('icacls.exe', [root.path, '/remove:d', everyone]);
+        await root.delete();
+      }
+    },
+    skip: !Platform.isWindows,
+  );
+
   group('delete while showing search results', () {
     Future<void> expectDeleteKeepsResultsWithoutRescan(
       Future<void> Function(FolderListBloc bloc, List<File> files) showResults,

@@ -6566,7 +6566,9 @@ class ChineseLocalizations implements AppLocalizations {
   @override
   String fnInvalidRegex(String error) => '无效的正则表达式：$error';
   @override
-  String get fnAccessDeniedAdmin => '访问被拒绝。请尝试以管理员身份运行。';
+  String folderAccessDenied(String path) => '无法访问此文件夹：$path';
+  @override
+  String get openInAdministratorWindow => '在管理员窗口中打开';
   @override
   String tsErrorLoadingTags(String error) => '加载标签时出错：$error';
   @override

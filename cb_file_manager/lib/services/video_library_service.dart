@@ -10,6 +10,7 @@ import 'package:sqflite_common/sqlite_api.dart';
 import '../helpers/core/filesystem_utils.dart';
 import '../helpers/core/text_utils.dart';
 import '../helpers/tags/tag_manager.dart';
+import '../models/database/desktop_database_factory.dart';
 import '../models/database/sqlite_database_provider.dart';
 import '../models/objectbox/video_library.dart';
 import '../models/objectbox/video_library_config.dart';
@@ -144,7 +145,7 @@ class VideoLibraryService {
   Future<bool> deleteLibrary(int libraryId) async {
     try {
       final database = await _getDatabase();
-      await database.transaction((txn) async {
+      await database.runAppTransaction((txn) async {
         await txn.delete(
           'video_library_files',
           where: 'video_library_id = ?',
@@ -299,7 +300,7 @@ class VideoLibraryService {
     final database = await _getDatabase();
     int successCount = 0;
 
-    await database.transaction((txn) async {
+    await database.runAppTransaction((txn) async {
       for (final filePath in filePaths) {
         final existing = await txn.query(
           'video_library_files',
