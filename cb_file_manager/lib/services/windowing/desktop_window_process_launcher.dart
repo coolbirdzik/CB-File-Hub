@@ -2,11 +2,12 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'windows_engine_host.dart';
+import 'windows_tab_window_launch.dart';
 
 import 'package:cb_file_manager/services/windowing/window_startup_payload.dart';
 import 'package:cb_file_manager/utils/app_logger.dart';
 
-/// Windows launches another engine; other desktop platforms launch a process.
+/// Launches another desktop window in its own process.
 class DesktopWindowProcessLauncher {
   static Future<bool> openWindow({
     List<WindowTabPayload> tabs = const <WindowTabPayload>[],
@@ -15,6 +16,7 @@ class DesktopWindowProcessLauncher {
     String windowRole = 'normal',
     double? initialPositionX,
     double? initialPositionY,
+    bool positionInPhysicalPixels = false,
     bool startDragging = false,
   }) async {
     if (!(Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
@@ -33,14 +35,26 @@ class DesktopWindowProcessLauncher {
       if (initialPositionX != null && initialPositionY != null) {
         env[WindowStartupPayload.envWindowPositionXKey] = '$initialPositionX';
         env[WindowStartupPayload.envWindowPositionYKey] = '$initialPositionY';
+        if (positionInPhysicalPixels) {
+          env[WindowsTabWindowLaunch.physicalPositionKey] = '1';
+        }
       }
 
-      if (tabs.isNotEmpty) {
-        final payload = <String, dynamic>{
-          'tabs': tabs.map((t) => t.toJson()).toList(growable: false),
-          'activeIndex': ?activeIndex,
-        };
-        env[WindowStartupPayload.envTabsKey] = jsonEncode(payload);
+      final encodedTabs = tabs.isEmpty
+          ? null
+          : jsonEncode({
+              'tabs': tabs.map((t) => t.toJson()).toList(growable: false),
+              'activeIndex': ?activeIndex,
+            });
+      if (Platform.isWindows) {
+        if (!WindowsEngineHost.isAvailable) return false;
+        return await WindowsTabWindowLaunch.start(
+          env,
+          encodedTabs: encodedTabs,
+        );
+      }
+      if (encodedTabs != null) {
+        env[WindowStartupPayload.envTabsKey] = encodedTabs;
       }
 
       final lowerExecutable = executable.toLowerCase();
@@ -58,8 +72,6 @@ class DesktopWindowProcessLauncher {
                 })
                 .toList(growable: false)
           : const <String>[];
-
-      if (Platform.isWindows) return await WindowsEngineHost.open(env);
 
       await Process.start(
         executable,

@@ -26,12 +26,12 @@ Each request opens centered over the app window that requested it. Windows reads
 that parent's current position and monitor at display time, scales for its DPI
 and clamps the form to the monitor's work area. A reused form is repositioned
 for every request; it does not change native ownership or block the main window.
-The main file-manager window remains usable. The small form process is warmed
-after the main app's first frame and
-reused for later requests; it does not initialize the library database or a
-second download engine. Save returns the options to the owning app window.
-On Windows, this process registers only the window and screen plugins, skipping
-the main app's video, PDF, AI, network and shell plugin initialization.
+The main file-manager window remains usable. On Windows, the Torrent page warms
+the form when needed, and a download request can start it on demand. On Linux
+and macOS the main app can warm it after the first frame. Later requests reuse
+the process. Save returns the options to the owning app window, which runs the
+library database and download engine. On Windows, the form process registers
+only the window and screen plugins.
 Cancel, Escape and the close button leave the download unchanged. The
 hidden form exits when its app connection closes. Mobile and automated test
 hosts retain the in-app dialog.

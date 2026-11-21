@@ -76,6 +76,20 @@ void main() {
               ? isA<CreateNewWindowIntent>()
               : isA<CreateNewTabIntent>(),
         );
+        if (platform == TargetPlatform.windows) {
+          final beforeWindowShortcut = invoked.length;
+          await press(
+            tester,
+            LogicalKeyboardKey.keyN,
+            modifiers: [
+              LogicalKeyboardKey.controlLeft,
+              LogicalKeyboardKey.shiftLeft,
+            ],
+            repeat: true,
+          );
+          expect(invoked, hasLength(beforeWindowShortcut + 1));
+          expect(invoked.last, isA<CreateNewWindowIntent>());
+        }
         await press(
           tester,
           LogicalKeyboardKey.tab,

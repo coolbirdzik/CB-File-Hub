@@ -88,6 +88,7 @@ include(flutter/generated_plugins.cmake)
 
 include(cmake/media_kit_video_multi_engine.cmake)
 coolbird_patch_media_kit_video()
+include(cmake/media_plugin_delay_load.cmake)
 
 
 # === Installation ===

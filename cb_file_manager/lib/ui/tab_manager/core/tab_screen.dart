@@ -2,7 +2,6 @@ import 'package:cb_file_manager/design_system/primitives/cb_popover_transition.d
 import 'package:material_ui/material_ui.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import 'dart:async';
-import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart'; // Import for keyboard shortcuts
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'dart:io';
@@ -45,6 +44,7 @@ import 'package:cb_file_manager/services/windowing/windows_native_tab_drag_drop_
 import 'package:cb_file_manager/services/windowing/windows_engine_host.dart';
 import 'tab_window_transfer.dart';
 import 'package:cb_file_manager/ui/widgets/drawer/cubit/drawer_cubit.dart';
+import 'package:cb_file_manager/ui/widgets/thumbnail_loader.dart';
 import 'split_pane_view.dart'; // Split-pane view
 import '../../screens/ai_chat/ai_panel_controller.dart';
 import '../../screens/ai_chat/ai_side_panel.dart';
@@ -1449,6 +1449,39 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
     );
   }
 
+  Widget _buildTabSlot(
+    TabData tab, {
+    required bool isActive,
+    required TabActivityManager? activity,
+  }) {
+    // A restored or background-opened desktop tab can wait for its first visit.
+    // Keep visited tabs mounted for their scroll, selection and view state.
+    final hasContent = _tabContentCache.containsKey(tab.id);
+    final shouldMount =
+        !_isDesktop ||
+        isActive ||
+        (activity?.isAlwaysActive(tab.id) ?? false) ||
+        tab.pendingTorrentSources.isNotEmpty ||
+        hasContent;
+    if (!shouldMount) return SizedBox.shrink(key: ValueKey(tab.id));
+
+    // First mount loads fresh data and has no mounted listener to resume it.
+    if (!hasContent && !(activity?.isInactive(tab.id) ?? false)) {
+      activity?.consumeReloadFlag(tab.id);
+      ThumbnailLoader.resumeTab(tab.id);
+    }
+    return TabFocusGate(
+      key: ValueKey('tab_focus_gate_${tab.id}'),
+      node: _focusScopeForTab(tab.id),
+      isActive: isActive,
+      onFocusEscaped: _restoreFocusToActiveTab,
+      child: TickerMode(
+        enabled: !_isDesktop || isActive,
+        child: _buildOrGetTabContent(tab),
+      ),
+    );
+  }
+
   Widget _buildTabContent(TabManagerState state) {
     if (state.tabs.isEmpty) return Container();
 
@@ -1462,14 +1495,15 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
         : 0;
 
     _syncTabContentCache(state.tabs);
+    final activity = locator.isRegistered<TabActivityManager>()
+        ? locator<TabActivityManager>()
+        : null;
     final children = <Widget>[
       for (int i = 0; i < state.tabs.length; i++)
-        TabFocusGate(
-          key: ValueKey('tab_focus_gate_${state.tabs[i].id}'),
-          node: _focusScopeForTab(state.tabs[i].id),
+        _buildTabSlot(
+          state.tabs[i],
           isActive: i == safeActiveIndex,
-          onFocusEscaped: _restoreFocusToActiveTab,
-          child: _buildOrGetTabContent(state.tabs[i]),
+          activity: activity,
         ),
     ];
 
@@ -1550,14 +1584,14 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
   }
 
   void _handleNewWindow() {
-    if (!_isDesktop) return;
-    HapticFeedback.mediumImpact();
-    SchedulerBinding.instance.addPostFrameCallback((_) async {
-      if (!mounted) return;
-      await locator<DesktopWindowingService>().openNewWindow(
+    if (!_isDesktop || !mounted) return;
+    unawaited(HapticFeedback.mediumImpact());
+    // An idle window may have no upcoming frame to run a post-frame callback.
+    unawaited(
+      locator<DesktopWindowingService>().openNewWindow(
         tabs: [WindowTabPayload(path: '#home', name: context.tr.homeTab)],
-      );
-    });
+      ),
+    );
   }
 
   void _handleAddNewTab() {
@@ -1900,10 +1934,17 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
         var opened =
             window != null &&
             await svc.revealPreparedWindow(window.window, result.windowOrigin);
-        // No spare was free: start a window the slow way.
-        if (!opened) opened = await svc.openNewWindow(tabs: tabs);
-        if (opened) closeMovedTabs();
-        await tearOff.end();
+        try {
+          if (!opened) {
+            opened = await svc.openNewWindow(
+              tabs: tabs,
+              clientOrigin: result.windowOrigin,
+            );
+          }
+          if (opened) closeMovedTabs();
+        } finally {
+          await tearOff.end();
+        }
     }
   }
 
@@ -2145,7 +2186,7 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
         {
           if (activityManager == null) return;
           final pinned = activityManager.isAlwaysActive(tab.id);
-          activityManager.setAlwaysActive(tab.id, !pinned);
+          setState(() => activityManager.setAlwaysActive(tab.id, !pinned));
           return;
         }
       case _DesktopTabAction.closeOtherTabs:

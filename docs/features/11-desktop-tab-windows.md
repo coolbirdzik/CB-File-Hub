@@ -4,18 +4,18 @@
 it in a new window that follows the cursor; drop a window's tab on another
 window's tab strip to move it there.
 
-## Architecture (Windows): one process, one engine per window
+## Architecture on Windows
 
-Windows uses the public Windows embedder API. `engine_window_host.cpp` owns
-secondary `FlutterWindow`s, each with its own `FlutterViewController`, engine
-and Dart isolate. There are no imports of Flutter's internal windowing APIs.
-Tab and torrent-options windows are created inside the existing process.
-Player, PiP and progress windows start their own process
-(`WindowsEngineHost.startWindowProcess`): every engine in one process shares a
-single ANGLE/D3D11 display, and a video drawing beside a scrolling thumbnail
-grid corrupted ANGLE's state and crashed the raster thread. Those windows only
-talk to their opener over sockets. macOS and Linux retain their process
-launchers.
+Tab windows, torrent options, video players, PiP and progress windows each
+launch a separate process with one Flutter engine. A crash opening a tab window
+was traced to `ANGLE StateManager11::updateState` on the raster thread. Engines
+in one process share ANGLE's D3D11 display. Process isolation gives each window
+its own display and keeps a renderer failure local to that window.
+
+`WindowsTabWindowLaunch` sends startup tabs over an authenticated loopback
+connection so large session snapshots can exceed Windows environment variable
+limits. The destination applies window placement and shows the rendered frame
+before confirming startup. The source keeps its tabs until confirmation.
 
 Rendering on Windows defaults to Impeller (`PreferredImpellerSwitch`;
 `CB_WINDOWS_RENDERER=skia` for comparisons — under the guard below Skia lost
@@ -28,10 +28,8 @@ video-thumbnail grid scrolled, under either renderer.
 `CB_FRAME_STATS=1` prints build/raster frame percentiles every 5 s.
 
 - `WindowsEngineHost` (`lib/services/windowing/windows_engine_host.dart`)
-  reads an engine-specific startup context over `cb_file_manager/engine_windows`.
-  Process environment variables are never changed to start a window. Each new
-  window gets fresh startup options instead of inheriting another window's tabs,
-  player arguments or PiP mode. Native plugins are registered per engine.
+  handles startup and shutdown over `cb_file_manager/engine_windows`. Each
+  new process gets its own options, and native plugins register with its engine.
 - Every engine owns its own widget tree, `TabManagerBloc`, navigator and GetIt
   locator. Widgets and `GlobalKey`s do not move across engines.
   `TabWindowTransfer` serializes tab identity, history, pinned/split state,
@@ -45,13 +43,9 @@ video-thumbnail grid scrolled, under either renderer.
   view snapshots are gzip-compressed in the tab payload to reduce native merge
   message size. Desktop resizing below 600dp keeps the desktop tab tree mounted
   rather than switching to the mobile tab view.
-- The existing peer/registry sockets carry serialized tab payloads between
-  engines. Native HWND-based preview and merge keep the drag responsive.
-  No spare engine is pre-warmed (`_keepSpareWarm` is false): every engine in
-  the process shares one ANGLE/D3D11 display, and a spare booting beside the
-  main window crashed the raster thread in ANGLE's `StateManager11` (Skia and
-  Impeller alike). Tear-off and "new window" start a fresh engine on demand;
-  the spare flow below applies only when a spare exists.
+- Peer and registry sockets discover other windows and carry tab payloads.
+  The HWND-based preview and merge protocol works across processes. New tab
+  windows start on demand, and keeping a hidden spare resident is disabled.
 - Each engine runs its UI isolate on its own thread
   (`UIThreadPolicy::RunOnSeparateThread`, `PreferredUIThreadPolicy()` in
   `windows/runner/utils.cpp`). Merged threads would put every window's Dart on
@@ -61,18 +55,9 @@ video-thumbnail grid scrolled, under either renderer.
   will drop the separate-thread option; it is still present on master (October
   2026). Launch with `CB_MERGED_UI_THREAD=1` to run the merged policy and check
   tab drag, merge, tear-off, the context menu and video playback against it.
-- All windows share the platform thread, so Windows no longer stops one of
-  them taking the foreground from another. The window prepared during a tab
-  drag is shown with `showWindowInactive` (window_manager's `show(inactive:)`
-  still calls `SetForegroundWindow`). After a reveal, merge drop or
-  `forceActivateWindow`, other windows yield for one second: a Flutter focus
-  request in the window the tabs left would otherwise activate it and raise it
-  over the new one. A click on another window ends the yield. A window's own
-  drag loop marks it with a property; releasing a reveal hold no longer waits
-  for another window's drag. The process-wide "a drag is running" flag is
-  released when the mouse is, not after a dropped tear-off preview stops
-  waiting for its window: otherwise the next tab drag fell back to the system
-  move loop (Windows' snap bar at the top edge, no merging).
+- The source calls `AllowSetForegroundWindow` before opening a destination or
+  handing off a drag. The drag loop releases its active flag on mouse-up while
+  the preview can stay visible until the destination is ready.
 - `custom_frame_message.h` wraps the entire native message dispatch before
   Flutter/plugin delegates. Every tab switch sets the window title, and
   `DefWindowProc` can paint its native caption through the transparent tab
@@ -98,35 +83,15 @@ video-thumbnail grid scrolled, under either renderer.
   refresh, are left alone; window_manager's fullscreen (no `WS_THICKFRAME` and
   `WS_MAXIMIZEBOX`) is not fitted.
   Backdrop, fullscreen and reveal-hold state belong to each native window.
-- Closing the primary window hides it while other user windows exist, retaining
-  its coordinator/registry engine. Closing an idle secondary destroys its engine.
-  Engines owning torrent downloads, tracked operations or model downloads stay
-  hidden until their work finishes. The process exits with the last user window,
-  except that hidden engines still running file operations or model downloads
-  keep it alive until that work ends. Torrent ownership does not (seeding never
-  finishes), and neither do spare or hidden torrent-options windows.
-- aria2 ownership still uses an exclusive file lock. Takeover tokens contain an
-  engine id as well as the PID, because every window now shares a PID. Services
-  and caches are isolate-local; database/settings synchronization still applies.
-- SQLite has one FFI worker registered with the public `IsolateNameServer` API.
-  The primary engine initializes it before any spare engine starts. Other
-  engines connect through sqflite's `isolatePortServer` API, without calling
-  `sqfliteFfiInit` or creating SQLite handles in their own UI isolates.
-  Closing a client engine leaves the worker and the shared connection alive.
-  The worker still runs SQL off the UI thread; transaction IDs serialize work
-  from different clients. Engines are separate isolate groups, so requests and
-  rows cross a group boundary; `flutter test` cannot spawn such an isolate
-  (`Isolate.spawnUri`), but the same exchange, blobs and transactions included,
-  works on the Dart VM. External app processes retain the WAL/busy-timeout
-  connection settings. `shared_desktop_database_test.dart` checks concurrent
-  preference reads, transaction writes and client-isolate exit/reconnect.
+- Each visible window owns its process lifetime. A closed window can keep its
+  process alive while a file operation or model download finishes. Torrent
+  activity uses the existing aria2 ownership lock and takeover mechanism.
+- Each process runs SQLite on a worker. Connections share the database file
+  using WAL and a busy timeout. The window registry can be re-elected by a
+  surviving window after the registry owner exits.
 - E2E mode does not initialize the engine host or create spare engines. Unit/widget
   coverage includes launch-channel contracts and serialized tab transfer. It does
   not prove real window dragging, DPI behavior or native-plugin runtime parity.
-
-The former `CB_MULTI_PROCESS_WINDOWS` and `CB_WINDOWING_SELF_TEST` defines are
-removed. Windows does not silently fall back to spawning another app process if
-engine creation fails; it reports the failed window request.
 
 ## Gestures
 
@@ -165,30 +130,17 @@ The tabs stay in the source window until the drop, as in Chrome:
    its own message loop moves the preview, so a busy UI thread anywhere cannot
    make it lag. It does the strip hover protocol itself and hides the preview
    over a strip.
-3. Meanwhile `prepareTearOffWindow` loads the tabs into the pre-warmed
-   **spare** (`prepare_tabs`). The spare is shown, but DWM-cloaked and off the
-   taskbar, and marked `preparing` so no other tear-off takes it.
-4. On release (`onTabTearOffEnded`):
-   - **empty space**: the preview thread sends `CBFileHub.TabTearOffReveal.v1`
-     to the readied spare, whose handle came back with `prepare_tabs`. The
-     spare's window procedure places its content where the preview is and
-     uncloaks before replying, and only then does the preview go. No Dart and
-     no socket sit in between. Taskbar entry, role and focus follow in Dart
-     (`_finishReveal`). Released before the spare was ready: `reveal_prepared`
-     over the socket, with no waiting either. Without a free spare, a window
-     is started normally.
+3. On release (`onTabTearOffEnded`):
+   - **empty space**: start the destination at the preview's physical client
+     origin. The native preview stays briefly while the destination renders.
+     The source closes the moved tabs when the destination acknowledges it.
    - **another window's strip**: the source sends the tabs there
-     (`WM_COPYDATA`) and closes them; the spare is discarded back to `spare`.
+     (`WM_COPYDATA`) and closes them after the target accepts.
    - **the source's own strip**: the tab returns and moves to the gap it
      opened. Escape cancels.
-5. Spare replacement is left to the registry host when a spare becomes
-   `normal` (1.5 s later), and only while `_keepSpareWarm` is true. A spare
-   with no normal window for two heartbeats exits.
 
-When the preview cannot start, the older path is used: the spare is shown
-cloaked with the tabs, follows the cursor itself, and uncloaks once its
-content settles. A window's only tab still moves the window itself (see
-Gestures).
+When the preview cannot start, the destination is launched directly from the
+drag. A window's only tab still moves the window itself (see Gestures).
 
 ## Merge protocol (native, `window_utils_plugin.cpp`)
 

@@ -950,9 +950,17 @@ namespace fc_native_video_thumbnail
     registrar->AddPlugin(std::move(plugin));
   }
 
-  FcNativeVideoThumbnailPlugin::FcNativeVideoThumbnailPlugin() : shutdown_(false)
+  FcNativeVideoThumbnailPlugin::FcNativeVideoThumbnailPlugin() = default;
+
+  bool FcNativeVideoThumbnailPlugin::StartThumbnailWorkers()
   {
-    // Initialize shared GDI+ resources
+    // Platform-channel calls are serialized on the Windows platform thread.
+    if (!workers_.empty())
+    {
+      return true;
+    }
+
+    if (!thumbnailBackendStarted_)
     {
       std::lock_guard<std::mutex> lock(gdiMutex_);
       instanceCount_++;
@@ -964,22 +972,25 @@ namespace fc_native_video_thumbnail
           gdiInitialized_ = true;
         }
       }
+      mediaFoundationStarted_ = SUCCEEDED(MFStartup(MF_VERSION));
+      thumbnailBackendStarted_ = true;
     }
 
-    // Initialize FFmpeg thumbnail helper GDI+ singleton (for fast SaveImageFast)
-    FFmpegThumbnailHelper::InitializeGdiPlus();
-
-    // Initialize MediaFoundation
-    MFStartup(MF_VERSION);
-
-    // Create worker threads (use hardware concurrency, but limit to reasonable number)
-    const size_t numThreads = std::min(std::thread::hardware_concurrency(), 4u);
-    workers_.reserve(numThreads);
-
-    for (size_t i = 0; i < numThreads; ++i)
+    // A partial pool can still serve the queue if Windows limits thread creation.
+    const size_t numThreads = std::clamp(std::thread::hardware_concurrency(), 1u, 4u);
+    try
     {
-      workers_.emplace_back(&FcNativeVideoThumbnailPlugin::WorkerThread, this);
+      workers_.reserve(numThreads);
+      for (size_t i = 0; i < numThreads; ++i)
+      {
+        workers_.emplace_back(&FcNativeVideoThumbnailPlugin::WorkerThread, this);
+      }
     }
+    catch (const std::exception &error)
+    {
+      OutputDebugStringA(error.what());
+    }
+    return !workers_.empty();
   }
 
   FcNativeVideoThumbnailPlugin::~FcNativeVideoThumbnailPlugin()
@@ -1021,13 +1032,17 @@ namespace fc_native_video_thumbnail
       }
     }
 
-    // Cleanup MediaFoundation
-    MFShutdown();
+    if (mediaFoundationStarted_)
+    {
+      MFShutdown();
+    }
 
-    // Shutdown FFmpeg thumbnail helper GDI+ singleton
-    FFmpegThumbnailHelper::ShutdownGdiPlus();
+    if (ffmpegGdiStarted_)
+    {
+      FFmpegThumbnailHelper::ShutdownGdiPlus();
+    }
 
-    // Cleanup shared GDI+ resources
+    if (thumbnailBackendStarted_)
     {
       std::lock_guard<std::mutex> lock(gdiMutex_);
       instanceCount_--;
@@ -1074,6 +1089,12 @@ namespace fc_native_video_thumbnail
         // File exists, update cache and return success to avoid re-rendering
         UpdateCache(*src_file, *dest_file);
         result->Success(flutter::EncodableValue(true));
+        return;
+      }
+
+      if (!StartThumbnailWorkers())
+      {
+        result->Error("PluginError", "Could not start native thumbnail workers");
         return;
       }
 
@@ -1134,7 +1155,7 @@ namespace fc_native_video_thumbnail
         if (activeRequests_.find(request->requestId) != activeRequests_.end())
         {
           // Request already in progress, return immediately
-          result->Success(flutter::EncodableValue(false));
+          request->result->Success(flutter::EncodableValue(false));
           return;
         }
         activeRequests_.insert(request->requestId);
@@ -1175,7 +1196,7 @@ namespace fc_native_video_thumbnail
         {
           std::lock_guard<std::mutex> activeLock(activeRequestsMutex_);
           activeRequests_.erase(request->requestId);
-          result->Success(flutter::EncodableValue(false));
+          request->result->Success(flutter::EncodableValue(false));
           return;
         }
 
@@ -1300,6 +1321,11 @@ namespace fc_native_video_thumbnail
 
       if (src_file && dest_file && !src_file->empty() && !dest_file->empty())
       {
+        if (!ffmpegGdiStarted_)
+        {
+          FFmpegThumbnailHelper::InitializeGdiPlus();
+          ffmpegGdiStarted_ = true;
+        }
         std::string srcPath = *src_file;
         std::string destPath = *dest_file;
         std::string format = format_val ? *format_val : "jpg";

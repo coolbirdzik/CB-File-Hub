@@ -2,9 +2,9 @@ import 'package:flutter/widgets.dart';
 
 /// Confines keyboard focus to the tab the user is actually looking at.
 ///
-/// The desktop shell keeps every tab mounted inside an [IndexedStack], so a
-/// hidden tab's [Focus] node stays attached to the focus tree. Two things then
-/// go wrong without a gate:
+/// The desktop shell keeps visited tabs mounted inside an [IndexedStack], so
+/// a hidden tab's [Focus] node stays attached to the focus tree. Two things
+/// then go wrong without a gate:
 ///
 ///  * switching tabs leaves the primary focus on the tab the user just left,
 ///    so Delete / Shift+Delete / Ctrl+C run against an invisible folder;

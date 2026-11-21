@@ -31,6 +31,7 @@ class _AppWindows extends DesktopWindowingService {
   Future<bool> openNewWindow({
     List<WindowTabPayload> tabs = const [],
     Offset? sourcePointerPosition,
+    Offset? clientOrigin,
     Offset dragAnchor = kDefaultTabTearOffAnchor,
     bool startDragging = false,
   }) async {

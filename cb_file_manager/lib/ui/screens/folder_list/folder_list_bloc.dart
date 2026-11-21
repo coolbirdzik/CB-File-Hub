@@ -264,6 +264,11 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
   }
 
   void _onRefresh(FolderListRefresh event, Emitter<FolderListState> emit) {
+    final searchTag = UriUtils.extractTagFromSearchPath(event.path);
+    if (searchTag != null) {
+      _tagSearchBloc.add(tag.TagSearchByTagGlobally(searchTag));
+      return;
+    }
     if (ArchivePathUtils.isArchiveBrowsePath(event.path)) {
       add(FolderListLoad(event.path));
       return;

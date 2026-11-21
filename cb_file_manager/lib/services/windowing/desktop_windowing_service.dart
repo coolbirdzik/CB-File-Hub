@@ -129,12 +129,8 @@ class DesktopWindowingService {
   // A debug engine can take seconds to boot; release ones well under one.
   static const Duration _spareBootTimeout = Duration(seconds: 10);
 
-  /// Whether a hidden spare engine is kept warm in the background. Every
-  /// Windows engine in this process shares one ANGLE/D3D11 display; a spare
-  /// booting beside the main window crashed the raster thread in ANGLE's
-  /// StateManager11 (Skia and Impeller alike) in about a third of launches
-  /// on a folder of video thumbnails, and cost ~400 MB. A spare is now only
-  /// started when a window is actually requested.
+  /// Keeping an idle Flutter process resident adds memory to every session.
+  /// The native preview covers on-demand startup during tab tear-off.
   static const bool _keepSpareWarm = false;
 
   ServerSocket? _peerServer;
@@ -517,6 +513,7 @@ class DesktopWindowingService {
   Future<bool> openNewWindow({
     List<WindowTabPayload> tabs = const [],
     Offset? sourcePointerPosition,
+    Offset? clientOrigin,
     Offset dragAnchor = kDefaultTabTearOffAnchor,
     bool startDragging = false,
   }) async {
@@ -525,16 +522,17 @@ class DesktopWindowingService {
     if (Platform.isWindows) {
       final allowForeground =
           WindowsNativeTabDragDropService.allowForegroundWindow();
-      DesktopWindowInfo? spare = await _findSpareWindow();
-      // Without a warm spare, booting one here and then a fresh window when
-      // it misses the wait would start two engines at once.
-      if (spare == null && _keepSpareWarm) {
-        // If the user triggers "new window" very quickly after startup,
-        // wait briefly for the pre-warmed spare to come online.
-        unawaited(ensureSpareWindow());
-        spare = await _waitForSpareWindow(
-          timeout: const Duration(milliseconds: 900),
-        );
+      // With no spare configured, launch directly even if the window registry
+      // is busy or recovering after its previous owner closed.
+      DesktopWindowInfo? spare;
+      if (_keepSpareWarm) {
+        spare = await _findSpareWindow();
+        if (spare == null) {
+          unawaited(ensureSpareWindow());
+          spare = await _waitForSpareWindow(
+            timeout: const Duration(milliseconds: 900),
+          );
+        }
       }
       await allowForeground;
       if (spare != null) {
@@ -551,8 +549,8 @@ class DesktopWindowingService {
       }
     }
 
-    Offset? initialPosition;
-    if (sourcePointerPosition != null) {
+    Offset? initialPosition = clientOrigin;
+    if (initialPosition == null && sourcePointerPosition != null) {
       try {
         final sourceWindowPosition = await windowManager.getPosition();
         initialPosition =
@@ -565,6 +563,7 @@ class DesktopWindowingService {
       windowRole: 'normal',
       initialPositionX: initialPosition?.dx,
       initialPositionY: initialPosition?.dy,
+      positionInPhysicalPixels: clientOrigin != null,
       startDragging: startDragging,
     );
     _scheduleSpareWarmup(delay: _spareRewarmDelay);

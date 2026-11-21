@@ -5,7 +5,7 @@ import 'package:flutter/foundation.dart';
 
 import '../media/media_kit_playback.dart';
 
-/// Each Windows window runs its own engine and Dart isolate in the same host.
+/// Manages startup options and the native lifetime of a Windows Flutter engine.
 /// Startup options belong to the engine; changing process environment variables
 /// would race with every other window.
 abstract final class WindowsEngineHost {
@@ -106,13 +106,10 @@ abstract final class WindowsEngineHost {
   static Future<void> Function(Map<String, String> environment) processStarter =
       _startDetachedProcess;
 
-  /// Starts a window (video player, PiP, progress) in a process of its own.
+  /// Starts a window in a process of its own.
   ///
-  /// Every engine in this process shares one ANGLE/D3D11 display. Two engines
-  /// drawing at once (a playing video beside a scrolling thumbnail grid)
-  /// corrupted ANGLE's shared state and crashed the raster thread, so windows
-  /// that only talk to their opener over sockets run in separate processes.
-  /// Tab windows stay in this host: native tab merge needs them here.
+  /// Windows engines in the same process share one ANGLE/D3D11 display.
+  /// Separate processes give each window an independent raster lifecycle.
   static Future<bool> startWindowProcess(
     Map<String, String> environment,
   ) async {

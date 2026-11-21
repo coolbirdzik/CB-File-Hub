@@ -156,7 +156,7 @@ void main() {
       ).writeAsString('1234567');
       await TagManager.setTags(m.path, [tag]);
       final refreshed = waitForFiles(SortOption.sizeDesc, [m, a, z]);
-      bloc.add(const SearchByTagGlobally(tag));
+      bloc.add(const FolderListRefresh(tagPath));
       await refreshed;
     } finally {
       await bloc.close();

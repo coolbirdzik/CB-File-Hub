@@ -67,6 +67,7 @@ import 'services/desktop_integration/folder_launch_request.dart';
 import 'services/desktop_integration/windows_folder_elevation.dart';
 import 'services/desktop_integration/folder_open_bridge.dart';
 import 'services/windowing/windows_engine_host.dart';
+import 'services/windowing/windows_tab_window_launch.dart';
 import 'services/windowing/engine_window_lifetime.dart';
 import 'services/local_ai/local_model_downloads.dart';
 import 'ui/controllers/operation_progress_controller.dart';
@@ -264,7 +265,18 @@ Future<void> runCbFileApp() async {
   final env = WindowsEngineHost.environment;
   if (env[WindowStartupPayload.envWindowRoleKey] ==
       TorrentOptionsWindowService.role) {
+    if (WindowsEngineHost.isAvailable) {
+      await WindowsEngineHost.setRole(TorrentOptionsWindowService.role);
+    }
     await runTorrentOptionsWindow(env);
+    return;
+  }
+  final WindowsTabWindowLaunch? tabWindowLaunch;
+  try {
+    tabWindowLaunch = await WindowsTabWindowLaunch.connect(env);
+  } catch (error) {
+    debugPrint('Could not receive new window startup tabs: $error');
+    await WindowsEngineHost.closeOrExit(1);
     return;
   }
   final elevatedFolderPath = WindowsFolderElevation.takeStartupPath(
@@ -450,10 +462,11 @@ Future<void> runCbFileApp() async {
 
   final windowAcrylicService = WindowAcrylicService();
   bool startupVisibilityHeld = false;
-  // Register the SQLite worker from the long-lived coordinator before any
-  // spare/player engine can connect to it. A child engine must never own the
-  // worker and take every window's database down when that engine closes.
-  if (WindowsEngineHost.isAvailable && WindowsEngineHost.isPrimary) {
+  // Bootstrap the main window's SQLite worker early. Detached windows can
+  // initialize their own worker on demand while loading their preferences.
+  if (WindowsEngineHost.isAvailable &&
+      WindowsEngineHost.isPrimary &&
+      !isSecondaryWindow) {
     await DatabaseManager.getInstance().initialize();
   }
   final List<Future<void> Function()> deferredSecondaryInitializers = [];
@@ -464,7 +477,7 @@ Future<void> runCbFileApp() async {
     } catch (_) {}
 
     if (Platform.isWindows &&
-        !isSecondaryWindow &&
+        (!isSecondaryWindow || (tabWindowLaunch != null && !startHidden)) &&
         !isPip &&
         !isProgressWindow &&
         !isDedicatedVideoWindow &&
@@ -511,7 +524,7 @@ Future<void> runCbFileApp() async {
           await windowManager.setBackgroundColor(
             windowOptions.backgroundColor!,
           );
-        } else if (isSecondaryWindow) {
+        } else if (isSecondaryWindow && tabWindowLaunch == null) {
           unawaited(windowManager.waitUntilReadyToShow(windowOptions));
         } else {
           await windowManager.waitUntilReadyToShow(windowOptions);
@@ -539,13 +552,22 @@ Future<void> runCbFileApp() async {
                 await windowManager.setSkipTaskbar(false);
               }
               if (initialWindowPosition != null) {
-                await windowManager.setPosition(initialWindowPosition);
+                if (env[WindowsTabWindowLaunch.physicalPositionKey] == '1') {
+                  await WindowsNativeTabDragDropService.placeWindowClientAt(
+                    initialWindowPosition,
+                  );
+                } else {
+                  await windowManager.setPosition(initialWindowPosition);
+                }
               }
-              await windowManager.show();
-              await windowManager.focus();
-              await WindowsNativeTabDragDropService.forceActivateWindow();
-              if (initialWindowPosition == null && !isRunnerPlacedVideoWindow) {
-                unawaited(windowManager.center());
+              if (!startupVisibilityHeld) {
+                await windowManager.show();
+                await windowManager.focus();
+                await WindowsNativeTabDragDropService.forceActivateWindow();
+                if (initialWindowPosition == null &&
+                    !isRunnerPlacedVideoWindow) {
+                  unawaited(windowManager.center());
+                }
               }
             } catch (_) {}
           }
@@ -631,8 +653,19 @@ Future<void> runCbFileApp() async {
     FrameTimingOptimizer().optimizeImageRendering();
   });
 
-  PaintingBinding.instance.imageCache.maximumSize = 200;
-  PaintingBinding.instance.imageCache.maximumSizeBytes = 100 * 1024 * 1024;
+  // Each Windows engine has its own decoded-image cache. Give additional
+  // tab windows a smaller budget for offscreen images.
+  final isSecondaryWindowsEngine = Platform.isWindows && isSecondaryWindow;
+  final isSecondaryWindowsTabWindow =
+      Platform.isWindows && tabWindowLaunch != null;
+  final deferSecondaryServicesUntilShown =
+      isSecondaryWindowsTabWindow && !startHidden && !startDraggingWindow;
+  final imageCache = PaintingBinding.instance.imageCache;
+  imageCache.maximumSize = isSecondaryWindowsEngine ? 100 : 200;
+  final imageCacheMiB = isSecondaryWindowsTabWindow
+      ? 24
+      : (isSecondaryWindowsEngine ? 50 : 100);
+  imageCache.maximumSizeBytes = imageCacheMiB * 1024 * 1024;
 
   // Initialize streaming service manager
   if (!kCbE2EFast) {
@@ -667,9 +700,13 @@ Future<void> runCbFileApp() async {
         debugPrint('Error initializing user preferences: $e');
       }
     });
-    deferredSecondaryInitializers.add(() async {
+    if (deferSecondaryServicesUntilShown) {
       await locator<LanguageController>().initialize();
-    });
+    } else {
+      deferredSecondaryInitializers.add(() async {
+        await locator<LanguageController>().initialize();
+      });
+    }
   } else {
     try {
       final preferences = locator<UserPreferences>();
@@ -722,10 +759,12 @@ Future<void> runCbFileApp() async {
     }
 
     try {
-      debugPrint('Initializing video thumbnail cache system');
-      await VideoThumbnailHelper.initializeCache();
       if (kDebugMode) {
         VideoThumbnailHelper.setVerboseLogging(true);
+      }
+      // Cache lookups and thumbnail generation load the disk index on demand.
+      if (!isSecondaryWindowsTabWindow) {
+        await VideoThumbnailHelper.initializeCache();
       }
     } catch (e) {
       debugPrint('Error initializing video thumbnail cache: $e');
@@ -820,7 +859,13 @@ Future<void> runCbFileApp() async {
         )
       : kCbE2E && CbE2EConfig.startupPayload != null
       ? CbE2EConfig.startupPayload
-      : WindowStartupPayload.fromEnvironment();
+      : WindowStartupPayload.fromEnvironment(
+          encodedTabs: tabWindowLaunch?.encodedTabs,
+        );
+  if (tabWindowLaunch?.encodedTabs != null && startupPayload == null) {
+    await WindowsEngineHost.closeOrExit(1);
+    return;
+  }
   final mainApp = ChangeNotifierProvider(
     create: (context) => locator<ThemeProvider>(),
     child: CBFileApp(
@@ -837,9 +882,20 @@ Future<void> runCbFileApp() async {
   }
   runApp(mainApp);
 
+  void startSecondaryServices() {
+    for (final initializer in deferredSecondaryInitializers) {
+      unawaited(initializer());
+    }
+  }
+
   if (startupVisibilityHeld) {
     unawaited(() async {
       await WidgetsBinding.instance.waitUntilFirstFrameRasterized;
+      if (tabWindowLaunch != null && startupPayload != null) {
+        // Startup tabs are inserted after the first frame. Paint that update
+        // before revealing the window over the native drag preview.
+        await SchedulerBinding.instance.endOfFrame;
+      }
       try {
         final theme = locator<ThemeProvider>();
         if (theme.isWallpaperMode) {
@@ -863,10 +919,22 @@ Future<void> runCbFileApp() async {
         } else {
           await windowManager.show();
           await windowManager.focus();
+          if (tabWindowLaunch != null) {
+            await WindowsNativeTabDragDropService.forceActivateWindow();
+          }
         }
+        await tabWindowLaunch?.markReady();
+        if (deferSecondaryServicesUntilShown) startSecondaryServices();
       } catch (e) {
         debugPrint('Error revealing the first app frame: $e');
+        if (tabWindowLaunch != null) await WindowsEngineHost.closeOrExit(1);
       }
+    }());
+  } else if (tabWindowLaunch != null) {
+    unawaited(() async {
+      await WidgetsBinding.instance.waitUntilFirstFrameRasterized;
+      await tabWindowLaunch?.markReady();
+      if (deferSecondaryServicesUntilShown) startSecondaryServices();
     }());
   }
 
@@ -883,7 +951,10 @@ Future<void> runCbFileApp() async {
       );
     });
   }
-  if (TorrentOptionsWindowService.isSupported &&
+  // Windows hosts the form in its own Flutter process. Let the torrent
+  // screen warm it up, or start it on the first download request.
+  if (!Platform.isWindows &&
+      TorrentOptionsWindowService.isSupported &&
       !isSecondaryWindow &&
       !isPip &&
       !isDedicatedVideoWindow) {
@@ -921,11 +992,10 @@ Future<void> runCbFileApp() async {
 
   if (isSecondaryWindow &&
       !isProgressWindow &&
+      !deferSecondaryServicesUntilShown &&
       deferredSecondaryInitializers.isNotEmpty) {
     SchedulerBinding.instance.addPostFrameCallback((_) {
-      for (final initializer in deferredSecondaryInitializers) {
-        unawaited(initializer());
-      }
+      startSecondaryServices();
     });
   }
 }

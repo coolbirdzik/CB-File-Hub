@@ -225,6 +225,16 @@
       "problemMatcher": []
     },
     {
+      "label": "just: windows-portable-test",
+      "type": "shell",
+      "command": "just windows-portable-test",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
       "label": "just: windows-msi",
       "type": "shell",
       "command": "just windows-msi",

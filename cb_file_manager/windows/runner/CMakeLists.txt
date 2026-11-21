@@ -97,7 +97,7 @@ endif()
 target_include_directories(${BINARY_NAME} SYSTEM PRIVATE "${FFMPEG_DIR}/include")
 target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
 target_link_directories(${BINARY_NAME} PRIVATE "${FFMPEG_DIR}/lib")
-target_link_libraries(${BINARY_NAME} PRIVATE avformat avcodec avutil swscale)
+target_link_libraries(${BINARY_NAME} PRIVATE delayimp)
 
 # Disable warnings as errors for ffmpeg_thumbnail_helper.cpp (FFmpeg headers have warnings)
 set_source_files_properties(
@@ -105,20 +105,44 @@ set_source_files_properties(
   PROPERTIES COMPILE_FLAGS "/W3"
 )
 
-# Copy FFmpeg DLLs to output directory
-set(_FFMPEG_DLL_PATTERNS
-  "${FFMPEG_DIR}/bin/avcodec-*.dll"
-  "${FFMPEG_DIR}/bin/avformat-*.dll"
-  "${FFMPEG_DIR}/bin/avutil-*.dll"
-  "${FFMPEG_DIR}/bin/swscale-*.dll"
-  "${FFMPEG_DIR}/bin/swresample-*.dll"
-)
+# The bundled FFmpeg ships GNU import libraries. MSVC needs its own import
+# library format to delay-load those DLLs until the first video operation.
 set(FFMPEG_DLLS)
-foreach(_dll_pattern IN LISTS _FFMPEG_DLL_PATTERNS)
-  file(GLOB _dll_matches "${_dll_pattern}")
-  list(APPEND FFMPEG_DLLS ${_dll_matches})
+set(FFMPEG_DELAY_IMPORT_LIBS)
+set(_ffmpeg_import_dir "${CMAKE_CURRENT_BINARY_DIR}/ffmpeg-imports")
+foreach(_component IN ITEMS avformat avcodec avutil swscale)
+  file(GLOB _dlls "${FFMPEG_DIR}/bin/${_component}-*.dll")
+  list(APPEND FFMPEG_DLLS ${_dlls})
+  list(LENGTH _dlls _num_dlls)
+  if(_num_dlls EQUAL 1)
+    get_filename_component(_dll_name "${_dlls}" NAME)
+    get_filename_component(_dll_stem "${_dlls}" NAME_WE)
+    set(_exports "${FFMPEG_DIR}/lib/${_dll_stem}.def")
+    if(EXISTS "${_exports}")
+      set(_import_lib "${_ffmpeg_import_dir}/${_dll_stem}.lib")
+      add_custom_command(
+        OUTPUT "${_import_lib}"
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${_ffmpeg_import_dir}"
+        COMMAND "${CMAKE_AR}" /NOLOGO "/DEF:${_exports}"
+          "/MACHINE:${CMAKE_CXX_COMPILER_ARCHITECTURE_ID}" "/OUT:${_import_lib}"
+        DEPENDS "${_exports}"
+        VERBATIM
+      )
+      list(APPEND FFMPEG_DELAY_IMPORT_LIBS "${_import_lib}")
+      target_link_libraries(${BINARY_NAME} PRIVATE "${_import_lib}")
+      target_link_options(${BINARY_NAME} PRIVATE "/DELAYLOAD:${_dll_name}")
+      continue()
+    endif()
+  endif()
+  # Custom FFmpeg distributions can still supply their existing import libs.
+  target_link_libraries(${BINARY_NAME} PRIVATE ${_component})
 endforeach()
-list(REMOVE_DUPLICATES FFMPEG_DLLS)
+if(FFMPEG_DELAY_IMPORT_LIBS)
+  add_custom_target(ffmpeg_delay_imports DEPENDS ${FFMPEG_DELAY_IMPORT_LIBS})
+  add_dependencies(${BINARY_NAME} ffmpeg_delay_imports)
+endif()
+file(GLOB _resampler "${FFMPEG_DIR}/bin/swresample-*.dll")
+list(APPEND FFMPEG_DLLS ${_resampler})
 
 if(NOT FFMPEG_DLLS)
   message(FATAL_ERROR "No FFmpeg runtime DLLs found in ${FFMPEG_DIR}/bin.")

@@ -104,6 +104,7 @@ namespace fc_native_video_thumbnail
             std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result);
 
         // Async thumbnail processing methods
+        bool StartThumbnailWorkers();
         void ProcessThumbnailAsync(std::unique_ptr<ThumbnailRequest> request);
         void WorkerThread();
         bool IsThumbnailCached(const std::string &srcFile, const std::string &destFile);
@@ -121,7 +122,10 @@ namespace fc_native_video_thumbnail
         std::vector<std::unique_ptr<ThumbnailRequest>> requestQueue_;
         std::mutex queueMutex_;
         std::condition_variable queueCondition_;
-        std::atomic<bool> shutdown_;
+        std::atomic<bool> shutdown_{false};
+        bool thumbnailBackendStarted_ = false;
+        bool mediaFoundationStarted_ = false;
+        bool ffmpegGdiStarted_ = false;
 
         // Request tracking for priority updates
         std::unordered_map<std::string, ThumbnailPriority> requestPriorities_;

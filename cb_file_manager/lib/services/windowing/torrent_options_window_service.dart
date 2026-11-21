@@ -256,9 +256,7 @@ class TorrentOptionsWindowService {
     required String workingDirectory,
   }) async {
     if (Platform.isWindows) {
-      if (!await WindowsEngineHost.open(environment)) {
-        throw StateError('Failed to create window engine');
-      }
+      await WindowsEngineHost.startWindowProcess(environment);
       return;
     }
     await Process.start(

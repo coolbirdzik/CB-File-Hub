@@ -2,8 +2,10 @@ import 'dart:io';
 
 import 'package:cb_file_manager/services/media/media_kit_playback.dart';
 import 'package:cb_file_manager/services/windowing/desktop_window_process_launcher.dart';
+import 'package:cb_file_manager/services/windowing/desktop_windowing_service.dart';
 import 'package:cb_file_manager/services/windowing/windows_engine_host.dart';
 import 'package:cb_file_manager/services/windowing/window_startup_payload.dart';
+import 'package:cb_file_manager/services/windowing/windows_tab_window_launch.dart';
 import 'package:cb_file_manager/services/windowing/video_window_service.dart';
 import 'package:cb_file_manager/services/pip_window_service.dart';
 import 'package:flutter/services.dart';
@@ -29,13 +31,11 @@ void main() {
   final calls = <MethodCall>[];
   final processes = <Map<String, String>>[];
   var primary = false;
-  var failCreate = false;
 
   setUp(() {
     calls.clear();
     processes.clear();
     primary = false;
-    failCreate = false;
     messenger.setMockMethodCallHandler(WindowsEngineHost.channel, (call) async {
       calls.add(call);
       if (call.method == 'startup') {
@@ -50,10 +50,6 @@ void main() {
             'CB_STARTUP_TABS': 'stale tabs',
           },
         };
-      }
-      if (call.method == 'create') {
-        if (failCreate) throw PlatformException(code: 'engine-create-failed');
-        return true;
       }
       return null;
     });
@@ -83,11 +79,25 @@ void main() {
     );
   });
 
-  test('tab windows get host engines; progress gets its own process', () async {
+  test('each window gets a process and large tab snapshots use IPC', () async {
     await WindowsEngineHost.initializeForTesting();
+    final session = 'large tab snapshot' * 3000;
+    WindowsEngineHost.processStarter = (environment) async {
+      processes.add(environment);
+      if (environment['CB_WINDOW_ROLE'] != 'spare') return;
+      final launch = (await WindowsTabWindowLaunch.connect(environment))!;
+      final tab = WindowStartupPayload.fromEnvironment(
+        encodedTabs: launch.encodedTabs,
+      )!.tabs.single;
+      expect(tab.path, r'C:\Music');
+      expect(tab.session?['snapshot'], session);
+      await launch.markReady();
+    };
     expect(
       await DesktopWindowProcessLauncher.openWindow(
-        tabs: const [WindowTabPayload(path: r'C:\Music')],
+        tabs: [
+          WindowTabPayload(path: r'C:\Music', session: {'snapshot': session}),
+        ],
         startHidden: true,
         windowRole: 'spare',
       ),
@@ -101,21 +111,15 @@ void main() {
       ),
       isTrue,
     );
-    final launches = calls.where((c) => c.method == 'create').toList();
-    expect(launches, hasLength(1));
-    expect(processes, hasLength(1));
-    final spare = (launches.first.arguments as Map)['environment'] as Map;
+    expect(calls.where((c) => c.method == 'create'), isEmpty);
+    expect(processes, hasLength(2));
+    final spare = processes.first;
     expect(spare['CB_WINDOW_ROLE'], 'spare');
     expect(spare['CB_START_HIDDEN'], '1');
-    expect(spare['CB_STARTUP_TABS'], contains(r'C:\\Music'));
+    expect(spare.containsKey('CB_STARTUP_TABS'), isFalse);
     expect(spare.containsKey('CB_PIP_MODE'), isFalse);
     expect(spare.containsKey('CB_VIDEO_WINDOW'), isFalse);
-    expect(
-      spare.keys.every((key) => (key as String).startsWith('CB_')),
-      isTrue,
-    );
-    final progress = processes.single;
-    // A whole environment for a fresh process, not engine overrides.
+    final progress = processes.last;
     expect(progress.keys.any((key) => key.toUpperCase() == 'PATH'), isTrue);
     expect(progress['CB_WINDOW_ROLE'], 'progress');
     expect(progress['CB_PROGRESS_IPC_PORT'], '12345');
@@ -123,16 +127,46 @@ void main() {
     expect(progress.containsKey('CB_STARTUP_TABS'), isFalse);
   }, skip: !Platform.isWindows);
 
-  test(
-    'failed engine creation is reported without spawning a process',
-    () async {
-      await WindowsEngineHost.initializeForTesting();
-      failCreate = true;
-      expect(await DesktopWindowProcessLauncher.openWindow(), isFalse);
-      expect(calls.where((c) => c.method == 'create'), hasLength(1));
-    },
-    skip: !Platform.isWindows,
-  );
+  test('failed process creation does not confirm the window', () async {
+    await WindowsEngineHost.initializeForTesting();
+    WindowsEngineHost.processStarter = (_) async {
+      throw const ProcessException('cb_file_hub.exe', [], 'launch failed');
+    };
+    expect(await DesktopWindowProcessLauncher.openWindow(), isFalse);
+    expect(calls.where((c) => c.method == 'create'), isEmpty);
+  }, skip: !Platform.isWindows);
+
+  test('opening a fresh Home window bypasses the spare registry', () async {
+    await WindowsEngineHost.initializeForTesting();
+    final registry = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(registry.close);
+    var contactedRegistry = false;
+    registry.listen((socket) {
+      contactedRegistry = true;
+      socket.destroy();
+    });
+    final service = DesktopWindowingService.forTesting(
+      registryPort: registry.port,
+    );
+    WindowsEngineHost.processStarter = (environment) async {
+      processes.add(environment);
+      final launch = (await WindowsTabWindowLaunch.connect(environment))!;
+      final payload = WindowStartupPayload.fromEnvironment(
+        encodedTabs: launch.encodedTabs,
+      )!;
+      expect(payload.tabs.single.path, '#home');
+      await launch.markReady();
+    };
+
+    expect(
+      await service.openNewWindow(
+        tabs: [const WindowTabPayload(path: '#home')],
+      ),
+      isTrue,
+    );
+    expect(processes.single['CB_WINDOW_ROLE'], 'normal');
+    expect(contactedRegistry, isFalse);
+  }, skip: !Platform.isWindows);
 
   test(
     'video and PiP start processes of their own, not host engines',

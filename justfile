@@ -215,11 +215,16 @@ macos-dev: deps
 # Build
 # =============================================================================
 
-# Build Windows portable (ZIP)
-windows: deps fetch-llama fetch-aria2
-    cd {{project_dir}} && {{flutter}} build windows --release {{dart_env}}
-    mkdir -p {{build_dir}}/windows/portable
-    cd {{build_dir}}/windows/x64/runner/Release && if command -v zip >/dev/null 2>&1; then zip -r ../../portable/CBFileHub-Portable.zip ./*; elif command -v 7z >/dev/null 2>&1; then 7z a -tzip ../../portable/CBFileHub-Portable.zip ./*; fi
+# Build the unpacked Windows portable bundle
+windows: windows-portable-test
+
+# Build the unpacked Windows release for testing and print the executable path
+windows-portable-test: deps fetch-llama fetch-aria2
+    cd {{project_dir}} && {{flutter}} build windows --release --no-pub {{dart_env}}
+    @cd {{build_dir}}/windows/x64/runner/Release && \
+        for file in cb_file_hub.exe flutter_windows.dll data/app.so llama/llama-server.exe aria2/aria2c.exe; do \
+            if [ ! -f "$file" ]; then printf 'Missing release file %s\n' "$file" >&2; exit 1; fi; \
+        done && cygpath -aw cb_file_hub.exe
 
 # Build Windows MSI installer
 windows-msi:

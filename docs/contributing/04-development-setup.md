@@ -50,12 +50,17 @@ just clean
 Build on the appropriate host with its platform toolchain installed:
 
 ```bash
-just windows      # Windows portable ZIP
+just windows-portable-test  # Unpacked Windows release for local testing (also just windows)
 just windows-msi  # Windows MSI installer
 just android      # Android APKs
 just android-aab  # Android App Bundle
 just macos        # macOS DMG
 ```
+
+The Windows recipe prints the path to `cb_file_hub.exe` in the ready-to-run
+bundle at `cb_file_manager/build/windows/x64/runner/Release/`. Copy that whole
+directory to take the portable build elsewhere. The rest of `build/` also
+holds compiler intermediates, test caches, and output from other targets.
 
 For Linux, run `flutter build linux --release` from `cb_file_manager/`; see [Linux setup](../guides/04-installation.md#linux) for the bundle location.
 

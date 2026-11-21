@@ -59,12 +59,12 @@ class WindowStartupPayload {
 
   bool get isEmpty => tabs.isEmpty;
 
-  static WindowStartupPayload? fromEnvironment() {
+  static WindowStartupPayload? fromEnvironment({String? encodedTabs}) {
     if (!(Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
       return null;
     }
 
-    final raw = WindowsEngineHost.environment[envTabsKey];
+    final raw = encodedTabs ?? WindowsEngineHost.environment[envTabsKey];
     if (raw == null || raw.trim().isEmpty) return null;
 
     try {
