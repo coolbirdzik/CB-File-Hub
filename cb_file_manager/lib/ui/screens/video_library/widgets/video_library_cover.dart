@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Displays a video library cover image, falling back to a tinted gradient
 /// placeholder (with an optional label) when no cover is set or the image

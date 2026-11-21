@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import 'dart:convert';
 import 'package:flutter/services.dart';
@@ -36,7 +37,8 @@ import 'config/fluent_theme_config.dart';
 import 'config/design_system_config.dart';
 import 'design_system/cb_font_licenses.dart';
 import 'design_system/desktop_acrylic_theme_bridge.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_localizations/flutter_localizations.dart'
+    hide GlobalMaterialLocalizations, GlobalCupertinoLocalizations;
 import 'config/language_controller.dart';
 import 'config/languages/app_localizations_delegate.dart';
 import 'config/languages/current_localizations.dart';
@@ -44,6 +46,7 @@ import 'services/streaming_service_manager.dart';
 import 'ui/utils/safe_navigation_wrapper.dart';
 import 'ui/utils/desktop_acrylic_backdrop.dart';
 import 'ui/utils/app_busy_cursor.dart';
+import 'ui/utils/legacy_material_bridge.dart';
 import 'core/service_locator.dart';
 import 'e2e/cb_e2e_config.dart';
 import 'services/app_update/app_update_models.dart';
@@ -766,6 +769,8 @@ Future<void> runCbFileApp() async {
       MaterialApp(
         theme: ThemeData.dark().copyWith(scaffoldBackgroundColor: Colors.black),
         debugShowCheckedModeBanner: false,
+        builder: (context, child) =>
+            LegacyMaterialBridge(child: child ?? const SizedBox.shrink()),
         home: DesktopPipWindow(args: args),
       ),
     );
@@ -1353,7 +1358,7 @@ class _CBFileAppState extends State<CBFileApp>
       ],
       builder: (context, child) {
         final wrappedChild = AppBusyCursorOverlay(
-          child: child ?? const SizedBox.shrink(),
+          child: LegacyMaterialBridge(child: child ?? const SizedBox.shrink()),
         );
         if (!_useDesktopAcrylicVisuals) return wrappedChild;
         return DesktopAcrylicBackdrop(
@@ -1398,6 +1403,8 @@ class _CBFileAppState extends State<CBFileApp>
         final shell = ScaffoldMessenger(
           child: AppBusyCursorOverlay(child: child ?? const SizedBox.shrink()),
         );
+        // Bridge sits under the Material Theme added below, so it is applied
+        // to `shell` there rather than here.
         final brightness = fluent.FluentTheme.of(context).brightness;
         final resolvedTheme = brightness == Brightness.dark
             ? _resolveMaterialDarkTheme(themeProvider)
@@ -1416,7 +1423,10 @@ class _CBFileAppState extends State<CBFileApp>
               )
             : resolvedTheme;
 
-        Widget result = Theme(data: materialTheme, child: shell);
+        Widget result = Theme(
+          data: materialTheme,
+          child: LegacyMaterialBridge(child: shell),
+        );
 
         if (_useDesktopAcrylicVisuals) {
           result = DesktopAcrylicBackdrop(

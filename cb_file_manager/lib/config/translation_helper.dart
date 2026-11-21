@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'languages/app_localizations.dart';
 import 'languages/english_localizations.dart';
 

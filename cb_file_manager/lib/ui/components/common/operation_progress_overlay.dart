@@ -5,7 +5,7 @@ import 'package:cb_file_manager/core/service_locator.dart';
 import 'package:cb_file_manager/services/app_update/app_update_service.dart';
 import 'package:cb_file_manager/ui/components/app_update/app_update_dialog.dart';
 import 'package:cb_file_manager/ui/controllers/operation_progress_controller.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:cb_file_manager/design_system/fluent_chrome_surface.dart';
 import 'package:cb_file_manager/design_system/primitives/cb_panel_reveal.dart';

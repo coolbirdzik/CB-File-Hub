@@ -5,7 +5,7 @@ import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/helpers/core/app_path_helper.dart';
 import 'package:cb_file_manager/utils/app_logger.dart';
 import 'package:crop_your_image/crop_your_image.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:cb_file_manager/helpers/media/image_transcoder.dart';
 import 'package:path/path.dart' as p;
 import 'package:phosphor_flutter/phosphor_flutter.dart';

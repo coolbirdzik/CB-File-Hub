@@ -7,7 +7,7 @@ import 'package:cb_file_manager/helpers/media/video_thumbnail_helper.dart';
 import 'package:cb_file_manager/models/database/database_manager.dart';
 import 'package:cb_file_manager/models/database/sqlite_database_provider.dart';
 import 'package:cb_file_manager/ui/widgets/lazy_video_thumbnail.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart' as rendering show ScrollCacheExtent;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';

@@ -8,12 +8,14 @@ import 'package:cb_file_manager/services/drive/drive_info.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:cb_file_manager/ui/tab_manager/components/drive_browser_content.dart';
 import 'package:cb_file_manager/ui/tab_manager/components/drive_avatar.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_localizations/flutter_localizations.dart'
+    hide GlobalMaterialLocalizations, GlobalCupertinoLocalizations;
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

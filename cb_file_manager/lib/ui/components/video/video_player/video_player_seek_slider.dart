@@ -1,5 +1,5 @@
 import 'package:cb_file_manager/design_system/primitives/cb_slider.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Seek slider used in mobile controls. Parent wires StreamBuilder/ValueListenable
 /// and provides value, min, max, and callbacks for seek start/change/end.

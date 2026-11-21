@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:cb_file_manager/design_system/tokens/cb_geometry_tokens.dart';
 import 'package:cb_file_manager/ui/components/common/optimized_interaction_handler.dart';
 import 'package:cb_file_manager/ui/utils/item_interaction_style.dart';

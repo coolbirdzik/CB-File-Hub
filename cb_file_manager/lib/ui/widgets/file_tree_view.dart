@@ -8,7 +8,7 @@ import '../components/common/file_entry_presentation.dart';
 
 import 'package:cb_native/cb_native.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 

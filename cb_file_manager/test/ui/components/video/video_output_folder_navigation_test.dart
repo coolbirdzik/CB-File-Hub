@@ -4,7 +4,7 @@ import 'package:cb_file_manager/services/windowing/desktop_windowing_service.dar
 import 'package:cb_file_manager/services/windowing/window_startup_payload.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';
 import 'package:cb_file_manager/ui/utils/video_output_folder_navigation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';

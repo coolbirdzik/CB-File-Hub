@@ -7,8 +7,10 @@ import 'package:cb_file_manager/services/local_ai/local_model_downloads.dart';
 import 'package:cb_file_manager/services/local_ai/subtitle_model_catalog.dart';
 import 'package:cb_file_manager/services/media/subtitle_preferences.dart';
 import 'package:cb_file_manager/ui/components/video/subtitle_settings_panel.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:flutter_localizations/flutter_localizations.dart'
+    hide GlobalMaterialLocalizations, GlobalCupertinoLocalizations;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 

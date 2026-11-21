@@ -5,8 +5,10 @@ import 'package:cb_file_manager/services/torrent/torrent_metainfo.dart';
 import 'package:cb_file_manager/services/torrent/torrent_repository.dart';
 import 'package:cb_file_manager/services/torrent/torrent_service.dart';
 import 'package:cb_file_manager/ui/screens/torrent/torrent_files_pane.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:flutter_localizations/flutter_localizations.dart'
+    hide GlobalMaterialLocalizations, GlobalCupertinoLocalizations;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common/sqlite_api.dart';

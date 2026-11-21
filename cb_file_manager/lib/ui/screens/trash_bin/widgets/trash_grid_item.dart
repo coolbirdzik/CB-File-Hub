@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:cb_file_manager/helpers/files/trash_manager.dart';
 import 'package:cb_file_manager/ui/components/common/item_shell.dart';
 import 'package:cb_file_manager/ui/utils/grid_zoom_constraints.dart';

@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:cb_file_manager/helpers/files/file_type_registry.dart';
 import 'package:cb_file_manager/models/file_template.dart';
 import 'package:cb_file_manager/services/file_template_service.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:path/path.dart' as path;
 
 enum DesktopNewFileItemKind { template, shellNew }

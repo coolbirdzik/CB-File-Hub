@@ -6,7 +6,7 @@ import 'ssh/ssh_terminal_screen.dart';
 import 'ssh/sftp_transfer_screen.dart';
 import 'dart:io';
 import '../../services/disk_cleaner/cleaner_paths.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/ui/screens/tag_management/tag_management_tab.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tabbed_folder/tabbed_folder_list_screen.dart';

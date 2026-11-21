@@ -4,9 +4,11 @@ import 'package:cb_file_manager/config/languages/app_localizations_delegate.dart
 import 'package:cb_file_manager/design_system/primitives/cb_slider.dart';
 import 'package:cb_file_manager/services/media/subtitle_progress.dart';
 import 'package:cb_file_manager/ui/components/video/subtitle_status_overlay.dart';
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_localizations/flutter_localizations.dart'
+    hide GlobalMaterialLocalizations, GlobalCupertinoLocalizations;
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

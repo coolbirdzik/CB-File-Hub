@@ -5,7 +5,7 @@ import 'package:cb_file_manager/ui/components/common/window_caption_buttons.dart
 import 'package:cb_file_manager/ui/tab_manager/desktop/desktop_tab_drag_data.dart';
 import 'package:cb_file_manager/ui/tab_manager/desktop/scrollable_tab_bar.dart';
 import 'package:flutter/gestures.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';

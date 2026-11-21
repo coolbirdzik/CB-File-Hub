@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mobile_smb_native/mobile_smb_native.dart';
 import '../files/file_type_registry.dart';
 import '../../services/network_browsing/i_smb_service.dart';

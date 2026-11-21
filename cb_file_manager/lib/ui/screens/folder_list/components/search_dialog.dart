@@ -6,7 +6,7 @@ import 'package:cb_file_manager/ui/components/common/search_text_field.dart';
 import 'dart:io';
 import 'dart:math';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:cb_file_manager/helpers/core/io_extensions.dart';
 import 'package:cb_file_manager/helpers/tags/tag_manager.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/file_details_screen.dart';

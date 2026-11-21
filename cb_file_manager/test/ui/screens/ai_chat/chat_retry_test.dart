@@ -8,8 +8,10 @@ import 'package:cb_file_manager/services/ai/ai_provider_service.dart';
 import 'package:cb_file_manager/services/ai/providers/ai_provider.dart';
 import 'package:cb_file_manager/ui/screens/ai_chat/ai_side_panel.dart';
 import 'package:cb_file_manager/ui/screens/ai_chat/components/chat_message_bubble.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:flutter_localizations/flutter_localizations.dart'
+    hide GlobalMaterialLocalizations, GlobalCupertinoLocalizations;
 import 'package:flutter_test/flutter_test.dart';
 
 AiMessage _message(

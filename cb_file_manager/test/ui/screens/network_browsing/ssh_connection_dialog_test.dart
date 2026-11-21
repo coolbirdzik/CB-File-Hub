@@ -12,7 +12,7 @@ import 'package:cb_file_manager/ui/screens/network_browsing/network_connection_d
 import 'package:cb_file_manager/services/ssh/local_ssh_discovery.dart';
 import 'package:cb_file_manager/services/ssh/ssh_profile_store.dart';
 import 'package:cb_file_manager/ui/screens/ssh/ssh_host_dialog.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';

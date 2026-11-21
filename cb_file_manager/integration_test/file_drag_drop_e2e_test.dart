@@ -3,7 +3,7 @@ import 'dart:ui' show PointerDeviceKind;
 import 'package:cb_file_manager/services/file_drag_drop/file_drag_drop_move_service.dart';
 import 'package:cb_file_manager/services/windowing/windows_explorer_drag_drop_service.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';

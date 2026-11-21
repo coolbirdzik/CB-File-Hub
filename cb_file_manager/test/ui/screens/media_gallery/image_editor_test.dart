@@ -6,7 +6,7 @@ import 'package:cb_file_manager/ui/screens/media_gallery/image_editor/edit_model
 import 'package:cb_file_manager/ui/screens/media_gallery/image_editor/edit_renderer.dart';
 import 'package:cb_file_manager/ui/screens/media_gallery/image_editor/image_editor_screen.dart';
 import 'package:cb_file_manager/ui/screens/media_gallery/image_editor/inpaint.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 

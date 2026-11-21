@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
@@ -448,9 +448,23 @@ class ReleaseNotesView extends StatelessWidget {
       if (trimmed.isEmpty) return const SizedBox.shrink();
       return MarkdownBody(
         data: trimmed,
-        styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
+        // flutter_markdown_plus still takes the legacy ThemeData, so the
+        // sheet is built from the app tokens instead of fromTheme().
+        styleSheet: MarkdownStyleSheet(
           p: CbTypography.body.copyWith(color: c.textPrimary),
           listBullet: CbTypography.body.copyWith(color: c.textSecondary),
+          strong: CbTypography.body.copyWith(
+            color: c.textPrimary,
+            fontWeight: FontWeight.bold,
+          ),
+          em: CbTypography.body.copyWith(
+            color: c.textPrimary,
+            fontStyle: FontStyle.italic,
+          ),
+          a: CbTypography.body.copyWith(
+            color: Theme.of(context).colorScheme.primary,
+            decoration: TextDecoration.underline,
+          ),
         ),
       );
     }

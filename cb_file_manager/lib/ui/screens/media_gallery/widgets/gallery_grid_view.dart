@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:cb_file_manager/ui/screens/media_gallery/widgets/gallery_tile.dart';
 import 'package:cb_file_manager/ui/screens/media_gallery/widgets/gallery_masonry_tile.dart';

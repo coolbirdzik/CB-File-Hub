@@ -3,7 +3,7 @@ import 'desktop_backdrop_strength_control.dart';
 import 'default_file_manager_settings.dart';
 
 import 'package:cb_native/cb_native.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'folder_view_mode_preference_control.dart';
 import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';

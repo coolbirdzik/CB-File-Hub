@@ -6,7 +6,7 @@ import 'package:cb_file_manager/ui/widgets/chips_input.dart';
 import 'package:cb_file_manager/ui/widgets/tag_chip.dart';
 import 'package:cb_file_manager/ui/widgets/tag_chips_field.dart';
 import 'package:cb_file_manager/ui/widgets/tag_management_section.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 

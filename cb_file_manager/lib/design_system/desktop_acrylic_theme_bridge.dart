@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'macos_glass_theme.dart';
 import 'desktop_acrylic_theme.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'cb_tokens.dart';
 
 /// Resolves the Material surface theme used alongside the desktop acrylic

@@ -13,7 +13,7 @@ import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:cb_file_manager/ui/components/common/browser_like_display_state.dart';
 import 'package:cb_file_manager/ui/components/common/delete_failure_toast.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:path/path.dart' as path;
 
 class BrowserLikeActionHandlers {

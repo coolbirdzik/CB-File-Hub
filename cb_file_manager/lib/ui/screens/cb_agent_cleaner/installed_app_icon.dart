@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'dart:ui' as ui;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../../helpers/files/windows_app_icon.dart';
 import '../../../services/disk_cleaner/macos_cleaner_platform.dart';

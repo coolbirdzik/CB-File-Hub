@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:cb_file_manager/config/languages/app_localizations_delegate.dart';
 import 'package:cb_file_manager/ui/components/common/column_chooser_dialog.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

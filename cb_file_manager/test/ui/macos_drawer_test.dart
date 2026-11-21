@@ -8,7 +8,7 @@ import 'package:cb_file_manager/services/filesystem/macos_user_folders_service.d
 import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';
 import 'package:cb_file_manager/ui/widgets/drawer/cubit/drawer_cubit.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:package_info_plus/package_info_plus.dart';

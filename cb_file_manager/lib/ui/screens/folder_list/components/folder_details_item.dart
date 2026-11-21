@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:cb_file_manager/helpers/core/io_extensions.dart';
 import 'package:cb_file_manager/helpers/core/uri_utils.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';

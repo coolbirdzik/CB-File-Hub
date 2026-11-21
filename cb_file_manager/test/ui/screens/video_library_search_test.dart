@@ -21,7 +21,7 @@ import 'package:cb_file_manager/ui/tab_manager/components/search_bar.dart'
     as search;
 import 'package:cb_file_manager/services/windowing/window_startup_payload.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_window_transfer.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter/services.dart';

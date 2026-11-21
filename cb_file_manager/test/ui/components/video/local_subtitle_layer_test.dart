@@ -5,8 +5,10 @@ import 'package:cb_file_manager/services/local_ai/local_ai_advisor_service.dart'
 import 'package:cb_file_manager/services/media/media_kit_playback.dart';
 import 'package:cb_file_manager/ui/components/video/local_subtitle_overlay.dart';
 import 'package:cb_file_manager/ui/components/video/video_player/video_player.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:flutter_localizations/flutter_localizations.dart'
+    hide GlobalMaterialLocalizations, GlobalCupertinoLocalizations;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get_it/get_it.dart';
 import 'package:media_kit/media_kit.dart' as mk;

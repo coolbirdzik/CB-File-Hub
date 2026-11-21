@@ -1,7 +1,7 @@
 import 'dart:io' show Platform;
 
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../../config/design_system_config.dart';
 import '../../../design_system/fluent_surface_tokens.dart';

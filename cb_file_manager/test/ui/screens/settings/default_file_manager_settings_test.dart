@@ -4,9 +4,11 @@ import 'package:cb_file_manager/config/languages/app_localizations_delegate.dart
 import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:cb_file_manager/services/desktop_integration/default_file_manager_service.dart';
 import 'package:cb_file_manager/ui/screens/settings/default_file_manager_settings.dart';
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_localizations/flutter_localizations.dart'
+    hide GlobalMaterialLocalizations, GlobalCupertinoLocalizations;
 
 class _Service extends DefaultFileManagerService {
   FolderDefaultStatus current = const FolderDefaultStatus();

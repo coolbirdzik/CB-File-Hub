@@ -21,7 +21,7 @@ import 'package:cb_file_manager/ui/components/common/browser_like_keyboard_short
 import 'package:cb_file_manager/ui/components/common/shared_action_bar.dart';
 import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:cb_file_manager/ui/components/common/delete_failure_toast.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
@@ -296,7 +296,9 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
           .firstOrNull;
       if (view != null) _folderListBloc.add(SetViewMode(view));
       if (sort != null) {
-        _folderListBloc.add(SetSortOption(sort, persist: false));
+        _folderListBloc.add(
+          SetSortOption(sort, persist: false, folderPath: _currentPath),
+        );
       }
       if (initial['zoom'] is int) {
         _folderListBloc.add(SetGridZoom(initial['zoom'] as int));
@@ -2326,6 +2328,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
                   toggleSelectionMode: _toggleSelectionMode,
                   columnVisibility: columnVisibility,
                   onColumnVisibilityChanged: saveColumnVisibility,
+                  onSortOptionSelected: _setSortOption,
                   showContextMenu: _showContextMenu,
                   isPreviewPaneVisible: false,
                   previewPaneWidthListenable: _previewPaneWidthNotifier,
@@ -2370,6 +2373,10 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
         );
       },
     );
+  }
+
+  void _setSortOption(SortOption option) {
+    _folderListBloc.add(SetSortOption(option, folderPath: _currentPath));
   }
 
   // Helper methods for dialog calls - now using DialogManager
@@ -2559,9 +2566,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
       folderListState: folderListState,
       currentPath: _currentPath,
       isNetworkPath: _currentPath.startsWith('#network/'),
-      onSortOptionSelected: (SortOption option) {
-        _folderListBloc.add(SetSortOption(option, folderPath: _currentPath));
-      },
+      onSortOptionSelected: _setSortOption,
       onViewModeToggled: _toggleViewMode,
       onViewModeSelected: _setViewMode,
       onRefresh: _refreshFileList,

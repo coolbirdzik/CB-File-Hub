@@ -8,7 +8,7 @@ import 'package:cb_file_manager/ui/components/common/shared_action_bar.dart';
 import 'package:cb_file_manager/services/windows_shell_properties.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:flutter/gestures.dart' show DragStartBehavior;
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 /// Horizontal padding of Details header and rows, on each side.

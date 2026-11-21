@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'dart:isolate';
 import 'package:ffi/ffi.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:flutter/services.dart';
 import 'package:win32/win32.dart' as win32;

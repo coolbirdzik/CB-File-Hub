@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:flutter/gestures.dart'; // Thêm import cho gesture detector
 import 'package:cb_file_manager/ui/widgets/thumbnail_loader.dart';

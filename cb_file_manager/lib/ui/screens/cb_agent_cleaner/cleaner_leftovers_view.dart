@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:cb_file_manager/ui/components/common/search_text_field.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 

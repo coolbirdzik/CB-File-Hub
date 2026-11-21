@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:path/path.dart' as p;
 import 'package:cb_file_manager/ui/screens/torrent/torrent_download_dialog.dart';
 import 'package:cb_file_manager/ui/screens/torrent/torrent_link_dialog.dart';
@@ -37,12 +39,12 @@ import 'package:cb_file_manager/services/torrent/torrent_service.dart';
 import 'package:cb_file_manager/ui/components/common/search_text_field.dart';
 import 'package:cb_file_manager/ui/screens/torrent/torrent_screen.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_localizations/flutter_localizations.dart'
+    hide GlobalMaterialLocalizations, GlobalCupertinoLocalizations;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common/sqlite_api.dart';

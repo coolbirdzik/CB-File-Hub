@@ -6,7 +6,7 @@ import 'package:cb_file_manager/ui/screens/media_gallery/image_viewer_screen.dar
 import 'package:cb_file_manager/ui/components/video/thumbnail_strip.dart';
 import 'package:cb_file_manager/ui/screens/media_gallery/widgets/image_viewer_chrome.dart';
 import 'package:flutter/gestures.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 

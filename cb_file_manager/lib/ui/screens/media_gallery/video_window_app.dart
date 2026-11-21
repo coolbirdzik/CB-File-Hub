@@ -2,8 +2,10 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 
-import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:flutter_localizations/flutter_localizations.dart'
+    hide GlobalMaterialLocalizations, GlobalCupertinoLocalizations;
 import 'package:provider/provider.dart';
 import 'package:window_manager/window_manager.dart';
 
@@ -11,6 +13,7 @@ import '../../../config/language_controller.dart';
 import '../../../config/languages/app_localizations_delegate.dart';
 import '../../../config/theme_config.dart';
 import '../../../core/service_locator.dart';
+import '../../utils/legacy_material_bridge.dart';
 import '../../../providers/theme_provider.dart';
 import '../../../services/windowing/video_window_service.dart';
 import '../../../services/windowing/windows_engine_host.dart';
@@ -175,6 +178,8 @@ class _VideoWindowAppState extends State<VideoWindowApp> with WindowListener {
               Locale('tr', ''),
               Locale('zh', ''),
             ],
+            builder: (context, child) =>
+                LegacyMaterialBridge(child: child ?? const SizedBox.shrink()),
             // Keep the same route/window; VideoPlayerFullScreen updates the
             // source from didUpdateWidget when this path changes.
             home: VideoPlayerFullScreen(

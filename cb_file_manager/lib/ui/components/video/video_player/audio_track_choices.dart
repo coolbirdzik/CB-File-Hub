@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:media_kit/media_kit.dart' as mk;
 
 import '../../../../services/media/media_language_labels.dart';

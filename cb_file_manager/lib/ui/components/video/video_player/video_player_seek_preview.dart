@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/gestures.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../../../services/media/media_kit_playback.dart';
 import 'video_player_utils.dart';

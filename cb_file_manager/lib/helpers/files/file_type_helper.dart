@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:cb_file_manager/helpers/files/file_type_registry.dart';
 
 /// Legacy enum maintained for backward compatibility.

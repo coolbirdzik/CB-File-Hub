@@ -2,7 +2,7 @@ import 'dart:io';
 import 'dart:async';
 import 'dart:math' as math;
 import 'dart:typed_data';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:cb_file_manager/design_system/cb_page_transitions.dart';
 import 'package:cb_file_manager/design_system/tokens/cb_geometry_tokens.dart';
 import 'package:cb_file_manager/design_system/cb_tokens.dart';

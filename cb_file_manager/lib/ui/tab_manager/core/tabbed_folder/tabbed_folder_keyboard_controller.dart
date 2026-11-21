@@ -9,7 +9,7 @@ import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:cb_file_manager/ui/utils/view_mode_utils.dart';
 import 'package:cb_file_manager/ui/widgets/smooth_wheel_scroll_controller.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 
 class TabbedFolderKeyboardController {

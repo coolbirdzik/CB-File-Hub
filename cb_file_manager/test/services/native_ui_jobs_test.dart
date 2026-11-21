@@ -8,7 +8,7 @@ import 'package:cb_file_manager/services/smart_album_scanner.dart';
 import 'package:cb_file_manager/services/thumbnail_cache_cleaner.dart';
 import 'package:cb_file_manager/ui/utils/preview_syntax_highlighter.dart';
 import 'package:cb_native/cb_native.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 

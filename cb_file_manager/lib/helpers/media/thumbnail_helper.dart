@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:typed_data';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'video_thumbnail_helper.dart';
 
 /// Adapter class để đảm bảo tương thích với mã hiện tại

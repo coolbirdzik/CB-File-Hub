@@ -22,7 +22,7 @@ import 'package:cb_file_manager/services/windowing/window_startup_payload.dart';
 import 'package:cb_file_manager/ui/widgets/lazy_video_thumbnail.dart';
 import 'package:cb_file_manager/ui/widgets/thumbnail_loader.dart';
 import 'package:flutter/gestures.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:path/path.dart' as p;
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';

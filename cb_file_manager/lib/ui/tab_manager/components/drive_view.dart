@@ -28,7 +28,7 @@ import 'package:cb_file_manager/ui/tab_manager/core/tab_paths.dart';
 import 'package:cb_file_manager/ui/utils/entity_open_actions.dart';
 import 'package:cb_file_manager/ui/utils/format_utils.dart';
 import 'package:cb_file_manager/ui/widgets/ctrl_scroll_zoom.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 

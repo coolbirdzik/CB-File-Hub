@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../cb_tokens.dart';
 import '../tokens/cb_color_tokens.dart';

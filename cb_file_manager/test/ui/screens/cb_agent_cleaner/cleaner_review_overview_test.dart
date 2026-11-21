@@ -7,10 +7,12 @@ import 'package:cb_file_manager/design_system/cb_theme_builder.dart';
 import 'package:cb_file_manager/services/disk_cleaner/cleaner_agent_review.dart';
 import 'package:cb_file_manager/services/disk_cleaner/disk_tree_node.dart';
 import 'package:cb_file_manager/ui/screens/cb_agent_cleaner/cleaner_review_overview.dart';
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_localizations/flutter_localizations.dart'
+    hide GlobalMaterialLocalizations, GlobalCupertinoLocalizations;
 import 'package:flutter_test/flutter_test.dart';
 
 Future<CleanerFullReview> fixture() async {

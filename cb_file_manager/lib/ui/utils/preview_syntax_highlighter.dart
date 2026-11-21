@@ -1,6 +1,6 @@
 import 'dart:isolate';
 import 'package:cb_native/cb_native.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:highlight/highlight.dart' show highlight, Node, Result;
 import 'package:path/path.dart' as p;
 

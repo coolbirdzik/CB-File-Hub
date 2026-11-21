@@ -1,5 +1,5 @@
 import 'dart:typed_data';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:cb_file_manager/helpers/core/uri_utils.dart';
 import 'package:cb_file_manager/helpers/files/archive_path_utils.dart';
 import 'package:cb_file_manager/services/torrent/torrent_launch_request.dart';

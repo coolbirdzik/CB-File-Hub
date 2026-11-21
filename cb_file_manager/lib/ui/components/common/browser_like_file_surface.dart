@@ -8,7 +8,7 @@ import 'package:cb_file_manager/ui/tab_manager/core/tab_focus_gate.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tabbed_folder/tabbed_folder_keyboard_controller.dart';
 import 'package:cb_file_manager/ui/utils/entity_open_actions.dart';
 import 'package:cb_file_manager/ui/widgets/selection_summary_tooltip.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'file_view_shell.dart';
 import 'screen_scaffold.dart';

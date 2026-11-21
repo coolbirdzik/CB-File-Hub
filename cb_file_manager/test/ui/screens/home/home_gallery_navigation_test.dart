@@ -11,12 +11,14 @@ import 'package:cb_file_manager/ui/screens/system_screen_router.dart';
 import 'package:cb_file_manager/ui/tab_manager/components/navigation_bar.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';
 import 'package:cb_file_manager/ui/widgets/drawer/cubit/drawer_cubit.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import 'package:flutter/gestures.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_localizations/flutter_localizations.dart'
+    hide GlobalMaterialLocalizations, GlobalCupertinoLocalizations;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';

@@ -1,7 +1,7 @@
 import 'package:cb_file_manager/helpers/tags/tag_manager.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/design_system/cb_design_system.dart';

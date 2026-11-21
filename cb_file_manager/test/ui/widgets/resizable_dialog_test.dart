@@ -1,5 +1,5 @@
 import 'package:cb_file_manager/ui/widgets/resizable_dialog.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 

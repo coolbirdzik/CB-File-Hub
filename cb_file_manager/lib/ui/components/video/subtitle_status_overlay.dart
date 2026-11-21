@@ -1,5 +1,5 @@
 import 'package:cb_file_manager/design_system/primitives/cb_popover_transition.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/services/media/subtitle_progress.dart';

@@ -1,7 +1,7 @@
 import 'package:cb_file_manager/helpers/core/search_query.dart';
 import 'package:cb_file_manager/helpers/core/search_request_guard.dart';
 import 'package:cb_file_manager/ui/components/common/search_text_field.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:flutter/services.dart'; // Handles keyboard events.
 import 'package:flutter_bloc/flutter_bloc.dart';

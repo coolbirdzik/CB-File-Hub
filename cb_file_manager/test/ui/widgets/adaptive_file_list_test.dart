@@ -5,7 +5,7 @@ import 'package:cb_file_manager/ui/screens/folder_list/components/folder_item.da
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:cb_file_manager/ui/widgets/adaptive_file_list.dart';
 import 'package:cb_file_manager/ui/widgets/compact_file_list_content.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/gestures.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tabbed_folder/tabbed_folder_keyboard_controller.dart';
 import 'package:flutter_test/flutter_test.dart';

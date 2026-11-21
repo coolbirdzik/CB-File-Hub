@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Animated thinking text with a gradient shimmer effect that slides
 /// from left to right, giving the appearance of "processing".

@@ -14,7 +14,7 @@ import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:cb_file_manager/ui/components/common/shared_action_bar.dart';
 import 'package:cb_file_manager/ui/utils/grid_zoom_constraints.dart';
 import 'package:cb_file_manager/ui/utils/view_mode_spectrum.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:photo_manager/photo_manager.dart';
 import '../media_gallery/device_media_sources.dart';
 import 'package:flutter/services.dart';

@@ -4,7 +4,7 @@ import 'package:cb_file_manager/helpers/platform_paths.dart';
 import 'package:cb_file_manager/ui/dialogs/image_crop_dialog.dart';
 import 'package:cb_file_manager/ui/dialogs/media_picker_dialog.dart';
 import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Opens the shared media browser configured for picking a thumbnail image.
 ///

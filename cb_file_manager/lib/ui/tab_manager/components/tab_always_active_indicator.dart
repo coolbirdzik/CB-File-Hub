@@ -2,7 +2,7 @@ import 'package:cb_file_manager/config/translation_helper.dart';
 import 'package:cb_file_manager/core/service_locator.dart';
 import 'package:cb_file_manager/design_system/primitives/cb_tooltip.dart';
 import 'package:cb_file_manager/services/tab_activity/tab_activity_manager.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 /// Small visual indicator shown on a tab header when the tab has been

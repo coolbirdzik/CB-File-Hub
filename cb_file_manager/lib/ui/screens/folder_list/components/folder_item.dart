@@ -1,6 +1,6 @@
 import 'package:cb_file_manager/ui/widgets/compact_file_list_content.dart';
 import 'dart:io';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/helpers/core/io_extensions.dart';

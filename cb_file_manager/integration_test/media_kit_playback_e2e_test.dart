@@ -7,10 +7,12 @@ import 'package:cb_file_manager/ui/components/video/video_player/video_player.da
     as app;
 import 'package:cb_file_manager/ui/components/video/video_player/video_player_fast_seek.dart';
 import 'package:cb_file_manager/config/languages/app_localizations_delegate.dart';
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_localizations/flutter_localizations.dart'
+    hide GlobalMaterialLocalizations, GlobalCupertinoLocalizations;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:media_kit_video/media_kit_video.dart' as mk;

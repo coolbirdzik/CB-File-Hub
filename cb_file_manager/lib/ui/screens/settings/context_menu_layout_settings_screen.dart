@@ -1,6 +1,6 @@
 // ignore_for_file: deprecated_member_use
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../config/languages/app_localizations.dart';

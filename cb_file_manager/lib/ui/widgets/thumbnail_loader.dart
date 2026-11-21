@@ -2,7 +2,7 @@ import 'dart:collection';
 import 'dart:io';
 import 'dart:async';
 import 'dart:ui' as ui;
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 import 'package:cb_file_manager/helpers/media/video_thumbnail_helper.dart';
 import 'package:cb_file_manager/helpers/network/network_thumbnail_helper.dart';

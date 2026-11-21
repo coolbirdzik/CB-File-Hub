@@ -1,3 +1,4 @@
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import 'package:cb_file_manager/design_system/primitives/cb_tooltip.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
@@ -16,9 +17,10 @@ import 'package:cb_file_manager/ui/screens/network_browsing/components/network_r
 import 'package:cb_file_manager/ui/screens/network_browsing/network_browser_screen.dart';
 import 'package:cb_file_manager/ui/screens/network_browsing/network_connection_screen.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_localizations/flutter_localizations.dart'
+    hide GlobalMaterialLocalizations, GlobalCupertinoLocalizations;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 

@@ -1,5 +1,5 @@
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// A Material tooltip whose accessibility anchor cannot be merged with a
 /// sibling tooltip anchor.

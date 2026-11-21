@@ -12,7 +12,7 @@ import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:cb_file_manager/ui/screens/network_browsing/network_browser_screen.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';
 import 'package:cb_file_manager/ui/widgets/adaptive_file_list.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';

@@ -7,7 +7,7 @@ import 'package:cb_file_manager/models/database/database_manager.dart';
 import 'package:cb_file_manager/models/database/sqlite_database_provider.dart';
 import 'package:cb_file_manager/ui/screens/home/home_keyboard_tip.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_keyboard_shortcuts.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';

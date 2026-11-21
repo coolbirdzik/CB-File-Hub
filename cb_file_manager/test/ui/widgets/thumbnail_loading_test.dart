@@ -6,7 +6,7 @@ import 'package:cb_file_manager/ui/screens/folder_list/bloc/file_navigation_bloc
 import 'package:cb_file_manager/ui/screens/folder_list/bloc/file_navigation_event.dart';
 import 'package:cb_file_manager/ui/widgets/thumbnail_loader.dart';
 import 'package:cb_file_manager/ui/widgets/thumbnail_placeholder.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:visibility_detector/visibility_detector.dart';

@@ -1,7 +1,7 @@
 import 'package:cb_file_manager/ui/components/common/search_text_field.dart';
 import 'package:cb_file_manager/helpers/core/search_request_guard.dart';
 import 'package:cb_file_manager/helpers/core/search_query.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

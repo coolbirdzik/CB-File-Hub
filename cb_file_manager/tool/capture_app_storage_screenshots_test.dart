@@ -20,11 +20,13 @@ import 'package:cb_file_manager/services/disk_cleaner/docker/docker_storage.dart
 import 'package:cb_file_manager/services/disk_cleaner/editor_storage/editor_storage_models.dart';
 import 'package:cb_file_manager/ui/screens/cb_agent_cleaner/cleaner_app_storage_view.dart';
 import 'package:cb_file_manager/ui/screens/cb_agent_cleaner/cleaner_utilities_shell.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_localizations/flutter_localizations.dart'
+    hide GlobalMaterialLocalizations, GlobalCupertinoLocalizations;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 

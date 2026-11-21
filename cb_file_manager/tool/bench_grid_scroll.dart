@@ -16,7 +16,7 @@ import 'package:cb_file_manager/ui/screens/folder_list/components/folder_thumbna
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_bloc.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:cb_file_manager/ui/widgets/lazy_video_thumbnail.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';

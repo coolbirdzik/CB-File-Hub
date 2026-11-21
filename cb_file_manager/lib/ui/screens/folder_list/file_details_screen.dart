@@ -5,7 +5,7 @@ import 'dart:io';
 import 'package:cb_file_manager/helpers/core/io_extensions.dart';
 import 'package:cb_file_manager/ui/dialogs/open_with_dialog.dart';
 import 'package:cb_file_manager/ui/utils/base_screen.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:path/path.dart' as pathlib;
 import 'package:flutter/services.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';

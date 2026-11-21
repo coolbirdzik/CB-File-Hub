@@ -16,7 +16,7 @@ import 'package:cb_file_manager/helpers/tags/tag_manager.dart';
 import 'package:cb_file_manager/ui/components/common/skeleton.dart';
 import 'package:cb_file_manager/ui/dialogs/video_frame_picker_dialog.dart';
 import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:path/path.dart' as path;
 import 'package:phosphor_flutter/phosphor_flutter.dart';

@@ -1,6 +1,6 @@
 import 'package:cb_file_manager/design_system/primitives/cb_slider.dart';
 import 'package:cb_file_manager/design_system/primitives/cb_tooltip.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Compact volume slider (0–100) for video player. Reuses SliderTheme across player backends.
 class VideoPlayerVolumeSlider extends StatelessWidget {

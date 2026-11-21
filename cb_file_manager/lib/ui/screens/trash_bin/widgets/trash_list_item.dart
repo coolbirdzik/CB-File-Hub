@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/helpers/files/file_type_registry.dart';
 import 'package:cb_file_manager/ui/components/common/item_shell.dart';

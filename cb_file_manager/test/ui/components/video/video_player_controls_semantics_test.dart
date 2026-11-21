@@ -1,6 +1,6 @@
 import 'package:cb_file_manager/ui/components/video/video_player/video_player_advanced_menu.dart';
 import 'package:cb_file_manager/ui/components/video/video_player/video_player_control_buttons.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';

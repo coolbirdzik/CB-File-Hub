@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:cb_file_manager/design_system/primitives/cb_slider.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/services/media/media_kit_playback.dart';

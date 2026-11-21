@@ -12,7 +12,7 @@ import 'package:cb_file_manager/helpers/media/folder_thumbnail_service.dart';
 import 'package:cb_file_manager/models/database/database_manager.dart';
 import 'package:cb_file_manager/models/database/sqlite_database_provider.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/components/folder_thumbnail.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';

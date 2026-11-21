@@ -1,6 +1,6 @@
 import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:cb_file_manager/services/drive/drive_info.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 /// Storage glyphs shared by cards, details, tree, columns and the inspector.

@@ -3,11 +3,13 @@ import 'dart:async';
 import 'package:cb_file_manager/config/languages/app_localizations_delegate.dart';
 import 'package:cb_file_manager/design_system/cb_theme_builder.dart';
 import 'package:cb_file_manager/ui/components/common/shared_file_context_menu.dart';
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/rendering.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_content_overlay.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_localizations/flutter_localizations.dart'
+    hide GlobalMaterialLocalizations, GlobalCupertinoLocalizations;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 

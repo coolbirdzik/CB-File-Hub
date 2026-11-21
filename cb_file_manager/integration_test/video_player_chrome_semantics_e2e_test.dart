@@ -1,4 +1,8 @@
 import 'dart:io';
+import 'package:cupertino_ui/cupertino_ui.dart';
+
+import 'package:material_ui/material_ui.dart';
+
 import 'e2e_wait.dart';
 
 import 'package:cb_file_manager/config/languages/app_localizations_delegate.dart';
@@ -7,8 +11,8 @@ import 'package:cb_file_manager/ui/components/video/video_player/video_player_ap
 import 'package:cb_file_manager/ui/components/video/video_player/video_player_control_buttons.dart';
 import 'package:cb_file_manager/ui/screens/media_gallery/video_player_full_screen.dart';
 import 'package:flutter/gestures.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_localizations/flutter_localizations.dart'
+    hide GlobalMaterialLocalizations, GlobalCupertinoLocalizations;
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:cb_file_manager/design_system/cb_tokens.dart';
 import 'package:cb_file_manager/design_system/primitives/cb_decorations.dart';
 import 'package:cb_file_manager/design_system/tokens/cb_geometry_tokens.dart';

@@ -12,7 +12,7 @@ import 'package:cb_file_manager/services/featured_albums_service.dart';
 import 'package:cb_file_manager/services/ssh/ssh_profile_store.dart';
 import 'package:cb_file_manager/services/windowing/window_startup_payload.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 import 'package:integration_test/integration_test.dart';

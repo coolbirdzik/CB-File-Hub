@@ -5,7 +5,7 @@ import 'dart:io';
 import 'package:cb_file_manager/helpers/media/video_thumbnail_helper.dart';
 import 'package:cb_file_manager/models/database/database_manager.dart';
 import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:path/path.dart' as path;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common/sqlite_api.dart';

@@ -1,6 +1,6 @@
 import 'package:cb_file_manager/design_system/primitives/cb_popover_transition.dart';
 import 'package:cb_file_manager/ui/widgets/gallery_nsfw_toggle.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:photo_manager/photo_manager.dart';
 import '../media_gallery/device_media_sources.dart';
 import 'package:cb_file_manager/models/objectbox/video_library.dart';

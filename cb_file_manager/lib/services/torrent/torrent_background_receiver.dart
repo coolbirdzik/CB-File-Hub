@@ -1,7 +1,7 @@
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter/material.dart' show Locale;
+import 'package:material_ui/material_ui.dart' show Locale;
 
 import '../../config/languages/app_localizations_delegate.dart';
 import '../../core/service_locator.dart';

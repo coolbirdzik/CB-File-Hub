@@ -2,7 +2,7 @@ import '../../../bloc/selection/selection.dart';
 import '../../../design_system/fluent_chrome_surface.dart';
 import '../../../design_system/fluent_surface_tokens.dart';
 import '../../tab_manager/components/index.dart' as tab_components;
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import '../../../config/design_system_config.dart';
 
 class ScreenScaffold extends StatelessWidget {

@@ -3,7 +3,7 @@ import 'dart:io';
 
 import 'package:cb_file_manager/helpers/files/file_icon_helper.dart';
 import 'package:cb_file_manager/ui/widgets/compact_file_list_content.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 

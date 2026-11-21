@@ -6,8 +6,10 @@ import 'package:cb_file_manager/services/app_update/app_update_service.dart';
 import 'package:cb_file_manager/ui/components/app_update/app_update_dialog.dart';
 import 'package:cb_file_manager/ui/components/common/operation_progress_overlay.dart';
 import 'package:cb_file_manager/ui/controllers/operation_progress_controller.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:flutter_localizations/flutter_localizations.dart'
+    hide GlobalMaterialLocalizations, GlobalCupertinoLocalizations;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/services.dart';
 import 'package:cb_file_manager/design_system/primitives/cb_panel_reveal.dart';

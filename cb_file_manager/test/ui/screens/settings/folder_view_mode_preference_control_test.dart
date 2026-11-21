@@ -4,8 +4,10 @@ import 'package:cb_file_manager/config/languages/vietnamese_localizations.dart';
 import 'package:cb_file_manager/design_system/primitives/cb_select.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/ui/screens/settings/folder_view_mode_preference_control.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:flutter_localizations/flutter_localizations.dart'
+    hide GlobalMaterialLocalizations, GlobalCupertinoLocalizations;
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

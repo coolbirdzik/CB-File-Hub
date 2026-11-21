@@ -5,7 +5,7 @@ import 'package:cb_file_manager/ui/components/common/breadcrumb_address_bar.dart
 import 'package:cb_file_manager/ui/screens/network_browsing/components/network_navigation_bar.dart';
 import 'package:cb_file_manager/ui/screens/system_screen.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';

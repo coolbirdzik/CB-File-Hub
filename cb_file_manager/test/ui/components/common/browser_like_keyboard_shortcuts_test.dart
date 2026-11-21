@@ -6,7 +6,7 @@
 // these tests hold the shared contract so the next screen to adopt it gets the
 // same behaviour rather than another hand-rolled subset.
 import 'package:cb_file_manager/ui/components/common/browser_like_keyboard_shortcuts.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 

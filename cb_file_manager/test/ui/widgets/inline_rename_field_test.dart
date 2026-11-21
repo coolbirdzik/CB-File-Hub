@@ -11,7 +11,7 @@ import 'package:cb_file_manager/design_system/primitives/cb_inline_rename.dart';
 import 'package:cb_file_manager/ui/controllers/inline_rename_controller.dart';
 import 'package:cb_file_manager/ui/utils/grid_zoom_constraints.dart';
 import 'package:cb_file_manager/ui/widgets/inline_rename_field.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 

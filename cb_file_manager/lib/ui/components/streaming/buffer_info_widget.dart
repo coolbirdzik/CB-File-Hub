@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'dart:async';
 
 /// Modern widget to display buffer information with beautiful UI

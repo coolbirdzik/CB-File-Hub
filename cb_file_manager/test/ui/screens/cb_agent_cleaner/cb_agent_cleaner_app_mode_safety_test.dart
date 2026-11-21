@@ -3,9 +3,11 @@ import 'package:cb_file_manager/e2e/cb_e2e_config.dart';
 import 'package:cb_file_manager/services/disk_cleaner/cleaner_models.dart';
 import 'package:cb_file_manager/services/disk_cleaner/disk_cleaner_service.dart';
 import 'package:cb_file_manager/ui/screens/cb_agent_cleaner/cb_agent_cleaner_screen.dart';
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_localizations/flutter_localizations.dart'
+    hide GlobalMaterialLocalizations, GlobalCupertinoLocalizations;
 import 'package:flutter_test/flutter_test.dart';
 
 Future<void> _pumpUi(WidgetTester tester) async {

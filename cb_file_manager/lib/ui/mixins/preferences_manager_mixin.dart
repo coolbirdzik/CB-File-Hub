@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_bloc.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_event.dart';
@@ -135,7 +135,13 @@ mixin PreferencesManagerMixin<T extends StatefulWidget> on State<T> {
       folderListBloc.add(SetViewMode(settings.viewMode));
     }
     if (current.sortOption != settings.sortOption) {
-      folderListBloc.add(SetSortOption(settings.sortOption, persist: false));
+      folderListBloc.add(
+        SetSortOption(
+          settings.sortOption,
+          persist: false,
+          folderPath: preferencePath,
+        ),
+      );
     }
     if (current.gridZoomLevel != zoom) {
       folderListBloc.add(SetGridZoom(zoom));

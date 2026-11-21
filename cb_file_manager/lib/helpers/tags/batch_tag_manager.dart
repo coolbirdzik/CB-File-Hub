@@ -2,7 +2,7 @@ import 'dart:io';
 import 'package:cb_file_manager/models/database/database_manager.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/helpers/tags/tag_manager.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Manages batch operations on file tags
 class BatchTagManager {

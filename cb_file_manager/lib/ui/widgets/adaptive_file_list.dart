@@ -1,8 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart' show ScrollCacheExtent;
+import 'package:material_ui/material_ui.dart';
 
 /// Explorer-style List fills each column from top to bottom, then moves right.
 /// Mobile keeps the existing, variable-height single-column list.

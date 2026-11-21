@@ -4,7 +4,7 @@ import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import '../components/common/file_entry_presentation.dart';
 import 'package:cb_file_manager/helpers/files/file_type_registry.dart';
 import 'package:cb_file_manager/ui/widgets/thumbnail_loader.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/rendering.dart';
 import 'package:path/path.dart' as p;

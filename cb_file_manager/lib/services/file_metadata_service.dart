@@ -2,7 +2,7 @@ import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:cb_native/cb_native.dart';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:cb_file_manager/helpers/media/fc_native_video_thumbnail.dart';
 import 'package:cb_file_manager/helpers/files/file_type_registry.dart';
 import 'package:path/path.dart' as path;

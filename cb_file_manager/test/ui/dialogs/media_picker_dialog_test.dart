@@ -5,8 +5,10 @@ import 'package:cb_file_manager/config/languages/app_localizations_delegate.dart
 import 'package:cb_file_manager/config/languages/english_localizations.dart';
 import 'package:cb_file_manager/config/languages/vietnamese_localizations.dart';
 import 'package:cb_file_manager/ui/dialogs/media_picker_dialog.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:flutter_localizations/flutter_localizations.dart'
+    hide GlobalMaterialLocalizations, GlobalCupertinoLocalizations;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';

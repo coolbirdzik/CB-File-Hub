@@ -1,43 +1,45 @@
 import 'package:cb_file_manager/ui/components/video/video_player/video_cut_panel.dart';
 import 'package:cb_file_manager/design_system/cb_design_system.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('source date mode is optional and can be switched back', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: SingleChildScrollView(
-            child: VideoCutPanel(
-              source: 'sample.mp4',
-              duration: const Duration(seconds: 20),
-              position: () => Duration.zero,
-              onSeek: (_) {},
-              onClose: () {},
+  testWidgets(
+    'keeps source file dates by default and can switch to export time',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: VideoCutPanel(
+                source: 'sample.mp4',
+                duration: const Duration(seconds: 20),
+                position: () => Duration.zero,
+                onSeek: (_) {},
+                onClose: () {},
+              ),
             ),
           ),
         ),
-      ),
-    );
-    await tester.tap(find.text('Export options'));
-    await tester.pumpAndSettle();
-    expect(find.text('Export time'), findsOneWidget);
-    await tester.ensureVisible(find.text('Export time'));
-    await tester.tap(find.text('Export time'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Keep source file dates'));
-    await tester.pumpAndSettle();
-    expect(find.text('Keep source file dates'), findsOneWidget);
-    await tester.tap(find.text('Keep source file dates'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Export time'));
-    await tester.pumpAndSettle();
-    expect(find.text('Export time'), findsOneWidget);
-    expect(tester.takeException(), isNull);
-  });
+      );
+      await tester.tap(find.text('Export options'));
+      await tester.pumpAndSettle();
+      expect(find.text('Keep source file dates'), findsOneWidget);
+      expect(find.text('Export time'), findsNothing);
+      await tester.ensureVisible(find.text('Keep source file dates'));
+      await tester.tap(find.text('Keep source file dates'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Export time'));
+      await tester.pumpAndSettle();
+      expect(find.text('Export time'), findsOneWidget);
+      await tester.tap(find.text('Export time'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Keep source file dates'));
+      await tester.pumpAndSettle();
+      expect(find.text('Keep source file dates'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   test(
     'timecodes round-trip hours and milliseconds and reject malformed values',

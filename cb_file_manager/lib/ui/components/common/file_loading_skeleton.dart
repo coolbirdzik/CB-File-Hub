@@ -6,7 +6,7 @@ import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/ui/utils/platform_utils.dart';
 import 'package:cb_file_manager/ui/utils/view_mode_utils.dart';
 import 'package:cb_file_manager/ui/widgets/adaptive_file_list.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// File-shaped, static loading rows. Progress is shown once by the host screen.
 class FileLoadingSkeleton extends StatelessWidget {

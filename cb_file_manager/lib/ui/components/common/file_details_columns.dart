@@ -1,6 +1,6 @@
 import 'dart:math' as math;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import '../../screens/folder_list/folder_list_state.dart';
 
 /// Additional metadata columns for an indexed collection, rendered by the

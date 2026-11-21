@@ -9,7 +9,7 @@
 // to something real rather than to a remembered number: an InkWell that offers
 // a double tap cannot report a single one promptly, so the page must do that
 // arbitration itself and keep `onTap` alone.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Taps the widget and reports how much simulated time passed before `onTap`

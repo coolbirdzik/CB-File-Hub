@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// A search controller whose query listeners ignore caret/selection changes.
 /// Normal controller listeners remain available to EditableText.

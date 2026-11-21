@@ -3,7 +3,7 @@ import 'widgets/drawer/sidebar_pinned_entry.dart';
 import 'dart:ui';
 
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import './utils/route.dart';

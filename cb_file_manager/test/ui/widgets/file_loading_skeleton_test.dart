@@ -1,7 +1,7 @@
 import 'package:cb_file_manager/ui/components/common/file_loading_skeleton.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:cb_file_manager/ui/widgets/adaptive_file_list.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

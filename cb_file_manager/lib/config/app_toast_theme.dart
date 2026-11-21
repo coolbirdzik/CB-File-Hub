@@ -1,6 +1,6 @@
 import 'dart:ui' show lerpDouble;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Toast notification theme — all dimensions and opacity values centralised
 /// so AppToast stays in sync with the active theme without duplicating magic

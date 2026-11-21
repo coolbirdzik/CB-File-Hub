@@ -1,7 +1,7 @@
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/design_system/primitives/cb_select.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 class FolderViewModePreferenceControl extends StatelessWidget {

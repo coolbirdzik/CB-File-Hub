@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:cb_file_manager/config/languages/app_localizations_delegate.dart';
 import 'package:cb_file_manager/ui/widgets/file_pane_layout.dart';
 import 'package:flutter/gestures.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class _StatefulContent extends StatefulWidget {

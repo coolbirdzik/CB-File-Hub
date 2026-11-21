@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Centered on-screen display for transient feedback (volume, wheel seek,
 /// mouse-wheel mode switch). Fades out when [visible] turns false.

@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:path/path.dart' as p;
 import 'package:cb_file_manager/helpers/files/file_icon_helper.dart';
+import 'package:cb_file_manager/helpers/core/filesystem_sorter.dart';
+import 'package:cb_file_manager/helpers/core/text_utils.dart';
 import 'package:cb_file_manager/helpers/tags/tag_manager.dart';
 import 'package:cb_file_manager/helpers/tags/tag_hierarchy_manager.dart';
 import 'package:cb_file_manager/helpers/core/uri_utils.dart';
@@ -22,6 +24,7 @@ import 'package:cb_file_manager/core/service_locator.dart';
 import 'package:cb_file_manager/ui/controllers/operation_progress_controller.dart';
 import 'package:cb_file_manager/helpers/files/archive_path_utils.dart';
 import 'package:cb_file_manager/services/archive/archive_service.dart';
+import 'package:cb_file_manager/utils/app_logger.dart';
 
 /// FolderListBloc is a Facade that composes three specialized BLoCs:
 ///
@@ -42,6 +45,15 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
   StreamSubscription? _opsSubscription;
   StreamSubscription? _tagSubscription;
   StreamSubscription? _tagChangeSubscription;
+
+  int _tagProjectionRevision = 0;
+  ({
+    List<String> paths,
+    SortOption sort,
+    Map<String, List<String>>? tags,
+    Future<List<FileSystemEntity>> files,
+  })?
+  _sortedTagFiles;
 
   /// Non-null while the tab is browsing inside an archive (`#archive?…`).
   /// The virtual listing is produced here, not by [FileNavigationBloc], so
@@ -493,6 +505,7 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
     }
 
     final hasActiveTagSearch = state.currentSearchTag != null;
+    final sortChanged = state.sortOption != navState.sortOption;
 
     // ignore: invalid_use_of_visible_for_testing_member
     emit(
@@ -532,6 +545,10 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
       ),
     );
 
+    if (sortChanged && _tagSearchBloc.state.currentSearchTag != null) {
+      unawaited(_onTagStateChanged(_tagSearchBloc.state));
+    }
+
     // Pre-warm extension icon cache when file listing arrives
     if (!navState.isLoading && navState.files.isNotEmpty) {
       final exts = navState.files
@@ -554,14 +571,16 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
     );
   }
 
-  void _onTagStateChanged(TagSearchState tagState) {
+  Future<void> _onTagStateChanged(TagSearchState tagState) async {
     if (isClosed) return;
+    final revision = ++_tagProjectionRevision;
 
     // Metadata updates must not replace the listing owned by navigation (for
     // example, filename search results) with the inactive tag search's results.
     // Still merge the transition out of an active tag search when it is cleared.
     if (_archiveBrowsePath != null ||
         (tagState.currentSearchTag == null && state.currentSearchTag == null)) {
+      _sortedTagFiles = null;
       // ignore: invalid_use_of_visible_for_testing_member
       emit(
         state.copyWith(
@@ -575,22 +594,49 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
     // Child tags are surfaced as virtual folders at the front of the results so
     // opening a parent tag lists its sub-tags (as folders) alongside its own
     // files, mirroring how tags behave like folders on the tag screen.
-    final childTagFolders = <FileSystemEntity>[];
     final currentTag = tagState.currentSearchTag;
-    if (currentTag != null && currentTag.isNotEmpty) {
-      for (final child in TagHierarchyManager.instance.getChildren(
-        currentTag,
-      )) {
-        childTagFolders.add(Directory(UriUtils.buildTagSearchPath(child)));
+    final sort = state.sortOption;
+    final paths = tagState.searchResultPaths;
+    final List<FileSystemEntity> fileResults;
+    if (paths.length < 2) {
+      _sortedTagFiles = null;
+      fileResults = [for (final path in paths) File(path)];
+    } else {
+      final tags = sort.metadataColumn == DetailsColumn.tags
+          ? tagState.fileTags
+          : null;
+      final cached = _sortedTagFiles;
+      final sorted =
+          cached != null &&
+              identical(cached.paths, paths) &&
+              cached.sort == sort &&
+              identical(cached.tags, tags)
+          ? cached.files
+          : _sortTagFiles(paths, sort);
+      _sortedTagFiles = (paths: paths, sort: sort, tags: tags, files: sorted);
+      fileResults = await sorted;
+      if (isClosed ||
+          revision != _tagProjectionRevision ||
+          _archiveBrowsePath != null) {
+        return;
       }
     }
 
-    final fileResults = tagState.searchResultPaths
-        .map<FileSystemEntity>((path) => File(path))
-        .toList(growable: false);
+    // Child tags have display names but no filesystem stats or properties.
+    final children = currentTag == null
+        ? <String>[]
+        : TagHierarchyManager.instance.getChildren(currentTag).toList();
+    if (sort == SortOption.nameAsc || sort == SortOption.nameDesc) {
+      children.sort(
+        (a, b) => sort.ascending
+            ? TextUtils.compareAlphabetically(a, b)
+            : TextUtils.compareAlphabetically(b, a),
+      );
+    }
 
     final searchResults = <FileSystemEntity>[
-      ...childTagFolders,
+      for (final child in children)
+        Directory(UriUtils.buildTagSearchPath(child)),
       ...fileResults,
     ];
 
@@ -607,5 +653,22 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
         allUniqueTags: tagState.allUniqueTags,
       ),
     );
+  }
+
+  Future<List<FileSystemEntity>> _sortTagFiles(
+    List<String> paths,
+    SortOption sort,
+  ) async {
+    final files = <FileSystemEntity>[for (final path in paths) File(path)];
+    try {
+      return await FileSystemSorter.sortEntities(files, sort);
+    } catch (error, stackTrace) {
+      AppLogger.error(
+        'Failed to sort tag search results',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      return files;
+    }
   }
 }

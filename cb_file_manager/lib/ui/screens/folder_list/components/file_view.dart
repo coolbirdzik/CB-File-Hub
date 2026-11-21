@@ -14,7 +14,7 @@ import 'package:cb_file_manager/ui/tab_manager/core/tabbed_folder/tabbed_folder_
 import 'package:cb_file_manager/ui/utils/grid_zoom_constraints.dart';
 import 'package:cb_file_manager/ui/utils/scroll_velocity_notifier.dart';
 import 'package:cb_file_manager/ui/widgets/ctrl_scroll_zoom.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'file_item.dart';

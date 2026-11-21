@@ -1,6 +1,6 @@
 import 'dart:ui' show lerpDouble;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Separate translucency and blur, with readable tint floors for macOS.
 /// Native backgrounds are unknown, so text contrast is checked against both

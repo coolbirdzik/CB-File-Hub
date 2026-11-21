@@ -5,7 +5,7 @@ import 'dart:async'; // Add this import for Completer
 // For math operations with drag selection and min/max functions
 
 import '../../components/common/shared_action_bar.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';

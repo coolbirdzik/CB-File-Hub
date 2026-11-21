@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import '../design_system/macos_glass_theme.dart';
 import '../design_system/desktop_acrylic_theme.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../design_system/cb_tokens.dart';
 import '../design_system/tokens/cb_geometry_tokens.dart';

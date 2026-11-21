@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'dart:async';
 
 /// Modern real-time stream speed indicator with beautiful UI

@@ -15,7 +15,7 @@ import 'package:cb_file_manager/ui/utils/preview_syntax_highlighter.dart';
 import 'package:cb_file_manager/ui/widgets/archive_preview.dart';
 import 'package:cb_file_manager/ui/widgets/selection_summary_tooltip.dart';
 import 'package:cb_file_manager/services/ai/content_reader.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:path/path.dart' as path;
 import 'package:pdfx/pdfx.dart';

@@ -16,10 +16,12 @@ import 'package:cb_file_manager/ui/screens/torrent/qbittorrent_import_dialog.dar
 import 'package:cb_file_manager/ui/screens/torrent/torrent_client_import_dialog.dart';
 import 'package:cb_file_manager/ui/screens/torrent/torrent_download_dialog.dart';
 import 'package:cb_file_manager/ui/screens/torrent/torrent_link_dialog.dart';
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_localizations/flutter_localizations.dart'
+    hide GlobalMaterialLocalizations, GlobalCupertinoLocalizations;
 import 'package:flutter_test/flutter_test.dart';
 
 class _ShowcaseLocalizations extends LocalizationsDelegate<AppLocalizations> {

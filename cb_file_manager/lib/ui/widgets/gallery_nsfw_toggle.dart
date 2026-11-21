@@ -1,5 +1,5 @@
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 class GalleryNsfwToggle extends StatelessWidget {
   final bool value;

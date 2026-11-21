@@ -2,7 +2,7 @@ import 'package:cb_file_manager/services/ai/assistant_response_text.dart';
 import 'package:cb_file_manager/services/ai/tool_executor.dart';
 import 'package:cb_file_manager/models/ai/ai_message.dart';
 import 'package:cb_file_manager/ui/screens/ai_chat/components/chat_message_bubble.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:cb_file_manager/config/languages/app_localizations_delegate.dart';
 import 'package:flutter_test/flutter_test.dart';
 

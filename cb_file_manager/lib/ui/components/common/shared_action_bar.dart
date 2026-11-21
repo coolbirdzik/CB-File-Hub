@@ -3,7 +3,7 @@ import 'dart:math' as math;
 
 import 'package:cb_file_manager/design_system/primitives/cb_popover_transition.dart';
 import 'package:cb_file_manager/design_system/primitives/cb_slider.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import '../../screens/folder_list/components/details_columns.dart';
 import '../../screens/folder_list/folder_list_state.dart';
 import '../../../helpers/core/user_preferences.dart';

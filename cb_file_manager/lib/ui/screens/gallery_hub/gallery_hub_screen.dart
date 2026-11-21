@@ -1,6 +1,6 @@
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/ui/screens/album_management/album_management_screen.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 /// The image-library root.

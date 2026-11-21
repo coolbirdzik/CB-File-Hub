@@ -1,7 +1,7 @@
 import 'package:cb_file_manager/design_system/cb_theme_builder.dart';
 import 'e2e_wait.dart';
 import 'package:cb_file_manager/ui/components/common/breadcrumb_address_bar.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';

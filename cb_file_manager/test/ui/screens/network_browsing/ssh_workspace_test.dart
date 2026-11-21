@@ -13,7 +13,7 @@ import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:cb_file_manager/ui/screens/ssh/ssh_host_sort.dart';
 import 'package:cb_file_manager/ui/screens/ssh/ssh_host_dialog.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';

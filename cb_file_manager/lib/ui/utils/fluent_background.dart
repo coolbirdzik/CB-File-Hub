@@ -1,5 +1,5 @@
 import 'dart:ui';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// A utility class to implement Fluent Design System inspired background effects
 class FluentBackground extends StatelessWidget {

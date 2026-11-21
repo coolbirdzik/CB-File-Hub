@@ -5,7 +5,7 @@ import 'dart:math';
 import 'tab_data.dart';
 import 'tab_window_transfer.dart';
 import '../../../services/windowing/window_startup_payload.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/helpers/core/uri_utils.dart';
 import 'package:cb_file_manager/helpers/media/photo_thumbnail_helper.dart';

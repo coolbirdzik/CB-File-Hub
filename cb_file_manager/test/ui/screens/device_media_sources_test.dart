@@ -1,9 +1,11 @@
 import 'package:cb_file_manager/config/languages/app_localizations_delegate.dart';
 import 'package:cb_file_manager/ui/screens/media_gallery/device_media_sources.dart';
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_localizations/flutter_localizations.dart'
+    hide GlobalMaterialLocalizations, GlobalCupertinoLocalizations;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cb_file_manager/ui/screens/system_screen_router.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';

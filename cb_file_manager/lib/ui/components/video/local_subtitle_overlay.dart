@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../../../services/media/local_subtitle_session.dart';
 import '../../../../services/media/media_kit_playback.dart';

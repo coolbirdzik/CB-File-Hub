@@ -11,7 +11,7 @@ import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:cb_file_manager/ui/screens/media_gallery/image_viewer_screen.dart';
 import 'package:cb_file_manager/ui/utils/video_playback_launcher.dart';
 import 'package:cb_file_manager/helpers/tags/tag_manager.dart'; // Import TagManager để lắng nghe thay đổi
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:cb_file_manager/design_system/cb_page_transitions.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';

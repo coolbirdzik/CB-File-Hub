@@ -6,8 +6,10 @@ import 'package:cb_file_manager/services/app_insights/app_leftover_finder.dart';
 import 'package:cb_file_manager/services/app_insights/app_leftover_scanner.dart';
 import 'package:cb_file_manager/services/disk_cleaner/cleaner_models.dart';
 import 'package:cb_file_manager/ui/screens/cb_agent_cleaner/cleaner_leftovers_view.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:flutter_localizations/flutter_localizations.dart'
+    hide GlobalMaterialLocalizations, GlobalCupertinoLocalizations;
 import 'package:flutter_test/flutter_test.dart';
 
 const int _mb = 1024 * 1024;

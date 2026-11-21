@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Gesture target for the video surface. Controls and timecode fields sit
 /// above it and keep their own gestures and text-editing context menus.

@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:cb_file_manager/bloc/selection/selection.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tabbed_folder/tabbed_folder_keyboard_controller.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:cb_file_manager/helpers/core/desktop_shortcuts.dart';
 import 'file_keyboard_shortcuts.dart';
 

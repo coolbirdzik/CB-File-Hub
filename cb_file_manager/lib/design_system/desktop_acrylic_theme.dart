@@ -1,6 +1,6 @@
 import 'dart:ui' show lerpDouble;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// One translucency ramp for the Fluent host and Material compatibility UI.
 /// Stored strength remains 0..2; the appearance control displays it as 0..100%.

@@ -5,9 +5,11 @@ import 'package:cb_file_manager/services/filesystem/macos_user_folders_service.d
 import 'package:cb_file_manager/ui/widgets/drawer/cubit/drawer_cubit.dart';
 import 'package:cb_file_manager/ui/widgets/drawer/pinned_section_widget.dart';
 import 'package:cb_file_manager/ui/widgets/drawer/sidebar_pinned_entry.dart';
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_localizations/flutter_localizations.dart'
+    hide GlobalMaterialLocalizations, GlobalCupertinoLocalizations;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 

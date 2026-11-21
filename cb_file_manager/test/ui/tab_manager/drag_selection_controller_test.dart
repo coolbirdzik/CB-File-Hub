@@ -1,7 +1,7 @@
 import 'package:cb_file_manager/bloc/selection/selection.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tabbed_folder/tabbed_folder_drag_selection_controller.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:cb_file_manager/ui/widgets/selection_geometry_item.dart';
 import 'package:flutter_test/flutter_test.dart';
 

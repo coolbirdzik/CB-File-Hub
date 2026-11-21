@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:path/path.dart' as path;
 import 'package:cb_file_manager/ui/widgets/resizable_dialog.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:cb_file_manager/helpers/files/external_app_helper.dart';
 import 'package:cb_file_manager/helpers/files/windows_app_icon.dart';

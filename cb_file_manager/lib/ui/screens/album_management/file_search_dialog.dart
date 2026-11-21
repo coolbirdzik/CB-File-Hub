@@ -2,7 +2,7 @@ import 'package:cb_file_manager/helpers/core/search_request_guard.dart';
 import 'package:cb_file_manager/ui/components/common/search_text_field.dart';
 import 'dart:io';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/services/album_service.dart';
 import 'package:cb_file_manager/ui/components/common/app_toast.dart';

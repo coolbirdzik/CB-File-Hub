@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Slim 3px indeterminate progress bar, designed to be overlaid at the bottom
 /// of a screen via [Positioned].  Used by the album detail screen and the

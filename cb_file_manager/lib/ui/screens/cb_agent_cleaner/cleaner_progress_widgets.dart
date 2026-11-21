@@ -2,7 +2,7 @@ import 'dart:math' as math;
 
 import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../../config/languages/app_localizations.dart';
 import '../../widgets/app_progress_indicator.dart';

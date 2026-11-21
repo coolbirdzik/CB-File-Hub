@@ -2,7 +2,7 @@ import 'dart:io';
 import 'package:cb_file_manager/services/drive/drive_browser_entries.dart';
 import 'package:cb_file_manager/ui/components/common/shared_action_bar.dart';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/components/details_columns.dart';

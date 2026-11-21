@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// A single action row at every width, so breakpoint changes cannot drop or
 /// duplicate the cut/menu actions. Only the secondary controls collapse.

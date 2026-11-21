@@ -1,5 +1,5 @@
 import 'package:cb_file_manager/design_system/primitives/cb_popover_transition.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import 'dart:async';
 import 'package:flutter/scheduler.dart';

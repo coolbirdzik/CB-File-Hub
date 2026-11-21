@@ -9,7 +9,7 @@ import 'package:cb_file_manager/helpers/media/thumbnail_work_scheduler.dart';
 import 'package:cb_file_manager/helpers/tags/tag_color_manager.dart';
 import 'package:cb_file_manager/helpers/tags/tag_thumbnail_manager.dart';
 import 'package:cb_file_manager/ui/widgets/thumbnail_loader.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 /// Widget for displaying folder thumbnail

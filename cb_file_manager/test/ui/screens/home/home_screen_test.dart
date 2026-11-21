@@ -10,10 +10,12 @@ import 'package:cb_file_manager/ui/screens/home/home_media_card.dart';
 import 'package:cb_file_manager/ui/screens/home/home_screen.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';
 import 'package:cb_file_manager/ui/widgets/drawer/cubit/drawer_cubit.dart';
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_localizations/flutter_localizations.dart'
+    hide GlobalMaterialLocalizations, GlobalCupertinoLocalizations;
 import 'package:flutter_test/flutter_test.dart';
 
 class _Content extends HomeContentService {

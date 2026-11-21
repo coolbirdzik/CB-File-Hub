@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'package:cb_file_manager/ui/widgets/file_tags_tooltip.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:cb_file_manager/helpers/files/file_attributes.dart';
 import 'package:cb_file_manager/services/windows_shell_properties.dart';
 import 'details_columns.dart';

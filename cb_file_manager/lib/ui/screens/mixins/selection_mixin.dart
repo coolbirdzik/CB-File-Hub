@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Mixin providing selection mode functionality for screens with file/item selection
 mixin SelectionMixin<T extends StatefulWidget> on State<T> {

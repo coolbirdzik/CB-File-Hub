@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../../config/languages/app_localizations.dart';
 import '../../../design_system/cb_design_system.dart';

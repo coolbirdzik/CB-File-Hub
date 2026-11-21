@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// A global notifier that tracks scroll velocity to optimize performance
 /// during fast scrolling operations.

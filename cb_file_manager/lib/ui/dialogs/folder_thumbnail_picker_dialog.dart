@@ -2,7 +2,7 @@ import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/helpers/media/video_thumbnail_helper.dart';
 import 'package:cb_file_manager/ui/dialogs/media_picker_dialog.dart';
 import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 Future<String?> showFolderThumbnailPickerDialog(
   BuildContext context,

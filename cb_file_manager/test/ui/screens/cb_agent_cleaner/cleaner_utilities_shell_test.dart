@@ -1,5 +1,5 @@
 import 'package:cb_file_manager/ui/screens/cb_agent_cleaner/cleaner_utilities_shell.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 const _destinations = <CleanerUtilityDestination>[

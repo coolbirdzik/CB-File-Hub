@@ -3,18 +3,24 @@ import 'dart:io';
 import 'dart:ui' show PointerDeviceKind;
 
 import 'package:cb_file_manager/core/service_locator.dart';
+import 'package:cb_file_manager/helpers/core/uri_utils.dart';
+import 'package:cb_file_manager/helpers/files/folder_sort_manager.dart';
+import 'package:cb_file_manager/helpers/tags/tag_hierarchy_manager.dart';
 import 'package:cb_file_manager/helpers/tags/tag_manager.dart';
 import 'package:cb_file_manager/models/database/database_manager.dart';
 import 'package:cb_file_manager/models/database/sqlite_database_provider.dart';
 import 'package:cb_file_manager/ui/controllers/operation_progress_controller.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_bloc.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_event.dart';
+import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:cb_file_manager/ui/tab_manager/components/search_bar.dart'
     as search;
 import 'package:cb_file_manager/config/languages/app_localizations_delegate.dart';
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_localizations/flutter_localizations.dart'
+    hide GlobalMaterialLocalizations, GlobalCupertinoLocalizations;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path/path.dart' as p;
@@ -89,6 +95,73 @@ void main() {
       }
     },
   );
+
+  test('virtual tag results follow sort changes and refreshes', () async {
+    const tag = 'y tá';
+    const tagPath = '#search?tag=y%20t%C3%A1';
+    final folder = await Directory(p.join(root.path, 'sort_tags')).create();
+    final a = await File(
+      p.join(folder.path, 'alpha.txt'),
+    ).writeAsString('1234');
+    final z = await File(p.join(folder.path, 'zulu.txt')).writeAsString('1');
+    await z.setLastModified(DateTime.utc(2025, 1, 1));
+    await a.setLastModified(DateTime.utc(2025, 1, 2));
+    await TagManager.setTags(a.path, [tag]);
+    await TagManager.setTags(z.path, [tag]);
+    final hierarchy = TagHierarchyManager.instance;
+    expect(await hierarchy.addChild(tag, 'áo'), isTrue);
+    expect(await hierarchy.addChild(tag, 'mũ'), isTrue);
+
+    final bloc = FolderListBloc();
+    Future<FolderListState> waitForFiles(SortOption sort, List<File> files) =>
+        bloc.stream
+            .firstWhere((s) {
+              final resultFiles = s.searchResults.whereType<File>().toList();
+              return !s.isLoading &&
+                  s.currentSearchTag == tag &&
+                  s.sortOption == sort &&
+                  resultFiles.length == files.length &&
+                  resultFiles.indexed.every(
+                    (e) => e.$2.path == files[e.$1].path,
+                  );
+            })
+            .timeout(const Duration(seconds: 10));
+
+    try {
+      final initial = waitForFiles(SortOption.dateDesc, [a, z]);
+      bloc.add(
+        SearchByTagGlobally(UriUtils.extractTagFromSearchPath(tagPath)!),
+      );
+      await initial;
+
+      final byName = waitForFiles(SortOption.nameDesc, [z, a]);
+      bloc.add(const SetSortOption(SortOption.nameDesc, folderPath: tagPath));
+      expect((await byName).searchResults.map((e) => e.path), [
+        UriUtils.buildTagSearchPath('mũ'),
+        UriUtils.buildTagSearchPath('áo'),
+        z.path,
+        a.path,
+      ]);
+
+      final bySize = waitForFiles(SortOption.sizeDesc, [a, z]);
+      bloc.add(const SetSortOption(SortOption.sizeDesc, folderPath: tagPath));
+      await bySize;
+      expect(
+        await FolderSortManager().getFolderSortOption(tagPath),
+        SortOption.sizeDesc,
+      );
+
+      final m = await File(
+        p.join(folder.path, 'middle.txt'),
+      ).writeAsString('1234567');
+      await TagManager.setTags(m.path, [tag]);
+      final refreshed = waitForFiles(SortOption.sizeDesc, [m, a, z]);
+      bloc.add(const SearchByTagGlobally(tag));
+      await refreshed;
+    } finally {
+      await bloc.close();
+    }
+  });
 
   for (final tagSearch in [false, true]) {
     for (final deleteParent in [false, true]) {

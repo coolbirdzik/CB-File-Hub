@@ -5,7 +5,7 @@ import 'package:cb_file_manager/design_system/primitives/cb_select.dart';
 import 'package:cb_file_manager/models/ai/ai_provider_model.dart';
 import 'package:cb_file_manager/services/ai/ai_provider_service.dart';
 import 'package:cb_file_manager/ui/screens/settings/ai_settings_section.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get_it/get_it.dart';
 

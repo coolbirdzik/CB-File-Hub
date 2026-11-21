@@ -2,14 +2,16 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:cb_file_manager/design_system/primitives/cb_slider.dart';
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/services/media/media_kit_playback.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../helpers/core/user_preferences.dart';
 import '../../../../services/windowing/windows_engine_host.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_localizations/flutter_localizations.dart'
+    hide GlobalMaterialLocalizations, GlobalCupertinoLocalizations;
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 
 class DesktopPipWindow extends StatefulWidget {

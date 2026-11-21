@@ -13,6 +13,7 @@ import 'package:cb_file_manager/helpers/files/folder_sort_manager.dart';
 import 'package:cb_file_manager/helpers/core/filesystem_sorter.dart';
 import 'package:cb_file_manager/helpers/core/file_property_sorter.dart';
 import 'package:cb_file_manager/helpers/core/text_utils.dart';
+import 'package:cb_file_manager/helpers/core/uri_utils.dart';
 import 'package:cb_file_manager/helpers/media/video_thumbnail_helper.dart';
 import 'package:cb_file_manager/services/directory_watcher_service.dart';
 import 'package:cb_file_manager/services/permission_state_service.dart';
@@ -628,17 +629,24 @@ class FileNavigationBloc
     bool isStale() => isClosed || requestId != _activeSortRequestId;
 
     try {
+      final preferencePath = event.folderPath ?? state.currentPath.path;
       if (event.persist) {
         final folderSortManager = FolderSortManager();
         await _safeCall(
           () => folderSortManager.saveFolderSortOption(
-            event.folderPath ?? state.currentPath.path,
+            preferencePath,
             event.sortOption,
           ),
         );
       }
 
       if (isStale()) return;
+
+      // The facade owns tag results, including virtual child-tag folders.
+      if (UriUtils.isTagSearchPath(preferencePath)) {
+        emit(state.copyWith(sortOption: event.sortOption));
+        return;
+      }
 
       final targetPath = state.currentPath.path;
 

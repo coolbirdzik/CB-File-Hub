@@ -1,10 +1,12 @@
 import 'package:cb_file_manager/services/windowing/windows_engine_host.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:flutter_localizations/flutter_localizations.dart'
+    hide GlobalMaterialLocalizations, GlobalCupertinoLocalizations;
 import 'package:window_manager/window_manager.dart';
 
 import '../../../config/languages/app_localizations_delegate.dart';
