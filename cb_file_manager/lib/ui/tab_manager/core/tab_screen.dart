@@ -1830,7 +1830,9 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                                 // ignore: use_build_context_synchronously
                                 final bloc = context.read<TabManagerBloc>();
                                 for (final id in moveSelection.tabIds) {
-                                  bloc.add(CloseTab(id, rememberForReopen: false));
+                                  bloc.add(
+                                    CloseTab(id, rememberForReopen: false),
+                                  );
                                 }
                               }
                             },
