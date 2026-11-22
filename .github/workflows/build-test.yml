@@ -296,7 +296,7 @@ jobs:
         uses: actions/setup-java@v6.0.0
         with:
           distribution: 'zulu'
-          java-version: '17'
+          java-version: '21'
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
