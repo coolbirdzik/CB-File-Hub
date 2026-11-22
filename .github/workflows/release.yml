@@ -653,6 +653,11 @@ jobs:
           key: cargo-${{ runner.os }}-${{ hashFiles('cb_native/rust/Cargo.lock') }}
           restore-keys: cargo-${{ runner.os }}-
 
+      # Flutter builds a universal app before splitting the two DMGs. The
+      # cb_native hook can omit a slice if its Rust target is unavailable.
+      - name: Setup Rust macOS targets (cb_native)
+        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+
       - name: Import signing certificate
         env:
           MACOS_CERT_BASE64: ${{ secrets.MACOS_CERT_BASE64 }}
@@ -705,6 +710,12 @@ jobs:
 
       - name: Check architecture-specific DMGs
         run: |
+          CB_NATIVE="${{ env.PROJECT_DIR }}/build/macos/Build/Products/Release/CB File Hub.app/Contents/Frameworks/cb_native.framework/cb_native"
+          if ! lipo -verify_arch arm64 x86_64 "$CB_NATIVE"; then
+            echo "::error::The macOS release requires cb_native slices for both arm64 and x86_64"
+            exit 1
+          fi
+
           for arch in arm64 x64; do
             DMG="${{ env.PROJECT_DIR }}/build/macos/dmg/CBFileHub-${{ needs.generate-release-notes.outputs.version_name }}-macos-$arch.dmg"
             if [ ! -f "$DMG" ]; then
