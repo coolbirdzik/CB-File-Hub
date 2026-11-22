@@ -18,6 +18,7 @@ Widget host(List<Intent> invoked, {Widget? child}) => MaterialApp(
           SwitchToTabIntent,
           CycleTabIntent,
           ToggleSplitViewIntent,
+          ReopenClosedTabIntent,
         ])
           type: CallbackAction<Intent>(
             onInvoke: (intent) => invoked.add(intent),
@@ -107,6 +108,14 @@ void main() {
           invoked.whereType<CycleTabIntent>().map((intent) => intent.delta),
           [1, -1],
         );
+        final beforeReopen = invoked.length;
+        await press(
+          tester,
+          LogicalKeyboardKey.keyT,
+          modifiers: [modifier, LogicalKeyboardKey.shiftLeft],
+        );
+        expect(invoked, hasLength(beforeReopen + 1));
+        expect(invoked.last, isA<ReopenClosedTabIntent>());
         final count = invoked.length;
         await press(tester, LogicalKeyboardKey.keyW);
         await press(

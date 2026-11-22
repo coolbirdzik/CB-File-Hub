@@ -1687,6 +1687,7 @@ abstract class AppLocalizations {
   String get closeAllTabs;
   String get activeTab;
   String get closeTab;
+  String get reopenClosedTab;
   String get closeOtherTabs;
   String get markTabInactive;
   String get addNewTab;

@@ -3680,6 +3680,9 @@ class ChineseLocalizations implements AppLocalizations {
   String get closeTab => '关闭标签页';
 
   @override
+  String get reopenClosedTab => '重新打开已关闭的标签页';
+
+  @override
   String get closeOtherTabs => '关闭其他标签页';
 
   @override

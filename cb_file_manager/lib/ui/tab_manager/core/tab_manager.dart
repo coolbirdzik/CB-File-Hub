@@ -59,8 +59,15 @@ class ConsumeTorrentSource extends TabEvent {
 class CloseTab extends TabEvent {
   final String tabId;
 
-  CloseTab(this.tabId);
+  /// Whether Ctrl+Shift+T may bring this tab back. Pass false when the tab is
+  /// not going away but moving to another window, or it would be duplicated.
+  final bool rememberForReopen;
+
+  CloseTab(this.tabId, {this.rememberForReopen = true});
 }
+
+/// Event to reopen the most recently closed tab (Ctrl/⌘+Shift+T).
+class ReopenClosedTab extends TabEvent {}
 
 /// Event to update a tab's path
 class UpdateTabPath extends TabEvent {
@@ -201,8 +208,42 @@ class _SplitTabResolution {
   });
 }
 
+/// A closed tab's snapshot and the position it occupied.
+class _ClosedTab {
+  final WindowTabPayload payload;
+  final int index;
+
+  const _ClosedTab(this.payload, this.index);
+}
+
 /// BLoC for managing tabs
 class TabManagerBloc extends Bloc<TabEvent, TabManagerState> {
+  static const int _maxClosedTabs = 20;
+
+  /// Most recently closed tab last. Kept outside [TabManagerState] because
+  /// nothing renders it.
+  final List<_ClosedTab> _closedTabs = [];
+
+  /// Whether [ReopenClosedTab] has a tab to bring back.
+  bool get canReopenClosedTab => _closedTabs.isNotEmpty;
+
+  /// Snapshots [tab] before its view state is released, so a reopened tab
+  /// comes back with the same history, pin, split pane and scroll position.
+  void _rememberClosedTab(TabData tab, int index) {
+    if (tab.path.isEmpty) return;
+    WindowTabPayload payload;
+    try {
+      payload = TabWindowTransfer.capture(tab);
+    } catch (e) {
+      // A screen that cannot serialise its view must not make the tab
+      // unrecoverable: fall back to just its location.
+      debugPrint('TabManagerBloc: closed tab kept without view state: $e');
+      payload = WindowTabPayload(path: tab.path, name: tab.name);
+    }
+    _closedTabs.add(_ClosedTab(payload, index));
+    if (_closedTabs.length > _maxClosedTabs) _closedTabs.removeAt(0);
+  }
+
   /// Resolves the activity manager lazily so this bloc can be unit-tested
   /// without a registered service locator.
   TabActivityManager? get _activity {
@@ -219,6 +260,7 @@ class TabManagerBloc extends Bloc<TabEvent, TabManagerState> {
     on<ConsumeTorrentSource>(_onConsumeTorrentSource);
     on<SwitchToTab>(_onSwitchToTab);
     on<CloseTab>(_onCloseTab);
+    on<ReopenClosedTab>(_onReopenClosedTab);
     on<CloseAllTabs>(_onCloseAllTabs);
     on<CloseOtherTabs>(_onCloseOtherTabs);
     on<UpdateTabPath>(_onUpdateTabPath);
@@ -355,7 +397,29 @@ class TabManagerBloc extends Bloc<TabEvent, TabManagerState> {
     }
   }
 
+  void _onReopenClosedTab(
+    ReopenClosedTab event,
+    Emitter<TabManagerState> emit,
+  ) {
+    if (_closedTabs.isEmpty) return;
+    final closed = _closedTabs.removeLast();
+    _onAddTab(
+      AddTab(
+        path: closed.payload.path,
+        name: closed.payload.name,
+        windowPayload: closed.payload,
+        insertIndex: closed.index,
+      ),
+      emit,
+    );
+  }
+
   void _onCloseTab(CloseTab event, Emitter<TabManagerState> emit) {
+    if (event.rememberForReopen) {
+      final index = state.tabs.indexWhere((t) => t.id == event.tabId);
+      // Must run before forget(): it still reads the mounted screen's state.
+      if (index >= 0) _rememberClosedTab(state.tabs[index], index);
+    }
     TabWindowTransfer.forget(event.tabId);
     if (state.tabs.isEmpty) return;
 
@@ -436,6 +500,7 @@ class TabManagerBloc extends Bloc<TabEvent, TabManagerState> {
         .toList();
     if (closing.isEmpty) return;
     for (final tab in closing) {
+      _rememberClosedTab(tab, state.tabs.indexOf(tab));
       TabWindowTransfer.forget(tab.id);
     }
 

@@ -28,6 +28,8 @@ import 'package:cb_file_manager/design_system/primitives/cb_tooltip.dart';
 import 'package:cb_file_manager/ui/components/common/search_text_field.dart';
 import 'package:cb_file_manager/ui/components/common/breadcrumb_address_bar.dart';
 import 'package:cb_file_manager/ui/tab_manager/components/path_navigation_bar.dart';
+import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';
+import 'package:cb_file_manager/ui/tab_manager/core/tab_screen.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/main.dart';
 import 'package:cb_file_manager/services/windowing/window_startup_payload.dart';
@@ -42,6 +44,7 @@ import 'e2e_helpers.dart';
 import 'e2e_keys.dart';
 import 'e2e_report.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -91,6 +94,31 @@ Future<bool> _confirmDeleteDialog(
   }
   return false;
 }
+
+TabManagerBloc _tabBloc(WidgetTester tester) =>
+    tester.element(find.byType(TabScreen)).read<TabManagerBloc>();
+
+List<String> _tabPaths(WidgetTester tester) =>
+    _tabBloc(tester).state.tabs.map((tab) => tab.path).toList();
+
+/// Waits for the tab list to settle on [paths]; fails showing the actual list.
+Future<void> _expectTabPaths(WidgetTester tester, List<String> paths) async {
+  await waitForE2ECondition(tester, () => listEquals(_tabPaths(tester), paths));
+  expect(_tabPaths(tester), paths);
+}
+
+Future<void> _pressCtrlW(E2ETester et) => et.sendKeyboardShortcut(
+  key: LogicalKeyboardKey.keyW,
+  ctrl: true,
+  detail: 'ctrl_w_close_tab',
+);
+
+Future<void> _pressCtrlShiftT(E2ETester et) => et.sendKeyboardShortcut(
+  key: LogicalKeyboardKey.keyT,
+  ctrl: true,
+  shift: true,
+  detail: 'ctrl_shift_t_reopen_tab',
+);
 
 Finder _findInlineRenameField() {
   return find.descendant(
@@ -1439,6 +1467,168 @@ void main() {
 
         await et.screenshot('after_tab_switch');
         if (kDebugMode) debugPrint('[E2E] tab switch with Ctrl+Tab — SUCCESS');
+      } finally {
+        await et.screenshot('result');
+        await e2eTearDown(tester, dir);
+      }
+    });
+
+    testWidgets('09.04 reopen a closed tab with Ctrl+Shift+T', (
+      WidgetTester tester,
+    ) async {
+      final et = E2ETester(tester);
+      final dir = await Directory.systemTemp.createTemp('cb_e2e_reopen_');
+      final other = await Directory.systemTemp.createTemp('cb_e2e_reopen2_');
+      final fileA = File('${dir.path}${Platform.pathSeparator}a.txt')
+        ..writeAsStringSync('a');
+      final fileB = File('${other.path}${Platform.pathSeparator}b.txt')
+        ..writeAsStringSync('b');
+
+      CbE2EConfig.startupPayload = WindowStartupPayload(
+        tabs: <WindowTabPayload>[WindowTabPayload(path: dir.path)],
+      );
+
+      try {
+        await runCbFileApp();
+        await settleE2EUi(tester);
+        await et.init('09.04 reopen a closed tab with Ctrl+Shift+T');
+        await waitForFileRowVisible(tester, fileA.path);
+
+        _tabBloc(tester).add(AddTab(path: other.path));
+        await _expectTabPaths(tester, [dir.path, other.path]);
+        await waitForFileRowVisible(tester, fileB.path);
+
+        await _pressCtrlW(et);
+        await _expectTabPaths(tester, [dir.path]);
+        await waitForFileRowAbsent(tester, fileB.path);
+
+        await _pressCtrlShiftT(et);
+        await _expectTabPaths(tester, [dir.path, other.path]);
+        expect(_tabBloc(tester).state.activeTab?.path, other.path);
+        await waitForFileRowVisible(tester, fileB.path);
+      } finally {
+        await et.screenshot('result');
+        await e2eTearDown(tester, dir);
+        await deleteDirectorySafe(other);
+      }
+    });
+
+    testWidgets('09.05 reopened tab returns to the folder it was browsing', (
+      WidgetTester tester,
+    ) async {
+      final et = E2ETester(tester);
+      final dir = await Directory.systemTemp.createTemp('cb_e2e_reopen_nav_');
+      final other = await Directory.systemTemp.createTemp('cb_e2e_reopen_in_');
+      final sub = Directory('${other.path}${Platform.pathSeparator}inner')
+        ..createSync();
+      final inner = File('${sub.path}${Platform.pathSeparator}deep.txt')
+        ..writeAsStringSync('deep');
+
+      CbE2EConfig.startupPayload = WindowStartupPayload(
+        tabs: <WindowTabPayload>[WindowTabPayload(path: dir.path)],
+      );
+
+      try {
+        await runCbFileApp();
+        await settleE2EUi(tester);
+        await et.init(
+          '09.05 reopened tab returns to the folder it was browsing',
+        );
+
+        _tabBloc(tester).add(AddTab(path: other.path));
+        await waitForFolderRowVisible(tester, sub.path);
+        await tapFolderRow(tester, sub.path);
+        await waitForFileRowVisible(tester, inner.path);
+        expect(
+          await waitForE2ECondition(
+            tester,
+            () => _tabBloc(tester).state.activeTab?.path == sub.path,
+          ),
+          isTrue,
+          reason:
+              'tab path should follow navigation into ${sub.path}, '
+              'was ${_tabBloc(tester).state.activeTab?.path}',
+        );
+
+        await _pressCtrlW(et);
+        await _expectTabPaths(tester, [dir.path]);
+
+        await _pressCtrlShiftT(et);
+        await _expectTabPaths(tester, [dir.path, sub.path]);
+        await waitForFileRowVisible(tester, inner.path);
+      } finally {
+        await et.screenshot('result');
+        await e2eTearDown(tester, dir);
+        await deleteDirectorySafe(other);
+      }
+    });
+
+    testWidgets('09.06 Ctrl+Shift+T reopens tabs newest first', (
+      WidgetTester tester,
+    ) async {
+      final et = E2ETester(tester);
+      final dir = await Directory.systemTemp.createTemp('cb_e2e_reopen_ord_');
+      final second = await Directory.systemTemp.createTemp('cb_e2e_reopen_b_');
+      final third = await Directory.systemTemp.createTemp('cb_e2e_reopen_c_');
+
+      CbE2EConfig.startupPayload = WindowStartupPayload(
+        tabs: <WindowTabPayload>[WindowTabPayload(path: dir.path)],
+      );
+
+      try {
+        await runCbFileApp();
+        await settleE2EUi(tester);
+        await et.init('09.06 Ctrl+Shift+T reopens tabs newest first');
+
+        final bloc = _tabBloc(tester);
+        bloc.add(AddTab(path: second.path));
+        bloc.add(AddTab(path: third.path));
+        await _expectTabPaths(tester, [dir.path, second.path, third.path]);
+
+        await _pressCtrlW(et); // closes third (active)
+        await _expectTabPaths(tester, [dir.path, second.path]);
+        await _pressCtrlW(et); // closes second (now active)
+        await _expectTabPaths(tester, [dir.path]);
+
+        await _pressCtrlShiftT(et);
+        await _expectTabPaths(tester, [dir.path, second.path]);
+        await _pressCtrlShiftT(et);
+        await _expectTabPaths(tester, [dir.path, second.path, third.path]);
+
+        // History is spent: another press changes nothing.
+        await _pressCtrlShiftT(et);
+        await settleE2EUi(tester);
+        expect(_tabPaths(tester), [dir.path, second.path, third.path]);
+      } finally {
+        await et.screenshot('result');
+        await e2eTearDown(tester, dir);
+        await deleteDirectorySafe(second);
+        await deleteDirectorySafe(third);
+      }
+    });
+
+    testWidgets('09.07 Ctrl+Shift+T with nothing closed opens no tab', (
+      WidgetTester tester,
+    ) async {
+      final et = E2ETester(tester);
+      final dir = await Directory.systemTemp.createTemp('cb_e2e_reopen_none_');
+      final fileA = File('${dir.path}${Platform.pathSeparator}a.txt')
+        ..writeAsStringSync('a');
+
+      CbE2EConfig.startupPayload = WindowStartupPayload(
+        tabs: <WindowTabPayload>[WindowTabPayload(path: dir.path)],
+      );
+
+      try {
+        await runCbFileApp();
+        await settleE2EUi(tester);
+        await et.init('09.07 Ctrl+Shift+T with nothing closed opens no tab');
+        await waitForFileRowVisible(tester, fileA.path);
+
+        // Must neither reopen anything nor fall through to Ctrl+T (new tab).
+        await _pressCtrlShiftT(et);
+        await settleE2EUi(tester);
+        expect(_tabPaths(tester), [dir.path]);
       } finally {
         await et.screenshot('result');
         await e2eTearDown(tester, dir);

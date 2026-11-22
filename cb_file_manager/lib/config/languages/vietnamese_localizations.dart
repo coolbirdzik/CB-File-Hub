@@ -3906,6 +3906,9 @@ class VietnameseLocalizations implements AppLocalizations {
   String get closeTab => 'Đóng tab';
 
   @override
+  String get reopenClosedTab => 'Mở lại tab đã đóng';
+
+  @override
   String get closeOtherTabs => 'Đóng các tab khác';
 
   @override

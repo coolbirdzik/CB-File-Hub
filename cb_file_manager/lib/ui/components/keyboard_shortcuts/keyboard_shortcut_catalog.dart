@@ -38,6 +38,7 @@ String? tabShortcutLabel(Intent intent, AppLocalizations l10n) {
     OpenCommandPaletteIntent() => l10n.commandPaletteTitle,
     CreateNewTabIntent() => l10n.newTab,
     CloseTabIntent() => l10n.closeTab,
+    ReopenClosedTabIntent() => l10n.reopenClosedTab,
     CreateNewWindowIntent() => l10n.newWindow,
     ToggleSplitViewIntent() => l10n.commandPaletteToggleSplit,
     CycleTabIntent(:final delta) =>

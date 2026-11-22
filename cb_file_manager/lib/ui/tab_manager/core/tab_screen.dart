@@ -751,6 +751,12 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                 CloseTabIntent: CallbackAction<CloseTabIntent>(
                   onInvoke: (CloseTabIntent intent) => _handleCloseCurrentTab(),
                 ),
+                ReopenClosedTabIntent: CallbackAction<ReopenClosedTabIntent>(
+                  onInvoke: (ReopenClosedTabIntent intent) {
+                    context.read<TabManagerBloc>().add(ReopenClosedTab());
+                    return null;
+                  },
+                ),
                 SwitchToTabIntent: CallbackAction<SwitchToTabIntent>(
                   onInvoke: (SwitchToTabIntent intent) =>
                       _handleSwitchToTab(intent.tabIndex),
@@ -1773,7 +1779,7 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                           // ignore: use_build_context_synchronously
                           final bloc = context.read<TabManagerBloc>();
                           for (final id in moveSelection.tabIds) {
-                            bloc.add(CloseTab(id));
+                            bloc.add(CloseTab(id, rememberForReopen: false));
                           }
                         }
                       },
@@ -1824,7 +1830,7 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                                 // ignore: use_build_context_synchronously
                                 final bloc = context.read<TabManagerBloc>();
                                 for (final id in moveSelection.tabIds) {
-                                  bloc.add(CloseTab(id));
+                                  bloc.add(CloseTab(id, rememberForReopen: false));
                                 }
                               }
                             },
@@ -1894,7 +1900,7 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
       );
       if (!mounted || !opened) return;
       for (final id in moveSelection.tabIds) {
-        tabBloc.add(CloseTab(id));
+        tabBloc.add(CloseTab(id, rememberForReopen: false));
       }
       return;
     }
@@ -1915,7 +1921,7 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
     void closeMovedTabs() {
       if (tabBloc.isClosed) return;
       for (final id in moveSelection.tabIds) {
-        tabBloc.add(CloseTab(id));
+        tabBloc.add(CloseTab(id, rememberForReopen: false));
       }
     }
 
@@ -2158,7 +2164,7 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
           if (!mounted) return;
           if (ok) {
             for (final id in tabIdsToMove) {
-              bloc.add(CloseTab(id));
+              bloc.add(CloseTab(id, rememberForReopen: false));
             }
           }
           return;
@@ -2176,7 +2182,7 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
           if (!mounted) return;
           if (ok) {
             for (final id in tabIdsToMove) {
-              bloc.add(CloseTab(id));
+              bloc.add(CloseTab(id, rememberForReopen: false));
             }
           }
           return;

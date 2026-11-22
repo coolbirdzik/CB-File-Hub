@@ -3927,6 +3927,9 @@ class EnglishLocalizations implements AppLocalizations {
   String get closeTab => 'Close tab';
 
   @override
+  String get reopenClosedTab => 'Reopen closed tab';
+
+  @override
   String get closeOtherTabs => 'Close other tabs';
 
   @override

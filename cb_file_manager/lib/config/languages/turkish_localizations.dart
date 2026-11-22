@@ -3945,6 +3945,9 @@ class TurkishLocalizations implements AppLocalizations {
   String get closeTab => 'Sekmeyi kapat';
 
   @override
+  String get reopenClosedTab => 'Kapatılan sekmeyi yeniden aç';
+
+  @override
   String get closeOtherTabs => 'Diğer sekmeleri kapat';
 
   @override

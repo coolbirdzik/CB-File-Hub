@@ -10,6 +10,11 @@ class CloseTabIntent extends Intent {
   const CloseTabIntent();
 }
 
+/// Brings back the tab closed last — Ctrl/⌘+Shift+T.
+class ReopenClosedTabIntent extends Intent {
+  const ReopenClosedTabIntent();
+}
+
 /// Opens (or closes) the Raycast-style command palette — Ctrl/⌘+K.
 class OpenCommandPaletteIntent extends Intent {
   const OpenCommandPaletteIntent();
@@ -45,6 +50,7 @@ Map<ShortcutActivator, Intent> tabKeyboardShortcuts() {
   bind(LogicalKeyboardKey.keyK, const OpenCommandPaletteIntent());
   bind(LogicalKeyboardKey.keyT, const CreateNewTabIntent());
   bind(LogicalKeyboardKey.keyW, const CloseTabIntent());
+  bind(LogicalKeyboardKey.keyT, const ReopenClosedTabIntent(), shift: true);
   bind(LogicalKeyboardKey.backslash, const ToggleSplitViewIntent());
   shortcuts[const SingleActivator(
         LogicalKeyboardKey.keyN,
