@@ -711,7 +711,7 @@ jobs:
       - name: Check architecture-specific DMGs
         run: |
           CB_NATIVE="${{ env.PROJECT_DIR }}/build/macos/Build/Products/Release/CB File Hub.app/Contents/Frameworks/cb_native.framework/cb_native"
-          if ! lipo -verify_arch arm64 x86_64 "$CB_NATIVE"; then
+          if ! lipo "$CB_NATIVE" -verify_arch arm64 x86_64; then
             echo "::error::The macOS release requires cb_native slices for both arm64 and x86_64"
             exit 1
           fi
