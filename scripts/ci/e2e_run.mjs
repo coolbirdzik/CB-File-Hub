@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { loadConfig, repoRoot } from './e2e_select.mjs';
-import { coveredSuites, executionSuites, reportResults, suitePattern } from './e2e_plan.mjs';
+import { coveredSuites, executionSuites, failureDigest, reportResults, suitePattern } from './e2e_plan.mjs';
 
 const projectDir = path.join(repoRoot, 'cb_file_manager');
 const logDir = path.join(projectDir, 'build/e2e-logs');
@@ -67,12 +67,19 @@ const failed = parsed.results.filter(item => !item.ok).map(item => item.id);
 fs.writeFileSync(path.join(logDir, 'summary.json'), JSON.stringify({
   seconds, firstTestMs: parsed.firstTestMs, exitCode: result.status, results: parsed.results,
 }, null, 2));
-for (const item of parsed.results) {
-  fs.writeFileSync(path.join(logDir, `${item.id}.log`), output);
-  console.log(`E2E ${item.id}: ${item.ok ? 'passed' : 'FAILED'} (${item.passed} passed, ${item.failed} failed, ${item.skipped} skipped, ${item.seconds}s tests)`);
+for (const item of parsed.results) fs.writeFileSync(path.join(logDir, `${item.id}.log`), output);
+// Log only what needs attention: passing suites collapse to one line.
+const okLine = parsed.results.filter(item => item.ok).map(item => `${item.id} (${item.passed})`).join(', ');
+if (okLine) console.log(`E2E passed: ${okLine}`);
+for (const item of parsed.results.filter(item => !item.ok)) {
+  console.log(`E2E ${item.id}: FAILED (${item.passed} passed, ${item.failed} failed, ${item.skipped} skipped, ${item.seconds}s tests)`);
 }
 console.log(`E2E total: ${seconds}s; first test after ${parsed.firstTestMs == null ? 'unknown' : `${(parsed.firstTestMs / 1000).toFixed(1)}s`}.`);
-if (failed.length || result.status !== 0) console.log(output);
+if (failed.length || result.status !== 0) {
+  console.log('');
+  console.log(failureDigest(report, output));
+  console.log('Full log: cb_file_manager/build/e2e-logs/desktop.log (e2e-diagnostics artifact).');
+}
 if (process.env.GITHUB_OUTPUT) {
   fs.appendFileSync(process.env.GITHUB_OUTPUT, `passed=${passed.join('.')}\nfailed=${failed.join(',')}\n`);
 }
@@ -81,5 +88,5 @@ const summary = ['## E2E results', '', '| Suite | Result | Passed | Skipped | Te
   ...parsed.results.map(r => `| ${r.id} | ${r.ok ? 'passed' : '**failed**'} | ${r.passed} | ${r.skipped} | ${r.seconds}s |`),
   '', `Total build/startup/tests: ${seconds}s.`, ''].join('\n');
 if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary);
-console.log(summary);
+else console.log(summary);
 process.exit(failed.length > 0 || result.status !== 0 ? 1 : 0);

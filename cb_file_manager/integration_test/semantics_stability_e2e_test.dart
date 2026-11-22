@@ -11,8 +11,8 @@
 // for it. A ValueKey built from mutable state used to do exactly that to the
 // drawer sections on every tab switch.
 //
-// Not part of the CI E2E run (tool/e2e_parallel.dart names its files
-// explicitly). Run it with: just e2e-file semantics_stability_e2e_test
+// Part of the combined CI E2E run (desktop_e2e_test.dart). Run it alone with:
+// just e2e-file semantics_stability_e2e_test
 import 'dart:io';
 import 'e2e_wait.dart';
 
@@ -166,6 +166,13 @@ String _describeOwner(int id) {
   return found ?? '(element gone)';
 }
 
+/// Breadcrumb for the CI digest: when a run stalls, the last printed phase is
+/// the one that never completed.
+String _enterPhase(String name) {
+  debugPrint('[AX] phase -> $name');
+  return name;
+}
+
 void main() {
   group('AX Semantics', () {
     IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -209,7 +216,7 @@ void main() {
         );
 
         var previous = <int, _NodeSnap>{};
-        var phase = 'boot';
+        var phase = _enterPhase('boot');
         var frames = 0;
         final churn = <String>[];
         final mixed = <String>[];
@@ -305,7 +312,7 @@ void main() {
         await settleE2EUi(tester);
 
         // Let the video thumbnails generate and land, then recycle the tiles.
-        phase = 'video-thumbnails';
+        phase = _enterPhase('video-thumbnails');
         for (var i = 0; i < 60; i++) {
           await tester.pump(const Duration(milliseconds: 250));
         }
@@ -322,7 +329,7 @@ void main() {
           ' mp4Finder=${find.textContaining('.mp4').evaluate().length}',
         );
 
-        phase = 'click-row';
+        phase = _enterPhase('click-row');
         final firstRow = find.textContaining('file_0.txt');
         if (firstRow.evaluate().isEmpty) {
           debugPrint('[AX] click-row skipped: no file_0.txt row on screen');
@@ -331,19 +338,19 @@ void main() {
           await settleE2EUi(tester);
         }
 
-        phase = 'arrow-keys';
+        phase = _enterPhase('arrow-keys');
         for (var i = 0; i < 6; i++) {
           await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
           await settleE2EUi(tester);
         }
 
-        phase = 'scroll';
+        phase = _enterPhase('scroll');
         await tester.drag(find.byType(Scrollable).first, const Offset(0, -400));
         await settleE2EUi(tester);
         await tester.drag(find.byType(Scrollable).first, const Offset(0, 400));
         await settleE2EUi(tester);
 
-        phase = 'toggle-drawer-section';
+        phase = _enterPhase('toggle-drawer-section');
         for (final label in <String>['Drives', 'Pinned']) {
           final header = find.text(label);
           if (header.evaluate().isEmpty) continue;
@@ -353,7 +360,7 @@ void main() {
           await settleE2EUi(tester);
         }
 
-        phase = 'switch-tab';
+        phase = _enterPhase('switch-tab');
         await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
         await tester.sendKeyEvent(LogicalKeyboardKey.keyT);
         await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
@@ -363,7 +370,7 @@ void main() {
         await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
         await settleE2EUi(tester);
 
-        phase = 'ctrl-a';
+        phase = _enterPhase('ctrl-a');
         await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
         await tester.sendKeyEvent(LogicalKeyboardKey.keyA);
         await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
@@ -375,7 +382,7 @@ void main() {
         // merged away, the overlay child is emitted with a traversal parent that is
         // not in the tree and the whole AXTreeUpdate is rejected. Hovering every
         // toolbar button walks that path for real.
-        phase = 'hover-tooltips';
+        phase = _enterPhase('hover-tooltips');
         final tooltipAnchors = find.byType(Tooltip);
         debugPrint(
           '[AX] tooltip anchors on screen=${tooltipAnchors.evaluate().length}',
@@ -437,6 +444,6 @@ void main() {
         handle.dispose();
         await e2eTearDown(tester, dir);
       }
-    });
+    }, timeout: const Timeout(Duration(minutes: 3)));
   });
 }

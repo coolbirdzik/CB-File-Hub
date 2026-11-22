@@ -77,3 +77,28 @@ test('global errors or an unexplained unsuccessful footer cannot seed pass cache
     assert.equal(parsed.results[0].ok, false);
   }
 });
+
+test('failure digest keeps errors and drops warnings and passing chatter', async () => {
+  const { failureDigest } = await import('../ci/e2e_plan.mjs');
+  const print = (testID, message) => ({ type: 'print', testID, message, time: 150 });
+  const content = report(
+    start(1, 'app ok'), print(1, 'FrameTimingOptimizer: Initialized'), end(1),
+    start(2, 'semantics_stability churn'), print(2, '[AX] nodes=1'), print(2, '[AX-CHURN] node 1 recreated'),
+    { type: 'error', testID: 2, error: 'Expected: empty', stackTrace: 'frame0\nframe1' },
+    end(2, { result: 'failure' }),
+    start(3, 'tooltip hangs'), print(3, 'step one'),
+  );
+  const output = [
+    'whisper.cpp(1,1): warning C4244: conversion',
+    'a.cc(1,1): error C1083: Cannot open source file',
+  ].join('\n');
+  const digest = failureDigest(content, output);
+  assert.match(digest, /✖ semantics_stability churn/);
+  assert.match(digest, /Expected: empty/);
+  assert.match(digest, /\[AX-CHURN\]/);
+  assert.match(digest, /✖ tooltip hangs {2}\(never finished/);
+  assert.match(digest, /step one/);
+  assert.match(digest, /last output:[^✖]*nodes=1/, 'a timed-out (finished) test still shows its tail');
+  assert.match(digest, /error C1083/);
+  assert.doesNotMatch(digest, /C4244|FrameTimingOptimizer|app ok/);
+});

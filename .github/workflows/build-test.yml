@@ -100,6 +100,8 @@ jobs:
   e2e-windows:
     name: E2E integration tests (Windows)
     runs-on: windows-latest
+    # A healthy full run is ~20 min (build ~9, tests ~11). Bound a hang.
+    timeout-minutes: 45
     needs: [analyze, e2e-select, windows-ffmpeg]
     if: needs.e2e-select.outputs.run == 'true'
     steps:
