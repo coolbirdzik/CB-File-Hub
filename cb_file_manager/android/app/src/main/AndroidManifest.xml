@@ -1,4 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Wi-Fi permissions must not make Wi-Fi hardware a Play Store requirement. -->
+    <uses-feature android:name="android.hardware.wifi" android:required="false" />
+
     <application
         android:label="CB File Hub"
         android:name="${applicationName}"
