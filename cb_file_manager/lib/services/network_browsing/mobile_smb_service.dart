@@ -439,6 +439,8 @@ class MobileSMBService implements ISmbService {
       debugPrint('MobileSMBService: Server extracted: $server');
 
       for (final shareName in shares) {
+        if (shareName.endsWith(r'$')) continue;
+
         final shareTabPath =
             '#network/${_smbScheme.toUpperCase()}/${Uri.encodeComponent(server)}/${Uri.encodeComponent(shareName)}/';
         debugPrint(

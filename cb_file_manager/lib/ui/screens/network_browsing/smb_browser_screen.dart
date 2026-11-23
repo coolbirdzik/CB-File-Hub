@@ -23,8 +23,15 @@ import 'network_connection_dialog.dart';
 class SMBBrowserScreen extends StatefulWidget {
   /// The tab ID this screen belongs to
   final String tabId;
+  final NetworkDiscoveryService? discoveryService;
+  final NetworkServiceRegistry? registry;
 
-  const SMBBrowserScreen({super.key, required this.tabId});
+  const SMBBrowserScreen({
+    super.key,
+    required this.tabId,
+    this.discoveryService,
+    this.registry,
+  });
 
   @override
   State<SMBBrowserScreen> createState() => _SMBBrowserScreenState();
@@ -32,9 +39,10 @@ class SMBBrowserScreen extends StatefulWidget {
 
 class _SMBBrowserScreenState extends State<SMBBrowserScreen>
     with AutomaticKeepAliveClientMixin {
-  final NetworkDiscoveryService _discoveryService = NetworkDiscoveryService();
-  final NetworkServiceRegistry _registry =
-      NetworkServiceRegistry(); // Added registry instance
+  late final NetworkDiscoveryService _discoveryService =
+      widget.discoveryService ?? NetworkDiscoveryService();
+  late final NetworkServiceRegistry _registry =
+      widget.registry ?? NetworkServiceRegistry();
 
   // Sử dụng static cache để giữ state khi widget bị dispose
   static final List<NetworkDevice> _cachedDiscoveredDevices = [];
@@ -94,7 +102,7 @@ class _SMBBrowserScreenState extends State<SMBBrowserScreen>
       debugPrint(
         'NetworkBrowsingBloc không tìm thấy trong context, tạo mới: $e',
       );
-      _networkBloc = NetworkBrowsingBloc();
+      _networkBloc = NetworkBrowsingBloc(registry: _registry);
       _isLocalBloc = true;
     }
 
@@ -469,160 +477,165 @@ class _SMBBrowserScreenState extends State<SMBBrowserScreen>
         value: _networkBloc,
         child: BlocBuilder<NetworkBrowsingBloc, NetworkBrowsingState>(
           bloc: _networkBloc,
-          builder: (context, state) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Hiển thị cảnh báo bật Network Discovery nếu cần
-                if (_showScanPermissionWarning)
-                  FluentBackground(
-                    blurAmount: 8.0,
-                    opacity: 0.7,
-                    backgroundColor: Theme.of(
-                      context,
-                    ).colorScheme.surface.withValues(alpha: 0.5),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12.0),
-                      child: Row(
-                        children: [
-                          Icon(
-                            PhosphorIconsLight.warning,
-                            color: Theme.of(context).colorScheme.secondary,
+          builder: (context, _) {
+            return CustomScrollView(
+              slivers: [
+                SliverList.list(
+                  children: [
+                    // Hiển thị cảnh báo bật Network Discovery nếu cần
+                    if (_showScanPermissionWarning)
+                      FluentBackground(
+                        blurAmount: 8.0,
+                        opacity: 0.7,
+                        backgroundColor: Theme.of(
+                          context,
+                        ).colorScheme.surface.withValues(alpha: 0.5),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12.0),
+                          child: Row(
+                            children: [
+                              Icon(
+                                PhosphorIconsLight.warning,
+                                color: Theme.of(context).colorScheme.secondary,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      l10n.networkDiscoveryDisabled,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    Text(
+                                      l10n.networkDiscoveryDescription,
+                                      style: const TextStyle(fontSize: 12),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              OutlinedButton(
+                                onPressed: _openWindowsNetworkSettings,
+                                child: Text(l10n.openSettings),
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
+                        ),
+                      ),
+
+                    // Connections Section
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            l10n.activeConnectionsTitle,
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                          Text(
+                            l10n.activeConnectionsDescription,
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                          const SizedBox(height: 8),
+                          // SMB Version Info
+                          Container(
+                            padding: const EdgeInsets.all(12.0),
+                            decoration: CbDecorations.card(
+                              context,
+                              radius: 16.0,
+                            ),
+                            child: Row(
                               children: [
-                                Text(
-                                  l10n.networkDiscoveryDisabled,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
+                                Icon(
+                                  PhosphorIconsLight.info,
+                                  size: 16,
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        '${l10n.smbVersion}: $_smbVersion',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodyMedium
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                      ),
+                                      if (_connectionInfo != l10n.notConnected)
+                                        Text(
+                                          _connectionInfo,
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodySmall
+                                              ?.copyWith(
+                                                color: Theme.of(
+                                                  context,
+                                                ).colorScheme.onSurfaceVariant,
+                                              ),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                    ],
                                   ),
                                 ),
-                                Text(
-                                  l10n.networkDiscoveryDescription,
-                                  style: const TextStyle(fontSize: 12),
-                                ),
+                                if (_isLoadingVersion)
+                                  const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                else
+                                  IconButton(
+                                    icon: const Icon(
+                                      PhosphorIconsLight.arrowsClockwise,
+                                      size: 16,
+                                    ),
+                                    onPressed: _updateSmbVersionInfo,
+                                    tooltip: l10n.refreshSmbVersionInfo,
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
+                                  ),
                               ],
                             ),
-                          ),
-                          OutlinedButton(
-                            onPressed: _openWindowsNetworkSettings,
-                            child: Text(l10n.openSettings),
                           ),
                         ],
                       ),
                     ),
-                  ),
+                  ],
+                ),
+                _buildActiveConnections(),
 
-                // Connections Section
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        l10n.activeConnectionsTitle,
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      Text(
-                        l10n.activeConnectionsDescription,
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                      const SizedBox(height: 8),
-                      // SMB Version Info
-                      Container(
-                        padding: const EdgeInsets.all(12.0),
-                        decoration: CbDecorations.card(context, radius: 16.0),
-                        child: Row(
-                          children: [
-                            Icon(
-                              PhosphorIconsLight.info,
-                              size: 16,
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    '${l10n.smbVersion}: $_smbVersion',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodyMedium
-                                        ?.copyWith(fontWeight: FontWeight.w500),
-                                  ),
-                                  if (_connectionInfo != l10n.notConnected)
-                                    Text(
-                                      _connectionInfo,
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodySmall
-                                          ?.copyWith(
-                                            color: Theme.of(
-                                              context,
-                                            ).colorScheme.onSurfaceVariant,
-                                          ),
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                ],
-                              ),
-                            ),
-                            if (_isLoadingVersion)
-                              const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            else
-                              IconButton(
-                                icon: const Icon(
-                                  PhosphorIconsLight.arrowsClockwise,
-                                  size: 16,
-                                ),
-                                onPressed: _updateSmbVersionInfo,
-                                tooltip: l10n.refreshSmbVersionInfo,
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(),
-                              ),
-                          ],
+                const SliverToBoxAdapter(child: Divider(height: 32)),
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          l10n.discoveredSmbServers,
+                          style: Theme.of(context).textTheme.titleLarge,
                         ),
-                      ),
-                    ],
+                        Text(
+                          l10n.discoveredSmbServersDescription,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-
-                // Active connections list
-                _buildActiveConnections(state.connections),
-
-                const Divider(height: 32),
-
-                // Discovered Devices Section
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        l10n.discoveredSmbServers,
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      Text(
-                        l10n.discoveredSmbServersDescription,
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Discovered devices list
                 _buildDiscoveredDevices(),
               ],
             );
@@ -632,7 +645,7 @@ class _SMBBrowserScreenState extends State<SMBBrowserScreen>
     );
   }
 
-  Widget _buildActiveConnections(Map<String, dynamic>? connections) {
+  Widget _buildActiveConnections() {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final activeConnections = _registry.activeConnections;
@@ -650,49 +663,49 @@ class _SMBBrowserScreenState extends State<SMBBrowserScreen>
     );
 
     if (smbConnections.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-        child: Container(
-          padding: const EdgeInsets.all(16.0),
-          decoration: CbDecorations.card(context, radius: 16),
-          child: Row(
-            children: [
-              Icon(
-                PhosphorIconsLight.info,
-                color: theme.colorScheme.onSurfaceVariant,
-                size: 20,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      l10n.noActiveSmbConnections,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w500,
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    Text(
-                      l10n.connectToSmbServer,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
+      return SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+          child: Container(
+            padding: const EdgeInsets.all(16.0),
+            decoration: CbDecorations.card(context, radius: 16),
+            child: Row(
+              children: [
+                Icon(
+                  PhosphorIconsLight.info,
+                  color: theme.colorScheme.onSurfaceVariant,
+                  size: 20,
                 ),
-              ),
-            ],
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        l10n.noActiveSmbConnections,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w500,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      Text(
+                        l10n.connectToSmbServer,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       );
     }
 
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
+    return SliverList.builder(
       itemCount: smbConnections.length,
       itemBuilder: (context, index) {
         final entry = smbConnections[index];
@@ -788,7 +801,8 @@ class _SMBBrowserScreenState extends State<SMBBrowserScreen>
     final theme = Theme.of(context);
     if (_discoveredDevices.isEmpty) {
       if (_isScanning) {
-        return Expanded(
+        return SliverFillRemaining(
+          hasScrollBody: false,
           child: Center(
             child: Padding(
               padding: const EdgeInsets.all(24.0),
@@ -834,7 +848,8 @@ class _SMBBrowserScreenState extends State<SMBBrowserScreen>
       }
 
       if (_hasScanned) {
-        return Expanded(
+        return SliverFillRemaining(
+          hasScrollBody: false,
           child: Center(
             child: Padding(
               padding: const EdgeInsets.all(24.0),
@@ -873,7 +888,8 @@ class _SMBBrowserScreenState extends State<SMBBrowserScreen>
         );
       }
 
-      return Expanded(
+      return SliverFillRemaining(
+        hasScrollBody: false,
         child: Center(
           child: Padding(
             padding: const EdgeInsets.all(24.0),
@@ -912,10 +928,10 @@ class _SMBBrowserScreenState extends State<SMBBrowserScreen>
       );
     }
 
-    return Expanded(
-      child: Column(
-        children: [
-          Padding(
+    return SliverMainAxisGroup(
+      slivers: [
+        SliverToBoxAdapter(
+          child: Padding(
             padding: const EdgeInsets.symmetric(
               horizontal: 16.0,
               vertical: 8.0,
@@ -969,127 +985,124 @@ class _SMBBrowserScreenState extends State<SMBBrowserScreen>
               ],
             ),
           ),
+        ),
+        SliverList.builder(
+          itemCount: _discoveredDevices.length,
+          itemBuilder: (context, index) {
+            final device = _discoveredDevices[index];
 
-          // Device list
-          Expanded(
-            child: ListView.builder(
-              itemCount: _discoveredDevices.length,
-              itemBuilder: (context, index) {
-                final device = _discoveredDevices[index];
-
-                return Card(
-                  margin: const EdgeInsets.symmetric(
-                    horizontal: 16.0,
-                    vertical: 4.0,
+            return Card(
+              margin: const EdgeInsets.symmetric(
+                horizontal: 16.0,
+                vertical: 4.0,
+              ),
+              child: ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                  child: ListTile(
-                    leading: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Icon(
-                        PhosphorIconsLight.desktop,
-                        color: theme.colorScheme.primary,
-                        size: 20,
+                  child: Icon(
+                    PhosphorIconsLight.desktop,
+                    color: theme.colorScheme.primary,
+                    size: 20,
+                  ),
+                ),
+                title: Text(
+                  device.name,
+                  style: const TextStyle(fontWeight: FontWeight.w500),
+                ),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      device.ipAddress,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
-                    title: Text(
-                      device.name,
-                      style: const TextStyle(fontWeight: FontWeight.w500),
-                    ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          device.ipAddress,
+                    if (device.hasSmbPort || device.hasNetbiosPort)
+                      Row(
+                        children: [
+                          if (device.hasSmbPort)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.tertiary.withValues(
+                                  alpha: 0.1,
+                                ),
+                                borderRadius: BorderRadius.circular(16.0),
+                              ),
+                              child: Text(
+                                'SMB',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: theme.colorScheme.tertiary,
+                                ),
+                              ),
+                            ),
+                          if (device.hasSmbPort && device.hasNetbiosPort)
+                            const SizedBox(width: 4),
+                          if (device.hasNetbiosPort)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.secondary.withValues(
+                                  alpha: 0.1,
+                                ),
+                                borderRadius: BorderRadius.circular(16.0),
+                              ),
+                              child: Text(
+                                'NetBIOS',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: theme.colorScheme.secondary,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    if (device.smbVersion != null)
+                      Container(
+                        margin: const EdgeInsets.only(top: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primary.withValues(
+                            alpha: 0.1,
+                          ),
+                          borderRadius: BorderRadius.circular(16.0),
+                        ),
+                        child: Text(
+                          'SMB ${device.smbVersion}',
                           style: TextStyle(
-                            fontSize: 12,
-                            color: theme.colorScheme.onSurfaceVariant,
+                            fontSize: 10,
+                            color: theme.colorScheme.primary,
                           ),
                         ),
-                        if (device.hasSmbPort || device.hasNetbiosPort)
-                          Row(
-                            children: [
-                              if (device.hasSmbPort)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: theme.colorScheme.tertiary
-                                        .withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(16.0),
-                                  ),
-                                  child: Text(
-                                    'SMB',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: theme.colorScheme.tertiary,
-                                    ),
-                                  ),
-                                ),
-                              if (device.hasSmbPort && device.hasNetbiosPort)
-                                const SizedBox(width: 4),
-                              if (device.hasNetbiosPort)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: theme.colorScheme.secondary
-                                        .withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(16.0),
-                                  ),
-                                  child: Text(
-                                    'NetBIOS',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: theme.colorScheme.secondary,
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        if (device.smbVersion != null)
-                          Container(
-                            margin: const EdgeInsets.only(top: 4),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.primary.withValues(
-                                alpha: 0.1,
-                              ),
-                              borderRadius: BorderRadius.circular(16.0),
-                            ),
-                            child: Text(
-                              'SMB ${device.smbVersion}',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: theme.colorScheme.primary,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                    trailing: Icon(
-                      PhosphorIconsLight.arrowRight,
-                      color: theme.colorScheme.primary,
-                    ),
-                    onTap: () =>
-                        _connectToSMBServer(device.ipAddress, device.name),
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
+                      ),
+                  ],
+                ),
+                trailing: Icon(
+                  PhosphorIconsLight.arrowRight,
+                  color: theme.colorScheme.primary,
+                ),
+                onTap: () => _connectToSMBServer(device.ipAddress, device.name),
+              ),
+            );
+          },
+        ),
+      ],
     );
   }
 }

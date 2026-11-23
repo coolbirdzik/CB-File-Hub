@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 
 import 'package:cb_file_manager/ui/screens/folder_list/bloc/file_navigation_bloc.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/bloc/file_navigation_event.dart';
+import 'package:cb_file_manager/ui/utils/scroll_velocity_notifier.dart';
 import 'package:cb_file_manager/ui/widgets/thumbnail_loader.dart';
 import 'package:cb_file_manager/ui/widgets/thumbnail_placeholder.dart';
 import 'package:material_ui/material_ui.dart';
@@ -206,6 +207,41 @@ void main() {
       },
     );
   }
+
+  testWidgets(
+    'a network thumbnail that becomes visible during a fling loads on idle',
+    (tester) async {
+      final velocity = ScrollVelocityNotifier.instance;
+      final requests = <String>[];
+      const path = '#network/smb/server/share/after-fling.png';
+      ThumbnailLoader.debugNetworkThumbnailGenerator = (path, _) async {
+        requests.add(path);
+        return null;
+      };
+      addTearDown(() {
+        velocity.reset();
+        ThumbnailLoader.debugNetworkThumbnailGenerator = null;
+      });
+
+      velocity.updateVelocity(200);
+      expect(velocity.isScrollingFast, isTrue);
+      await tester.pumpWidget(
+        host(
+          const ThumbnailLoader(filePath: path, isImage: true, isVideo: false),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 110));
+      expect(requests, isEmpty);
+
+      velocity.reset();
+      await tester.pump(const Duration(milliseconds: 110));
+      await tester.pump();
+      expect(requests, [path]);
+
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump(const Duration(seconds: 1));
+    },
+  );
 
   testWidgets(
     'network queue starts outside build, drains and bounds concurrency',

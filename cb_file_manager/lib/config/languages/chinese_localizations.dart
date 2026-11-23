@@ -3465,6 +3465,9 @@ class ChineseLocalizations implements AppLocalizations {
   String get connectToSmbServer => '连接到 SMB 服务器后会显示在这里';
 
   @override
+  String get mountSmbShareHint => '在系统文件管理器中连接到 SMB 共享，然后刷新此页面。';
+
+  @override
   String get connected => '已连接';
 
   @override

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:uuid/uuid.dart';
 
 import 'package:shelf/shelf.dart';
@@ -21,10 +22,7 @@ class SmbHttpProxyServer {
   HttpServer? _server;
   int? _port;
   Future<void>? _starting;
-  final _sources = <String, String>{};
-
-  // For simple per-request handling we do not cache connections long-term.
-  // The player will reconnect with Range requests as needed.
+  final _sources = <String, _SmbProxySource>{};
 
   Future<void> _ensureStarted() async {
     if (_server != null) return;
@@ -48,13 +46,26 @@ class SmbHttpProxyServer {
   Future<Uri> urlFor(String smbUrl) async {
     await _ensureStarted();
     final encoded = const Uuid().v4();
-    _sources[encoded] = smbUrl;
+    _sources[encoded] = _SmbProxySource(smbUrl);
     return Uri.parse('http://127.0.0.1:$_port/stream?u=$encoded');
   }
 
   void release(Uri url) => _sources.remove(url.queryParameters['u']);
 
+  /// Video bytes pulled from SMB for this proxy URL, including range reads.
+  int? bytesRead(Uri url) => _sources[url.queryParameters['u']]?.bytesRead;
+
   Future<Response> _handle(Request req) async {
+    Future<void> Function()? closeReader;
+    var bodyOwnsReader = false;
+    Future<void> close() async {
+      try {
+        await closeReader?.call();
+      } catch (_) {
+        // A disconnected native reader may already have been closed.
+      }
+    }
+
     try {
       if (req.url.path != 'stream') {
         return Response.notFound('Not Found');
@@ -64,44 +75,47 @@ class SmbHttpProxyServer {
       if (u == null || u.isEmpty) {
         return Response(400, body: 'Missing parameter u');
       }
-      final smbUrl = _sources[u];
-      if (smbUrl == null) return Response.notFound('Stream expired');
+      final source = _sources[u];
+      if (source == null) return Response.notFound('Stream expired');
 
-      final reader = SmbChunkReader();
-      final info = _parseSmbUrl(smbUrl);
+      final info = _parseSmbUrl(source.smbUrl);
       if (info == null) {
         return Response(400, body: 'Invalid SMB URL');
       }
-      final filePath = _buildClientPath(info);
-
-      final ok = await reader.initialize(
-        SmbConnectionConfig(
-          host: info.host,
-          port: info.port,
-          domain: info.domain,
-          username: info.username ?? '',
-          password: info.password ?? '',
-          shareName: info.share,
-          timeoutMs: 60000,
-        ),
+      final config = SmbConnectionConfig(
+        host: info.host,
+        port: info.port,
+        domain: info.domain,
+        username: info.username ?? '',
+        password: info.password ?? '',
+        shareName: info.share,
+        timeoutMs: 60000,
       );
-      if (!ok) {
-        await reader.dispose();
-        return Response(502, body: 'Failed to connect SMB');
+      final nativeReader = await MobileSmbNativePlatform.instance
+          .openPlaybackReader(config, info.path.substring(1));
+      final Future<List<int>?> Function(int, int) read;
+      final int fileSize;
+      if (nativeReader != null) {
+        closeReader = nativeReader.close;
+        fileSize = nativeReader.fileSize;
+        read = nativeReader.read;
+      } else {
+        final reader = SmbChunkReader();
+        closeReader = reader.dispose;
+        if (!await reader.initialize(config)) {
+          return Response(502, body: 'Failed to connect SMB');
+        }
+        if (!await reader.setFile(_buildClientPath(info))) {
+          return Response(404, body: 'File not found');
+        }
+        final size = reader.fileSize;
+        if (size == null) return Response.notFound('File size unavailable');
+
+        fileSize = size;
+        read = (offset, count) async =>
+            (await reader.readChunk(offset, count))?.data;
       }
 
-      // SmbChunkReader expects a path relative to the SMB base share.
-      final fileOk = await reader.setFile(filePath);
-      if (!fileOk) {
-        await reader.dispose();
-        return Response(404, body: 'File not found');
-      }
-
-      final fileSize = reader.fileSize;
-      if (fileSize == null) {
-        await reader.dispose();
-        return Response.notFound('File size unavailable');
-      }
       final range = req.headers['range'];
       var start = 0;
       var end = fileSize - 1;
@@ -123,7 +137,6 @@ class SmbHttpProxyServer {
           valid = valid && start < fileSize && end >= start;
         }
         if (!valid) {
-          await reader.dispose();
           return Response(416, headers: {'Content-Range': 'bytes */$fileSize'});
         }
       }
@@ -135,8 +148,7 @@ class SmbHttpProxyServer {
         if (range != null) 'Content-Range': 'bytes $start-$end/$fileSize',
       };
 
-      if (req.method == 'HEAD') {
-        await reader.dispose();
+      if (req.method == 'HEAD' || fileSize == 0) {
         return Response(statusCode, headers: headers);
       }
 
@@ -144,26 +156,37 @@ class SmbHttpProxyServer {
       // cancellation during a seek closes the previous SMB reader.
       Stream<List<int>> body() async* {
         var offset = start;
-        const chunkSize = 256 * 1024;
         try {
           while (offset <= end) {
+            // Deliver the first block promptly, then amortize channel calls.
+            final chunkSize = nativeReader != null && offset != start
+                ? 1024 * 1024
+                : 256 * 1024;
             final remaining = end - offset + 1;
             final count = remaining.clamp(0, chunkSize);
-            if (count == 0) break;
-            final chunk = await reader.readChunk(offset, count);
-            if (chunk == null || chunk.data.isEmpty) break;
-            yield chunk.data;
-            offset += chunk.size;
-            if (chunk.isLastChunk) break;
+            final chunk = await read(offset, count);
+            if (chunk == null || chunk.isEmpty) break;
+            source.bytesRead += chunk.length;
+            yield chunk;
+            offset += chunk.length;
           }
         } finally {
-          await reader.dispose();
+          await close();
         }
       }
 
-      return Response(statusCode, headers: headers, body: body());
+      final response = Response(statusCode, headers: headers, body: body());
+      bodyOwnsReader = true;
+      return response;
+    } on PlatformException catch (error) {
+      if (error.code == 'SMB_PLAYBACK_NOT_FOUND') {
+        return Response.notFound('File not found');
+      }
+      return Response(502, body: 'Failed to open SMB video');
     } catch (e) {
       return Response.internalServerError(body: 'SMB stream failed');
+    } finally {
+      if (!bodyOwnsReader) await close();
     }
   }
 
@@ -228,6 +251,13 @@ class SmbHttpProxyServer {
     }
     return path;
   }
+}
+
+class _SmbProxySource {
+  _SmbProxySource(this.smbUrl);
+
+  final String smbUrl;
+  int bytesRead = 0;
 }
 
 class _SmbUrlInfo {

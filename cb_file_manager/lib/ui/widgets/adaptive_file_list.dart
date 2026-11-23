@@ -1,7 +1,10 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:material_ui/material_ui.dart';
+
+import '../utils/scroll_velocity_notifier.dart';
 
 /// Explorer-style List fills each column from top to bottom, then moves right.
 /// Mobile keeps the existing, variable-height single-column list.
@@ -58,13 +61,19 @@ class _AdaptiveFileListState extends State<AdaptiveFileList> {
   @override
   Widget build(BuildContext context) {
     if (!widget.isDesktop) {
-      return ListView.builder(
-        controller: _controller,
-        physics: const ClampingScrollPhysics(),
-        scrollCacheExtent: const ScrollCacheExtent.pixels(800),
-        padding: const EdgeInsets.only(bottom: 200),
-        itemCount: widget.itemCount,
-        itemBuilder: widget.itemBuilder,
+      final isAndroid = defaultTargetPlatform == TargetPlatform.android;
+      return ScrollVelocityListener(
+        enabled: isAndroid,
+        child: ListView.builder(
+          controller: _controller,
+          physics: const ClampingScrollPhysics(),
+          scrollCacheExtent: isAndroid
+              ? null
+              : const ScrollCacheExtent.pixels(800),
+          padding: const EdgeInsets.only(bottom: 200),
+          itemCount: widget.itemCount,
+          itemBuilder: widget.itemBuilder,
+        ),
       );
     }
 

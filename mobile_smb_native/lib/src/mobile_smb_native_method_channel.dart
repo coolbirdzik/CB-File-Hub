@@ -7,12 +7,19 @@ import 'smb_file.dart';
 import 'smb_connection_config.dart';
 import 'mobile_smb_native_platform_interface.dart';
 import 'smb_platform_service.dart';
+import 'smb_playback_channel.dart';
 
 /// An implementation of [MobileSmbNativePlatform] that uses method channels.
 class MethodChannelMobileSmbNative extends MobileSmbNativePlatform {
   /// The method channel used to interact with the native platform.
   @visibleForTesting
   final methodChannel = const MethodChannel('mobile_smb_native');
+
+  @override
+  Future<SmbPlaybackReader?> openPlaybackReader(
+    SmbConnectionConfig config,
+    String path,
+  ) async => Platform.isAndroid ? SmbPlaybackChannel.open(config, path) : null;
 
   @override
   Future<bool> connect(SmbConnectionConfig config) async {

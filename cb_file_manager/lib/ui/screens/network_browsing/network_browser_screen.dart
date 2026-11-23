@@ -96,6 +96,7 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
   late SelectionBloc _selectionBloc;
   bool _showSearchBar = false;
   String _currentPath = '';
+  final ScrollController _scrollController = ScrollController();
 
   // View and sort preferences
   ViewMode _viewMode = ViewMode.list;
@@ -217,10 +218,6 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
     super.initState();
     _currentPath = widget.path;
     _searchController = SearchTextController();
-    _scrollController = ScrollController();
-
-    // Add scroll listener for auto load more
-    _scrollController.addListener(_onScroll);
 
     // Enable hardware acceleration for smoother animations
     // ignore: deprecated_member_use
@@ -1439,31 +1436,6 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
     ),
     builder: (context, _) => builder(context, _selectionBloc.state),
   );
-
-  // Scroll controller for auto load more
-  late ScrollController _scrollController;
-  bool _isLoadingMore = false;
-
-  void _onScroll() {
-    if (_scrollController.position.pixels >=
-        _scrollController.position.maxScrollExtent - 200) {
-      _loadMoreItems();
-    }
-  }
-
-  Future<void> _loadMoreItems() async {
-    if (_isLoadingMore) return;
-
-    setState(() {
-      _isLoadingMore = true;
-    });
-
-    // Auto loading logic would go here
-
-    setState(() {
-      _isLoadingMore = false;
-    });
-  }
 
   void _handleGridZoomChange(int newZoomLevel) {
     final maxZoom = GridZoomConstraints.maxGridSizeForContext(

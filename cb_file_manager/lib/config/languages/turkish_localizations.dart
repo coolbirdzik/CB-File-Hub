@@ -3720,6 +3720,10 @@ class TurkishLocalizations implements AppLocalizations {
       'Burada görmek için bir SMB sunucusuna bağlanın';
 
   @override
+  String get mountSmbShareHint =>
+      'Sistem dosya yöneticisinde bir SMB paylaşımına bağlanın, ardından bu sayfayı yenileyin.';
+
+  @override
   String get connected => 'Bağlı';
 
   @override

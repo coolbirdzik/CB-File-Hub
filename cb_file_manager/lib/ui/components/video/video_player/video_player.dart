@@ -34,6 +34,7 @@ import '../../../../helpers/files/file_type_registry.dart';
 import '../../../../helpers/core/user_preferences.dart';
 import '../../streaming/stream_speed_indicator.dart';
 import '../../streaming/buffer_info_widget.dart';
+import '../../../utils/format_utils.dart';
 import '../../../utils/route.dart';
 import '../../../../config/languages/app_localizations.dart';
 import 'package:cb_file_manager/ui/components/common/app_toast.dart';
@@ -1402,6 +1403,16 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
           if (_isLoading)
             Positioned.fill(child: IgnorePointer(child: _buildLoadingWidget())),
           if (widget.showControls && _showControls) _buildCustomControls(),
+          if (widget.smbMrl != null && !_isAndroidPip && !_suspendVideoSurface)
+            if (_player case final player?)
+              PositionedDirectional(
+                top: 12,
+                end: 12,
+                child: _SmbPlaybackSpeedBadge(
+                  key: ObjectKey(player),
+                  player: player,
+                ),
+              ),
           if (_showSpeedIndicator && _currentStream != null)
             _buildSpeedIndicatorOverlay(),
           _buildFastSeekIndicator(),
@@ -3902,5 +3913,51 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
   Future<void> _resumeVideoAfterRoutePop({bool resumePlaying = false}) async {
     if (mounted) setState(() => _suspendVideoSurface = false);
     if (resumePlaying) await _player?.play();
+  }
+}
+
+class _SmbPlaybackSpeedBadge extends StatefulWidget {
+  const _SmbPlaybackSpeedBadge({super.key, required this.player});
+
+  final PlaybackPlayer player;
+
+  @override
+  State<_SmbPlaybackSpeedBadge> createState() => _SmbPlaybackSpeedBadgeState();
+}
+
+class _SmbPlaybackSpeedBadgeState extends State<_SmbPlaybackSpeedBadge> {
+  late final _speed = widget.player.sampleSmbReadSpeed();
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: StreamBuilder<int?>(
+        stream: _speed,
+        builder: (context, snapshot) {
+          final speed = snapshot.data;
+          final value = speed == null
+              ? '—'
+              : '${FormatUtils.formatFileSize(speed)}/s';
+          return DecoratedBox(
+            decoration: BoxDecoration(
+              color: Colors.black54,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              child: Text(
+                '↓ $value',
+                semanticsLabel: '${context.tr.vpStreamSpeed} $value',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontFeatures: [ui.FontFeature.tabularFigures()],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
   }
 }

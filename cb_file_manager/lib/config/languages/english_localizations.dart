@@ -3699,6 +3699,10 @@ class EnglishLocalizations implements AppLocalizations {
   String get connectToSmbServer => 'Connect to an SMB server to see it here';
 
   @override
+  String get mountSmbShareHint =>
+      'Connect to an SMB share in your system file manager, then refresh here.';
+
+  @override
   String get connected => 'Connected';
 
   @override

@@ -13,6 +13,7 @@ import 'package:cb_file_manager/ui/tab_manager/core/tabbed_folder/tabbed_folder_
 import 'package:cb_file_manager/ui/screens/network_browsing/network_connection_screen.dart';
 import 'package:cb_file_manager/ui/screens/network_browsing/network_browser_screen.dart';
 import 'package:cb_file_manager/ui/screens/network_browsing/smb_browser_screen.dart';
+import 'network_browsing/mounted_smb_browser_screen.dart';
 import 'package:cb_file_manager/ui/screens/network_browsing/ftp_browser_screen.dart';
 import 'package:cb_file_manager/ui/screens/network_browsing/webdav_browser_screen.dart';
 import 'package:cb_file_manager/ui/screens/media_gallery/image_viewer_screen.dart';
@@ -123,6 +124,9 @@ class SystemScreenRouter {
       case '#network':
         return NetworkConnectionScreen(tabId: tabId);
       case '#smb':
+        if (Platform.isMacOS || Platform.isLinux) {
+          return MountedSmbBrowserScreen(tabId: tabId);
+        }
         return BlocProvider<NetworkBrowsingBloc>(
           create: (_) => NetworkBrowsingBloc(),
           child: SMBBrowserScreen(tabId: tabId),

@@ -12,6 +12,7 @@ import 'package:cb_file_manager/ui/screens/media_gallery/image_viewer_screen.dar
 import 'package:cb_file_manager/ui/utils/video_playback_launcher.dart';
 import 'package:cb_file_manager/helpers/tags/tag_manager.dart'; // Import TagManager để lắng nghe thay đổi
 import 'package:material_ui/material_ui.dart';
+import 'package:flutter/foundation.dart';
 import 'package:cb_file_manager/design_system/cb_page_transitions.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -738,11 +739,12 @@ class _FileItemContentState extends State<_FileItemContent> {
   }
 
   Widget _buildThumbnail(bool isVideo, bool isImage) {
-    // Always use ThumbnailLoader for all files (network and local)
+    const thumbnailSize = 48.0;
+    final isAndroid = defaultTargetPlatform == TargetPlatform.android;
     return RepaintBoundary(
       child: SizedBox(
-        width: 48,
-        height: 48,
+        width: thumbnailSize,
+        height: thumbnailSize,
         child: isVideo || isImage
             ? ValueListenableBuilder<FileThumbnailFitMode>(
                 valueListenable: UserPreferences.instance.fileThumbnailFitMode,
@@ -752,8 +754,17 @@ class _FileItemContentState extends State<_FileItemContent> {
                     filePath: widget.file.path,
                     isVideo: isVideo,
                     isImage: isImage,
-                    width: 48,
-                    height: 48,
+                    keepAlive: !isAndroid,
+                    // Allow for cover cropping at the device's pixel density.
+                    localImageDecodeWidth: isAndroid && isImage
+                        ? (thumbnailSize *
+                                  2 *
+                                  MediaQuery.devicePixelRatioOf(context))
+                              .ceil()
+                              .clamp(1, 512)
+                        : null,
+                    width: thumbnailSize,
+                    height: thumbnailSize,
                     fit: fitMode == FileThumbnailFitMode.contain
                         ? BoxFit.contain
                         : BoxFit.cover,

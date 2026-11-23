@@ -231,6 +231,8 @@ class ThumbnailLoader extends StatefulWidget {
   final VoidCallback? onThumbnailLoaded;
   final BorderRadius? borderRadius;
   final bool isPriority;
+  final bool keepAlive;
+  final int? localImageDecodeWidth;
 
   // Static counter to track pending thumbnail generation tasks
   static int pendingThumbnailCount = 0;
@@ -378,6 +380,8 @@ class ThumbnailLoader extends StatefulWidget {
     this.onThumbnailLoaded,
     this.borderRadius,
     this.isPriority = false,
+    this.keepAlive = true,
+    this.localImageDecodeWidth,
   });
 
   @override
@@ -395,7 +399,8 @@ class _ThumbnailLoaderState extends State<ThumbnailLoader>
   Timer? _refreshTimer;
   Timer? _visibilityDebounceTimer;
   String? _networkThumbnailPath; // Store the generated thumbnail path
-  bool _isScrollingFast = false; // Track if user is scrolling fast
+  double _visibleFraction = 0;
+  bool _isScrollingFast = ScrollVelocityNotifier.instance.isScrollingFast;
   int _thumbnailVersion = 0;
 
   // Debounce for VisibilityDetector: kept short because loading a cached
@@ -438,11 +443,15 @@ class _ThumbnailLoaderState extends State<ThumbnailLoader>
   static void _onGlobalScrollVelocityChanged() {
     final isFast = ScrollVelocityNotifier.instance.isScrollingFast;
     for (final instance in _liveInstances) {
-      if (isFast && instance._isScrollingFast != isFast) {
-        instance._isScrollingFast = true;
+      if (instance._isScrollingFast == isFast) continue;
+      instance._isScrollingFast = isFast;
+      if (!instance.widget.filePath.startsWith('#network/')) continue;
+      if (isFast) {
+        instance._visibilityDebounceTimer?.cancel();
         instance._cancelPendingLoad();
-      } else if (!isFast && instance._isScrollingFast != isFast) {
-        instance._isScrollingFast = false;
+      } else if (instance._visibleFraction > 0.8) {
+        // A row can remain visible when a fling ends without another callback.
+        instance._updateNetworkVisibility();
       }
     }
   }
@@ -493,9 +502,7 @@ class _ThumbnailLoaderState extends State<ThumbnailLoader>
 
   @override
   bool get wantKeepAlive =>
-      // Keep visible/nearby image+video thumbnail states alive so scrolling
-      // away and back does not recreate the whole thumbnail pipeline.
-      widget.isImage || widget.isVideo;
+      widget.keepAlive && (widget.isImage || widget.isVideo);
 
   @override
   void initState() {
@@ -621,9 +628,18 @@ class _ThumbnailLoaderState extends State<ThumbnailLoader>
   @override
   void didUpdateWidget(ThumbnailLoader oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.keepAlive != widget.keepAlive ||
+        oldWidget.isVideo != widget.isVideo ||
+        oldWidget.isImage != widget.isImage) {
+      updateKeepAlive();
+    }
     if (oldWidget.filePath != widget.filePath ||
         oldWidget.isVideo != widget.isVideo ||
         oldWidget.isImage != widget.isImage) {
+      if (oldWidget.filePath != widget.filePath) {
+        _visibleFraction = 0;
+        _visibilityDebounceTimer?.cancel();
+      }
       _cancelPendingLoad();
       _thumbnailVersion++;
       _networkThumbnailPath = null; // Reset thumbnail path
@@ -772,74 +788,52 @@ class _ThumbnailLoaderState extends State<ThumbnailLoader>
     }
   }
 
+  void _updateNetworkVisibility() {
+    _visibilityDebounceTimer?.cancel();
+    final path = widget.filePath;
+    if (_visibleFraction == 0) {
+      NetworkThumbnailHelper().markInvisible(path);
+      _cancelPendingLoad();
+    } else if (_visibleFraction > 0.8 && !_isScrollingFast) {
+      _visibilityDebounceTimer = Timer(_visibilityDebounceDuration, () {
+        if (!_widgetMounted || _isScrollingFast) return;
+        NetworkThumbnailHelper().markVisible(path);
+        if (_networkThumbnailPath == null &&
+            !_cache.isGeneratingThumbnail(path)) {
+          _scheduleLoadWithDelay();
+        }
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
 
-    // Gói toàn bộ nội dung bên trong VisibilityDetector để chỉ tải khi thấy trên màn hình
+    final content = ClipRRect(
+      borderRadius: widget.borderRadius ?? BorderRadius.zero,
+      child: ValueListenableBuilder<bool>(
+        valueListenable: _hasErrorNotifier,
+        builder: (context, hasError, _) => RepaintBoundary(
+          child: hasError ? _buildFallbackWidget() : _buildThumbnailContent(),
+        ),
+      ),
+    );
+
+    // Local images use Flutter's image cache and local videos track visibility
+    // in LazyVideoThumbnail. Only network thumbnails need this detector.
+    if (!widget.filePath.startsWith('#network/')) {
+      return RepaintBoundary(child: content);
+    }
     return RepaintBoundary(
       child: VisibilityDetector(
         key: ValueKey('vis-${widget.filePath}'),
         onVisibilityChanged: (info) {
           if (!_widgetMounted) return;
-
-          // PERFORMANCE: Skip loading during fast scrolling
-          if (ScrollVelocityNotifier.instance.isScrollingFast) {
-            _visibilityDebounceTimer?.cancel();
-            _cancelPendingLoad();
-            return;
-          }
-
-          // PERFORMANCE: Debounce visibility changes to prevent excessive operations during scrolling
-          _visibilityDebounceTimer?.cancel();
-
-          // Increased threshold: only load when visible fraction > 80% to avoid loading too early
-          if (info.visibleFraction > 0.8) {
-            // Debounce becoming visible to avoid loading during fast scrolling
-            _visibilityDebounceTimer = Timer(_visibilityDebounceDuration, () {
-              if (!_widgetMounted) return;
-
-              // Double-check scroll velocity before loading
-              if (ScrollVelocityNotifier.instance.isScrollingFast) {
-                return;
-              }
-
-              // Became visible
-              NetworkThumbnailHelper().markVisible(widget.filePath);
-
-              // Local videos already have LazyVideoThumbnail's cache/generation
-              // pipeline; starting another one here duplicated mapped-drive
-              // file probes and video requests for every newly visible tile.
-              // Local images likewise use ResizeImage's own lifecycle.
-              final bool needsExplicitLoad = widget.filePath.startsWith('#');
-              if (needsExplicitLoad &&
-                  _networkThumbnailPath == null &&
-                  !_cache.isGeneratingThumbnail(widget.filePath) &&
-                  !ScrollVelocityNotifier.instance.isScrollingFast) {
-                _scheduleLoadWithDelay();
-              }
-            });
-          } else if (info.visibleFraction == 0) {
-            // Immediately handle becoming invisible (no debounce needed)
-            NetworkThumbnailHelper().markInvisible(widget.filePath);
-            _cancelPendingLoad();
-          }
+          _visibleFraction = info.visibleFraction;
+          _updateNetworkVisibility();
         },
-        child: ClipRRect(
-          borderRadius: widget.borderRadius ?? BorderRadius.zero,
-          // PERFORMANCE: Consolidated ValueListenableBuilder to eliminate double rebuilds
-          child: ValueListenableBuilder<bool>(
-            valueListenable: _hasErrorNotifier,
-            builder: (context, hasError, _) {
-              if (hasError) {
-                return RepaintBoundary(child: _buildFallbackWidget());
-              }
-
-              // The image's first decoded frame controls its placeholder.
-              return RepaintBoundary(child: _buildThumbnailContent());
-            },
-          ),
-        ),
+        child: content,
       ),
     );
   }
@@ -878,7 +872,7 @@ class _ThumbnailLoaderState extends State<ThumbnailLoader>
       key: ValueKey('photo-${widget.filePath}-$_thumbnailVersion'),
       image: ResizeImage(
         FileImage(File(widget.filePath)),
-        width: 512,
+        width: widget.localImageDecodeWidth ?? 512,
         allowUpscaling: false,
         policy: ResizeImagePolicy.fit,
       ),

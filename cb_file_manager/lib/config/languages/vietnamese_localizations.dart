@@ -3681,6 +3681,10 @@ class VietnameseLocalizations implements AppLocalizations {
   String get connectToSmbServer => 'Kết nối đến máy chủ SMB để xem tại đây';
 
   @override
+  String get mountSmbShareHint =>
+      'Mở thư mục chia sẻ SMB trong trình quản lý tệp của hệ điều hành, rồi làm mới tại đây.';
+
+  @override
   String get connected => 'Đã kết nối';
 
   @override

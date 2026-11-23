@@ -30,6 +30,7 @@ import kotlinx.coroutines.delay
 class MobileSmbNativePlugin: FlutterPlugin, MethodCallHandler {
   private lateinit var channel : MethodChannel
   private lateinit var binding: FlutterPlugin.FlutterPluginBinding
+  private lateinit var playbackChannel: SmbPlaybackChannel
   private var smbFile: SmbFile? = null
   private var isConnected = false
   private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -107,6 +108,7 @@ class MobileSmbNativePlugin: FlutterPlugin, MethodCallHandler {
     
     // Initialize JCIFS configuration
     initializeJcifs()
+    playbackChannel = SmbPlaybackChannel(flutterPluginBinding.binaryMessenger)
 
     // VLC platform view registration removed - now using flutter_vlc_player
   }
@@ -1194,6 +1196,7 @@ class MobileSmbNativePlugin: FlutterPlugin, MethodCallHandler {
   }
 
   override fun onDetachedFromEngine(@NonNull binding: FlutterPlugin.FlutterPluginBinding) {
+    playbackChannel.detach()
     channel.setMethodCallHandler(null)
     // Clean up event channels
     eventChannels.values.forEach { it.setStreamHandler(null) }

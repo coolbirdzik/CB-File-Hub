@@ -1590,6 +1590,7 @@ abstract class AppLocalizations {
   String get discoveredSmbServersDescription;
   String get noActiveSmbConnections;
   String get connectToSmbServer;
+  String get mountSmbShareHint;
   String get connected;
   String get openConnection;
   String get disconnect;

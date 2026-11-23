@@ -7,6 +7,7 @@ import 'package:media_kit/media_kit.dart' as mk;
 import 'package:media_kit_video/media_kit_video.dart' as video;
 
 import '../../helpers/core/path_utils.dart';
+import '../network_browsing/desktop_smb_mounts.dart';
 import '../network_browsing/smb_service.dart';
 import '../streaming/smb_http_proxy_server.dart';
 import 'media_language_labels.dart';
@@ -170,6 +171,47 @@ class PlaybackPlayer {
   mk.PlayerState get state => _player.state;
   mk.PlayerStream get stream => _player.stream;
 
+  /// Samples the active SMB source in bytes per second while listened to.
+  Stream<int?> sampleSmbReadSpeed() {
+    final proxy = SmbHttpProxyServer.instance;
+    final clock = Stopwatch()..start();
+    var previousUrl = _proxyUrl;
+    var previousBytes = previousUrl == null
+        ? 0
+        : proxy.bytesRead(previousUrl) ?? 0;
+    var previousMicros = 0;
+
+    return Stream<void>.periodic(const Duration(seconds: 1)).asyncMap((
+      _,
+    ) async {
+      if (_disposal != null) return null;
+      final micros = clock.elapsedMicroseconds;
+      final elapsed = micros - previousMicros;
+      previousMicros = micros;
+      if (_proxyUrl case final url?) {
+        final bytes = proxy.bytesRead(url);
+        if (bytes == null) return null;
+        final bytesRead = bytes - (previousUrl == url ? previousBytes : 0);
+        previousUrl = url;
+        previousBytes = bytes;
+        return elapsed > 0
+            ? (bytesRead * Duration.microsecondsPerSecond / elapsed).round()
+            : null;
+      }
+
+      // For UNC paths and mounted SMB files, mpv reports input throughput.
+      if (_player.platform case final mk.NativePlayer native
+          when Uri.tryParse(_subtitleCacheSource ?? '')?.scheme == 'smb') {
+        try {
+          return int.tryParse(await native.getProperty('cache-speed'));
+        } catch (_) {
+          // The property can be unavailable during open or teardown.
+        }
+      }
+      return null;
+    }).distinct();
+  }
+
   /// Playback intent stays synchronous while native state events catch up.
   bool get playRequested => _playRequested;
 
@@ -207,8 +249,15 @@ class PlaybackPlayer {
         }
         source = smbMrlToUnc(source);
       } else {
-        _proxyUrl = await SmbHttpProxyServer.instance.urlFor(source);
-        source = _proxyUrl.toString();
+        final mountedFile = DesktopSmbMount.isSupported
+            ? await DesktopSmbMount.resolveFile(uri)
+            : null;
+        if (mountedFile != null) {
+          source = mountedFile;
+        } else {
+          _proxyUrl = await SmbHttpProxyServer.instance.urlFor(source);
+          source = _proxyUrl.toString();
+        }
       }
     }
     if (_disposal != null) return;

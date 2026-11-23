@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 import 'smb_file.dart';
 import 'smb_connection_config.dart';
@@ -75,6 +77,13 @@ abstract class MobileSmbNativePlatform extends PlatformInterface {
     throw UnimplementedError('getFileInfo() has not been implemented.');
   }
 
+  /// Opens an independent, forward-only playback reader where supported.
+  /// A null result means the caller should use the existing stream API.
+  Future<SmbPlaybackReader?> openPlaybackReader(
+    SmbConnectionConfig config,
+    String path,
+  ) async => null;
+
   /// Open file for streaming read
   Stream<List<int>>? openFileStream(String path) {
     throw UnimplementedError('openFileStream() has not been implemented.');
@@ -108,4 +117,10 @@ abstract class MobileSmbNativePlatform extends PlatformInterface {
     throw UnimplementedError(
         'seekFileStreamOptimized() has not been implemented.');
   }
+}
+
+abstract interface class SmbPlaybackReader {
+  int get fileSize;
+  Future<Uint8List> read(int offset, int length);
+  Future<void> close();
 }
