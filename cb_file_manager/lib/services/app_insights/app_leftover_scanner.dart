@@ -135,11 +135,7 @@ class AppLeftoverScanner {
     List<String> paths, {
     void Function(AppLeftoverScanProgress progress)? onProgress,
   }) {
-    return AppLeftoverMeasureJob._start(
-      paths,
-      maxEntriesPerFolder,
-      onProgress,
-    );
+    return AppLeftoverMeasureJob._start(paths, maxEntriesPerFolder, onProgress);
   }
 }
 

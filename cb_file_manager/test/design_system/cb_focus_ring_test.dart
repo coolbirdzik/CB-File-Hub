@@ -19,7 +19,9 @@ void main() {
       final boundary = GlobalKey();
       await tester.pumpWidget(
         MaterialApp(
-          theme: dark ? ThemeConfig.getDarkTheme() : ThemeConfig.getLightTheme(),
+          theme: dark
+              ? ThemeConfig.getDarkTheme()
+              : ThemeConfig.getLightTheme(),
           home: Scaffold(
             body: Center(
               child: RepaintBoundary(
