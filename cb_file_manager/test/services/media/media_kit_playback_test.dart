@@ -300,7 +300,10 @@ void main() {
       ),
       isTrue,
     );
-    expect(PlaybackPlayer.isLikelyLargeVideoSource('demo_4K_60fps.mkv'), isTrue);
+    expect(
+      PlaybackPlayer.isLikelyLargeVideoSource('demo_4K_60fps.mkv'),
+      isTrue,
+    );
     expect(PlaybackPlayer.isLikelyLargeVideoSource('clip_1080p.mp4'), isFalse);
   });
 }

@@ -120,17 +120,20 @@ void main() {
     },
   );
 
-  test('previewTextureSize caps 8K VR aspect ratios to small even textures', () {
-    final vr8k = VideoSeekPreviewController.previewTextureSize(7680 / 3840);
-    expect(vr8k.width, lessThanOrEqualTo(320));
-    expect(vr8k.height, lessThanOrEqualTo(240));
-    expect(vr8k.width.isEven, isTrue);
-    expect(vr8k.height.isEven, isTrue);
+  test(
+    'previewTextureSize caps 8K VR aspect ratios to small even textures',
+    () {
+      final vr8k = VideoSeekPreviewController.previewTextureSize(7680 / 3840);
+      expect(vr8k.width, lessThanOrEqualTo(320));
+      expect(vr8k.height, lessThanOrEqualTo(240));
+      expect(vr8k.width.isEven, isTrue);
+      expect(vr8k.height.isEven, isTrue);
 
-    final portrait = VideoSeekPreviewController.previewTextureSize(9 / 16);
-    expect(portrait.width, lessThanOrEqualTo(320));
-    expect(portrait.height, lessThanOrEqualTo(240));
-    expect(portrait.width.isEven, isTrue);
-    expect(portrait.height.isEven, isTrue);
-  });
+      final portrait = VideoSeekPreviewController.previewTextureSize(9 / 16);
+      expect(portrait.width, lessThanOrEqualTo(320));
+      expect(portrait.height, lessThanOrEqualTo(240));
+      expect(portrait.width.isEven, isTrue);
+      expect(portrait.height.isEven, isTrue);
+    },
+  );
 }
