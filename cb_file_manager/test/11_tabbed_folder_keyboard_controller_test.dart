@@ -250,6 +250,12 @@ void main() {
       ),
     );
 
+    // The bloc can catch up before the list has rendered its new widgets.
+    // Draining microtasks must not drop the pointer/key feedback early.
+    await tester.idle();
+    expect(oldSelection.value, isFalse);
+    expect(newSelection.value, isTrue);
+
     // Keep the existing row style for this frame, then hand control back to
     // SelectionBloc without any second overlay or visible transition.
     expect(oldSelection.value, isFalse);
@@ -257,6 +263,37 @@ void main() {
     await tester.pump();
     expect(oldSelection.value, isNull);
     expect(newSelection.value, isNull);
+  });
+
+  testWidgets('an older frame cannot clear a newer immediate selection', (
+    tester,
+  ) async {
+    final controller = TabbedFolderKeyboardController();
+    addTearDown(controller.dispose);
+    final selected = controller.immediateSelectionForPath('second.mp4');
+    controller.showImmediateSelection({
+      'first.mp4',
+    }, currentSelectedPaths: const []);
+    controller.syncFromSelection(
+      const SelectionState(
+        selectedFilePaths: {'first.mp4'},
+        lastSelectedPath: 'first.mp4',
+      ),
+    );
+    controller.showImmediateSelection(
+      {'second.mp4'},
+      currentSelectedPaths: const ['first.mp4'],
+    );
+    await tester.pump();
+    expect(selected.value, isTrue);
+    controller.syncFromSelection(
+      const SelectionState(
+        selectedFilePaths: {'second.mp4'},
+        lastSelectedPath: 'second.mp4',
+      ),
+    );
+    await tester.pump();
+    expect(selected.value, isNull);
   });
 
   testWidgets('11.03 Interaction without long press reacts on pointer down', (

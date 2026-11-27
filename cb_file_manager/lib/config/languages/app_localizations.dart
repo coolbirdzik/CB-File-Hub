@@ -1,6 +1,9 @@
 import 'package:material_ui/material_ui.dart';
 
 abstract class AppLocalizations {
+  String deleteQueued(int count, bool permanent);
+  String get viewOperationProgress;
+
   String get cutInPlace;
   String get cutChooseOtherFolder;
   String get cutInPlaceHint;
@@ -3301,6 +3304,10 @@ abstract class AppLocalizations {
   String subtitleRuleVideoCount(int count);
   String subtitleQueueStartRule(String name);
   String subtitleQueueRunScope(String name);
+  String get subtitleQueueProcessingOrder;
+  String get subtitleQueueProcessingOrderHint;
+  String get subtitleQueueOldestFirst;
+  String get subtitleQueueNewestFirst;
   String get subtitleQueueParallelJobs;
   String get subtitleQueueParallelHint;
   String subtitleQueueParallelOption(int count);

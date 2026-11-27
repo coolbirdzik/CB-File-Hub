@@ -2,6 +2,13 @@ import 'app_localizations.dart';
 
 class VietnameseLocalizations implements AppLocalizations {
   @override
+  String deleteQueued(int count, bool permanent) => permanent
+      ? 'Đã thêm $count mục vào hàng đợi xóa vĩnh viễn.'
+      : 'Đã thêm $count mục vào hàng đợi chuyển vào Thùng rác.';
+  @override
+  String get viewOperationProgress => 'Xem tiến trình';
+
+  @override
   String get cutInPlace => 'Xuất tại chỗ';
   @override
   String get cutChooseOtherFolder => 'Chọn thư mục khác';
@@ -7703,6 +7710,14 @@ class VietnameseLocalizations implements AppLocalizations {
   String subtitleQueueStartRule(String name) => 'Chạy “$name”';
   @override
   String subtitleQueueRunScope(String name) => 'Đang chạy: $name';
+  @override
+  String get subtitleQueueProcessingOrder => 'Thứ tự tạo phụ đề';
+  @override
+  String get subtitleQueueProcessingOrderHint => 'Theo ngày sửa đổi video gốc';
+  @override
+  String get subtitleQueueOldestFirst => 'Cũ nhất trước';
+  @override
+  String get subtitleQueueNewestFirst => 'Mới nhất trước';
   @override
   String get subtitleQueueParallelJobs => 'Số video chạy cùng lúc';
   @override

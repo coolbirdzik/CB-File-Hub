@@ -2,6 +2,13 @@ import 'app_localizations.dart';
 
 class EnglishLocalizations implements AppLocalizations {
   @override
+  String deleteQueued(int count, bool permanent) => permanent
+      ? '$count item(s) added to the permanent deletion queue.'
+      : '$count item(s) queued to move to the Recycle Bin.';
+  @override
+  String get viewOperationProgress => 'View progress';
+
+  @override
   String get cutInPlace => 'Export here';
   @override
   String get cutChooseOtherFolder => 'Choose another folder';
@@ -7724,6 +7731,15 @@ class EnglishLocalizations implements AppLocalizations {
   String subtitleQueueStartRule(String name) => 'Run “$name”';
   @override
   String subtitleQueueRunScope(String name) => 'Running: $name';
+  @override
+  String get subtitleQueueProcessingOrder => 'Processing order';
+  @override
+  String get subtitleQueueProcessingOrderHint =>
+      'Source video modification date';
+  @override
+  String get subtitleQueueOldestFirst => 'Oldest first';
+  @override
+  String get subtitleQueueNewestFirst => 'Newest first';
   @override
   String get subtitleQueueParallelJobs => 'Videos at once';
   @override

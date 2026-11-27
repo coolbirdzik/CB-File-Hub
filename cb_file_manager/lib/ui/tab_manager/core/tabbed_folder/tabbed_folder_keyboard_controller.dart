@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:io';
 import 'package:cb_file_manager/helpers/core/desktop_shortcuts.dart';
 import 'package:cb_file_manager/ui/components/common/file_keyboard_shortcuts.dart';
@@ -116,10 +115,14 @@ class TabbedFolderKeyboardController {
     }
 
     final generation = ++_immediateSelectionGeneration;
-    scheduleMicrotask(() {
+    // The outer selection builder can catch up before layout has updated the
+    // grid's item widgets. Keep the immediate highlight through that frame;
+    // a microtask can otherwise expose the tile's old isSelected value.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       if (generation != _immediateSelectionGeneration) return;
       clearImmediateSelection();
     });
+    WidgetsBinding.instance.ensureVisualUpdate();
   }
 
   GlobalKey itemKeyForPath(String path) {

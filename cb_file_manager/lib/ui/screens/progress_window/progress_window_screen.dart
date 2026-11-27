@@ -7,6 +7,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:cb_file_manager/config/translation_helper.dart';
+import 'package:cb_file_manager/ui/widgets/operation_activity.dart';
 
 /// Enum trạng thái progress (mirror OperationProgressStatus không import controller)
 enum _ProgressStatus { running, success, error }
@@ -202,6 +203,8 @@ class _ProgressWindowScreenState extends State<ProgressWindowScreen>
   bool get _isFinished => _status != _ProgressStatus.running;
 
   double? get _progressFraction {
+    if (_status == _ProgressStatus.success) return 1;
+    if (!_isRunning && (_isIndeterminate || _total <= 0)) return 0;
     if (_isIndeterminate) return null;
     if (_total <= 0) return null;
     return (_completed / _total).clamp(0.0, 1.0);
@@ -229,9 +232,14 @@ class _ProgressWindowScreenState extends State<ProgressWindowScreen>
         break;
     }
 
+    final fraction = _progressFraction;
     final label = _isRunning
-        ? (_isIndeterminate ? 'Processing...' : '$_completed / $_total')
-        : (_status == _ProgressStatus.success ? 'Done' : 'Error');
+        ? (fraction == null
+              ? context.tr.processing
+              : '$_completed / $_total · ${(fraction * 100).round()}%')
+        : (_status == _ProgressStatus.success
+              ? context.tr.done
+              : context.tr.errorTitle);
 
     final bgColor = isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF5F5F5);
     final titleBarColor = isDark
@@ -292,7 +300,11 @@ class _ProgressWindowScreenState extends State<ProgressWindowScreen>
               children: [
                 Row(
                   children: [
-                    Icon(icon, size: 18, color: accent),
+                    OperationActivityIcon(
+                      running: _isRunning,
+                      icon: icon,
+                      color: accent,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Column(
@@ -324,14 +336,10 @@ class _ProgressWindowScreenState extends State<ProgressWindowScreen>
                   ],
                 ),
                 const SizedBox(height: 8),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(99),
-                  child: LinearProgressIndicator(
-                    value: _progressFraction,
-                    minHeight: 7,
-                    backgroundColor: isDark ? Colors.white12 : Colors.black12,
-                    valueColor: AlwaysStoppedAnimation<Color>(accent),
-                  ),
+                OperationProgressBar(
+                  value: fraction,
+                  backgroundColor: isDark ? Colors.white12 : Colors.black12,
+                  color: accent,
                 ),
               ],
             ),

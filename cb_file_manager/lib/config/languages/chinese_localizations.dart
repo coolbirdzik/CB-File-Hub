@@ -2,6 +2,12 @@ import 'app_localizations.dart';
 
 class ChineseLocalizations implements AppLocalizations {
   @override
+  String deleteQueued(int count, bool permanent) =>
+      permanent ? '已将 $count 个项目加入永久删除队列。' : '已将 $count 个项目加入移至回收站的队列。';
+  @override
+  String get viewOperationProgress => '查看进度';
+
+  @override
   String get cutInPlace => '原位导出';
   @override
   String get cutChooseOtherFolder => '选择其他文件夹';
@@ -7209,6 +7215,14 @@ class ChineseLocalizations implements AppLocalizations {
   String subtitleQueueStartRule(String name) => '运行“$name”';
   @override
   String subtitleQueueRunScope(String name) => '运行范围：$name';
+  @override
+  String get subtitleQueueProcessingOrder => '字幕生成顺序';
+  @override
+  String get subtitleQueueProcessingOrderHint => '按原视频修改日期';
+  @override
+  String get subtitleQueueOldestFirst => '最旧优先';
+  @override
+  String get subtitleQueueNewestFirst => '最新优先';
   @override
   String get subtitleQueueParallelJobs => '同时处理的视频';
   @override

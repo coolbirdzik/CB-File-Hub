@@ -254,6 +254,49 @@ void main() {
     );
 
     test(
+      'processing priority is saved and can change while a job runs',
+      () async {
+        final older = await video('old.mp4');
+        final newer = await video('new.mp4');
+        final tied = await video('tie.mp4');
+        final missing = p.join(sandbox.path, 'unknown.mp4');
+        await File(older).setLastModified(DateTime(2025, 1, 1));
+        await File(tied).setLastModified(DateTime(2025, 1, 1));
+        await File(newer).setLastModified(DateTime(2025, 2, 1));
+        await store.enqueue(
+          [missing, newer, older, tied],
+          settings: _settings,
+          ruleName: 'r',
+        );
+        expect(await store.processingOrder(), SubtitleBatchOrder.newestFirst);
+        final running = (await store.claimNext())!;
+        expect(running.path, newer);
+
+        await store.setProcessingOrder(SubtitleBatchOrder.oldestFirst);
+        final reopened = SubtitleBatchStore(openDatabase: () async => db);
+        expect(
+          await reopened.processingOrder(),
+          SubtitleBatchOrder.oldestFirst,
+        );
+        expect((await reopened.jobs()).map((j) => j.path), [
+          newer,
+          older,
+          tied,
+          missing,
+        ]);
+        expect(
+          (await reopened.job(running.id))!.status,
+          SubtitleBatchStatus.running,
+        );
+        expect((await reopened.claimNext())!.path, older);
+        expect((await reopened.claimNext())!.path, tied);
+        expect((await reopened.claimNext())!.path, missing);
+        await reopened.setProcessingOrder(SubtitleBatchOrder.newestFirst);
+        expect(await store.processingOrder(), SubtitleBatchOrder.newestFirst);
+      },
+    );
+
+    test(
       'cached database is migrated before date-dependent queries without resetting jobs',
       () async {
         final path = await video('existing.mp4');

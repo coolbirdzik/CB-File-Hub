@@ -107,6 +107,7 @@ class _SubtitleQueueScreenState extends State<SubtitleQueueScreen> {
   bool _runRequested = false;
   bool _pauseWhileWatching = true;
   int _parallelJobs = SubtitleBatchStore.autoParallelJobs;
+  SubtitleBatchOrder _processingOrder = SubtitleBatchOrder.newestFirst;
   bool _loaded = false;
   bool _scanning = false;
   bool _cleaning = false;
@@ -350,6 +351,7 @@ class _SubtitleQueueScreenState extends State<SubtitleQueueScreen> {
         _store.pauseWhileWatching(),
         _store.runRule(),
         _store.parallelJobs(),
+        _store.processingOrder(),
         if (rules || !_loaded) _store.rules(),
       ]);
       if (!mounted) return;
@@ -369,8 +371,9 @@ class _SubtitleQueueScreenState extends State<SubtitleQueueScreen> {
         _pauseWhileWatching = results[5] as bool;
         _runRule = results[6] as int?;
         _parallelJobs = results[7] as int;
-        if (results.length > 8) {
-          _rules = results[8] as List<SubtitleBatchRule>;
+        _processingOrder = results[8] as SubtitleBatchOrder;
+        if (results.length > 9) {
+          _rules = results[9] as List<SubtitleBatchRule>;
           // The selected rule was deleted, maybe in another window.
           if (_ruleFilter != null && _selectedRule == null) {
             _ruleFilter = null;
@@ -918,6 +921,34 @@ class _SubtitleQueueScreenState extends State<SubtitleQueueScreen> {
                 _queue.schedule();
                 await _reload();
               },
+            ),
+            ContextMenuAction(
+              id: 'subtitle-processing-order',
+              label: l.subtitleQueueProcessingOrder,
+              icon: PhosphorIconsLight.sortAscending,
+              childSections: [
+                ContextMenuSection(
+                  title: l.subtitleQueueProcessingOrderHint,
+                  actions: [
+                    for (final order in SubtitleBatchOrder.values)
+                      ContextMenuAction(
+                        id: 'subtitle-order-${order.name}',
+                        label: order == SubtitleBatchOrder.oldestFirst
+                            ? l.subtitleQueueOldestFirst
+                            : l.subtitleQueueNewestFirst,
+                        icon: order == SubtitleBatchOrder.oldestFirst
+                            ? PhosphorIconsLight.sortAscending
+                            : PhosphorIconsLight.sortDescending,
+                        isChecked: _processingOrder == order,
+                        onSelected: (_) async {
+                          await _store.setProcessingOrder(order);
+                          _queue.schedule();
+                          await _reload();
+                        },
+                      ),
+                  ],
+                ),
+              ],
             ),
             ContextMenuAction(
               id: 'subtitle-parallel-jobs',

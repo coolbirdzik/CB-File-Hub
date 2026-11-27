@@ -2,6 +2,13 @@ import 'app_localizations.dart';
 
 class TurkishLocalizations implements AppLocalizations {
   @override
+  String deleteQueued(int count, bool permanent) => permanent
+      ? '$count öğe kalıcı silme kuyruğuna eklendi.'
+      : '$count öğe Geri Dönüşüm Kutusuna taşıma kuyruğuna eklendi.';
+  @override
+  String get viewOperationProgress => 'İlerlemeyi görüntüle';
+
+  @override
   String get cutInPlace => 'Buraya dışa aktar';
   @override
   String get cutChooseOtherFolder => 'Başka klasör seç';
@@ -7780,6 +7787,15 @@ class TurkishLocalizations implements AppLocalizations {
   String subtitleQueueStartRule(String name) => '“$name” çalıştır';
   @override
   String subtitleQueueRunScope(String name) => 'Çalışan: $name';
+  @override
+  String get subtitleQueueProcessingOrder => 'Altyazı oluşturma sırası';
+  @override
+  String get subtitleQueueProcessingOrderHint =>
+      'Kaynak videonun değiştirilme tarihi';
+  @override
+  String get subtitleQueueOldestFirst => 'Önce en eski';
+  @override
+  String get subtitleQueueNewestFirst => 'Önce en yeni';
   @override
   String get subtitleQueueParallelJobs => 'Aynı anda işlenen video';
   @override

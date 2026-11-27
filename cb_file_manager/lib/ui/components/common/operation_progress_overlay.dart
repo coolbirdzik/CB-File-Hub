@@ -12,6 +12,7 @@ import 'package:cb_file_manager/design_system/primitives/cb_panel_reveal.dart';
 import 'package:cb_file_manager/design_system/cb_tokens.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/config/translation_helper.dart';
+import 'package:cb_file_manager/ui/widgets/operation_activity.dart';
 
 class OperationProgressOverlay extends StatefulWidget {
   const OperationProgressOverlay({super.key});
@@ -635,7 +636,12 @@ class _StatusCenterTaskTile extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(_statusIcon(entry.status), size: 20, color: color),
+                OperationActivityIcon(
+                  running: entry.isRunning,
+                  icon: _statusIcon(entry.status),
+                  size: 22,
+                  color: color,
+                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
@@ -675,10 +681,8 @@ class _StatusCenterTaskTile extends StatelessWidget {
             // done or failed, so a leftover bar just looks like it is loading.
             if (entry.isRunning) ...[
               const SizedBox(height: 10),
-              LinearProgressIndicator(
+              OperationProgressBar(
                 value: entry.isIndeterminate ? null : entry.progressFraction,
-                minHeight: 7,
-                borderRadius: BorderRadius.circular(999),
                 color: color,
               ),
             ],
@@ -723,6 +727,10 @@ class _StatusCenterTaskTile extends StatelessWidget {
   String _statusText(AppLocalizations l10n, OperationProgressEntry entry) {
     if (entry.isRunning) {
       if (entry.isIndeterminate) return l10n.processing;
+      if (entry.kind == OperationProgressKind.delete) {
+        return '${entry.completed} / ${entry.total} · '
+            '${(entry.progressFraction * 100).toStringAsFixed(0)}%';
+      }
       return '${(entry.progressFraction * 100).toStringAsFixed(0)}%';
     }
     return entry.status == OperationProgressStatus.success

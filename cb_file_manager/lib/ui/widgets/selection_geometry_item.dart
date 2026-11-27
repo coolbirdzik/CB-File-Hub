@@ -1,12 +1,34 @@
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
+import 'file_deletion_overlay.dart';
 
 import '../tab_manager/core/tabbed_folder/tabbed_folder_drag_selection_controller.dart';
 
 /// Registers geometry without rebuilding or measuring each tile every frame.
-class SelectionGeometryItem extends SingleChildRenderObjectWidget {
+class SelectionGeometryItem extends StatelessWidget {
   const SelectionGeometryItem({
     super.key,
+    required this.path,
+    required this.controller,
+    this.isFolder,
+    required this.child,
+  });
+  final String path;
+  final bool? isFolder;
+  final TabbedFolderDragSelectionController? controller;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => _SelectionGeometryRegistration(
+    path: path,
+    controller: controller,
+    isFolder: isFolder,
+    child: FileDeletionOverlay(path: path, child: child),
+  );
+}
+
+class _SelectionGeometryRegistration extends SingleChildRenderObjectWidget {
+  const _SelectionGeometryRegistration({
     required this.path,
     required this.controller,
     this.isFolder,

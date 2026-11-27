@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/services/pending_file_deletions.dart';
 import 'dart:io';
 import 'package:cb_file_manager/config/languages/current_localizations.dart';
 
@@ -75,9 +76,27 @@ class FileOperationsBloc
     on<FileOperationsCopy>(_onCopy);
     on<FileOperationsCut>(_onCut);
     on<FileOperationsPaste>(_onPaste);
-    on<FileOperationsDeleteFiles>(_onDeleteFiles);
-    on<FileOperationsDeleteItems>(_onDeleteItems);
-    on<FileOperationsRetryDeleteAsAdministrator>(_onRetryDeleteAsAdministrator);
+    on<FileOperationsDeleteFiles>(
+      (event, emit) => PendingFileDeletions.instance.track(
+        event.filePaths,
+        () => _onDeleteFiles(event, emit),
+      ),
+    );
+    on<FileOperationsDeleteItems>(
+      (event, emit) => PendingFileDeletions.instance.track([
+        ...event.filePaths,
+        ...event.folderPaths,
+      ], () => _onDeleteItems(event, emit)),
+    );
+    on<FileOperationsRetryDeleteAsAdministrator>(
+      (event, emit) => PendingFileDeletions.instance.track(
+        retainApprovedRetryPaths(
+          approvedPaths: state.retryableElevatedDeletePaths,
+          requestedPaths: event.failedPaths,
+        ),
+        () => _onRetryDeleteAsAdministrator(event, emit),
+      ),
+    );
     on<FileOperationsRename>(_onRename);
     on<FileOperationsClearClipboard>(_onClearClipboard);
   }
@@ -226,6 +245,7 @@ class FileOperationsBloc
   ) async {
     final targetPaths = event.filePaths.toSet();
     if (targetPaths.isEmpty) return;
+
     emit(
       state.copyWith(
         error: null,
@@ -338,6 +358,7 @@ class FileOperationsBloc
   ) async {
     final Set<String> targets = {...event.filePaths, ...event.folderPaths};
     if (targets.isEmpty) return;
+
     emit(
       state.copyWith(
         error: null,
@@ -636,11 +657,9 @@ class FileOperationsBloc
 }
 
 class _ProgressUpdateThrottle {
-  static const int _minimumItemInterval = 10;
   static const Duration _minimumTimeInterval = Duration(milliseconds: 120);
 
   final Stopwatch _stopwatch = Stopwatch()..start();
-  int _lastCompleted = 0;
 
   void maybeUpdate({
     required int completed,
@@ -649,14 +668,15 @@ class _ProgressUpdateThrottle {
   }) {
     final isFirst = completed == 1;
     final isLast = completed >= total;
-    final enoughItems = completed - _lastCompleted >= _minimumItemInterval;
     final enoughTime = _stopwatch.elapsed >= _minimumTimeInterval;
 
-    if (!isFirst && !isLast && !enoughItems && !enoughTime) {
+    // A fast disk can finish thousands of items between frames. An item-count
+    // bypass floods all controller listeners (including native taskbar calls).
+    // Keep the first/final state immediate and cap intermediate notifications.
+    if (!isFirst && !isLast && !enoughTime) {
       return;
     }
 
-    _lastCompleted = completed;
     _stopwatch
       ..reset()
       ..start();

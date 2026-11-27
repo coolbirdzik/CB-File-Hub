@@ -42,6 +42,7 @@ void main() {
     expect(find.text(r'C:\cache\next'), findsOneWidget);
     progress.value = (300, 1200, r'C:\cache\delete.tmp');
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 240));
     expect(find.text('Preparing files · 1200 found'), findsNothing);
     expect(
       tester

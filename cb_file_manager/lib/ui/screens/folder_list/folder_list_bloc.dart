@@ -128,12 +128,17 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
 
   @override
   Future<void> close() async {
+    // Stop accepting events immediately, but keep children open until queued
+    // facade handlers have finished forwarding their events. Closing both in
+    // parallel lets a tab closed during restore send events to closed children.
     await Future.wait<void>([
       super.close(),
       if (_navSubscription != null) _navSubscription!.cancel(),
       if (_opsSubscription != null) _opsSubscription!.cancel(),
       if (_tagSubscription != null) _tagSubscription!.cancel(),
       if (_tagChangeSubscription != null) _tagChangeSubscription!.cancel(),
+    ]);
+    await Future.wait<void>([
       _navigationBloc.close(),
       _operationsBloc.close(),
       _tagSearchBloc.close(),

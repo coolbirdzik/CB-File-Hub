@@ -10,6 +10,9 @@ import 'subtitle_generated_metadata.dart';
 
 enum SubtitleBatchLease { acquired, renewed, denied }
 
+/// Priority of waiting videos, based on the source file's modification date.
+enum SubtitleBatchOrder { newestFirst, oldestFirst }
+
 /// Rules, jobs and queue state in the application's shared SQLite database.
 /// Every window reads the same tables; [tryLease] keeps a single runner.
 class SubtitleBatchStore {
@@ -502,7 +505,7 @@ class SubtitleBatchStore {
     return rows.single['n'] as int;
   }
 
-  /// Running first, then newest source videos, then the most recent
+  /// Running first, then source videos in the saved processing order, then recent
   /// finished jobs.
   Future<List<SubtitleBatchJob>> jobs({
     Set<SubtitleBatchStatus>? statuses,
@@ -510,6 +513,9 @@ class SubtitleBatchStore {
     int limit = 20000,
   }) async {
     final db = await _databaseWithFileModified();
+    final direction = await processingOrder() == SubtitleBatchOrder.oldestFirst
+        ? 'ASC'
+        : 'DESC';
     final (rule, ruleArgs) = _ruleFilter(ruleId);
     final where = [
       ?rule,
@@ -522,7 +528,8 @@ class SubtitleBatchStore {
       whereArgs: [...ruleArgs, ...?statuses?.map((s) => s.name)],
       orderBy:
           "CASE status WHEN 'running' THEN 0 WHEN 'pending' THEN 1 ELSE 2 END, "
-          "CASE WHEN status = 'pending' THEN NULLIF(file_modified_at, 0) END DESC, "
+          "CASE WHEN status = 'pending' THEN NULLIF(file_modified_at, 0) IS NULL END, "
+          "CASE WHEN status = 'pending' THEN NULLIF(file_modified_at, 0) END $direction, "
           "CASE WHEN status IN ('running', 'pending') THEN id ELSE -updated_at END, id",
       limit: limit,
     );
@@ -565,7 +572,7 @@ class SubtitleBatchStore {
     return result;
   }
 
-  /// Marks the newest modified pending video running, together with its twins in other
+  /// Marks the next pending video in the saved order running, together with its twins in other
   /// rules, and returns it: whichever rule comes first runs it for all.
   ///
   /// [ruleId] runs only that rule's videos; their twins in other rules still
@@ -575,6 +582,9 @@ class SubtitleBatchStore {
   /// parallel jobs never decode the same file or write its cache at once.
   Future<SubtitleBatchJob?> claimNext({int? ruleId}) async {
     final db = await _databaseWithFileModified();
+    final direction = await processingOrder() == SubtitleBatchOrder.oldestFirst
+        ? 'ASC'
+        : 'DESC';
     final (rule, ruleArgs) = _ruleFilter(ruleId);
     return db.runAppTransaction((txn) async {
       final rows = await txn.query(
@@ -589,7 +599,9 @@ class SubtitleBatchStore {
           SubtitleBatchStatus.running.name,
           ...ruleArgs,
         ],
-        orderBy: 'NULLIF(file_modified_at, 0) DESC, id',
+        orderBy:
+            'NULLIF(file_modified_at, 0) IS NULL, '
+            'NULLIF(file_modified_at, 0) $direction, id',
         limit: 1,
       );
       if (rows.isEmpty) return null;
@@ -823,6 +835,15 @@ class SubtitleBatchStore {
 
   /// Stored for [parallelJobs] when the queue picks the number itself.
   static const autoParallelJobs = 0;
+
+  /// Shared across windows and retained after restart. Unknown dates go last.
+  Future<SubtitleBatchOrder> processingOrder() async =>
+      await _get('processing_order') == SubtitleBatchOrder.oldestFirst.name
+      ? SubtitleBatchOrder.oldestFirst
+      : SubtitleBatchOrder.newestFirst;
+
+  Future<void> setProcessingOrder(SubtitleBatchOrder value) =>
+      _put('processing_order', value.name);
 
   /// How many videos are generated at the same time; [autoParallelJobs]
   /// (the default) lets the queue choose from its measured speed.

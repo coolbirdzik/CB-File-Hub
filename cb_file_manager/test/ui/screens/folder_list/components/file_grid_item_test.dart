@@ -38,11 +38,13 @@ void main() {
     await pumpTile(isSelected: false);
     final thumbnail = find.byType(ThumbnailOnly);
     final State initial = tester.state(thumbnail);
+    final initialWidget = tester.widget<ThumbnailOnly>(thumbnail);
 
     // A remount would make a video thumbnail re-read its cache
     // asynchronously and blink for a frame.
     await pumpTile(isSelected: true);
     expect(tester.state(thumbnail), same(initial));
+    expect(tester.widget<ThumbnailOnly>(thumbnail), same(initialWidget));
     await pumpTile(isSelected: false);
     expect(tester.state(thumbnail), same(initial));
   });

@@ -6,6 +6,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../../config/languages/app_localizations.dart';
 import '../../widgets/app_progress_indicator.dart';
+import '../../widgets/operation_activity.dart';
 
 /// The Cleaner's progress bar: a thin rounded accent bar on the control
 /// fill. Null [value] animates as indeterminate.
@@ -17,14 +18,11 @@ class CleanerProgressBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.cbColors;
-    return ClipRRect(
-      borderRadius: CbRadii.all(CbRadii.full),
-      child: LinearProgressIndicator(
-        value: value?.clamp(0.0, 1.0),
-        minHeight: CbSpacing.xs,
-        backgroundColor: CbDecorations.controlFill(c),
-        color: c.accent.base,
-      ),
+    return OperationProgressBar(
+      value: value,
+      height: CbSpacing.xs,
+      backgroundColor: CbDecorations.controlFill(c),
+      color: c.accent.base,
     );
   }
 }
@@ -160,7 +158,12 @@ class CleanerScanStrip extends StatelessWidget {
         children: [
           Row(
             children: [
-              AppWaveLoader(size: CbSizes.iconMd, color: c.accent.base),
+              RepaintBoundary(
+                child: AppWaveLoader(
+                  size: CbSizes.iconMd,
+                  color: c.accent.base,
+                ),
+              ),
               const SizedBox(width: CbSpacing.sm),
               Expanded(
                 child: Text(

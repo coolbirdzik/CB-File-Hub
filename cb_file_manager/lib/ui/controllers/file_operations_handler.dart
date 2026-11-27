@@ -18,6 +18,8 @@ import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_bloc.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:cb_file_manager/ui/components/common/app_toast.dart';
+import 'package:cb_file_manager/ui/components/common/delete_queued_toast.dart';
+import 'package:cb_file_manager/ui/controllers/operation_progress_controller.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cb_file_manager/bloc/selection/selection.dart';
 import 'package:path/path.dart' as path;
@@ -229,12 +231,19 @@ class FileOperationsHandler {
       );
 
       if (confirmed == true) {
+        if (!context.mounted || folderListBloc.isClosed) return;
         folderListBloc.add(
           FolderListDeleteItems(
             filePaths: filesToDelete,
             folderPaths: foldersToDelete,
             permanent: true,
           ),
+        );
+        DeleteQueuedToast.show(
+          context,
+          count: totalCount,
+          permanent: true,
+          controller: locator<OperationProgressController>(),
         );
         if (onDeleteConfirmed != null) {
           onDeleteConfirmed(pathsToDelete, nextFocusPath);
@@ -263,12 +272,19 @@ class FileOperationsHandler {
       );
 
       if (confirmed == true) {
+        if (!context.mounted || folderListBloc.isClosed) return;
         folderListBloc.add(
           FolderListDeleteItems(
             filePaths: filesToDelete,
             folderPaths: foldersToDelete,
             permanent: false,
           ),
+        );
+        DeleteQueuedToast.show(
+          context,
+          count: totalCount,
+          permanent: false,
+          controller: locator<OperationProgressController>(),
         );
         if (onDeleteConfirmed != null) {
           onDeleteConfirmed(pathsToDelete, nextFocusPath);

@@ -233,7 +233,11 @@ The automatic concurrency scaler still samples whole-machine resources to
 avoid exhausting RAM or VRAM; process I/O is not whole-disk utilization.
 
 The queue prioritizes waiting videos by the source file's modification time
-(newest first, insertion order for ties). Dates are captured on enqueue/rescan;
+(newest first by default, insertion order for ties). The queue menu offers
+Processing order → Newest first / Oldest first. This choice is saved in the
+shared database across restarts and windows and applies to the next waiting
+video; running jobs continue. Videos with unknown dates go last in either
+direction. Display sorting does not change processing priority. Dates are captured on enqueue/rescan;
 older databases are backfilled without changing job status or saved progress.
 Each subtitle worker keeps its FFmpeg input open for the current video/audio
 track, reusing its stream information and seek index instead of reopening the

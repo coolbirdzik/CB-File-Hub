@@ -718,6 +718,17 @@ void main() {
         await tester.tap(find.text('2 video'));
         await settle();
         expect(await tester.runAsync(store.parallelJobs), 2);
+        await tester.tap(find.byKey(const ValueKey('subtitle-queue-more')));
+        await settle();
+        await tester.tap(find.text('Thứ tự tạo phụ đề'));
+        await settle();
+        expect(find.text('Theo ngày sửa đổi video gốc'), findsOneWidget);
+        await tester.tap(find.text('Cũ nhất trước'));
+        await settle();
+        expect(
+          await tester.runAsync(store.processingOrder),
+          SubtitleBatchOrder.oldestFirst,
+        );
       },
     );
   });

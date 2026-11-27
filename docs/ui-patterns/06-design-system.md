@@ -162,6 +162,65 @@ cannot detect this regression.
 Coverage: `test/design_system/primitives/cb_pressable_pointer_test.dart` and
 `test/ui/screens/home/drive_browser_content_test.dart`.
 
+### File-browser focus handoff and thumbnail stability
+
+The file grid has an immediate selection notifier for pointer and keyboard
+feedback while `SelectionBloc` catches up. A selected video tile must show its
+outline in the first rendered input frame, without waiting for thumbnail work.
+
+Two regressions made the outline appear a beat late:
+
+- Clearing the immediate notifier in `scheduleMicrotask` once BLoC state matched.
+  The outer selection builder could already see that state while layout had not
+  yet updated the inner grid items. Clearing early exposed an item's previous
+  `isSelected` value.
+- Creating a new `ThumbnailOnly` widget on every selection/hover rebuild. A stable
+  key kept its State mounted, but its video thumbnail subtree still rebuilt on
+  the input path. Keeping State alive alone does not avoid this work.
+
+Preserve these implementation rules when changing selection, theme styling or
+thumbnail layout:
+
+1. In `TabbedFolderKeyboardController._settleImmediateSelection`, keep immediate
+   feedback through the current frame. Hand control back with
+   `WidgetsBinding.instance.addPostFrameCallback`, not a microtask, timer or
+   delayed animation. Keep the generation guard so an older callback cannot
+   clear a newer click/key selection or access a disposed controller. Use
+   `ensureVisualUpdate()` so a handoff requested outside build gets a frame.
+2. In `FileGridItem`, reuse the thumbnail widget when only selection, focus or
+   hover changes. Recreate it when the file path or thumbnail-specific inputs
+   change. Preserve stable keys and subtree structure; do not key thumbnails by
+   selection. Theme and layout dependencies must still update normally.
+3. Paint selection/focus styling immediately. Do not add a debounce, fade or
+   animation delay to the outline, or wait for a video thumbnail/cache read.
+   Preserve the existing deferred click on an already-selected drag source so
+   multi-item dragging and double-click opening continue to work.
+
+Regression coverage (paths below are relative to `cb_file_manager/`):
+
+- `test/11_tabbed_folder_keyboard_controller_test.dart`: drain microtasks before
+  painting and assert the immediate selection remains; pump a frame and assert
+  the handoff completes; ensure an older frame cannot clear a newer selection.
+- `test/ui/screens/folder_list/components/file_grid_item_test.dart`: changing
+  selection preserves both the thumbnail State **and widget instance**, and
+  double-clicking the filename still opens the file.
+- `test/ui/components/common/optimized_interaction_handler_test.dart`: mouse-down
+  selects before release, with the selected-item drag and double-click contracts
+  preserved.
+
+Run these widget checks from `cb_file_manager/`:
+
+```bash
+flutter test --no-pub test/11_tabbed_folder_keyboard_controller_test.dart test/ui/screens/folder_list/components/file_grid_item_test.dart test/ui/components/common/optimized_interaction_handler_test.dart
+```
+
+For a visual smoke check, click unselected video thumbnails and move rapidly
+between them with arrow keys, including Shift+Arrow. Watch the outline on the
+first input frame and check that thumbnails do not blink or reload. Repeat with
+warm and pending thumbnails. Passing widget tests does not establish live
+Windows rendering latency; report that separately. E2E execution still requires
+explicit authorization under `AGENTS.md`.
+
 ## Command palette (Ctrl/⌘+K)
 
 `ui/components/command_palette/` is the Raycast-style launcher: a frosted, hairline-edged window with a borderless search row, grouped results and a footer of key hints. `showCommandPalette` takes items that are ready now, a `deferredItems` future merged in when it resolves (so the palette opens instantly), and `itemsForQuery` for query-dependent rows. `rankCommandPaletteItems` keeps section order and ranks titles by prefix, word start, then substring, using `TextUtils.searchKey`, so matching is accent-insensitive.

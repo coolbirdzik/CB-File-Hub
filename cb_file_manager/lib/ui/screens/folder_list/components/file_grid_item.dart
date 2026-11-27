@@ -70,6 +70,7 @@ class FileGridItem extends StatefulWidget {
 
 class _FileGridItemState extends State<FileGridItem> {
   bool _isHovering = false;
+  late Widget _thumbnail;
   late List<String> _fileTags;
   StreamSubscription? _tagChangeSubscription;
 
@@ -135,6 +136,7 @@ class _FileGridItemState extends State<FileGridItem> {
   @override
   void initState() {
     super.initState();
+    _thumbnail = _createThumbnail();
     // Initialize from state if available; will be refreshed from TagManager on first event
     final shouldUseTags = widget.showFileTags && widget.state != null;
     _fileTags = shouldUseTags
@@ -157,6 +159,9 @@ class _FileGridItemState extends State<FileGridItem> {
   @override
   void didUpdateWidget(FileGridItem oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.file.path != oldWidget.file.path) {
+      _thumbnail = _createThumbnail();
+    }
     // Sync from state when bloc emits a new state (e.g. after reload)
     if (widget.state != oldWidget.state) {
       final newTags = widget.state?.getTagsForFile(widget.file.path) ?? [];
@@ -166,6 +171,12 @@ class _FileGridItemState extends State<FileGridItem> {
       }
     }
   }
+
+  Widget _createThumbnail() => ThumbnailOnly(
+    key: ValueKey('thumb-only-${widget.file.path}'),
+    file: widget.file,
+    iconSize: 48.0,
+  );
 
   void _onTagChanged(String changedFilePath) {
     // Handle global notifications
@@ -366,11 +377,7 @@ class _FileGridItemState extends State<FileGridItem> {
                       fit: StackFit.expand,
                       children: [
                         // Icon rendered at large size (fills available space)
-                        ThumbnailOnly(
-                          key: ValueKey('thumb-only-${widget.file.path}'),
-                          file: widget.file,
-                          iconSize: 48.0,
-                        ),
+                        _thumbnail,
                         // Interaction layer
                         Positioned.fill(
                           child: _buildFileInteractionLayer(context),
