@@ -315,6 +315,7 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
     if (path == '#home') return context.tr.homeTab;
     if (path == '#gallery') return context.tr.imageGallery;
     if (path == '#video') return context.tr.videoHubTitle;
+    if (path == kSubtitleQueuePath) return context.tr.subtitleQueueTitle;
     if (path == '#torrents' || path.startsWith('#torrents?')) {
       return context.tr.torrents;
     }

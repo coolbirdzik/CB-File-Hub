@@ -8,6 +8,16 @@ class DelayedPlayer extends mk.PlatformPlayer {
   DelayedPlayer() : super(configuration: const mk.PlayerConfiguration());
   final commands = <String>[];
   Completer<void>? seekGate;
+  Completer<void>? disposeGate;
+  final disposeStarted = Completer<void>();
+
+  @override
+  Future<void> dispose() async {
+    disposeStarted.complete();
+    await disposeGate?.future;
+    await super.dispose();
+  }
+
   void loadMetadata(Duration duration) {
     state = state.copyWith(duration: duration);
     durationController.add(duration);
@@ -31,6 +41,24 @@ class DelayedPlayer extends mk.PlatformPlayer {
 }
 
 void main() {
+  test('engine teardown waits for a player already being disposed', () async {
+    final native = DelayedPlayer()..disposeGate = Completer<void>();
+    final player = PlaybackPlayer(player: mk.Player(platformPlayer: native));
+    final disposing = player.dispose();
+    await native.disposeStarted.future;
+    var released = false;
+    final closing = PlaybackPlayer.disposeAll().then((_) => released = true);
+    await Future<void>.delayed(Duration.zero);
+    try {
+      expect(released, isFalse);
+    } finally {
+      native.disposeGate!.complete();
+      await disposing;
+      await closing;
+    }
+    expect(released, isTrue);
+  });
+
   test('seeking back from EOF resumes requested playback', () async {
     final native = DelayedPlayer();
     final player = PlaybackPlayer(player: mk.Player(platformPlayer: native));

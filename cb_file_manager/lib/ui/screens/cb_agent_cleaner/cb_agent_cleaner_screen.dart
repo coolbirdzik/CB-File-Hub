@@ -317,6 +317,11 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       ValueNotifier<_CleanProgressSnapshot>(const _CleanProgressSnapshot());
   DateTime _lastCleanProgressUiUpdate = DateTime.fromMillisecondsSinceEpoch(0);
   static const Duration _cleanProgressUiThrottle = Duration(milliseconds: 80);
+  // Trailing edge of the throttle: the newest tick that arrived inside the
+  // throttle window. Dropping it left the bar showing a stale count for the
+  // whole next native batch (one IFileOperation call can take seconds).
+  _CleanProgressSnapshot? _pendingCleanProgress;
+  Timer? _cleanProgressFlushTimer;
 
   // Pending confirmation before clean
   List<JunkItem> _pendingCleanItems = [];
@@ -470,7 +475,14 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
         return apps;
       }();
   int _appLeftoversGeneration = 0;
+  AppLeftoverDiscoveryJob? _appLeftoversDiscoveryJob;
   AppLeftoverMeasureJob? _appLeftoversJob;
+  bool _leftoverScanIsDeep = false;
+  // Hot status of the running leftover scan (stage + current folder). Kept
+  // out of the cubit so a tick repaints only the status line, not the list.
+  final ValueNotifier<AppLeftoverScanProgress?> _leftoverScanProgress =
+      ValueNotifier<AppLeftoverScanProgress?>(null);
+  String? _lastLoggedLeftoverStage;
   AppStorageReport? _appStorageReport;
   FullDiskScanResult? _lastDiskScanResult;
   List<CleanerFolderGrowth> _recentFolderGrowthList =
@@ -579,6 +591,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     _diskScanGeneration++;
     _appInsightsGeneration++;
     _appLeftoversGeneration++;
+    _appLeftoversDiscoveryJob?.cancel();
     _appLeftoversJob?.cancel();
     _agentActivitySub?.cancel();
     _agentReviewStateSub?.cancel();
@@ -587,6 +600,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     _appStorageSub?.cancel();
     _appInsightsCubit.close();
     _appLeftoversCubit.close();
+    _leftoverScanProgress.dispose();
     _appStorageCubit.close();
     _appStorageFocusNode.dispose();
     _smartCleanCubit.close();
@@ -600,6 +614,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     _diskProgressListenable.dispose();
     _appInsightsProgressListenable.dispose();
     _subFeatureListenable.dispose();
+    _cancelPendingCleanProgress();
     _cleanProgress.dispose();
     _treeScrollController.dispose();
     _resultsFocusNode.dispose();
@@ -711,10 +726,6 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     if (_showsAppInsightsData &&
         _appInsightsCubit.state.status == CleanerAppInsightsStatus.idle) {
       unawaited(_startAppInsightsScan());
-    }
-    if (_activeSubFeature == _CleanerSubFeature.appLeftovers &&
-        _appLeftoversCubit.state.status == CleanerAppLeftoversStatus.idle) {
-      unawaited(_startLeftoverScan());
     }
   }
 
@@ -1640,14 +1651,19 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     }
     // Gone from both pages; its data shows on Leftovers after a scan.
     _appStorageCubit.dropApp(app.id);
+    _appLeftoversGeneration++;
+    _appLeftoversDiscoveryJob?.cancel();
+    _appLeftoversDiscoveryJob = null;
+    _appLeftoversJob?.cancel();
+    _appLeftoversJob = null;
+    _leftoverScanIsDeep = false;
+    _leftoverScanProgress.value = null;
+    _appLeftoversCubit.clear();
     say(
       l.cleanerAppsMacUninstallDone(app.displayName),
       action: SnackBarAction(
         label: l.cleanerAppsOpenLeftovers,
-        onPressed: () {
-          _setSubFeature(_CleanerSubFeature.appLeftovers);
-          unawaited(_startLeftoverScan());
-        },
+        onPressed: () => _setSubFeature(_CleanerSubFeature.appLeftovers),
       ),
     );
   }
@@ -1671,10 +1687,24 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
 
   /// Lists leftover folders and measures them one by one, so the page fills
   /// in while the walk runs. Independent of the full-disk scan.
-  Future<void> _startLeftoverScan() async {
+  Future<void> _startLeftoverScan({bool deepScan = false}) async {
     final generation = ++_appLeftoversGeneration;
+    _appLeftoversDiscoveryJob?.cancel();
+    _appLeftoversDiscoveryJob = null;
     _appLeftoversJob?.cancel();
     _appLeftoversJob = null;
+    final isDeepScan = Platform.isWindows && deepScan;
+    _leftoverScanIsDeep = isDeepScan;
+    _lastLoggedLeftoverStage = null;
+    void onProgress(AppLeftoverScanProgress progress) {
+      if (!mounted || generation != _appLeftoversGeneration) return;
+      _logLeftoverScanStage(progress, deep: isDeepScan);
+      _leftoverScanProgress.value = progress;
+    }
+
+    onProgress(
+      const AppLeftoverScanProgress(stage: AppLeftoverScanStage.readingApps),
+    );
     _appLeftoversCubit.setLoading();
     if (mounted) setState(() {});
     try {
@@ -1705,16 +1735,29 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       final excluded = await _ownAppPaths();
       if (!mounted || generation != _appLeftoversGeneration) return;
       const scanner = AppLeftoverScanner();
-      final report = await scanner.discover(
+      final discoveryJob = await scanner.startDiscovery(
         inventory: inventory,
         environment: environment,
         excludedPaths: excluded,
+        deepScan: isDeepScan,
+        onProgress: onProgress,
       );
+      if (!mounted || generation != _appLeftoversGeneration) {
+        discoveryJob.cancel();
+        return;
+      }
+      _appLeftoversDiscoveryJob = discoveryJob;
+      final report = await discoveryJob.result;
       if (!mounted || generation != _appLeftoversGeneration) return;
+      _appLeftoversDiscoveryJob = null;
+      if (report == null) {
+        _appLeftoversCubit.clear();
+        return;
+      }
       final paths = report.candidates.map((c) => c.path).toList();
       _appLeftoversCubit.setReport(report, scanning: paths.isNotEmpty);
       if (paths.isEmpty) return;
-      final job = await scanner.measure(paths);
+      final job = await scanner.measure(paths, onProgress: onProgress);
       if (!mounted || generation != _appLeftoversGeneration) {
         job.cancel();
         return;
@@ -1742,19 +1785,55 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       _appLeftoversCubit.setError('$error');
     } finally {
       if (mounted && generation == _appLeftoversGeneration) {
+        _appLeftoversDiscoveryJob = null;
         _appLeftoversJob = null;
+        _leftoverScanProgress.value = null;
+        AppLogger.info(
+          '[Cleaner] Leftover ${isDeepScan ? "deep " : ""}scan finished',
+        );
         _appLeftoversCubit.finishScan();
         setState(() {});
       }
     }
   }
 
-  /// Stops measuring; folders already measured stay listed.
+  /// One log line per stage (and per drive in a deep scan), never per folder.
+  void _logLeftoverScanStage(
+    AppLeftoverScanProgress progress, {
+    required bool deep,
+  }) {
+    final key = '${progress.stage.name}|${progress.root}';
+    if (key == _lastLoggedLeftoverStage) return;
+    _lastLoggedLeftoverStage = key;
+    final kind = deep ? 'deep scan' : 'scan';
+    final where = switch (progress.stage) {
+      AppLeftoverScanStage.readingApps => 'reading installed apps',
+      AppLeftoverScanStage.listingFolders =>
+        'listing app data folders (first: ${progress.path})',
+      AppLeftoverScanStage.checkingCandidates =>
+        'checking ${progress.total} candidate folder(s) for programs',
+      AppLeftoverScanStage.checkingPath =>
+        'checking PATH folders for command-line tools',
+      AppLeftoverScanStage.searchingDrive =>
+        'searching ${progress.root} for portable apps '
+            '(${progress.done}/${progress.total} drives done)',
+      AppLeftoverScanStage.measuring =>
+        'measuring ${progress.total} leftover folder(s)',
+    };
+    AppLogger.info('[Cleaner] Leftover $kind: $where');
+  }
+
+  /// Stops discovery or measuring; folders already measured stay listed.
   void _cancelLeftoverScan() {
     _appLeftoversGeneration++;
+    _leftoverScanProgress.value = null;
+    _appLeftoversDiscoveryJob?.cancel();
+    _appLeftoversDiscoveryJob = null;
     _appLeftoversJob?.cancel();
     _appLeftoversJob = null;
     if (_appLeftoversCubit.state.status == CleanerAppLeftoversStatus.loading) {
+      _leftoverScanIsDeep = false;
+      _leftoverScanProgress.value = null;
       _appLeftoversCubit.clear();
     } else {
       _appLeftoversCubit.finishScan();
@@ -1821,8 +1900,12 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
           _appInsightsSharedWithAgent = false;
           _smartCleanAppsFuture = null;
           _appLeftoversGeneration++;
+          _appLeftoversDiscoveryJob?.cancel();
+          _appLeftoversDiscoveryJob = null;
           _appLeftoversJob?.cancel();
           _appLeftoversJob = null;
+          _leftoverScanIsDeep = false;
+          _leftoverScanProgress.value = null;
           _publishAppInsightsReport(
             AppStorageReport(
               drivePath: report.drivePath,
@@ -3447,9 +3530,6 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     if (feature == _CleanerSubFeature.appLeftovers) {
       // Keeps Delete and Ctrl+A away from the hidden Disk Usage tree.
       _leftoversFocusNode.requestFocus();
-      if (_appLeftoversCubit.state.status == CleanerAppLeftoversStatus.idle) {
-        unawaited(_startLeftoverScan());
-      }
     } else if (_showsAppInsightsData) {
       _appsFocusNode.requestFocus();
       if (_appInsightsCubit.state.status == CleanerAppInsightsStatus.idle) {
@@ -3771,7 +3851,13 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       child: CleanerLeftoversView(
         cubit: _appLeftoversCubit,
         usesTrash: !Platform.isWindows,
+        supportsDeepScan: Platform.isWindows,
+        deepScan: _leftoverScanIsDeep,
+        scanProgress: _leftoverScanProgress,
         onScan: _isCleaningJunk ? null : () => unawaited(_startLeftoverScan()),
+        onDeepScan: _isCleaningJunk || !Platform.isWindows
+            ? null
+            : () => unawaited(_startLeftoverScan(deepScan: true)),
         onCancel: _cancelLeftoverScan,
         onOpenFolder: _openLeftoverFolder,
         onClean: _cleanSelectedItems,
@@ -5406,6 +5492,12 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       items.add(item);
     }
     if (items.isEmpty) return Future<CleanReport?>.value();
+    if (_cleanupCount == 0) {
+      // The notifier still holds the previous run's final "100%" snapshot;
+      // without this the bar shows it until the new batch's first tick.
+      _cancelPendingCleanProgress();
+      _cleanProgress.value = const _CleanProgressSnapshot();
+    }
     setState(() {
       _cleanupCount++;
       _isCleaningJunk = true;
@@ -5461,11 +5553,30 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     );
   }
 
+  void _flushPendingCleanProgress() {
+    _cleanProgressFlushTimer = null;
+    final pending = _pendingCleanProgress;
+    _pendingCleanProgress = null;
+    if (pending == null || !mounted) return;
+    _lastCleanProgressUiUpdate = DateTime.now();
+    _cleanProgress.value = pending;
+  }
+
+  void _cancelPendingCleanProgress() {
+    _cleanProgressFlushTimer?.cancel();
+    _cleanProgressFlushTimer = null;
+    _pendingCleanProgress = null;
+  }
+
   Future<CleanReport?> _runCleanJunk(
     List<JunkItem> items, {
     required bool permanent,
   }) async {
     final l = AppLocalizations.of(context)!;
+    // A batch queued behind another must not show that batch's final tick
+    // while the free-space probe below runs.
+    _cancelPendingCleanProgress();
+    _cleanProgress.value = const _CleanProgressSnapshot();
     _freeBytesBeforeClean = await _currentFreeBytes();
     _freeBytesAfterClean = null;
     if (!mounted) return null;
@@ -5497,17 +5608,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
         onDeleteFailure: _promptDeleteFailureAction,
         onProgress: (done, total, currentPath) {
           if (!mounted) return;
-          final now = DateTime.now();
-          final isFinal = total > 0 && done >= total;
-          final isPreparing = total == 0;
-          if (!isFinal &&
-              !isPreparing &&
-              now.difference(_lastCleanProgressUiUpdate) <
-                  _cleanProgressUiThrottle) {
-            return;
-          }
-          _lastCleanProgressUiUpdate = now;
-          _cleanProgress.value = _CleanProgressSnapshot(
+          final snapshot = _CleanProgressSnapshot(
             done: done,
             total: total,
             currentPath: currentPath ?? '',
@@ -5517,8 +5618,24 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
                       ? l.moveToTrash
                       : l.diskCleanerMovingToRecycleBin),
           );
+          final now = DateTime.now();
+          final isFinal = total > 0 && done >= total;
+          final isPreparing = total == 0;
+          final elapsed = now.difference(_lastCleanProgressUiUpdate);
+          if (!isFinal && !isPreparing && elapsed < _cleanProgressUiThrottle) {
+            _pendingCleanProgress = snapshot;
+            _cleanProgressFlushTimer ??= Timer(
+              _cleanProgressUiThrottle - elapsed,
+              _flushPendingCleanProgress,
+            );
+            return;
+          }
+          _cancelPendingCleanProgress();
+          _lastCleanProgressUiUpdate = now;
+          _cleanProgress.value = snapshot;
         },
       );
+      _cancelPendingCleanProgress();
 
       if (!mounted) return result;
       final succeededSet = result.succeeded.toSet();
@@ -5562,6 +5679,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       }
       return result;
     } catch (e) {
+      _cancelPendingCleanProgress();
       if (!mounted) return null;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -5850,7 +5968,10 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     // Reflect "waiting for decision" state in the progress notifier so the
     // bottom bar updates without rebuilding the whole screen.
     final l = AppLocalizations.of(context)!;
-    final prev = _cleanProgress.value;
+    // Take any throttled tick now, or its timer would overwrite the
+    // "waiting for decision" status while the dialog is open.
+    final prev = _pendingCleanProgress ?? _cleanProgress.value;
+    _cancelPendingCleanProgress();
     _cleanProgress.value = _CleanProgressSnapshot(
       done: prev.done,
       total: prev.total,

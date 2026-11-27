@@ -2397,7 +2397,28 @@ abstract class AppLocalizations {
   String cleanerLeftoversScanProgress(int done, int total);
   String get cleanerLeftoversConfirmWarning;
   String get cleanerLeftoversScan;
+  String get cleanerLeftoversNormalScan;
+  String get cleanerLeftoversDeepScan;
+  String get cleanerLeftoversDeepScanHint;
+  String get cleanerLeftoversDeepScanLoading;
+  String get cleanerLeftoversDeepScanResult;
+  String get cleanerLeftoversDeepScanPartial;
+  String get cleanerLeftoversDeepScanNoMatch;
+  String get cleanerLeftoversDeepScanNoMatchHint;
+  String cleanerLeftoversPossibleSize(String size);
   String get cleanerLeftoversMeasuring;
+  String get cleanerLeftoversStageReadingApps;
+  String get cleanerLeftoversStageListing;
+  String get cleanerLeftoversStageCandidates;
+  String get cleanerLeftoversStagePath;
+  String cleanerLeftoversStageDrive(String drive);
+
+  /// [finished] of [drives] searched; several may be read at once.
+  String cleanerLeftoversStageDriveDetail(
+    int finished,
+    int drives,
+    int entries,
+  );
   String cleanerLeftoversReclaimable(String size);
   String cleanerLeftoversFound(String size);
   String cleanerLeftoversSelected(String size, int count);
@@ -3201,4 +3222,101 @@ abstract class AppLocalizations {
   String get cleanerDockerConfirmBody;
   String cleanerDockerRunning(String command);
   String cleanerDockerFreed(String size);
+
+  // AI subtitle queue
+  String get subtitleQueueTitle;
+  String get subtitleQueueDesktopOnly;
+  String get subtitleQueueTabQueue;
+  String get subtitleQueueTabRules;
+  String get subtitleQueueStart;
+  String get subtitleQueuePause;
+  String get subtitleQueueStatePaused;
+  String get subtitleQueueStateIdle;
+  String get subtitleQueueStateRunning;
+  String get subtitleQueueStateWatching;
+  String subtitleQueueStateBlocked(String model);
+  String get subtitleQueueStateOtherWindow;
+  String get subtitleQueuePauseWhileWatching;
+  String get subtitleQueuePauseWhileWatchingHint;
+  String get subtitleQueueScanAll;
+  String get subtitleQueueAddVideos;
+  String get subtitleQueueRetryFailed;
+  String get subtitleQueueClearFinished;
+  String get subtitleQueueCleanGenerated;
+  String get subtitleQueueCleanPause;
+  String subtitleQueueCleanConfirm(String scope);
+  String subtitleQueueCleanResult(int cleaned, int retained, int failed);
+  String get subtitleQueueGeneratedModels;
+  String get subtitleQueueLegacyModels;
+  String get subtitleQueueEmpty;
+  String get subtitleQueueStatusPending;
+  String get subtitleQueueStatusRunning;
+  String get subtitleQueueStatusDone;
+  String get subtitleQueueStatusSkipped;
+  String get subtitleQueueStatusFailed;
+  String get subtitleQueueStatusCancelled;
+  String get subtitleQueueAll;
+  String subtitleQueueScanResult(int added, int queued, int skipped);
+  String get subtitleQueueChooseRule;
+  String get subtitleQueueNeedRule;
+  String get subtitleRuleNew;
+  String get subtitleRuleEdit;
+  String get subtitleRuleName;
+  String get subtitleRuleDefaultName;
+  String get subtitleRuleEnabled;
+  String get subtitleRuleSources;
+  String get subtitleRuleAddFolder;
+  String get subtitleRuleAddLibrary;
+  String get subtitleRuleNoSources;
+  String get subtitleRuleIncludeSubfolders;
+  String get subtitleRuleFilters;
+  String get subtitleRuleExtensions;
+  String get subtitleRuleExtensionsHint;
+  String get subtitleRuleNamePattern;
+  String get subtitleRuleNamePatternHint;
+  String get subtitleRuleSkipExisting;
+  String get subtitleRuleScanNow;
+  String subtitleRuleDeleteConfirm(String name);
+  String get subtitleRuleEmpty;
+  String subtitleRuleSourceCount(int count);
+  String get subtitleRuleModelMissing;
+  String get subtitleRuleAutoDetect;
+  String get subtitleRuleFollowApp;
+  String subtitleQueueWaitingCount(int count);
+  String get subtitleQueueAllDone;
+  String get subtitleQueueGuideTitle;
+  String get subtitleQueueGuideStep1;
+  String get subtitleQueueGuideStep2;
+  String get subtitleQueueGuideStep3;
+  String get subtitleRuleSourcesHint;
+  String get subtitleRuleSaveAndScan;
+  String get subtitleQueueSortQueue;
+  String get subtitleQueueColumnStatus;
+  String get subtitleQueueColumnProgress;
+  String get subtitleQueueColumnAdded;
+  String get subtitleQueueColumnUpdated;
+  String get subtitleQueueColumnRule;
+  String get subtitleQueueSearchHint;
+  String get subtitleQueueAllRules;
+  String subtitleRuleVideoCount(int count);
+  String subtitleQueueStartRule(String name);
+  String subtitleQueueRunScope(String name);
+  String get subtitleQueueParallelJobs;
+  String get subtitleQueueParallelHint;
+  String subtitleQueueParallelOption(int count);
+  String subtitleQueueRunningCount(int count);
+  String get subtitleQueueParallelAuto;
+  String get subtitleQueueErrorDetails;
+  String get subtitleQueueTechnicalDetails;
+  String get subtitleQueueResources;
+  String get subtitleQueueDisk;
+  String subtitleQueueAutoLimit(int count);
+  String subtitleQueueRetrying(int attempt, int max);
+
+  /// [kind] is a SubtitleBatchFailureKind name.
+  String subtitleBatchFailureTitle(String kind);
+  String subtitleBatchFailureHint(String kind);
+
+  /// [reason] is a SubtitleBatchAutoReason name.
+  String subtitleQueueAutoReason(String reason);
 }

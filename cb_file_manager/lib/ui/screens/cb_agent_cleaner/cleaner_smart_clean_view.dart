@@ -931,8 +931,14 @@ class _SelectionCheckbox extends StatelessWidget {
                         color: enabled ? c.strokeStrong : c.strokeSubtle,
                       )
                     : null,
-                boxShadow: state.focused ? CbDecorations.focusRing(c) : null,
               ),
+              // Separate from the box so the unchecked edge stays.
+              foregroundDecoration: state.focused
+                  ? BoxDecoration(
+                      borderRadius: CbRadii.all(CbRadii.sm),
+                      border: CbDecorations.focusRing(c),
+                    )
+                  : null,
               child: value == false
                   ? null
                   : Icon(

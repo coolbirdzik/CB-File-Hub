@@ -8,11 +8,13 @@ import '../../models/local_ai/local_ai_advisor_model.dart';
 import '../local_ai/gguf_llama_cpp_runtime.dart';
 import '../local_ai/local_ai_advisor_service.dart';
 import 'media_kit_playback.dart';
+import 'subtitle_activity.dart';
 import 'subtitle_preferences.dart';
 import 'subtitle_worker.dart';
 import 'subtitle_progress.dart';
 import 'subtitle_cache.dart';
 import 'subtitle_srt.dart';
+import 'subtitle_translation_pool.dart';
 
 export 'subtitle_progress.dart';
 export 'subtitle_cache.dart' show LocalSubtitleCue;
@@ -32,6 +34,16 @@ class LocalSubtitleSession extends ChangeNotifier {
   final bool continuous;
   static const previewRunwayMs = 30000;
 
+  /// A player the user is watching. The batch queue creates its sessions with
+  /// false; full interactive players report [SubtitleActivity] so the queue
+  /// yields to them.
+  final bool interactive;
+
+  /// Covers the whole media even without writing a file: gaps behind the
+  /// cursor are filled once the rest is done. Batch jobs need it to finish.
+  final bool wholeMedia;
+  bool _reportedActive = false;
+
   /// Writes SRT sidecars in the automatic file modes.
   final SubtitleSrtWriter srtWriter;
   String? _exportToken;
@@ -40,6 +52,9 @@ class LocalSubtitleSession extends ChangeNotifier {
   bool _nonLocalReported = false;
   SubtitleExportNotice? _exportNotice;
   String? _cacheKey;
+
+  /// Identity of the generated cache, including the models and audio track.
+  String? get generatedCacheKey => _cacheKey;
   bool _cacheChecked = false;
   int? _cacheRevision;
   int _cacheReadPosition = -100000;
@@ -48,6 +63,7 @@ class LocalSubtitleSession extends ChangeNotifier {
   bool get canRegenerate => cache != null && _cacheKey != null;
   final SubtitleWorker Function() createWorker;
   final GgufLlamaCppLocalAiChatRuntime Function() createTranslator;
+  final SubtitleTranslationPool? translationPool;
   Future<(Object, StackTrace)?>? _translationPreparation;
   final Future<String> Function(InstalledLocalModel, String, String)?
   translateText;
@@ -86,7 +102,7 @@ class LocalSubtitleSession extends ChangeNotifier {
   late String _audioSelection = player.state.track.audio.id;
   final _clock = Stopwatch()..start();
   int _lastTickMs = 0;
-  GgufLlamaCppLocalAiChatRuntime? _translator;
+  SubtitleTranslator? _translator;
   Timer? _timer;
   Timer? _refreshTimer;
   Timer? _seekDebounce;
@@ -157,10 +173,13 @@ class LocalSubtitleSession extends ChangeNotifier {
     required this.models,
     SubtitleWorker Function()? createWorker,
     GgufLlamaCppLocalAiChatRuntime Function()? createTranslator,
+    this.translationPool,
     this.translateText,
     this.cache,
     this.sourceFingerprint,
     this.continuous = true,
+    this.interactive = true,
+    this.wholeMedia = false,
     SubtitleSrtWriter? srtWriter,
   }) : srtWriter = srtWriter ?? SubtitleSrtWriter(preferences.prefs),
        createWorker = createWorker ?? SubtitleWorker.new,
@@ -195,9 +214,31 @@ class LocalSubtitleSession extends ChangeNotifier {
     restart();
   }
 
+  @override
+  void notifyListeners() {
+    _reportActivity();
+    super.notifyListeners();
+  }
+
+  void _reportActivity() {
+    // A file-browser preview only fills a short runway; making the queue
+    // reload its models for every clicked video would cost more.
+    final active =
+        interactive &&
+        continuous &&
+        !_disposed &&
+        preferences.enabled &&
+        (phase == SubtitlePhase.loading || phase == SubtitlePhase.processing);
+    if (active) SubtitleActivity.beat();
+    if (active == _reportedActive) return;
+    _reportedActive = active;
+    SubtitleActivity.local.value += active ? 1 : -1;
+  }
+
   Future<void> _refresh() async {
     if (_disposed || _refreshing) return;
     _refreshing = true;
+    if (_reportedActive) SubtitleActivity.beat();
     try {
       await models.refreshInstalledModels();
       if (!_disposed) await preferences.refresh();
@@ -280,7 +321,8 @@ class LocalSubtitleSession extends ChangeNotifier {
   /// Whole-media modes process regions before the playhead once everything
   /// after it is done, so the file covers the entire video.
   bool get _fillsWholeMedia =>
-      continuous && preferences.fileMode != SubtitleFileMode.appOnly;
+      continuous &&
+      (wholeMedia || preferences.fileMode != SubtitleFileMode.appOnly);
 
   int _nextWorkStart() {
     final ahead = _unprocessedAt(_cursor);
@@ -784,7 +826,9 @@ class LocalSubtitleSession extends ChangeNotifier {
 
   void _prepareTranslation(InstalledLocalModel model) {
     if (_translator != null || translateText != null) return;
-    final runtime = createTranslator();
+    final runtime =
+        translationPool?.acquire(model) ??
+        DedicatedSubtitleTranslator(createTranslator());
     _translator = runtime;
     _translatorModelPath = model.localPath;
     _translationBusy = true;
@@ -1144,6 +1188,7 @@ class LocalSubtitleSession extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _reportActivity();
     _generation++;
     _timer?.cancel();
     _refreshTimer?.cancel();

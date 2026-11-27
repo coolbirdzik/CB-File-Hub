@@ -9,6 +9,7 @@
 #include "torrent_launch.h"
 #include "folder_defaults.h"
 #include "fc_native_video_thumbnail_plugin.h"
+#include "media_kit_reference_cleanup.h"
 
 // Function to get the primary monitor work area dimensions
 // This ensures we respect the taskbar and title bar areas
@@ -157,6 +158,19 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
     }
   }
   if (TryForwardTorrentLaunch(command_line_arguments)) return EXIT_SUCCESS;
+
+#ifdef _DEBUG
+  // Windows may reuse an old player process's PID. media_kit restores its
+  // debug hot-restart pointer from a temp file without checking its lifetime.
+  // Do this once at cold process startup, including detached video windows.
+  if (ClearCurrentProcessMediaKitReferenceFile() != ERROR_SUCCESS) {
+    MessageBoxW(nullptr,
+                L"Could not clear a stale media player reference file in the "
+                L"temporary directory. Please close the app and try again.",
+                L"CB File Hub", MB_OK | MB_ICONERROR);
+    return EXIT_FAILURE;
+  }
+#endif
 
   // Initialize COM, so that it is available for use in the library and/or
   // plugins.

@@ -59,8 +59,10 @@ class SubtitleProgress {
       phase == SubtitlePhase.loading || phase == SubtitlePhase.processing;
   Duration? get processedUntil => completed.isEmpty ? null : completed.last.end;
   bool get reachedEnd =>
-      duration > Duration.zero &&
+      duration.inMilliseconds > 0 &&
       completed.length == 1 &&
       completed.first.start == Duration.zero &&
-      completed.first.end >= duration;
+      // Recognition and persisted ranges share integer-millisecond precision.
+      // mpv may report a duration with a fractional final millisecond.
+      completed.first.end.inMilliseconds >= duration.inMilliseconds;
 }

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import '../../models/local_ai/local_ai_advisor_model.dart';
 
 /// Speed/accuracy position of a subtitle model within its purpose.
@@ -27,12 +29,15 @@ class SubtitleModelProfile {
 /// IDs identify an artifact, since several weights share a repository. Never
 /// rename an existing ID: installed models and preferences refer to it.
 ///
-/// Speech models run on the bundled whisper.cpp (ggml `.bin`); translation
+/// Whisper speech models run on bundled whisper.cpp; Nemotron uses the
+/// separate Windows NeMo-Speech.cpp worker. Translation
 /// models run on the bundled llama-server (GGUF). Translation IDs must keep a
 /// last path segment starting with `hy-mt` so `LlamaCppChatClient` applies
 /// deterministic translation sampling.
 abstract final class SubtitleModelCatalog {
   static const _whisperRepo = 'ggerganov/whisper.cpp';
+  static const nemotronId = 'nvidia/nemotron-3.5-asr-streaming-0.6b';
+  static const nemotronArtifact = 'nemotron-3.5-asr-streaming-0.6b.q8_0.gguf';
 
   static const entries = <HuggingFaceModelEntry>[
     // Speech recognition, ordered fastest → most accurate.
@@ -124,6 +129,23 @@ abstract final class SubtitleModelCatalog {
       sha256:
           '4a3b92192b5d3578ff854a5876213e2e27af0c2d357492c2d14271e82c303658',
     ),
+    HuggingFaceModelEntry(
+      id: nemotronId,
+      displayName: 'Nemotron 3.5 ASR 0.6B · Q8_0',
+      purpose: LocalModelPurpose.speech,
+      description:
+          'NVIDIA · 32 transcription-ready/broad-coverage locales · local CPU (Windows) · word timestamps. '
+          'Publisher FLEURS error rates (original checkpoint, 1.12 s context, explicit language; lower is better): '
+          'JA CER 11.48%, VI WER 11.18%, EN WER 7.91%. Auto: 11.66%, 11.22%, 8.84%. '
+          'NVIDIA reports 240–2,400 concurrent real-time streams on one H100 (80–1,120 ms chunks). '
+          'Source: NVIDIA Nemotron 3.5 ASR model card. Not measurements of this Q8 build or your PC.',
+      revision: 'ea30d66debe3740a08b573244286791d423d6b3e',
+      artifactFileName: nemotronArtifact,
+      sizeBytes: 742090464,
+      license: 'OpenMDW-1.1',
+      sha256:
+          '3fc991d3badad7277c11030a7519832cddaf2057aafed6d4b25147e953a070b1',
+    ),
 
     // Subtitle translation (Hy-MT2: 33 languages, Apache 2.0).
     HuggingFaceModelEntry(
@@ -184,6 +206,7 @@ abstract final class SubtitleModelCatalog {
       SubtitleModelTier.balanced,
       onlyLanguage: 'ja',
     ),
+    nemotronId: SubtitleModelProfile(SubtitleModelTier.balanced),
     'tencent/Hy-MT2-1.8B-GGUF': SubtitleModelProfile(
       SubtitleModelTier.fast,
       recommended: true,
@@ -194,6 +217,10 @@ abstract final class SubtitleModelCatalog {
     'tencent/Hy-MT2-7B-GGUF': SubtitleModelProfile(SubtitleModelTier.accurate),
   };
 
+  static List<HuggingFaceModelEntry> get availableEntries => entries
+      .where((entry) => entry.id != nemotronId || Platform.isWindows)
+      .toList();
+
   static List<HuggingFaceModelEntry> forPurpose(LocalModelPurpose purpose) =>
-      entries.where((e) => e.purpose == purpose).toList();
+      availableEntries.where((e) => e.purpose == purpose).toList();
 }

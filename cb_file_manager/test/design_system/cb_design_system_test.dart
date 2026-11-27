@@ -335,6 +335,33 @@ void main() {
       expect(find.byType(CbButton), findsOneWidget);
     });
 
+    testWidgets('an optional outline keeps the same button size', (
+      tester,
+    ) async {
+      Widget button({bool outlined = false}) =>
+          CbButton(label: 'Manage', onPressed: () {}, outlined: outlined);
+
+      final finder = find.byType(CbButton);
+      final animation = find.descendant(
+        of: finder,
+        matching: find.byType(AnimatedContainer),
+      );
+      await tester.pumpWidget(host(button()));
+      final size = tester.getSize(finder);
+      expect(
+        tester.widget<AnimatedContainer>(animation).foregroundDecoration,
+        isNull,
+      );
+
+      await tester.pumpWidget(host(button(outlined: true)));
+      await tester.pumpAndSettle();
+      final outline =
+          tester.widget<AnimatedContainer>(animation).foregroundDecoration
+              as BoxDecoration;
+      expect(outline.border, isNotNull);
+      expect(tester.getSize(finder), size);
+    });
+
     testWidgets('loading blocks presses and shows a spinner', (tester) async {
       var taps = 0;
       await tester.pumpWidget(

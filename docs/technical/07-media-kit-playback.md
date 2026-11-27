@@ -30,6 +30,14 @@ Flutter generates native plugin registration and bundles media_kit's libraries.
 `PlaybackPlayer` initializes MediaKit before creating a player, including when
 launched directly by a PiP window or integration test.
 
+Windows Debug builds clear media_kit's PID-specific `NativeReferenceHolder`
+temp file once in `wWinMain`, before creating a Flutter engine. The file stores
+a raw pointer for hot restart, which is invalid when Windows reuses the PID in
+a new process ([media_kit issue #1465](https://github.com/media-kit/media-kit/issues/1465)).
+Only the current process's file is removed; hot restart within the same process
+retains it. `scripts/test_windows_media_kit_reference_cleanup.ps1` verifies
+the cold-start cleanup, missing and locked files, and isolation from other files.
+
 On Windows, `windows/cmake/media_kit_video_multi_engine.cmake` compiles a
 patched copy of media_kit_video's host implementation. Each HWND owns its
 plugin callback; the upstream process-wide singleton sends texture callbacks
@@ -38,6 +46,14 @@ forever. The pub cache stays unchanged. The patch checks its upstream anchors
 and stops configuration if a dependency update needs review.
 Player disposal waits for initialization before entering media_kit's global
 disposal lock, so closing a pending preview cannot block subsequent players.
+The playback registry retains disposing players until native teardown finishes,
+so engine shutdown can await the same disposal. Raw native property/command
+calls recheck the player lifetime after initialization, and UI listeners ignore
+events from replaced players.
+The Windows build also patches window_manager's taskbar COM calls to lazily
+initialize and check the interface before use, including runner-positioned
+video windows that skip waitUntilReadyToShow and cases where the shell is
+unavailable. The dependency's pub cache remains unchanged.
 Local previews show initialization errors before checking for a video controller;
 retry creates a fresh player.
 From the repository root, `node --test scripts/tests/media_kit_multi_engine.test.mjs`

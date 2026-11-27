@@ -227,6 +227,12 @@ List<_Place> _places(BuildContext context) {
     _Place(kDrivesPath, l10n.drivesTab, PhosphorIconsLight.hardDrives),
     _Place('#gallery', l10n.imageGallery, PhosphorIconsLight.image),
     _Place('#video', l10n.videoGallery, PhosphorIconsLight.videoCamera),
+    if (Platform.isWindows || Platform.isMacOS || Platform.isLinux)
+      _Place(
+        kSubtitleQueuePath,
+        l10n.subtitleQueueTitle,
+        PhosphorIconsLight.subtitles,
+      ),
     _Place('#tags', l10n.tags, PhosphorIconsLight.tag),
     _Place('#network', l10n.networksMenu, PhosphorIconsLight.wifiHigh),
     _Place('#ssh', l10n.sshWorkspace, PhosphorIconsLight.terminalWindow),

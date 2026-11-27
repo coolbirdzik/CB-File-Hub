@@ -1084,8 +1084,25 @@ class DiskCleanerService {
     var skipAllRemainingDeletes = false;
     int freed = 0;
 
+    // Progress must never move backward within a phase. Native batches report
+    // in-flight completion (`done + completed`), and the per-item bookkeeping
+    // loop that follows each batch restarts from the pre-batch `done`; without
+    // this guard the bar visibly jumps back after every chunk.
+    var reportedTotal = -1;
+    var reportedDone = 0;
+    void report(int done, int total, String? currentPath) {
+      if (onProgress == null) return;
+      if (total != reportedTotal) {
+        reportedTotal = total;
+        reportedDone = done;
+      } else if (done > reportedDone) {
+        reportedDone = done;
+      }
+      onProgress(reportedDone, total, currentPath);
+    }
+
     final trash = _trashForTesting ?? TrashManager();
-    onProgress?.call(0, 0, null);
+    report(0, 0, null);
     final eligibleItems = <JunkItem>[];
     for (final item in items) {
       if (CleanerCategories.byId(item.categoryId)?.reviewOnly == true ||
@@ -1112,7 +1129,7 @@ class DiskCleanerService {
         // Surface the directory being expanded so the UI can show
         // "Preparing files…" instead of appearing frozen on huge junk
         // folders (e.g. %TEMP% with tens of thousands of children).
-        onProgress?.call(found, 0, currentPath);
+        report(found, 0, currentPath);
       },
     );
     final total = expandedItems.length + skippedUnsafe.length;
@@ -1124,6 +1141,9 @@ class DiskCleanerService {
     final byPath = <String, JunkItem>{};
     final binItems = <JunkItem>[];
     final bulkItems = <JunkItem>[];
+    // Duplicates are part of [total]; count them as done up front so the
+    // bar can reach 100%.
+    var duplicateCount = 0;
 
     for (final item in expandedItems) {
       final isBinItem =
@@ -1145,7 +1165,10 @@ class DiskCleanerService {
       }
       // Deduplicate by path; junk scans can produce the same path under
       // multiple categories.
-      if (byPath.containsKey(item.path)) continue;
+      if (byPath.containsKey(item.path)) {
+        duplicateCount++;
+        continue;
+      }
       byPath[item.path] = item;
       if (isBinItem) {
         binItems.add(item);
@@ -1154,8 +1177,8 @@ class DiskCleanerService {
       }
     }
 
-    int done = skippedUnsafe.length;
-    onProgress?.call(done, total, null);
+    int done = skippedUnsafe.length + duplicateCount;
+    report(done, total, null);
 
     void recordSuccess(JunkItem item, {String? actionLabel, bool log = true}) {
       succeeded.add(item.path);
@@ -1410,7 +1433,7 @@ class DiskCleanerService {
             '[DiskCleaner] Preparing ${permanent ? "permanent delete" : "recycle-bin move"} batch | range=${start + 1}-$end/$total | first=${chunk.first.path}',
           );
         }
-        onProgress?.call(done, total, chunk.first.path);
+        report(done, total, chunk.first.path);
 
         for (final item in chunk) {
           // Once Skip all is active, skip ALL FFI preflight (CreateFile +
@@ -1452,7 +1475,7 @@ class DiskCleanerService {
                 knownInUse: true,
               );
               done++;
-              onProgress?.call(done, total, item.path);
+              report(done, total, item.path);
             }
             continue;
           }
@@ -1470,7 +1493,7 @@ class DiskCleanerService {
             log: false,
           );
           done += autoSkippedInUse.length;
-          onProgress?.call(done, total, autoSkippedInUse.last.path);
+          report(done, total, autoSkippedInUse.last.path);
         }
 
         if (batchedDeletes.isEmpty) {
@@ -1481,7 +1504,7 @@ class DiskCleanerService {
         final paths = batchedDeletes
             .map((item) => item.path)
             .toList(growable: false);
-        onProgress?.call(done, total, paths.first);
+        report(done, total, paths.first);
 
         try {
           Set<String> ok;
@@ -1498,7 +1521,7 @@ class DiskCleanerService {
               chunkSize: paths.length,
               timeoutOverride: fastSkipTimeout,
               onChunkStart: (path, completed, _) =>
-                  onProgress?.call(done + completed, total, path),
+                  report(done + completed, total, path),
               onError: (path, error) => deleteErrors[path] = error,
             );
           } else {
@@ -1508,7 +1531,7 @@ class DiskCleanerService {
               timeoutOverride: fastSkipTimeout,
               onError: (path, error) => deleteErrors[path] = error,
               onChunkStart: (path, completed, _) =>
-                  onProgress?.call(done + completed, total, path),
+                  report(done + completed, total, path),
             );
           }
 
@@ -1530,7 +1553,7 @@ class DiskCleanerService {
               );
             }
             done++;
-            onProgress?.call(done, total, item.path);
+            report(done, total, item.path);
           }
           if (batchSuccessCount > 0) {
             AppLogger.info(
@@ -1551,12 +1574,12 @@ class DiskCleanerService {
                 log: false,
               );
               done += remaining.length;
-              onProgress?.call(done, total, remaining.last.path);
+              report(done, total, remaining.last.path);
               break;
             }
             await resolveFailedItem(item, fallbackReason: '$e', error: e);
             done++;
-            onProgress?.call(done, total, item.path);
+            report(done, total, item.path);
           }
         }
 
@@ -1571,7 +1594,7 @@ class DiskCleanerService {
       AppLogger.info(
         '[DiskCleaner] Processing delete from Recycle Bin: ${item.path}',
       );
-      onProgress?.call(done, total, item.path);
+      report(done, total, item.path);
       try {
         final ok = await trash.deleteFromWindowsRecycleBin(item.path);
         if (ok) {
@@ -1598,7 +1621,7 @@ class DiskCleanerService {
         );
       }
       done++;
-      onProgress?.call(done, total, item.path);
+      report(done, total, item.path);
     }
 
     return CleanReport(

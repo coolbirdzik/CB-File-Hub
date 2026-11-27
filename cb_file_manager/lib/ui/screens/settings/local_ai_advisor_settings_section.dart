@@ -40,10 +40,13 @@ class LocalAiAdvisorSettingsSection extends StatefulWidget {
   })
   buildCompactSettingTile;
 
+  final bool compact;
+
   const LocalAiAdvisorSettingsSection({
     super.key,
     required this.buildSectionCard,
     required this.buildCompactSettingTile,
+    this.compact = false,
   });
 
   @override
@@ -61,7 +64,8 @@ class _LocalAiAdvisorSettingsSectionState
   String? _hfToken;
   List<InstalledLocalModel> _installed = [];
   InstalledLocalModel? _selectedModel;
-  int _maxTokens = LocalAiAdvisorService.defaultContextTokens;
+  final _contextTokens = TextEditingController();
+  int? _savedContextTokens;
   String _modelStorageDir = '';
   bool _hasCustomModelStorage = false;
 
@@ -93,6 +97,7 @@ class _LocalAiAdvisorSettingsSectionState
     for (final subscription in _subscriptions) {
       subscription.cancel();
     }
+    _contextTokens.dispose();
     super.dispose();
   }
 
@@ -130,11 +135,14 @@ class _LocalAiAdvisorSettingsSectionState
     final hasCustomStorage = _service.getCustomModelStorageDirectory() != null;
 
     if (mounted) {
+      if (_savedContextTokens != maxTokens) {
+        _savedContextTokens = maxTokens;
+        _contextTokens.text = maxTokens.toString();
+      }
       setState(() {
         _hfToken = token;
         _installed = installed;
         _selectedModel = selected;
-        _maxTokens = maxTokens;
         _modelStorageDir = storageDir;
         _hasCustomModelStorage = hasCustomStorage;
         _isLoading = false;
@@ -153,95 +161,75 @@ class _LocalAiAdvisorSettingsSectionState
       children: [
         if (_isLoading)
           const Padding(
-            padding: EdgeInsets.all(16),
+            padding: EdgeInsets.all(CbSpacing.lg),
             child: Center(child: CircularProgressIndicator()),
           )
         else ...[
-          // HF Token section
-          _buildTokenSection(context, l),
-          const Divider(height: 1),
-
-          if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) ...[
-            SubtitleSettingsPanel(models: _service, downloads: _downloads),
+          if (!widget.compact) ...[
+            _buildTokenSection(context, l),
             const Divider(height: 1),
+            if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) ...[
+              SubtitleSettingsPanel(models: _service, downloads: _downloads),
+              const Divider(height: 1),
+            ],
           ],
-          // Installed models section
           _buildInstalledModelsSection(context, l),
-          const Divider(height: 1),
-
-          // Download location section
-          _buildModelStorageSection(context, l),
-          const Divider(height: 1),
-
-          // Context window section
-          _buildContextWindowSection(context, l),
+          if (widget.compact) ...[
+            Divider(height: CbSpacing.xl, color: context.cbColors.strokeSubtle),
+            CbExpander(
+              title: Text(l.advancedSettings),
+              flush: true,
+              headerPadding: const EdgeInsets.symmetric(vertical: CbSpacing.sm),
+              contentPadding: const EdgeInsets.only(top: CbSpacing.md),
+              children: [
+                _buildTokenSection(context, l),
+                const SizedBox(height: CbSpacing.lg),
+                _buildModelStorageSection(context, l),
+                const SizedBox(height: CbSpacing.lg),
+                _buildContextWindowSection(context, l),
+              ],
+            ),
+          ] else ...[
+            const Divider(height: 1),
+            _buildModelStorageSection(context, l),
+            const Divider(height: 1),
+            _buildContextWindowSection(context, l),
+          ],
         ],
       ],
     );
   }
 
   Widget _buildTokenSection(BuildContext context, AppLocalizations l) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            l.huggingFaceToken,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            l.huggingFaceTokenHint,
-            style: TextStyle(
-              fontSize: 12,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    _hfToken != null
-                        ? '${_hfToken!.substring(0, 8)}••••••••'
-                        : l.noTokenSet,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: _hfToken != null
-                          ? theme.colorScheme.onSurface
-                          : theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              if (_hfToken != null)
-                IconButton(
-                  icon: const Icon(PhosphorIconsLight.x, size: 18),
-                  tooltip: l.clearToken,
-                  onPressed: _clearToken,
-                )
-              else
-                FilledButton.icon(
-                  onPressed: _pasteToken,
-                  icon: const Icon(PhosphorIconsLight.clipboardText, size: 16),
-                  label: Text(l.pasteToken),
-                ),
-            ],
-          ),
-        ],
+    final token = _hfToken;
+    return _buildConfigurationField(
+      label: l.huggingFaceToken,
+      hint: l.huggingFaceTokenHint,
+      field: _buildFieldValue(
+        context,
+        token == null
+            ? l.noTokenSet
+            : '${token.length > 8 ? token.substring(0, 8) : ''}••••••••',
       ),
+      actions: [
+        if (token != null)
+          CbButton.icon(
+            icon: PhosphorIconsLight.x,
+            tooltip: l.clearToken,
+            onPressed: _clearToken,
+            variant: widget.compact
+                ? CbButtonVariant.secondary
+                : CbButtonVariant.ghost,
+            outlined: widget.compact,
+          )
+        else
+          CbButton(
+            icon: PhosphorIconsLight.clipboardText,
+            label: l.pasteToken,
+            tooltip: l.pasteToken,
+            onPressed: _pasteToken,
+          ),
+      ],
     );
   }
 
@@ -249,32 +237,37 @@ class _LocalAiAdvisorSettingsSectionState
     BuildContext context,
     AppLocalizations l,
   ) {
-    final theme = Theme.of(context);
+    final colors = context.cbColors;
     return Padding(
-      padding: const EdgeInsets.all(16),
+      padding: widget.compact
+          ? EdgeInsets.zero
+          : const EdgeInsets.all(CbSpacing.lg),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        spacing: CbSpacing.sm,
         children: [
           Row(
+            spacing: CbSpacing.sm,
             children: [
               Expanded(
-                child: Text(
-                  l.installedModels,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
+                child: Text(l.installedModels, style: CbTypography.headingSm),
+              ),
+              Flexible(
+                child: Align(
+                  alignment: AlignmentDirectional.centerEnd,
+                  child: CbButton(
+                    key: const ValueKey('local-ai-install-model'),
+                    onPressed: _showModelBrowser,
+                    icon: PhosphorIconsLight.downloadSimple,
+                    label: l.installLocalModel,
+                    variant: widget.compact
+                        ? CbButtonVariant.primary
+                        : CbButtonVariant.secondary,
                   ),
                 ),
               ),
-              FilledButton.tonalIcon(
-                key: const ValueKey('local-ai-install-model'),
-                onPressed: _showModelBrowser,
-                icon: const Icon(PhosphorIconsLight.downloadSimple, size: 16),
-                label: Text(l.installLocalModel),
-              ),
             ],
           ),
-          const SizedBox(height: 12),
           for (final download in _downloads.downloads)
             _DownloadTile(
               download: download,
@@ -282,30 +275,19 @@ class _LocalAiAdvisorSettingsSectionState
               onRetry: () => _downloads.start(download.entry),
             ),
           if (_installed.isEmpty && _downloads.downloads.isEmpty)
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(8),
+            CbSurface(
+              padding: const EdgeInsets.all(CbSpacing.md),
+              child: Text(
+                l.noModelsInstalled,
+                style: CbTypography.body.copyWith(color: colors.textSecondary),
               ),
-              child: Center(
-                child: Text(
-                  l.noModelsInstalled,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ),
-            )
-          else
-            ..._installed.map(
-              (model) => _buildInstalledModelTile(
-                context,
-                l,
-                model,
-                isActive: _selectedModel?.catalogId == model.catalogId,
-              ),
+            ),
+          for (final model in _installed)
+            _buildInstalledModelTile(
+              context,
+              l,
+              model,
+              isActive: _selectedModel?.catalogId == model.catalogId,
             ),
         ],
       ),
@@ -313,83 +295,28 @@ class _LocalAiAdvisorSettingsSectionState
   }
 
   Widget _buildModelStorageSection(BuildContext context, AppLocalizations l) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            l.localAiModelStorage,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            l.localAiModelStorageHint,
-            style: TextStyle(
-              fontSize: 12,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        PhosphorIconsLight.folder,
-                        size: 14,
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Tooltip(
-                          message: _displayPath(_modelStorageDir),
-                          child: Text(
-                            _displayPath(_modelStorageDir),
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontFamily: 'monospace',
-                              color: theme.colorScheme.onSurface,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              if (_hasCustomModelStorage)
-                IconButton(
-                  icon: const Icon(
-                    PhosphorIconsLight.arrowCounterClockwise,
-                    size: 18,
-                  ),
-                  tooltip: l.localAiModelStorageReset,
-                  onPressed: () => _setModelStorageDirectory(null),
-                ),
-              FilledButton.icon(
-                onPressed: _pickModelStorageDirectory,
-                icon: const Icon(PhosphorIconsLight.folderOpen, size: 16),
-                label: Text(l.browse),
-              ),
-            ],
-          ),
-        ],
+    final path = _displayPath(_modelStorageDir);
+    return _buildConfigurationField(
+      label: l.localAiModelStorage,
+      hint: l.localAiModelStorageHint,
+      field: CbTooltip(
+        message: path,
+        child: _buildFieldValue(context, path, mono: true),
       ),
+      actions: [
+        if (_hasCustomModelStorage)
+          CbButton.icon(
+            icon: PhosphorIconsLight.arrowCounterClockwise,
+            tooltip: l.localAiModelStorageReset,
+            onPressed: () => _setModelStorageDirectory(null),
+          ),
+        CbButton(
+          icon: PhosphorIconsLight.folderOpen,
+          label: l.browse,
+          tooltip: l.browse,
+          onPressed: _pickModelStorageDirectory,
+        ),
+      ],
     );
   }
 
@@ -434,74 +361,120 @@ class _LocalAiAdvisorSettingsSectionState
   }
 
   Widget _buildContextWindowSection(BuildContext context, AppLocalizations l) {
-    final theme = Theme.of(context);
-    final controller = TextEditingController(text: _maxTokens.toString());
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            l.localAiContextWindow,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            l.localAiContextWindowHint,
-            style: TextStyle(
-              fontSize: 12,
-              color: theme.colorScheme.onSurfaceVariant,
+    void apply() {
+      final parsed = int.tryParse(_contextTokens.text);
+      if (parsed != null) {
+        unawaited(_setMaxTokens(parsed));
+      } else {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l.localAiInvalidTokenCount)));
+      }
+    }
+
+    return _buildConfigurationField(
+      label: l.localAiContextWindow,
+      hint: l.localAiContextWindowHint,
+      field: Semantics(
+        label: l.localAiContextWindow,
+        child: CbTextField(
+          controller: _contextTokens,
+          keyboardType: TextInputType.number,
+          placeholder:
+              '${LocalAiAdvisorService.minContextTokens}–${LocalAiAdvisorService.maxContextTokens}',
+          suffix: Text(
+            l.localAiTokensSuffix,
+            style: CbTypography.bodySm.copyWith(
+              color: context.cbColors.textSecondary,
             ),
           ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: TextFormField(
-                  controller: controller,
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    suffixText: l.localAiTokensSuffix,
-                    hintText:
-                        '${LocalAiAdvisorService.minContextTokens}–${LocalAiAdvisorService.maxContextTokens}',
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
-                    ),
-                  ).flat(context, radius: 8),
-                  onFieldSubmitted: (value) {
-                    final parsed = int.tryParse(value);
-                    if (parsed != null) {
-                      _setMaxTokens(parsed);
-                    }
-                  },
-                ),
-              ),
-              const SizedBox(width: 8),
-              FilledButton.icon(
-                onPressed: () {
-                  final parsed = int.tryParse(controller.text);
-                  if (parsed != null) {
-                    _setMaxTokens(parsed);
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(l.localAiInvalidTokenCount)),
-                    );
-                  }
-                },
-                icon: const Icon(PhosphorIconsLight.check, size: 16),
-                label: Text(l.apply),
-              ),
-            ],
-          ),
-        ],
+          onSubmitted: (_) => apply(),
+        ),
       ),
+      actions: [
+        CbButton(
+          icon: PhosphorIconsLight.check,
+          label: l.save,
+          onPressed: apply,
+        ),
+      ],
     );
   }
+
+  Widget _buildConfigurationField({
+    required String label,
+    required String hint,
+    required Widget field,
+    required List<CbButton> actions,
+  }) => Padding(
+    padding: widget.compact
+        ? EdgeInsets.zero
+        : const EdgeInsets.all(CbSpacing.lg),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      spacing: CbSpacing.sm,
+      children: [
+        Text(label, style: CbTypography.headingSm),
+        if (!widget.compact)
+          Text(
+            hint,
+            style: CbTypography.bodySm.copyWith(
+              color: context.cbColors.textSecondary,
+            ),
+          ),
+        Row(
+          spacing: CbSpacing.sm,
+          children: [
+            Expanded(child: field),
+            if (widget.compact)
+              SizedBox(
+                width: CbSpacing.xxxl * 3,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  spacing: CbSpacing.sm,
+                  children: [
+                    ...actions.take(actions.length - 1),
+                    if (actions.last.label != null)
+                      Expanded(child: actions.last)
+                    else
+                      actions.last,
+                  ],
+                ),
+              )
+            else
+              ...actions,
+          ],
+        ),
+      ],
+    ),
+  );
+
+  Widget _buildFieldValue(
+    BuildContext context,
+    String text, {
+    bool mono = false,
+  }) => CbSurface(
+    height: CbSizes.controlMd,
+    padding: const EdgeInsets.symmetric(horizontal: CbSpacing.md),
+    child: Align(
+      alignment: AlignmentDirectional.centerStart,
+      child: Text(
+        text,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: (mono ? CbTypography.mono : CbTypography.body).copyWith(
+          color: context.cbColors.textSecondary,
+        ),
+      ),
+    ),
+  );
 
   Future<void> _setMaxTokens(int tokens) async {
     await _service.setMaxContextTokens(tokens);
     await _loadState();
+    if (mounted && _savedContextTokens != null) {
+      _contextTokens.text = _savedContextTokens.toString();
+    }
   }
 
   Widget _buildInstalledModelTile(
@@ -510,46 +483,41 @@ class _LocalAiAdvisorSettingsSectionState
     InstalledLocalModel model, {
     required bool isActive,
   }) {
-    final theme = Theme.of(context);
+    final colors = context.cbColors;
     final modelPath = _displayPath(model.localPath);
     final isRunnable =
         model.purpose != LocalModelPurpose.chat || model.isRunnableArtifact;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: CbDecorations.card(context, radius: 8, selected: isActive),
+    return CbSurface(
+      padding: const EdgeInsets.all(CbSpacing.md),
+      selected: isActive,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        spacing: CbSpacing.sm,
         children: [
           Row(
+            spacing: CbSpacing.sm,
             children: [
-              Icon(
-                PhosphorIconsLight.brain,
-                size: 20,
-                color: isActive
-                    ? theme.colorScheme.primary
-                    : theme.colorScheme.onSurfaceVariant,
-              ),
-              const SizedBox(width: 12),
+              if (!widget.compact)
+                Icon(
+                  PhosphorIconsLight.brain,
+                  size: CbSizes.iconLg,
+                  color: isActive ? colors.accent.text : colors.icon,
+                ),
               Expanded(
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       model.displayName,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: isActive
-                            ? FontWeight.w600
-                            : FontWeight.w500,
-                      ),
+                      style: isActive
+                          ? CbTypography.headingSm
+                          : CbTypography.label,
                     ),
-                    const SizedBox(height: 2),
                     Text(
-                      '${modelPurposeLabel(l, model.purpose)} · ${(model.sizeBytes / (1024 * 1024)).toStringAsFixed(0)} MB',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: theme.colorScheme.onSurfaceVariant,
+                      '${modelPurposeLabel(l, model.purpose)} · ${_formatBytes(model.sizeBytes)}',
+                      style: CbTypography.bodySm.copyWith(
+                        color: colors.textSecondary,
                       ),
                     ),
                   ],
@@ -558,62 +526,47 @@ class _LocalAiAdvisorSettingsSectionState
               if (!isActive &&
                   isRunnable &&
                   model.purpose == LocalModelPurpose.chat)
-                TextButton(
-                  onPressed: () => _setActiveModel(model.catalogId),
-                  child: Text(l.selectActiveModel),
+                if (widget.compact)
+                  CbButton.icon(
+                    icon: PhosphorIconsLight.checkCircle,
+                    tooltip: l.selectActiveModel,
+                    onPressed: () => _setActiveModel(model.catalogId),
+                  )
+                else
+                  CbButton(
+                    label: l.selectActiveModel,
+                    variant: CbButtonVariant.ghost,
+                    onPressed: () => _setActiveModel(model.catalogId),
+                  ),
+              if (widget.compact)
+                CbButton.icon(
+                  icon: PhosphorIconsLight.folderOpen,
+                  tooltip: '${l.openLocation}\n$modelPath',
+                  onPressed: () => _openModelLocation(modelPath),
                 ),
-              IconButton(
-                icon: const Icon(PhosphorIconsLight.trash, size: 18),
+              CbButton.icon(
+                icon: PhosphorIconsLight.trash,
                 tooltip: l.uninstallModel,
                 onPressed: () => _uninstallModel(model.catalogId),
               ),
             ],
           ),
           if (!isRunnable) _buildIncompatibleBanner(context, l, model),
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Row(
+          if (!widget.compact)
+            Row(
+              spacing: CbSpacing.sm,
               children: [
-                Icon(
-                  PhosphorIconsLight.folder,
-                  size: 14,
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: 8),
                 Expanded(
-                  child: Text(
-                    modelPath,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontFamily: 'monospace',
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  child: _buildFieldValue(context, modelPath, mono: true),
                 ),
-                const SizedBox(width: 8),
-                TextButton.icon(
+                CbButton(
                   onPressed: () => _openModelLocation(modelPath),
-                  icon: const Icon(PhosphorIconsLight.folderOpen, size: 14),
-                  label: Text(l.openLocation),
-                  style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
+                  icon: PhosphorIconsLight.folderOpen,
+                  label: l.openLocation,
+                  variant: CbButtonVariant.ghost,
                 ),
               ],
             ),
-          ),
         ],
       ),
     );
@@ -624,51 +577,35 @@ class _LocalAiAdvisorSettingsSectionState
     AppLocalizations l,
     InstalledLocalModel model,
   ) {
-    final theme = Theme.of(context);
-    return Container(
-      margin: const EdgeInsets.only(top: 8),
-      padding: const EdgeInsets.all(10),
-      decoration: CbDecorations.tint(
-        context,
-        theme.colorScheme.error,
-        radius: 6,
-      ),
+    final colors = context.cbColors;
+    return CbSurface(
+      color: colors.status.dangerSurface,
+      padding: const EdgeInsets.all(CbSpacing.sm),
       child: Row(
+        spacing: CbSpacing.sm,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(
             PhosphorIconsLight.warning,
-            size: 16,
-            color: theme.colorScheme.error,
+            size: CbSizes.iconMd,
+            color: colors.status.danger,
           ),
-          const SizedBox(width: 8),
           Expanded(
             child: Column(
+              spacing: CbSpacing.xs,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   l.localAiIncompatibleArtifact,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: theme.colorScheme.onErrorContainer,
+                  style: CbTypography.bodySm.copyWith(
+                    color: colors.textPrimary,
                   ),
                 ),
-                const SizedBox(height: 6),
-                FilledButton.tonalIcon(
+                CbButton(
                   onPressed: () => _reinstallCompatibleModel(model),
-                  icon: const Icon(
-                    PhosphorIconsLight.arrowsClockwise,
-                    size: 14,
-                  ),
-                  label: Text(l.localAiReinstallCompatible),
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    minimumSize: Size.zero,
-                  ),
+                  icon: PhosphorIconsLight.arrowsClockwise,
+                  label: l.localAiReinstallCompatible,
+                  size: CbButtonSize.sm,
                 ),
               ],
             ),
@@ -1142,64 +1079,56 @@ class _DownloadTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final colors = context.cbColors;
     final l = AppLocalizations.of(context)!;
     final progress = download.progress;
     final failed = download.failed;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: CbDecorations.card(context, radius: 8),
+    return CbSurface(
+      padding: const EdgeInsets.all(CbSpacing.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        spacing: CbSpacing.sm,
         children: [
           Row(
+            spacing: CbSpacing.sm,
             children: [
               Icon(
                 failed
                     ? PhosphorIconsLight.warningCircle
                     : PhosphorIconsLight.downloadSimple,
-                size: 20,
-                color: failed
-                    ? theme.colorScheme.error
-                    : theme.colorScheme.primary,
+                size: CbSizes.iconLg,
+                color: failed ? colors.status.danger : colors.icon,
               ),
-              const SizedBox(width: 12),
               Expanded(
                 child: Text(
                   failed
                       ? '${context.tr.laInstallFailed}: ${download.entry.displayName}'
                       : l.localModelDownloading(download.entry.displayName),
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
+                  style: CbTypography.label,
                 ),
               ),
-              if (failed) TextButton(onPressed: onRetry, child: Text(l.retry)),
-              IconButton(
-                icon: const Icon(PhosphorIconsLight.x, size: 18),
+              if (failed) CbButton(label: l.retry, onPressed: onRetry),
+              CbButton.icon(
+                icon: PhosphorIconsLight.x,
                 tooltip: failed ? l.dismiss : l.cancel,
                 onPressed: onCancel,
               ),
             ],
           ),
-          const SizedBox(height: 8),
           if (failed)
             Text(
               download.error!,
-              style: TextStyle(fontSize: 12, color: theme.colorScheme.error),
+              style: CbTypography.bodySm.copyWith(color: colors.status.danger),
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
             )
           else ...[
             LinearProgressIndicator(
               value: progress,
-              minHeight: 6,
-              borderRadius: BorderRadius.circular(3),
+              minHeight: CbSpacing.xs,
+              borderRadius: CbRadii.smAll,
             ),
-            const SizedBox(height: 6),
             Text(
               [
                 if (progress != null) '${(progress * 100).toInt()}%',
@@ -1207,10 +1136,7 @@ class _DownloadTile extends StatelessWidget {
                     ? '${_formatBytes(download.downloadedBytes)} / ${_formatBytes(download.totalBytes)}'
                     : _formatBytes(download.downloadedBytes),
               ].join(' · '),
-              style: TextStyle(
-                fontSize: 11,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
+              style: CbTypography.bodySm.copyWith(color: colors.textSecondary),
             ),
           ],
         ],
@@ -1348,46 +1274,35 @@ class _MoveModelsProgressDialogState extends State<_MoveModelsProgressDialog> {
 
 /// Reuses the Settings model manager from a standalone video/PiP window.
 Future<void> showLocalModelManagerDialog(BuildContext context) =>
-    showDialog<void>(
+    CbDialog.show<void>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(context.tr.aiModels),
+      dialog: CbDialog(
+        title: context.tr.aiSubtitleManage,
         content: SizedBox(
-          width: 640,
-          height: 560,
-          child: SingleChildScrollView(
-            child: LocalAiAdvisorSettingsSection(
-              buildSectionCard:
-                  ({
-                    required String title,
-                    required IconData icon,
-                    required List<Widget> children,
-                  }) => Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: children,
-                  ),
-              buildCompactSettingTile:
-                  ({
-                    required String title,
-                    required String subtitle,
-                    required IconData icon,
-                    Widget? trailing,
-                    VoidCallback? onTap,
-                  }) => ListTile(
-                    title: Text(title),
-                    subtitle: Text(subtitle),
-                    leading: Icon(icon),
-                    trailing: trailing,
-                    onTap: onTap,
-                  ),
-            ),
+          width: double.infinity,
+          child: LocalAiAdvisorSettingsSection(
+            compact: true,
+            buildSectionCard:
+                ({required title, required icon, required children}) => Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: children,
+                ),
+            buildCompactSettingTile:
+                ({
+                  required title,
+                  required subtitle,
+                  required icon,
+                  trailing,
+                  onTap,
+                }) => ListTile(
+                  title: Text(title),
+                  subtitle: Text(subtitle),
+                  leading: Icon(icon),
+                  trailing: trailing,
+                  onTap: onTap,
+                ),
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text(context.tr.close),
-          ),
-        ],
       ),
     );

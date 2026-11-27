@@ -31,6 +31,36 @@ class _Trash implements TrashManager {
   }
 }
 
+/// Reports in-flight progress like the native batch does and fails one path,
+/// so the service's per-item bookkeeping runs after the batch.
+class _ProgressTrash implements TrashManager {
+  @override
+  dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
+
+  @override
+  Future<Set<String>> deleteMultiplePermanently(
+    List<String> filePaths, {
+    int chunkSize = 200,
+    void Function(String, int, int)? onChunkStart,
+    void Function(int, int)? onChunkDone,
+    void Function(String, Object)? onError,
+    Duration? timeoutOverride,
+    bool useNative = true,
+  }) async {
+    final ok = <String>{};
+    for (var i = 0; i < filePaths.length; i++) {
+      final path = filePaths[i];
+      if (i == 0) {
+        onError?.call(path, FileSystemException('locked', path));
+      } else {
+        ok.add(path);
+      }
+      onChunkStart?.call(path, i + 1, filePaths.length);
+    }
+    return ok;
+  }
+}
+
 void main() {
   late Directory root;
   setUp(() async {
@@ -95,6 +125,46 @@ void main() {
       expect(events.firstWhere((event) => event.$2 > 0).$1, 0);
       expect(events.last.$1, events.last.$2);
       expect(root.existsSync(), isTrue);
+    },
+  );
+
+  test(
+    'delete progress never moves backward and reaches total with duplicates',
+    () async {
+      final service = DiskCleanerService.forTesting(
+        fullDiskScanSpawner: spawnFullDiskScan,
+        trashManager: _ProgressTrash(),
+      );
+      final target = JunkItem(
+        path: root.path,
+        sizeBytes: 80,
+        categoryId: 'package_download_cache',
+        isContainerOnly: true,
+      );
+      final events = <(int, int)>[];
+      final report = await service.cleanJunk(
+        // The same target twice yields duplicate expanded paths.
+        items: [target, target],
+        permanent: true,
+        onProgress: (done, total, _) => events.add((done, total)),
+        onDeleteFailure: (_) async => CleanFailureAction.skip,
+      );
+
+      expect(report.succeeded, hasLength(15));
+      expect(report.skippedByUser, hasLength(1));
+      final deleting = events.where((event) => event.$2 > 0).toList();
+      expect(deleting, isNotEmpty);
+      final total = deleting.first.$2;
+      expect(total, 32);
+      for (var i = 1; i < deleting.length; i++) {
+        expect(deleting[i].$2, total);
+        expect(
+          deleting[i].$1,
+          greaterThanOrEqualTo(deleting[i - 1].$1),
+          reason: 'progress went backward at event $i: $deleting',
+        );
+      }
+      expect(deleting.last.$1, total);
     },
   );
 

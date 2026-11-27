@@ -457,6 +457,19 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
                         ),
                       ),
 
+                      if (Platform.isWindows ||
+                          Platform.isMacOS ||
+                          Platform.isLinux)
+                        DrawerNavigationItem(
+                          icon: PhosphorIconsLight.subtitles,
+                          title: context.tr.subtitleQueueTitle,
+                          onTap: () => _navigateTo(
+                            context,
+                            kSubtitleQueuePath,
+                            context.tr.subtitleQueueTitle,
+                          ),
+                        ),
+
                       // Tags section
                       DrawerNavigationItem(
                         icon: PhosphorIconsLight.tag,
@@ -719,6 +732,21 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
                             context,
                             '#video',
                             context.tr.videoHubTitle,
+                          ),
+                        ),
+                        _fluentNavigationItem(
+                          context,
+                          icon: PhosphorIconsLight.subtitles,
+                          title: context.tr.subtitleQueueTitle,
+                          semanticLabel: context.tr.subtitleQueueTitle,
+                          selected: _isFluentPathSelected(
+                            activePath,
+                            kSubtitleQueuePath,
+                          ),
+                          onPressed: () => _navigateTo(
+                            context,
+                            kSubtitleQueuePath,
+                            context.tr.subtitleQueueTitle,
                           ),
                         ),
                         _fluentNavigationItem(

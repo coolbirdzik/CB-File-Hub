@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:cb_file_manager/models/local_ai/local_ai_advisor_model.dart';
 import 'package:cb_file_manager/services/local_ai/local_ai_advisor_service.dart';
 import 'package:cb_file_manager/services/local_ai/subtitle_model_catalog.dart';
@@ -27,7 +29,8 @@ void main() {
       );
       final file = entry.artifactFileName;
       expect(
-        entry.purpose == LocalModelPurpose.speech
+        entry.purpose == LocalModelPurpose.speech &&
+                entry.id != SubtitleModelCatalog.nemotronId
             ? file.endsWith('.bin')
             : file.endsWith('.gguf'),
         isTrue,
@@ -104,5 +107,25 @@ void main() {
     });
     expect(subtitleModelDetectsLanguage('whisper/kotoba-v2.0-q5_0'), isFalse);
     expect(subtitleModelDetectsLanguage('whisper/small'), isTrue);
+    final nemo = subtitleSourceLanguagesFor(SubtitleModelCatalog.nemotronId);
+    expect(nemo.keys, containsAll(['ja', 'vi', 'en', 'ko', 'zh']));
+    expect(nemo.keys, isNot(contains('th')));
+    expect(nemo.keys, isNot(contains('yue')));
+    expect(
+      subtitleModelDetectsLanguage(SubtitleModelCatalog.nemotronId),
+      isTrue,
+    );
+    expect(
+      SubtitleModelCatalog.forPurpose(
+        LocalModelPurpose.speech,
+      ).any((e) => e.id == SubtitleModelCatalog.nemotronId),
+      Platform.isWindows,
+    );
+    expect(
+      entries
+          .singleWhere((e) => e.id == SubtitleModelCatalog.nemotronId)
+          .description,
+      contains('JA CER 11.48%'),
+    );
   });
 }

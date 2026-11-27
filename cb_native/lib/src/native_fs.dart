@@ -1,3 +1,4 @@
+import 'dart:io' show sleep;
 import 'dart:typed_data';
 
 import 'bindings.dart' as b;
@@ -184,10 +185,184 @@ class NativeJunkResult {
   final String? error;
 }
 
+/// Counters of a [NativeExecutableWalk].
+class NativeExecutableWalkProgress {
+  const NativeExecutableWalkProgress({
+    required this.visited,
+    required this.directories,
+    required this.incomplete,
+    required this.matches,
+    required this.currentPath,
+  });
+
+  /// Entries listed so far (the budget counts these).
+  final int visited;
+  final int directories;
+
+  /// Unreadable folders, links or reparse points skipped, failed entries,
+  /// and the budget running out. Zero means every entry was seen.
+  final int incomplete;
+  final int matches;
+  final String currentPath;
+}
+
+/// One root of [NativeFs.volumeDisks].
+class NativeVolumeDisks {
+  const NativeVolumeDisks({required this.seekPenalty, required this.disks});
+
+  /// True for a spinning disk, false for an SSD, null when unknown.
+  final bool? seekPenalty;
+
+  /// Physical disk numbers the volume occupies; empty when unknown.
+  final List<int> disks;
+}
+
+/// A running [NativeFs.startExecutableWalk]. Every call is synchronous, so a
+/// worker isolate that runs synchronous code (the leftover discovery) can
+/// drive it with [poll] and a short `sleep` between calls. Always [dispose].
+class NativeExecutableWalk {
+  NativeExecutableWalk._(this._job);
+
+  final NativeJob _job;
+  bool _ended = false;
+  bool _failed = false;
+
+  /// The walk finished (done, failed or cancelled); the [poll] that set this
+  /// returned the last matches.
+  bool get ended => _ended;
+
+  /// The walk stopped on a native error, so not every folder was read.
+  bool get failed => _failed;
+
+  /// Matching file paths produced since the previous call.
+  List<String> poll() {
+    final (state, chunk) = _job.poll();
+    if (state != b.jobRunning) {
+      _ended = true;
+      _failed = state != b.jobDone;
+    }
+    final paths = <String>[];
+    final r = WireReader(chunk);
+    while (!r.isDone) {
+      paths.add(r.str());
+    }
+    return paths;
+  }
+
+  NativeExecutableWalkProgress progress() {
+    final p = _job.progress();
+    return NativeExecutableWalkProgress(
+      visited: p.counters[0],
+      directories: p.counters[1],
+      incomplete: p.counters[2],
+      matches: p.counters[3],
+      currentPath: p.currentPath,
+    );
+  }
+
+  void cancel() => _job.cancel();
+
+  void dispose() => _job.dispose();
+}
+
 /// Filesystem walks on Rust threads. Every method returns null when the
 /// native library is unavailable (or the call was cancelled), so callers
 /// keep their Dart code as the fallback.
 abstract final class NativeFs {
+  /// Starts listing files below [root] whose package:path extension
+  /// (lower-cased, with the dot) is in [extensions], on the shared pool.
+  /// Entries are classified like `Directory.listSync(followLinks: false)`:
+  /// links and every Windows reparse point are skipped and counted as
+  /// incomplete. Folders named one of [skipNames] or at one of [skipPaths]
+  /// (both compared upper-cased) are not entered. Listing more than
+  /// [maxEntries] entries (0 = no limit) stops the walk as incomplete.
+  /// Returns null when the library is unavailable or too old.
+  static NativeExecutableWalk? startExecutableWalk({
+    required String root,
+    required Iterable<String> extensions,
+    bool recursive = true,
+    int maxEntries = 0,
+    Iterable<String> skipNames = const [],
+    Iterable<String> skipPaths = const [],
+  }) {
+    final config = WireWriter()
+      ..str(root)
+      ..boolean(recursive)
+      ..i64(maxEntries)
+      ..strs(extensions)
+      ..strs(skipNames)
+      ..strs(skipPaths);
+    final job = NativeJob.start(b.jobExecutableWalk, config.takeBytes());
+    return job == null ? null : NativeExecutableWalk._(job);
+  }
+
+  /// [startExecutableWalk] for a whole NTFS volume ([root] is `X:\`), read
+  /// from the Master File Table instead of folder by folder: seconds instead
+  /// of minutes on a hard disk. Same output and counters; there is no entry
+  /// budget because every record is read anyway.
+  ///
+  /// Windows only lets an elevated process (or anyone, for some removable
+  /// drives) open a volume, so the walk usually ends [NativeExecutableWalk.failed]
+  /// within milliseconds and the caller falls back to [startExecutableWalk].
+  /// It reports one name per file: a hard link's other names are missing.
+  static NativeExecutableWalk? startMftExecutables({
+    required String root,
+    required Iterable<String> extensions,
+    Iterable<String> skipNames = const [],
+    Iterable<String> skipPaths = const [],
+  }) {
+    final config = WireWriter()
+      ..str(root)
+      ..strs(extensions)
+      ..strs(skipNames)
+      ..strs(skipPaths);
+    final job = NativeJob.start(b.jobMftExecutables, config.takeBytes());
+    return job == null ? null : NativeExecutableWalk._(job);
+  }
+
+  /// The physical disks under each of [roots] (drive roots such as `C:\`)
+  /// and whether they seek, in order. Synchronous: the volume queries take
+  /// milliseconds, unless a disk has to spin up first. Null when the library
+  /// is unavailable, the query failed, or it took longer than [timeout].
+  static List<NativeVolumeDisks>? volumeDisks(
+    List<String> roots, {
+    Duration timeout = const Duration(seconds: 20),
+  }) {
+    final config = WireWriter()..strs(roots);
+    final job = NativeJob.start(b.jobVolumeDisks, config.takeBytes());
+    if (job == null) return null;
+    final clock = Stopwatch()..start();
+    final output = BytesBuilder(copy: false);
+    try {
+      while (true) {
+        final (state, chunk) = job.poll();
+        output.add(chunk);
+        if (state == b.jobDone) break;
+        if (state != b.jobRunning || clock.elapsed > timeout) return null;
+        sleep(const Duration(milliseconds: 2));
+      }
+    } finally {
+      job.dispose();
+    }
+    final r = WireReader(output.takeBytes());
+    final result = <NativeVolumeDisks>[];
+    for (var i = 0; i < roots.length; i++) {
+      final seek = r.u8();
+      final count = r.u32();
+      result.add(
+        NativeVolumeDisks(
+          seekPenalty: switch (seek) {
+            0 => false,
+            1 => true,
+            _ => null,
+          },
+          disks: [for (var d = 0; d < count; d++) r.u32()],
+        ),
+      );
+    }
+    return result;
+  }
+
   /// Reads a regular file's creation time when the filesystem reports one.
   static Future<DateTime?> fileCreated(String path) async {
     final config = WireWriter()..str(path);

@@ -153,6 +153,9 @@ const int jobPermanentDelete = 28;
 const int jobRootSizes = 29;
 const int jobFfmpegProcess = 30;
 const int jobFileCreated = 31;
+const int jobExecutableWalk = 32;
+const int jobVolumeDisks = 33;
+const int jobMftExecutables = 34;
 
 // Job states (job.rs).
 const int jobRunning = 0;

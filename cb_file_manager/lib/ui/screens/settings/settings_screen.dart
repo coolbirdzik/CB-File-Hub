@@ -657,7 +657,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  /// Handle back navigation - close tab or pop navigator
+  /// Return to the previous tab location, or close a standalone settings tab.
   void _handleBack(BuildContext context) {
     // Try to get TabManagerBloc
     TabManagerBloc? tabBloc;
@@ -670,8 +670,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (tabBloc != null) {
       final activeTab = tabBloc.state.activeTab;
       if (activeTab != null) {
-        // Close the settings tab
-        tabBloc.add(CloseTab(activeTab.id));
+        if (tabBloc.backNavigationToPath(activeTab.id) == null) {
+          tabBloc.add(CloseTab(activeTab.id));
+        }
         return;
       }
     }

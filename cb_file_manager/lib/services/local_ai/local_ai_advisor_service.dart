@@ -341,7 +341,7 @@ class LocalAiAdvisorService {
       ..._curatedCatalog,
       if (includeSubtitleModels &&
           (Platform.isWindows || Platform.isLinux || Platform.isMacOS))
-        ...SubtitleModelCatalog.entries,
+        ...SubtitleModelCatalog.availableEntries,
       ...entries.where((entry) => !curatedIds.contains(entry.id)),
     ];
   }

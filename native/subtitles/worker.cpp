@@ -1,11 +1,15 @@
 // Persistent JSON-lines worker. stdout contains protocol messages only; model
-// and decoder diagnostics go to stderr. Each request is bounded to 30 seconds.
+// and decoder diagnostics go to stderr. Audio I/O has a deadline per stage;
+// the Dart caller also bounds the complete request and can kill this process.
 #include "json.hpp"
+#ifndef CB_SUBTITLE_NEMO
 #include "whisper.h"
 #include "ggml-backend.h"
+#endif
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <cerrno>
 #include <cmath>
 #include <cstdio>
 #include <iostream>
@@ -26,6 +30,7 @@ extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 #include <libavutil/channel_layout.h>
+#include <libavutil/error.h>
 #include <libswresample/swresample.h>
 }
 using json = nlohmann::json;
@@ -35,6 +40,7 @@ static double milliseconds(Clock::time_point start) {
     return std::chrono::duration<double, std::milli>(Clock::now() - start).count();
 }
 
+#ifndef CB_SUBTITLE_NEMO
 struct LanguageMemory {
     std::string source;
     int track = -1, id = -1, stable = 0;
@@ -44,6 +50,7 @@ struct LanguageMemory {
 static bool gpu_ready_to_take_over(void* flag) {
     return static_cast<std::atomic<bool>*>(flag)->load(std::memory_order_acquire);
 }
+#endif
 
 struct Audio {
     AVFormatContext* format = nullptr;
@@ -51,7 +58,10 @@ struct Audio {
     SwrContext* swr = nullptr;
     AVPacket* packet = av_packet_alloc();
     AVFrame* frame = av_frame_alloc();
-    Clock::time_point deadline = Clock::now() + std::chrono::seconds(20);
+    Clock::time_point deadline = Clock::now() + std::chrono::seconds(30);
+    std::string source;
+    int ordinal = 0, stream = -1;
+    bool used = false;
     ~Audio() {
         av_frame_free(&frame); av_packet_free(&packet);
         swr_free(&swr); avcodec_free_context(&codec); avformat_close_input(&format);
@@ -64,26 +74,42 @@ static int interrupt(void* opaque) {
     return Clock::now() > static_cast<Audio*>(opaque)->deadline;
 }
 
-// Decode the selected audio stream at original media speed. Volume, mute and
-// video playback rate do not alter recognition or the returned media times.
-static std::vector<float> decode(const json& request) {
-    Audio a;
+// Preserve FFmpeg's error code and distinguish I/O delays from unsupported
+// media. A timeout during *open*, probe or seek is not a corrupt audio codec.
+struct AudioReadError : std::runtime_error {
+    bool retryable;
+    AudioReadError(const std::string& message, bool retry) : std::runtime_error(message), retryable(retry) {}
+};
+static void checkAudio(const Audio& a, int status, const char* operation) {
+    if (status >= 0) return;
+    char detail[AV_ERROR_MAX_STRING_SIZE]{};
+    av_strerror(status, detail, sizeof(detail));
+    const bool timeout = Clock::now() > a.deadline || status == AVERROR_EXIT || status == AVERROR(ETIMEDOUT);
+    const bool io = status == AVERROR(EIO) || status == AVERROR(EAGAIN) || status == AVERROR(EINTR);
+    const std::string prefix = timeout ? "Audio read timed out: " : io ? "Audio read failed: " : "";
+    throw AudioReadError(prefix + operation + ": " + detail, timeout || io);
+}
+
+static void openAudio(Audio& a, const std::string& source, int track) {
+    a.source = source;
+    a.ordinal = track;
+    a.deadline = Clock::now() + std::chrono::seconds(30);
     a.format = avformat_alloc_context();
     if (!a.format || !a.packet || !a.frame) throw std::bad_alloc();
     a.format->interrupt_callback = {interrupt, &a};
-    const auto source = request.at("source").get<std::string>();
     AVDictionary* options = nullptr;
-    av_dict_set(&options, "rw_timeout", "15000000", 0);
+    av_dict_set(&options, "rw_timeout", "25000000", 0);
     const int opened = avformat_open_input(&a.format, source.c_str(), nullptr, &options);
     av_dict_free(&options);
-    check(opened, "Cannot open media audio");
-    check(avformat_find_stream_info(a.format, nullptr), "Cannot inspect audio streams");
+    checkAudio(a, opened, "Cannot open media audio");
+    checkAudio(a, avformat_find_stream_info(a.format, nullptr), "Cannot inspect audio streams");
     int stream = -1, ordinal = 0;
     for (unsigned i = 0; i < a.format->nb_streams; ++i) {
         if (a.format->streams[i]->codecpar->codec_type != AVMEDIA_TYPE_AUDIO) continue;
-        if (ordinal++ == request.value("audio_track", 0)) { stream = static_cast<int>(i); break; }
+        if (ordinal++ == track) { stream = static_cast<int>(i); break; }
     }
     if (stream < 0) throw std::runtime_error("Selected audio track is unavailable");
+    a.stream = stream;
     auto* st = a.format->streams[stream];
     const AVCodec* decoder = avcodec_find_decoder(st->codecpar->codec_id);
     if (!decoder) throw std::runtime_error("Audio codec is unsupported");
@@ -104,15 +130,35 @@ static std::vector<float> decode(const json& request) {
     if (!a.swr) throw std::runtime_error("Cannot configure audio resampling");
 #endif
     check(swr_init(a.swr), "Cannot initialize audio resampling");
+}
+
+// Decode at original media speed. Keep the input and its expensive container
+// index/probe results for the life of this worker; reset codec/resampler on
+// every seek so the preroll and media timestamps are independent per chunk.
+static std::vector<float> readAudio(Audio& a, const json& request) {
+    a.deadline = Clock::now() + std::chrono::seconds(30);
+    const int stream = a.stream;
+    auto* st = a.format->streams[stream];
     const int64_t start_ms = std::max<int64_t>(0, request.value("start_ms", int64_t(0)));
     const int duration_ms = std::clamp(request.value("duration_ms", 8000), 1000, 30000);
     const int wanted = duration_ms * rate / 1000;
     const int64_t origin_us = a.format->start_time == AV_NOPTS_VALUE ? 0 : a.format->start_time;
     const int64_t seek_time = av_rescale_q(start_ms * 1000 + origin_us, AV_TIME_BASE_Q, st->time_base);
-    if (start_ms > 0) {
-        check(av_seek_frame(a.format, stream, seek_time, AVSEEK_FLAG_BACKWARD), "Media audio is not seekable");
+    if (start_ms > 0 || a.used) {
+        // Seek by time on the default stream. Containers such as Matroska
+        // usually index only the video track; seeking on the unindexed audio
+        // stream makes FFmpeg scan the file linearly, which takes longer than
+        // the read deadline deep into large 4K files. max_ts keeps the landing
+        // point at or before the wanted start, so no audio is skipped.
+        const int64_t target_us = start_ms * 1000 + origin_us;
+        int status = avformat_seek_file(a.format, -1, INT64_MIN, target_us, target_us, 0);
+        if (status < 0 && Clock::now() <= a.deadline) status = av_seek_frame(a.format, stream, seek_time, AVSEEK_FLAG_BACKWARD);
+        checkAudio(a, status, "Media audio is not seekable");
         avcodec_flush_buffers(a.codec);
+        swr_close(a.swr);
+        check(swr_init(a.swr), "Cannot initialize audio resampling");
     }
+    a.used = true;
     std::vector<float> pcm(static_cast<size_t>(wanted), 0.0f);
     int filled = 0;
     int64_t next_sample = start_ms * rate / 1000;
@@ -121,7 +167,7 @@ static std::vector<float> decode(const json& request) {
         while (!done) {
             const int result = avcodec_receive_frame(a.codec, a.frame);
             if (result == AVERROR(EAGAIN) || result == AVERROR_EOF) break;
-            check(result, "Audio frame decoding failed");
+            checkAudio(a, result, "Audio frame decoding failed");
             const int capacity = static_cast<int>(av_rescale_rnd(
                 swr_get_delay(a.swr, a.codec->sample_rate) + a.frame->nb_samples,
                 rate, a.codec->sample_rate, AV_ROUND_UP));
@@ -154,20 +200,57 @@ static std::vector<float> decode(const json& request) {
     };
     int read_status = 0;
     while (!done && (read_status = av_read_frame(a.format, a.packet)) >= 0) {
-        if (Clock::now() > a.deadline) throw std::runtime_error("Audio read timed out");
+        if (Clock::now() > a.deadline) throw AudioReadError("Audio read timed out", true);
         if (a.packet->stream_index == stream) {
             int status = avcodec_send_packet(a.codec, a.packet);
             if (status == AVERROR(EAGAIN)) { receive(); status = avcodec_send_packet(a.codec, a.packet); }
-            check(status, "Cannot feed audio decoder"); receive();
+            checkAudio(a, status, "Cannot feed audio decoder"); receive();
         }
         av_packet_unref(a.packet);
     }
-    if (!done && read_status != AVERROR_EOF) check(read_status, "Audio read failed");
+    if (!done && Clock::now() > a.deadline) throw AudioReadError("Audio read timed out", true);
+    if (!done && read_status != AVERROR_EOF) checkAudio(a, read_status, "Audio read failed");
+    // Some demuxers translate an underlying I/O failure to EOF. Never commit
+    // that truncated chunk as silence; let the fresh reader retry it.
+    if (!done && a.format->pb && a.format->pb->error < 0 && a.format->pb->error != AVERROR_EOF)
+        checkAudio(a, a.format->pb->error, "Audio read failed");
     if (!done) { avcodec_send_packet(a.codec, nullptr); receive(); }
     pcm.resize(static_cast<size_t>(filled));
     return pcm;
 }
 
+static std::vector<float> decode(const json& request, bool* reused = nullptr) {
+    // Requests are serialized by the worker protocol; inference futures use
+    // only PCM, never this reader. A failed context must not poison a retry.
+    static std::unique_ptr<Audio> input;
+    const auto source = request.at("source").get<std::string>();
+    const auto track = request.value("audio_track", 0);
+    for (int attempt = 0; ; ++attempt) {
+        try {
+            const bool reuse = input && input->source == source && input->ordinal == track;
+            if (!reuse) {
+                input.reset();
+                input = std::make_unique<Audio>();
+                openAudio(*input, source, track);
+            }
+            auto pcm = readAudio(*input, request);
+            if (reused) *reused = reuse;
+            return pcm;
+        } catch (const AudioReadError& error) {
+            input.reset();
+            if (!error.retryable || attempt > 0) throw;
+            // Retry only the failed read, with a fresh demuxer, not the model.
+            std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        } catch (...) {
+            input.reset();
+            throw;
+        }
+    }
+}
+
+#ifdef CB_SUBTITLE_NEMO
+#include "nemo_worker_main.h"
+#else
 static whisper_context* load_model(const std::string& path, bool gpu) {
     FILE* file = nullptr;
 #ifdef _WIN32
@@ -373,9 +456,11 @@ int main() {
 #endif
             } else if (command == "decode") {
                 // Also available without a model for decoder/timeline validation.
-                const auto pcm = decode(request);
+                bool reused = false;
+                const auto pcm = decode(request, &reused);
                 double energy = 0; for (const float sample : pcm) energy += sample * sample;
-                response = {{"samples", pcm.size()}, {"rms", pcm.empty() ? 0 : std::sqrt(energy / pcm.size())}};
+                response = {{"samples", pcm.size()}, {"rms", pcm.empty() ? 0 : std::sqrt(energy / pcm.size())},
+                    {"reused_input", reused}};
             } else if (command == "transcribe") {
                 if (!ctx) throw std::runtime_error("Speech model is not initialized");
                 if (startup_task.valid() && startup_task.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready) {
@@ -386,7 +471,8 @@ int main() {
                 auto decode_request = request;
                 if (plan.detect) decode_request["duration_ms"] = 30000;
                 const auto decode_started = Clock::now();
-                auto pcm = std::make_shared<const std::vector<float>>(decode(decode_request));
+                bool reused = false;
+                auto pcm = std::make_shared<const std::vector<float>>(decode(decode_request, &reused));
                 const double decode_ms = milliseconds(decode_started);
                 Transcription result;
                 bool cpu_won = false;
@@ -425,6 +511,7 @@ int main() {
                 remembered = std::move(result.memory);
                 response = std::move(result.response);
                 response["timings"]["decode_ms"] = decode_ms;
+                response["reused_input"] = reused;
                 response["backend"] = cpu_won ? "cpu-startup" : accelerated ? "gpu" : "cpu";
                 response["gpu_warmup_ms"] = gpu_warmup_us.load() / 1000.0;
             } else throw std::runtime_error("Unknown command");
@@ -434,3 +521,4 @@ int main() {
     }
     return 0;
 }
+#endif

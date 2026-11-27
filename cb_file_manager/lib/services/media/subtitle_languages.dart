@@ -114,6 +114,43 @@ final _legacyWhisperLanguages = Map<String, String>.unmodifiable({
 /// Single-language fine-tunes accept only their own language. Unknown IDs keep
 /// the complete list.
 Map<String, String> subtitleSourceLanguagesFor(String modelId) {
+  // The 8 adaptation-ready locales are not usable out of the box.
+  if (modelId == SubtitleModelCatalog.nemotronId) {
+    const supported = {
+      'en',
+      'es',
+      'fr',
+      'it',
+      'pt',
+      'nl',
+      'de',
+      'tr',
+      'ru',
+      'ar',
+      'hi',
+      'ja',
+      'ko',
+      'vi',
+      'uk',
+      'pl',
+      'sv',
+      'cs',
+      'no',
+      'da',
+      'bg',
+      'fi',
+      'hr',
+      'sk',
+      'zh',
+      'hu',
+      'ro',
+      'et',
+    };
+    return Map.unmodifiable({
+      for (final entry in subtitleSourceLanguages.entries)
+        if (supported.contains(entry.key)) entry.key: entry.value,
+    });
+  }
   final profile = SubtitleModelCatalog.profiles[modelId];
   if (profile == null) return subtitleSourceLanguages;
   final only = profile.onlyLanguage;

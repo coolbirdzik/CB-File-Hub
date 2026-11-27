@@ -5704,7 +5704,52 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get cleanerLeftoversScan => 'Find leftovers';
   @override
+  String get cleanerLeftoversNormalScan => 'Normal scan';
+  @override
+  String get cleanerLeftoversDeepScan => 'Deep scan';
+  @override
+  String get cleanerLeftoversDeepScanHint =>
+      'Checks more locations for app files, including portable apps. This can take longer.';
+  @override
+  String get cleanerLeftoversDeepScanLoading =>
+      'Checking for app files and portable apps in additional locations...';
+  @override
+  String get cleanerLeftoversDeepScanResult =>
+      'These are possible leftovers after checking more locations for installed and portable apps. Review each folder before cleaning.';
+  @override
+  String get cleanerLeftoversDeepScanPartial =>
+      'Deep scan could not verify every location. Review remaining folders before cleaning.';
+  @override
+  String get cleanerLeftoversDeepScanNoMatch => 'No app match found';
+  @override
+  String get cleanerLeftoversDeepScanNoMatchHint =>
+      'No matching installed or portable app was found in the locations checked.';
+  @override
+  String cleanerLeftoversPossibleSize(String size) =>
+      'Possible leftovers: $size';
+  @override
   String get cleanerLeftoversMeasuring => 'Measuring leftover folders...';
+  @override
+  String get cleanerLeftoversStageReadingApps =>
+      'Reading the list of installed apps...';
+  @override
+  String get cleanerLeftoversStageListing => 'Listing app data folders...';
+  @override
+  String get cleanerLeftoversStageCandidates =>
+      'Checking leftover folders for programs...';
+  @override
+  String get cleanerLeftoversStagePath =>
+      'Checking PATH folders for command-line tools...';
+  @override
+  String cleanerLeftoversStageDrive(String drive) =>
+      'Searching $drive for portable apps...';
+  @override
+  String cleanerLeftoversStageDriveDetail(
+    int finished,
+    int drives,
+    int entries,
+  ) =>
+      '$finished of $drives drives done · $entries ${entries == 1 ? 'item' : 'items'} checked';
   @override
   String cleanerLeftoversReclaimable(String size) => 'Up to $size can be freed';
   @override
@@ -7499,4 +7544,261 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String cleanerDockerFreed(String size) =>
       'Docker freed $size. Docker Desktop gives the space back to your disk shortly after.';
+
+  // AI subtitle queue
+  @override
+  String get subtitleQueueTitle => 'AI Subtitle Queue';
+  @override
+  String get subtitleQueueDesktopOnly =>
+      'The subtitle queue is available in the desktop app.';
+  @override
+  String get subtitleQueueTabQueue => 'Queue';
+  @override
+  String get subtitleQueueTabRules => 'Rules';
+  @override
+  String get subtitleQueueStart => 'Start';
+  @override
+  String get subtitleQueuePause => 'Pause';
+  @override
+  String get subtitleQueueStatePaused => 'Paused';
+  @override
+  String get subtitleQueueStateIdle => 'Running · waiting for videos';
+  @override
+  String get subtitleQueueStateRunning => 'Generating subtitles';
+  @override
+  String get subtitleQueueStateWatching =>
+      'Waiting while a video with AI subtitles plays';
+  @override
+  String subtitleQueueStateBlocked(String model) =>
+      'Model not installed: $model';
+  @override
+  String get subtitleQueueStateOtherWindow => 'Running in another window';
+  @override
+  String get subtitleQueuePauseWhileWatching => 'Pause while watching videos';
+  @override
+  String get subtitleQueuePauseWhileWatchingHint =>
+      'Frees the GPU for the player; the interrupted video resumes where it stopped.';
+  @override
+  String get subtitleQueueScanAll => 'Scan all rules';
+  @override
+  String get subtitleQueueAddVideos => 'Add videos';
+  @override
+  String get subtitleQueueRetryFailed => 'Retry failed';
+  @override
+  String get subtitleQueueClearFinished => 'Clear finished';
+  @override
+  String get subtitleQueueCleanGenerated => 'Clean generated subtitles';
+  @override
+  String get subtitleQueueCleanPause =>
+      'Pause the queue and wait for running jobs to stop before cleaning.';
+  @override
+  String subtitleQueueCleanConfirm(String scope) =>
+      'Remove generated subtitles and their known cache for $scope? Cleaned jobs return to the waiting queue. Original videos and unverified or edited subtitles are kept.';
+  @override
+  String subtitleQueueCleanResult(int cleaned, int retained, int failed) =>
+      'Cleaned $cleaned · Kept $retained · Failed $failed';
+  @override
+  String get subtitleQueueGeneratedModels => 'Generation model metadata';
+  @override
+  String get subtitleQueueLegacyModels =>
+      'Historical job settings; no verified generation metadata.';
+  @override
+  String get subtitleQueueEmpty =>
+      'The queue is empty. Create a rule and scan it, or add videos directly.';
+  @override
+  String get subtitleQueueStatusPending => 'Waiting';
+  @override
+  String get subtitleQueueStatusRunning => 'Processing';
+  @override
+  String get subtitleQueueStatusDone => 'Done';
+  @override
+  String get subtitleQueueStatusSkipped => 'Skipped';
+  @override
+  String get subtitleQueueStatusFailed => 'Failed';
+  @override
+  String get subtitleQueueStatusCancelled => 'Cancelled';
+  @override
+  String get subtitleQueueAll => 'All';
+  @override
+  String subtitleQueueScanResult(int added, int queued, int skipped) =>
+      'Queued $added videos · $queued already in this rule\'s queue · $skipped already have subtitles';
+  @override
+  String get subtitleQueueChooseRule => 'Use the settings of rule';
+  @override
+  String get subtitleQueueNeedRule =>
+      'Create a rule first: added videos use its subtitle settings.';
+  @override
+  String get subtitleRuleNew => 'New rule';
+  @override
+  String get subtitleRuleEdit => 'Edit rule';
+  @override
+  String get subtitleRuleName => 'Rule name';
+  @override
+  String get subtitleRuleDefaultName => 'Subtitle rule';
+  @override
+  String get subtitleRuleEnabled => 'Included in “Scan all rules”';
+  @override
+  String get subtitleRuleSources => 'Sources';
+  @override
+  String get subtitleRuleAddFolder => 'Add folder';
+  @override
+  String get subtitleRuleAddLibrary => 'Add video library';
+  @override
+  String get subtitleRuleNoSources =>
+      'Add at least one folder or video library.';
+  @override
+  String get subtitleRuleIncludeSubfolders => 'Include subfolders';
+  @override
+  String get subtitleRuleFilters => 'Filters';
+  @override
+  String get subtitleRuleExtensions => 'File types';
+  @override
+  String get subtitleRuleExtensionsHint =>
+      'e.g. mp4, mkv. Leave empty for every video type.';
+  @override
+  String get subtitleRuleNamePattern => 'File name';
+  @override
+  String get subtitleRuleNamePatternHint =>
+      'Text the name contains, or a pattern with *, e.g. *S01E*';
+  @override
+  String get subtitleRuleSkipExisting =>
+      'Skip videos that already have a subtitle in the target language';
+  @override
+  String get subtitleRuleScanNow => 'Scan now';
+  @override
+  String subtitleRuleDeleteConfirm(String name) =>
+      'Delete “$name” and its videos in the queue? Subtitle files already created are kept.';
+  @override
+  String get subtitleRuleEmpty =>
+      'No rules yet. A rule chooses folders or video libraries and the subtitle settings to generate with.';
+  @override
+  String subtitleRuleSourceCount(int count) => '$count sources';
+  @override
+  String get subtitleRuleModelMissing =>
+      'Not installed. Download it in AI subtitle settings before starting the queue.';
+  @override
+  String get subtitleRuleAutoDetect => 'Auto detect';
+  @override
+  String get subtitleRuleFollowApp => 'Follow app language';
+  @override
+  String subtitleQueueWaitingCount(int count) => '$count videos waiting';
+  @override
+  String get subtitleQueueAllDone =>
+      'Nothing waiting. Scan a rule or add videos to continue.';
+  @override
+  String get subtitleQueueGuideTitle =>
+      'Generate subtitles for many videos at once';
+  @override
+  String get subtitleQueueGuideStep1 =>
+      'Create a rule: choose folders or video libraries, the languages and where to save the subtitles.';
+  @override
+  String get subtitleQueueGuideStep2 =>
+      'Matching videos are queued right away. Scan the rule again later to pick up new videos.';
+  @override
+  String get subtitleQueueGuideStep3 =>
+      'Press Start. Videos are processed one by one in the background, even when this tab is closed.';
+  @override
+  String get subtitleRuleSourcesHint =>
+      'Videos in these folders or video libraries are added to the queue.';
+  @override
+  String get subtitleRuleSaveAndScan => 'Save and scan';
+  @override
+  String get subtitleQueueSortQueue => 'Queue order';
+  @override
+  String get subtitleQueueColumnStatus => 'Status';
+  @override
+  String get subtitleQueueColumnProgress => 'Progress';
+  @override
+  String get subtitleQueueColumnAdded => 'Added';
+  @override
+  String get subtitleQueueColumnUpdated => 'Updated';
+  @override
+  String get subtitleQueueColumnRule => 'Rule';
+  @override
+  String get subtitleQueueSearchHint => 'Search videos in the queue';
+  @override
+  String get subtitleQueueAllRules => 'All rules';
+  @override
+  String subtitleRuleVideoCount(int count) => '$count videos';
+  @override
+  String subtitleQueueStartRule(String name) => 'Run “$name”';
+  @override
+  String subtitleQueueRunScope(String name) => 'Running: $name';
+  @override
+  String get subtitleQueueParallelJobs => 'Videos at once';
+  @override
+  String get subtitleQueueParallelHint =>
+      'Each video loads its own models: more RAM and VRAM';
+  @override
+  String subtitleQueueParallelOption(int count) =>
+      count == 1 ? '1 video' : '$count videos';
+  @override
+  String subtitleQueueRunningCount(int count) => '$count videos in progress';
+  @override
+  String get subtitleQueueParallelAuto => 'Automatic (recommended)';
+  @override
+  String get subtitleQueueErrorDetails => 'Error details';
+  @override
+  String get subtitleQueueTechnicalDetails => 'Technical details';
+  @override
+  String get subtitleQueueResources =>
+      'Subtitle Queue resources (ASR + translation)';
+  @override
+  String get subtitleQueueDisk => 'Disk';
+  @override
+  String subtitleQueueAutoLimit(int count) => 'Auto: $count at once';
+  @override
+  String subtitleQueueRetrying(int attempt, int max) =>
+      'Retrying ($attempt/$max)';
+  @override
+  String subtitleBatchFailureTitle(String kind) => switch (kind) {
+    'slowRead' => 'File reads too slow',
+    'fileMissing' => 'File not found',
+    'unreadable' => 'Cannot read the audio',
+    'noAudio' => 'No audio track',
+    'language' => 'Language not recognized',
+    'speechModel' => 'Speech model failed to load',
+    'translation' => 'Translation failed',
+    'runtimeMissing' => 'Subtitle runtime missing',
+    'runtimeCrashed' => 'Subtitle worker stopped',
+    'stalledIdle' => 'Stuck before the end',
+    'stalledSlow' => 'No progress for 10 minutes',
+    'unknown' => 'Unknown error',
+    _ => 'Unknown error',
+  };
+  @override
+  String subtitleBatchFailureHint(String kind) => switch (kind) {
+    'slowRead' =>
+      'Reading this part of the file took too long: a busy drive, or a large file that is slow to seek. New failures are retried automatically; press Retry.',
+    'fileMissing' =>
+      'The file was moved, renamed or deleted, or its drive is not connected.',
+    'unreadable' =>
+      'The file is damaged or uses an audio format that is not supported.',
+    'noAudio' => 'This video has no audio track to recognize.',
+    'language' =>
+      'Pick the spoken language in the rule instead of Detect automatically.',
+    'speechModel' =>
+      'The model file may be damaged, or RAM/VRAM ran out. Re-download it in AI subtitle settings.',
+    'translation' =>
+      'The translation model could not run, usually for lack of RAM or VRAM. Free some memory and retry.',
+    'runtimeMissing' => 'Reinstall or rebuild the app.',
+    'runtimeCrashed' =>
+      'Usually RAM or VRAM ran out, or the GPU was overloaded. It was retried automatically; run fewer videos at once.',
+    'stalledIdle' =>
+      'The rest of the video was never scheduled. Retry: the finished part is kept.',
+    'stalledSlow' =>
+      'The computer is overloaded (a game or another app is using the GPU). Retry when it is less busy.',
+    'unknown' => 'See the technical details below.',
+    _ => 'See the technical details below.',
+  };
+  @override
+  String subtitleQueueAutoReason(String reason) => switch (reason) {
+    'measuring' => 'measuring speed',
+    'probing' => 'trying one more',
+    'faster' => 'more was faster',
+    'noGain' => 'more was not faster',
+    'lowMemory' => 'not enough free RAM/VRAM',
+    'failures' => 'reads failed, running fewer',
+    _ => '',
+  };
 }

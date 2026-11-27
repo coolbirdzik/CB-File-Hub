@@ -88,6 +88,8 @@ include(flutter/generated_plugins.cmake)
 
 include(cmake/media_kit_video_multi_engine.cmake)
 coolbird_patch_media_kit_video()
+include(cmake/window_manager_taskbar_safe.cmake)
+coolbird_patch_window_manager_taskbar()
 include(cmake/media_plugin_delay_load.cmake)
 
 

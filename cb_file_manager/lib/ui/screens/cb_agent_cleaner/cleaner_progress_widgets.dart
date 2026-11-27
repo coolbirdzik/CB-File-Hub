@@ -42,6 +42,11 @@ class CleanerScanPanel extends StatelessWidget {
   final String? path;
   final double? value;
 
+  /// Keeps one detail line and two path lines laid out even when they are
+  /// empty or shorter. The panel is centered, so without this every tick that
+  /// changes the path's wrap (one line vs two) moved the bar up and down.
+  final bool reserveSpace;
+
   const CleanerScanPanel({
     super.key,
     required this.title,
@@ -49,6 +54,7 @@ class CleanerScanPanel extends StatelessWidget {
     this.detailKey,
     this.path,
     this.value,
+    this.reserveSpace = false,
   });
 
   @override
@@ -70,18 +76,43 @@ class CleanerScanPanel extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: CbTypography.label.copyWith(fontWeight: FontWeight.w600),
               ),
-              if (detail != null) ...[
+              if (detail != null || reserveSpace) ...[
                 const SizedBox(height: CbSpacing.xs),
                 Text(
-                  detail!,
+                  detail ?? '',
                   key: detailKey,
+                  maxLines: reserveSpace ? 1 : null,
+                  overflow: reserveSpace ? TextOverflow.ellipsis : null,
                   textAlign: TextAlign.center,
                   style: muted,
                 ),
               ],
               const SizedBox(height: CbSpacing.md),
               CleanerProgressBar(value: value),
-              if (path != null && path!.isNotEmpty) ...[
+              if (reserveSpace) ...[
+                const SizedBox(height: CbSpacing.sm),
+                Stack(
+                  alignment: Alignment.topCenter,
+                  children: [
+                    // Invisible two-line placeholder fixes the slot height.
+                    Visibility(
+                      visible: false,
+                      maintainSize: true,
+                      maintainAnimation: true,
+                      maintainState: true,
+                      child: Text('\n', maxLines: 2, style: muted),
+                    ),
+                    if (path != null && path!.isNotEmpty)
+                      Text(
+                        path!,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: muted.copyWith(color: c.textTertiary),
+                      ),
+                  ],
+                ),
+              ] else if (path != null && path!.isNotEmpty) ...[
                 const SizedBox(height: CbSpacing.sm),
                 Text(
                   path!,

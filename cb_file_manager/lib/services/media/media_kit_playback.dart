@@ -31,19 +31,6 @@ String playbackMediaSource(String source) {
       : uri.toString();
 }
 
-// TEMP-DIAG
-void tempDiag(String message) {
-  try {
-    File(
-      'C:/Users/ngtan/AppData/Local/Temp/claude/l--Code-coolbirdfm-flutter/6b1fa93e-8926-4f83-b6f2-cb13bb1b692d/scratchpad/diag.log',
-    ).writeAsStringSync(
-      '${DateTime.now().toIso8601String()} $message\n',
-      mode: FileMode.append,
-      flush: true,
-    );
-  } catch (_) {}
-}
-
 /// Shared media_kit backend for the main player, PiP and frame picker.
 class PlaybackPlayer {
   PlaybackPlayer({
@@ -132,7 +119,9 @@ class PlaybackPlayer {
     var id = state.track.audio.id;
     if (_player.platform case final mk.NativePlayer native) {
       try {
-        id = await native.getProperty('aid');
+        if (await _nativeReady(native) && _disposal == null) {
+          id = await native.getProperty('aid', waitForInitialization: false);
+        }
       } catch (_) {
         /* Use state during load/teardown. */
       }
@@ -171,6 +160,16 @@ class PlaybackPlayer {
   mk.PlayerState get state => _player.state;
   mk.PlayerStream get stream => _player.stream;
 
+  // media_kit checks disposed before awaiting initialization in its raw FFI
+  // helpers. Recheck after those awaits, then make the call without another
+  // initialization wait; otherwise a closing player can invalidate the handle.
+  Future<bool> _nativeReady(mk.NativePlayer native) async {
+    if (_disposal != null || native.disposed) return false;
+    await native.waitForPlayerInitialization;
+    await native.waitForVideoControllerInitializationIfAttached;
+    return _disposal == null && !native.disposed;
+  }
+
   /// Samples the active SMB source in bytes per second while listened to.
   Stream<int?> sampleSmbReadSpeed() {
     final proxy = SmbHttpProxyServer.instance;
@@ -203,7 +202,13 @@ class PlaybackPlayer {
       if (_player.platform case final mk.NativePlayer native
           when Uri.tryParse(_subtitleCacheSource ?? '')?.scheme == 'smb') {
         try {
-          return int.tryParse(await native.getProperty('cache-speed'));
+          if (!await _nativeReady(native) || _disposal != null) return null;
+          return int.tryParse(
+            await native.getProperty(
+              'cache-speed',
+              waitForInitialization: false,
+            ),
+          );
         } catch (_) {
           // The property can be unavailable during open or teardown.
         }
@@ -219,71 +224,89 @@ class PlaybackPlayer {
   bool get fellBackToSoftware => _softwareFallback;
 
   Future<void> open(PlaybackMedia media, {bool play = true}) async {
+    if (_disposal != null) return;
     _playRequested = play;
     _pendingSeek = null;
     final previousProxy = _proxyUrl;
     _proxyUrl = null;
-    final uri = playbackSourceUri(media.uri);
-    String source = playbackMediaSource(media.uri);
-    if (uri.scheme == 'smb') {
-      if (Platform.isWindows) {
-        if (uri.userInfo.isNotEmpty) {
-          final separator = uri.userInfo.indexOf(':');
-          final username = Uri.decodeComponent(
-            separator < 0 ? uri.userInfo : uri.userInfo.substring(0, separator),
-          ).replaceFirst(';', r'\');
-          final password = separator < 0
-              ? ''
-              : Uri.decodeComponent(uri.userInfo.substring(separator + 1));
-          // Reuse the same Windows authentication path as SMB browsing. The
-          // OS session is shared with browser tabs and PiP; do not disconnect
-          // it when an individual decoder closes.
-          final result = await SMBService().connect(
-            host: uri.host,
-            username: username,
-            password: password,
-          );
-          if (!result.success) {
-            throw StateError(result.errorMessage ?? 'SMB connection failed');
+    try {
+      final uri = playbackSourceUri(media.uri);
+      String source = playbackMediaSource(media.uri);
+      if (uri.scheme == 'smb') {
+        if (Platform.isWindows) {
+          if (uri.userInfo.isNotEmpty) {
+            final separator = uri.userInfo.indexOf(':');
+            final username = Uri.decodeComponent(
+              separator < 0
+                  ? uri.userInfo
+                  : uri.userInfo.substring(0, separator),
+            ).replaceFirst(';', r'\');
+            final password = separator < 0
+                ? ''
+                : Uri.decodeComponent(uri.userInfo.substring(separator + 1));
+            // Reuse the same Windows authentication path as SMB browsing. The
+            // OS session is shared with browser tabs and PiP; do not disconnect
+            // it when an individual decoder closes.
+            final result = await SMBService().connect(
+              host: uri.host,
+              username: username,
+              password: password,
+            );
+            if (!result.success) {
+              throw StateError(result.errorMessage ?? 'SMB connection failed');
+            }
+          }
+          source = smbMrlToUnc(source);
+        } else {
+          final mountedFile = DesktopSmbMount.isSupported
+              ? await DesktopSmbMount.resolveFile(uri)
+              : null;
+          if (mountedFile != null) {
+            source = mountedFile;
+          } else {
+            final proxy = await SmbHttpProxyServer.instance.urlFor(source);
+            if (_disposal != null) {
+              SmbHttpProxyServer.instance.release(proxy);
+              return;
+            }
+            _proxyUrl = proxy;
+            source = _proxyUrl.toString();
           }
         }
-        source = smbMrlToUnc(source);
-      } else {
-        final mountedFile = DesktopSmbMount.isSupported
-            ? await DesktopSmbMount.resolveFile(uri)
-            : null;
-        if (mountedFile != null) {
-          source = mountedFile;
-        } else {
-          _proxyUrl = await SmbHttpProxyServer.instance.urlFor(source);
-          source = _proxyUrl.toString();
+      }
+      if (_disposal != null) return;
+      if (_player.platform case final mk.NativePlayer native) {
+        // The previous file may have been large; probe the next one with the
+        // configured decoder until its size is known.
+        if (_largeVideoHwdec) {
+          _largeVideoHwdec = false;
+          await _applyHwdec();
+        }
+        if (!await _nativeReady(native) || _disposal != null) return;
+        await native.setProperty(
+          'cache-secs',
+          (configuration.networkCaching.inMilliseconds / 1000).toString(),
+          waitForInitialization: false,
+        );
+        if (configuration.framePreview) {
+          // Hover previews need a frame quickly, not sound or exact frames.
+          if (_disposal != null) return;
+          await native.setProperty('aid', 'no', waitForInitialization: false);
+          if (_disposal != null) return;
+          await native.setProperty(
+            'hr-seek',
+            'no',
+            waitForInitialization: false,
+          );
         }
       }
-    }
-    if (_disposal != null) return;
-    if (_player.platform case final mk.NativePlayer native) {
-      // The previous file may have been large; probe the next one with the
-      // configured decoder until its size is known.
-      if (_largeVideoHwdec) {
-        _largeVideoHwdec = false;
-        await _applyHwdec();
-      }
-      await native.setProperty(
-        'cache-secs',
-        (configuration.networkCaching.inMilliseconds / 1000).toString(),
+      if (_disposal != null) return;
+      _subtitleSource = source;
+      _subtitleCacheSource = media.uri;
+      await _player.setPlaylistMode(
+        configuration.looping ? mk.PlaylistMode.single : mk.PlaylistMode.none,
       );
-      if (configuration.framePreview) {
-        // Hover previews need a frame quickly, not sound or exact frames.
-        await native.setProperty('aid', 'no');
-        await native.setProperty('hr-seek', 'no');
-      }
-    }
-    _subtitleSource = source;
-    _subtitleCacheSource = media.uri;
-    await _player.setPlaylistMode(
-      configuration.looping ? mk.PlaylistMode.single : mk.PlaylistMode.none,
-    );
-    try {
+      if (_disposal != null) return;
       await _player.open(mk.Media(source), play: play);
     } finally {
       if (previousProxy != null) {
@@ -308,6 +331,7 @@ class PlaybackPlayer {
   /// [exact] false jumps to the nearest keyframe. Precise seeks decode every
   /// frame from the previous keyframe, which stalls high-bitrate 4K scrubbing.
   Future<void> seek(Duration position, {bool exact = true}) async {
+    if (_disposal != null) return;
     // open() returns before mpv has loaded metadata. A restore seek issued
     // immediately afterwards would otherwise be discarded by the decoder.
     if (state.duration == Duration.zero) {
@@ -318,11 +342,12 @@ class PlaybackPlayer {
     // A raw keyframe command leaves that flag set, making play restart at zero.
     if (!exact && !state.completed) {
       if (_player.platform case final mk.NativePlayer native) {
+        if (!await _nativeReady(native) || _disposal != null) return;
         await native.command([
           'seek',
           (position.inMilliseconds / 1000).toStringAsFixed(3),
           'absolute+keyframes',
-        ]);
+        ], waitForInitialization: false);
         return;
       }
     }
@@ -349,22 +374,29 @@ class PlaybackPlayer {
   Future<void> dispose() => _disposal ??= _dispose();
 
   Future<void> _dispose() async {
-    _live.remove(this);
-    await _durationSubscription.cancel();
-    await _errorSubscription.cancel();
-    for (final subscription in _sizeSubscriptions) {
-      await subscription.cancel();
+    // Keep the player registered until native callbacks have been detached.
+    // Engine shutdown may call disposeAll while an individual widget is
+    // already disposing its player, and must still await that same future.
+    try {
+      await _durationSubscription.cancel();
+      await _errorSubscription.cancel();
+      for (final subscription in _sizeSubscriptions) {
+        await subscription.cancel();
+      }
+      // NativePlayer.dispose acquires a process-wide lock before waiting for
+      // the video surface. Wait outside that lock so closing an initializing
+      // preview cannot block creation of every subsequent player.
+      if (_player.platform case final mk.NativePlayer native) {
+        await native.future;
+        await native.waitForPlayerInitialization;
+        await native.waitForVideoControllerInitializationIfAttached;
+      }
+      await _player.dispose();
+    } finally {
+      _live.remove(this);
+      if (_proxyUrl case final url?) SmbHttpProxyServer.instance.release(url);
+      _proxyUrl = null;
     }
-    // NativePlayer.dispose acquires a process-wide lock before waiting for
-    // the video surface. Wait outside that lock so closing an initializing
-    // preview cannot block creation of every subsequent player.
-    if (_player.platform case final mk.NativePlayer native) {
-      await native.future;
-      await native.waitForPlayerInitialization;
-      await native.waitForVideoControllerInitializationIfAttached;
-    }
-    await _player.dispose();
-    if (_proxyUrl case final url?) SmbHttpProxyServer.instance.release(url);
   }
 
   video.VideoController _configureVideo(PlaybackVideoConfiguration config) {
@@ -402,12 +434,11 @@ class PlaybackPlayer {
     final controller = _videoController;
     if (controller == null) return;
     if (_player.platform case final mk.NativePlayer native) {
-      await controller.platform.future;
-      if (_disposal == null) {
-        tempDiag(
-          'hwdec -> $_hwdec (large=$_largeVideoHwdec fallback=$_softwareFallback) frame=${configuration.framePreview}',
-        ); // TEMP-DIAG
-        await native.setProperty('hwdec', _hwdec);
+      try {
+        if (!await _nativeReady(native) || _disposal != null) return;
+        await native.setProperty('hwdec', _hwdec, waitForInitialization: false);
+      } catch (e) {
+        if (_disposal == null) debugPrint('Could not update video decoder: $e');
       }
     }
   }
@@ -421,9 +452,6 @@ class PlaybackPlayer {
     final height = state.height ?? 0;
     if (width == 0 || height == 0) return;
     final large = (width > height ? width : height) >= largeVideoLongEdge;
-    tempDiag(
-      'size ${width}x$height large=$large was=$_largeVideoHwdec',
-    ); // TEMP-DIAG
     if (large == _largeVideoHwdec) return;
     _largeVideoHwdec = large;
     if (!config.enableHardwareAcceleration) unawaited(_applyHwdec());
@@ -434,7 +462,6 @@ class PlaybackPlayer {
   /// which is what can take down the engine on a failing driver.
   void _onError(String error) {
     if (_softwareFallback || _hwdec == 'no') return;
-    tempDiag('error: $error'); // TEMP-DIAG
     if (!isHardwareDecodeError(error)) return;
     _softwareFallback = true;
     unawaited(_applyHwdec());

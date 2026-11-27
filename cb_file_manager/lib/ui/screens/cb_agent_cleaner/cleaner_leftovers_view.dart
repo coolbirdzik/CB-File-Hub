@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:cb_file_manager/ui/components/common/search_text_field.dart';
+import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -39,8 +40,15 @@ typedef AppLeftoverCleanAction =
 class CleanerLeftoversView extends StatefulWidget {
   final CleanerAppLeftoversCubit cubit;
   final VoidCallback? onScan;
+  final VoidCallback? onDeepScan;
   final VoidCallback? onCancel;
   final AppLeftoverPathAction? onOpenFolder;
+
+  /// Deep scan can inspect additional Windows application locations.
+  final bool supportsDeepScan;
+
+  /// Whether the active scan or displayed results are from deep scan.
+  final bool deepScan;
 
   /// Adds the approved batch to the shared Cleaner queue.
   final AppLeftoverCleanAction? onClean;
@@ -48,14 +56,21 @@ class CleanerLeftoversView extends StatefulWidget {
   /// macOS and Linux move to the Trash instead of the Recycle Bin.
   final bool usesTrash;
 
+  /// What the running scan is reading: stage, counts and current folder.
+  final ValueListenable<AppLeftoverScanProgress?>? scanProgress;
+
   const CleanerLeftoversView({
     super.key,
     required this.cubit,
     this.onScan,
+    this.onDeepScan,
     this.onCancel,
     this.onOpenFolder,
     this.onClean,
     this.usesTrash = false,
+    this.supportsDeepScan = false,
+    this.deepScan = false,
+    this.scanProgress,
   });
 
   @override
@@ -200,23 +215,32 @@ class _CleanerLeftoversViewState extends State<CleanerLeftoversView> {
         final scanning =
             state.status == CleanerAppLeftoversStatus.loading ||
             state.isScanning;
+        final subtitle = hasResults
+            ? (scanning
+                  ? l.cleanerLeftoversFound(
+                      FormatUtils.formatFileSize(state.visibleBytes),
+                    )
+                  : widget.deepScan
+                  ? l.cleanerLeftoversPossibleSize(
+                      FormatUtils.formatFileSize(state.visibleBytes),
+                    )
+                  : l.cleanerLeftoversReclaimable(
+                      FormatUtils.formatFileSize(state.visibleBytes),
+                    ))
+            : l.cleanerLeftoversUtilityDescription;
         return Column(
           key: const ValueKey<String>('cleaner-leftovers-feature'),
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _Header(
-              subtitle: hasResults
-                  ? (scanning
-                        ? l.cleanerLeftoversFound(
-                            FormatUtils.formatFileSize(state.visibleBytes),
-                          )
-                        : l.cleanerLeftoversReclaimable(
-                            FormatUtils.formatFileSize(state.visibleBytes),
-                          ))
-                  : l.cleanerLeftoversUtilityDescription,
+              subtitle: widget.deepScan && (hasResults || scanning)
+                  ? '${l.cleanerLeftoversDeepScan} · $subtitle'
+                  : subtitle,
               scanning: scanning,
               enabled: !_cleaning,
               onScan: widget.onScan,
+              onDeepScan: widget.onDeepScan,
+              supportsDeepScan: widget.supportsDeepScan,
               onCancel: widget.onCancel,
             ),
             const Divider(height: 1),
@@ -258,11 +282,34 @@ class _CleanerLeftoversViewState extends State<CleanerLeftoversView> {
         return _Intro(
           key: const ValueKey<String>('cleaner-leftovers-intro'),
           onScan: widget.onScan,
+          onDeepScan: widget.onDeepScan,
+          supportsDeepScan: widget.supportsDeepScan,
         );
       case CleanerAppLeftoversStatus.loading:
-        return CleanerScanPanel(
+        final fallbackTitle = widget.deepScan
+            ? l.cleanerLeftoversDeepScanLoading
+            : l.cleanerLeftoversLoading;
+        final progress = widget.scanProgress;
+        if (progress == null) {
+          return CleanerScanPanel(
+            key: const ValueKey<String>('cleaner-leftovers-loading'),
+            title: fallbackTitle,
+          );
+        }
+        // Keyed here: AnimatedSwitcher compares its direct child's key.
+        return ValueListenableBuilder<AppLeftoverScanProgress?>(
           key: const ValueKey<String>('cleaner-leftovers-loading'),
-          title: l.cleanerLeftoversLoading,
+          valueListenable: progress,
+          // Discovery runs several stages with unrelated totals; a per-stage
+          // fraction filled the bar and then dropped it back to zero at every
+          // stage change. Counts stay in the detail line, the bar animates.
+          builder: (context, value, _) => CleanerScanPanel(
+            title: value == null ? fallbackTitle : _stageTitle(l, value),
+            detail: value == null ? null : _stageDetail(l, value),
+            detailKey: const ValueKey<String>('cleaner-leftovers-stage-detail'),
+            path: value?.path,
+            reserveSpace: true,
+          ),
         );
       case CleanerAppLeftoversStatus.failure:
         return _CenteredStatus(
@@ -292,6 +339,62 @@ class _CleanerLeftoversViewState extends State<CleanerLeftoversView> {
     }
   }
 
+  String _stageTitle(AppLocalizations l, AppLeftoverScanProgress progress) {
+    return switch (progress.stage) {
+      AppLeftoverScanStage.readingApps => l.cleanerLeftoversStageReadingApps,
+      AppLeftoverScanStage.listingFolders => l.cleanerLeftoversStageListing,
+      AppLeftoverScanStage.checkingCandidates =>
+        l.cleanerLeftoversStageCandidates,
+      AppLeftoverScanStage.checkingPath => l.cleanerLeftoversStagePath,
+      AppLeftoverScanStage.searchingDrive => l.cleanerLeftoversStageDrive(
+        progress.root,
+      ),
+      AppLeftoverScanStage.measuring => l.cleanerLeftoversMeasuring,
+    };
+  }
+
+  String? _stageDetail(AppLocalizations l, AppLeftoverScanProgress progress) {
+    return switch (progress.stage) {
+      AppLeftoverScanStage.readingApps ||
+      AppLeftoverScanStage.listingFolders => null,
+      AppLeftoverScanStage.checkingCandidates ||
+      AppLeftoverScanStage.checkingPath ||
+      AppLeftoverScanStage.measuring =>
+        progress.total == 0
+            ? null
+            : l.cleanerLeftoversScanProgress(progress.done, progress.total),
+      AppLeftoverScanStage.searchingDrive => l.cleanerLeftoversStageDriveDetail(
+        progress.done,
+        progress.total,
+        progress.visited,
+      ),
+    };
+  }
+
+  Widget _measuringStrip(
+    AppLocalizations l,
+    CleanerAppLeftoversState state,
+    AppLeftoverScanProgress? progress,
+  ) {
+    return CleanerScanStrip(
+      key: const ValueKey<String>('cleaner-leftovers-progress'),
+      title: l.cleanerLeftoversMeasuring,
+      trailing: l.cleanerLeftoversScanProgress(
+        state.measuredCount,
+        state.totalCount,
+      ),
+      // With live progress the path line is always laid out (a blank line
+      // until the first folder starts), so the strip and the list below it
+      // do not shift when the path appears.
+      path: progress?.stage == AppLeftoverScanStage.measuring
+          ? progress!.path
+          : (widget.scanProgress == null ? null : ' '),
+      value: state.totalCount == 0
+          ? null
+          : state.measuredCount / state.totalCount,
+    );
+  }
+
   Widget _buildResults(
     AppLocalizations l,
     CleanerAppLeftoversState state,
@@ -304,23 +407,25 @@ class _CleanerLeftoversViewState extends State<CleanerLeftoversView> {
       if (state.isScanning)
         Padding(
           padding: const EdgeInsets.only(bottom: 10),
-          child: CleanerScanStrip(
-            key: const ValueKey<String>('cleaner-leftovers-progress'),
-            title: l.cleanerLeftoversMeasuring,
-            trailing: l.cleanerLeftoversScanProgress(
-              state.measuredCount,
-              state.totalCount,
-            ),
-            value: state.totalCount == 0
-                ? null
-                : state.measuredCount / state.totalCount,
-          ),
+          child: widget.scanProgress == null
+              ? _measuringStrip(l, state, null)
+              : ValueListenableBuilder<AppLeftoverScanProgress?>(
+                  valueListenable: widget.scanProgress!,
+                  builder: (context, progress, _) =>
+                      _measuringStrip(l, state, progress),
+                ),
         ),
       _InfoBar(
         key: const ValueKey<String>('cleaner-leftovers-intro-banner'),
-        text: report.isPartial
-            ? '${l.cleanerLeftoversIntro}\n${l.cleanerLeftoversPartialBanner}'
-            : l.cleanerLeftoversIntro,
+        text: [
+          widget.deepScan
+              ? l.cleanerLeftoversDeepScanResult
+              : l.cleanerLeftoversIntro,
+          if (report.isPartial)
+            widget.deepScan
+                ? l.cleanerLeftoversDeepScanPartial
+                : l.cleanerLeftoversPartialBanner,
+        ].join('\n'),
       ),
       if (hidden > 0)
         Padding(
@@ -358,7 +463,7 @@ class _CleanerLeftoversViewState extends State<CleanerLeftoversView> {
         CleanerStaggeredEntrance(
           key: ValueKey<String>('tier-${reason.name}'),
           index: order++,
-          child: _TierHeader(reason: reason),
+          child: _TierHeader(reason: reason, deepScan: widget.deepScan),
         ),
       );
       for (final location in AppLeftoverLocation.values) {
@@ -590,6 +695,8 @@ class _Header extends StatelessWidget {
   final bool scanning;
   final bool enabled;
   final VoidCallback? onScan;
+  final VoidCallback? onDeepScan;
+  final bool supportsDeepScan;
   final VoidCallback? onCancel;
 
   const _Header({
@@ -597,6 +704,8 @@ class _Header extends StatelessWidget {
     required this.scanning,
     required this.enabled,
     required this.onScan,
+    required this.onDeepScan,
+    required this.supportsDeepScan,
     required this.onCancel,
   });
 
@@ -604,55 +713,97 @@ class _Header extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l = AppLocalizations.of(context)!;
+    final title = Row(
+      children: [
+        Icon(
+          PhosphorIconsLight.folderDashed,
+          size: 19,
+          color: theme.colorScheme.primary,
+        ),
+        const SizedBox(width: 9),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                l.cleanerLeftoversTitle,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              Text(
+                subtitle,
+                key: const ValueKey<String>('cleaner-leftovers-subtitle'),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+    final actions = Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      alignment: WrapAlignment.end,
+      children: [
+        if (supportsDeepScan && !scanning)
+          Tooltip(
+            message: l.cleanerLeftoversDeepScanHint,
+            child: OutlinedButton.icon(
+              key: const ValueKey<String>('cleaner-leftovers-deep-rescan'),
+              onPressed: enabled ? onDeepScan : null,
+              icon: const Icon(Icons.manage_search_rounded, size: 18),
+              label: Text(l.cleanerLeftoversDeepScan),
+            ),
+          ),
+        OutlinedButton.icon(
+          key: const ValueKey<String>('cleaner-leftovers-rescan'),
+          onPressed: !enabled
+              ? null
+              : scanning
+              ? onCancel
+              : onScan,
+          icon: Icon(
+            scanning ? Icons.stop_rounded : Icons.refresh_rounded,
+            size: 18,
+          ),
+          label: Text(
+            scanning
+                ? l.diskCleanerCancel
+                : supportsDeepScan
+                ? l.cleanerLeftoversNormalScan
+                : l.diskCleanerScanAgain,
+          ),
+        ),
+      ],
+    );
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: Row(
-        children: [
-          Icon(
-            PhosphorIconsLight.folderDashed,
-            size: 19,
-            color: theme.colorScheme.primary,
-          ),
-          const SizedBox(width: 9),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  l.cleanerLeftoversTitle,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          if (supportsDeepScan && !scanning && constraints.maxWidth < 560) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [title, const SizedBox(height: 8), actions],
+            );
+          }
+          return Row(
+            children: [
+              Expanded(child: title),
+              const SizedBox(width: 12),
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: constraints.maxWidth * 0.62,
                 ),
-                Text(
-                  subtitle,
-                  key: const ValueKey<String>('cleaner-leftovers-subtitle'),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          OutlinedButton.icon(
-            key: const ValueKey<String>('cleaner-leftovers-rescan'),
-            onPressed: !enabled
-                ? null
-                : scanning
-                ? onCancel
-                : onScan,
-            icon: Icon(
-              scanning ? Icons.stop_rounded : Icons.refresh_rounded,
-              size: 18,
-            ),
-            label: Text(
-              scanning ? l.diskCleanerCancel : l.diskCleanerScanAgain,
-            ),
-          ),
-        ],
+                child: actions,
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -1051,8 +1202,9 @@ class _InfoBar extends StatelessWidget {
 
 class _TierHeader extends StatelessWidget {
   final AppLeftoverReason reason;
+  final bool deepScan;
 
-  const _TierHeader({required this.reason});
+  const _TierHeader({required this.reason, required this.deepScan});
 
   @override
   Widget build(BuildContext context) {
@@ -1060,8 +1212,12 @@ class _TierHeader extends StatelessWidget {
     final l = AppLocalizations.of(context)!;
     final (title, hint, color) = switch (reason) {
       AppLeftoverReason.noInstalledApp => (
-        l.cleanerLeftoversTierNoApp,
-        l.cleanerLeftoversTierNoAppHint,
+        deepScan
+            ? l.cleanerLeftoversDeepScanNoMatch
+            : l.cleanerLeftoversTierNoApp,
+        deepScan
+            ? l.cleanerLeftoversDeepScanNoMatchHint
+            : l.cleanerLeftoversTierNoAppHint,
         Colors.orange.shade800,
       ),
       AppLeftoverReason.olderVersion => (
@@ -1096,8 +1252,15 @@ class _TierHeader extends StatelessWidget {
 
 class _Intro extends StatelessWidget {
   final VoidCallback? onScan;
+  final VoidCallback? onDeepScan;
+  final bool supportsDeepScan;
 
-  const _Intro({super.key, required this.onScan});
+  const _Intro({
+    super.key,
+    required this.onScan,
+    required this.onDeepScan,
+    required this.supportsDeepScan,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1123,12 +1286,42 @@ class _Intro extends StatelessWidget {
                 style: theme.textTheme.bodyMedium,
               ),
               const SizedBox(height: 18),
-              FilledButton.icon(
-                key: const ValueKey<String>('cleaner-leftovers-scan'),
-                onPressed: onScan,
-                icon: const Icon(Icons.search_rounded, size: 18),
-                label: Text(l.cleanerLeftoversScan),
+              Wrap(
+                alignment: WrapAlignment.center,
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  FilledButton.icon(
+                    key: const ValueKey<String>('cleaner-leftovers-scan'),
+                    onPressed: onScan,
+                    icon: const Icon(Icons.search_rounded, size: 18),
+                    label: Text(
+                      supportsDeepScan
+                          ? l.cleanerLeftoversNormalScan
+                          : l.cleanerLeftoversScan,
+                    ),
+                  ),
+                  if (supportsDeepScan)
+                    OutlinedButton.icon(
+                      key: const ValueKey<String>(
+                        'cleaner-leftovers-deep-scan',
+                      ),
+                      onPressed: onDeepScan,
+                      icon: const Icon(Icons.manage_search_rounded, size: 18),
+                      label: Text(l.cleanerLeftoversDeepScan),
+                    ),
+                ],
               ),
+              if (supportsDeepScan) ...[
+                const SizedBox(height: 10),
+                Text(
+                  l.cleanerLeftoversDeepScanHint,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
             ],
           ),
         ),

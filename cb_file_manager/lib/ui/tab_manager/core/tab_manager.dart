@@ -790,6 +790,8 @@ class TabManagerBloc extends Bloc<TabEvent, TabManagerState> {
       switch (path) {
         case '#video':
           return l10n?.videoHubTitle ?? 'Video Hub';
+        case kSubtitleQueuePath:
+          return l10n?.subtitleQueueTitle ?? 'AI Subtitle Queue';
         case '#torrents':
           return l10n?.torrents ?? 'Torrents';
         case '#gallery':

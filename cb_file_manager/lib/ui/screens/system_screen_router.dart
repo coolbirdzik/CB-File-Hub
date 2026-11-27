@@ -39,6 +39,7 @@ import 'package:cb_file_manager/config/translation_helper.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import '../utils/route.dart';
 import 'trash_bin/trash_bin_screen.dart';
+import 'subtitle_queue/subtitle_queue_screen.dart';
 import 'settings/settings_screen.dart';
 import 'backup_sync/backup_sync_screen.dart';
 import 'ai_chat/ai_chat_screen.dart';
@@ -109,6 +110,8 @@ class SystemScreenRouter {
         return GalleryHubScreen(tabId: tabId);
       case '#video':
         return VideoHubScreen(tabId: tabId);
+      case kSubtitleQueuePath:
+        return SubtitleQueueScreen(tabId: tabId);
       case '#torrents':
         return TorrentScreen(tabId: tabId);
       case '#albums':

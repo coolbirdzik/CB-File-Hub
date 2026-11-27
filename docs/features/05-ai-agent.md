@@ -200,6 +200,32 @@ the cleanup leaves the shared queue. Cancelled/failed uninstalls and incomplete
 inventories never permit this cleanup. Read failures and failed deletion paths
 remain visible. **Manage in Windows** remains available for other uninstallers.
 
+**Leftover app data** is a separate scan for old application folders, not a
+list of everything missing from the Windows uninstall registry. Opening the
+page does not start a scan; choose a scan mode explicitly. On Windows,
+the normal scan compares folders in AppData, ProgramData and the program
+directories against the installed-app inventory, and checks the candidate
+folders themselves for executable evidence of applications still present.
+This protects portable apps even when they have no uninstall registration.
+The Windows-only **Deep scan** also looks for matching executables on mounted
+fixed local drives and in PATH locations, to protect the data of apps stored
+outside the usual install directories. This is an evidence pass: it does not
+add arbitrary directories on those drives to the cleanup targets and does not
+run any discovered program. The recursive drive pass skips reparse points and
+protected system locations. Deep scan takes longer; cancelling during discovery
+stops the scan, while cancelling during size measurement keeps the results
+already measured.
+
+Installed-app names, locations and executable evidence are conservative
+ownership signals; the absence of a match is not proof of uninstallation.
+Inaccessible or bounded scans report incomplete coverage rather than claiming
+that every possible installation was checked. A candidate whose own folder
+cannot be inspected for executable evidence is kept. Older-version candidates
+still need review, as old and current versions can coexist. The inactivity filter
+is separate from installation detection: a portable app that has not written
+its settings recently is not necessarily unused. Review the paths and their
+contents before moving selected folders to the Recycle Bin or Trash.
+
 Cleaner deletion runs in a background isolate. Permanent deletion uses the
 optional `cb_native` `deletion.rs` job with up to eight Rust workers and one
 outcome per approved path, including the OS error on failure; missing native

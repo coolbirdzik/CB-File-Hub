@@ -36,6 +36,9 @@ class CbDialog extends StatelessWidget {
   /// Shows the close affordance in the header.
   final bool showCloseButton;
 
+  /// An optional control beside the title, before the close button.
+  final Widget? headerTrailing;
+
   const CbDialog({
     super.key,
     required this.title,
@@ -46,6 +49,7 @@ class CbDialog extends StatelessWidget {
     this.destructive = false,
     this.width = 520,
     this.showCloseButton = true,
+    this.headerTrailing,
   });
 
   /// Shows this dialog and completes with the value passed to
@@ -119,6 +123,10 @@ class CbDialog extends StatelessWidget {
                               ),
                         ),
                       ),
+                      if (headerTrailing != null) ...[
+                        const SizedBox(width: CbSpacing.md),
+                        headerTrailing!,
+                      ],
                       if (showCloseButton) ...[
                         const SizedBox(width: CbSpacing.lg),
                         CbButton.icon(

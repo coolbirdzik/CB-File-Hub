@@ -423,9 +423,15 @@ class _CbSelectState<T> extends State<CbSelect<T>> {
                     enabled: !state.disabled,
                   )
                 : null,
-            // Like CbButton, the keyboard focus ring sits outside the shape.
-            boxShadow: state.focused ? CbDecorations.focusRing(c) : null,
           ),
+          // Like CbButton, the keyboard focus ring sits outside the shape. It
+          // is a separate decoration so the field edge above stays.
+          foregroundDecoration: state.focused
+              ? BoxDecoration(
+                  borderRadius: CbRadii.smAll,
+                  border: CbDecorations.focusRing(c),
+                )
+              : null,
           child: Row(
             // `min` matters beyond sizing: a select dropped straight into a
             // `Row` or `Wrap` is laid out with unbounded width, and a flex

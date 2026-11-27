@@ -307,10 +307,12 @@ features:
 
   cleaner_app_leftovers:
     entrypoints:
+      - cb_file_manager/lib/ui/screens/cb_agent_cleaner/cb_agent_cleaner_screen.dart
       - cb_file_manager/lib/ui/screens/cb_agent_cleaner/cleaner_leftovers_view.dart
       - cb_file_manager/lib/bloc/cleaner_app_leftovers/cleaner_app_leftovers_cubit.dart
       - cb_file_manager/lib/services/app_insights/app_leftover_finder.dart
       - cb_file_manager/lib/services/app_insights/app_leftover_scanner.dart
+      - cb_file_manager/lib/services/app_insights/windows_leftover_presence.dart
       - cb_file_manager/lib/services/app_insights/posix_app_leftover_finder.dart
       - cb_file_manager/lib/services/app_insights/posix_app_inventory.dart
     parent: cb_agent_cleaner
@@ -322,8 +324,10 @@ features:
       - cb_file_manager/test/services/app_insights/posix_app_inventory_test.dart
       - cb_file_manager/test/bloc/cleaner_app_leftovers_cubit_test.dart
       - cb_file_manager/test/ui/screens/cb_agent_cleaner/cleaner_leftovers_view_test.dart
+      - cb_file_manager/test/ui/screens/cb_agent_cleaner/cleaner_leftover_navigation_test.dart
     invariants:
       - "Runs its own scan (inventory, two-level listing, per-folder walk on an isolate); it never waits for the full-disk scan."
+      - "Opening Leftovers does not start a scan; the user must choose a scan mode. Windows Deep Scan only uses extra drive locations to rule out possible leftovers, not to expand deletion scope."
       - "Folders are listed as each one is measured; cancelling keeps what was measured."
       - "Last changed is the newest write or creation time of the folder itself or anything inside it; the folder's own time counts because deleting or renaming files moves it. Access times are never used."
       - "Without the Win32 uninstall inventory (Windows) or any app/desktop entry (macOS, Linux) nothing is reported."

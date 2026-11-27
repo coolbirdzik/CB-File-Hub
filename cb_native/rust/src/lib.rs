@@ -20,6 +20,7 @@ mod dart_api;
 mod deletion;
 mod disk_scan;
 mod doctext;
+mod exec_walk;
 mod fold_table;
 mod fsx;
 mod glob;
@@ -35,6 +36,7 @@ mod smart_album;
 mod syntax;
 mod torrent;
 mod ui_fs;
+mod volume;
 mod walk;
 #[cfg(windows)]
 mod win_dir;
@@ -87,6 +89,9 @@ const JOB_PERMANENT_DELETE: u32 = 28;
 const JOB_ROOT_SIZES: u32 = 29;
 const JOB_FFMPEG_PROCESS: u32 = 30;
 const JOB_FILE_CREATED: u32 = 31;
+const JOB_EXECUTABLE_WALK: u32 = 32;
+const JOB_VOLUME_DISKS: u32 = 33;
+const JOB_MFT_EXECUTABLES: u32 = 34;
 
 unsafe fn str_arg<'a>(ptr: *const u8, len: usize) -> Option<&'a str> {
     if len == 0 {
@@ -382,6 +387,9 @@ pub unsafe extern "C" fn cb_job_start(
         JOB_ROOT_SIZES => walk::start_root_sizes(port, &config),
         JOB_FFMPEG_PROCESS => media_process::start(port, &config),
         JOB_FILE_CREATED => batch_fs::start_file_created(port, &config),
+        JOB_EXECUTABLE_WALK => exec_walk::start_executable_walk(port, &config),
+        JOB_VOLUME_DISKS => volume::start_volume_disks(port, &config),
+        JOB_MFT_EXECUTABLES => volume::start_mft_executables(port, &config),
         _ => None,
     };
     match job {

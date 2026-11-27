@@ -6,19 +6,34 @@ import 'package:cb_file_manager/services/media/subtitle_progress.dart';
 import 'package:cb_file_manager/services/media/subtitle_languages.dart';
 import 'video_player/video_player_utils.dart';
 
-/// Only caption text occupies the picture; processing UI belongs to controls.
+/// Displays the current caption or the wait message in the subtitle area.
 class SubtitleCaptionOverlay extends StatelessWidget {
   final String caption;
   final bool controlsVisible;
+  final SubtitleProgress? progress;
   const SubtitleCaptionOverlay({
     super.key,
     required this.caption,
     required this.controlsVisible,
+    this.progress,
   });
 
   @override
   Widget build(BuildContext context) {
-    if (caption.isEmpty) return const SizedBox.shrink();
+    var text = caption;
+    final current = progress;
+    if (text.isEmpty &&
+        current != null &&
+        current.busy &&
+        (current.duration <= Duration.zero ||
+            current.position < current.duration) &&
+        !current.completed.any(
+          (range) =>
+              range.start <= current.position && current.position < range.end,
+        )) {
+      text = AppLocalizations.of(context)!.aiSubtitleProcessing;
+    }
+    if (text.isEmpty) return const SizedBox.shrink();
     return IgnorePointer(
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -54,7 +69,7 @@ class SubtitleCaptionOverlay extends StatelessWidget {
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
-                    caption,
+                    text,
                     key: const ValueKey('ai-subtitle-caption'),
                     textAlign: TextAlign.center,
                     maxLines: compact ? 2 : 4,
@@ -113,6 +128,19 @@ class SubtitleControlButton extends StatelessWidget {
       );
     }
     final progress = current;
+    String? percentage;
+    final duration = progress.duration.inMicroseconds;
+    if (duration > 0 &&
+        (progress.busy || progress.phase == SubtitlePhase.ready)) {
+      // Session and cache snapshots merge overlapping completed ranges.
+      var completedMicros = 0;
+      for (final range in progress.completed) {
+        final start = range.start.inMicroseconds.clamp(0, duration);
+        final end = range.end.inMicroseconds.clamp(0, duration);
+        completedMicros += (end - start).toInt();
+      }
+      percentage = '${completedMicros * 100 ~/ duration}%';
+    }
     final failed = progress.phase == SubtitlePhase.failed;
     final warning =
         progress.phase == SubtitlePhase.missingModels || progress.lagging;
@@ -234,25 +262,49 @@ class SubtitleControlButton extends StatelessWidget {
       child: Semantics(
         button: true,
         label: '${l.aiSubtitles}: $title',
+        value: percentage,
         child: SizedBox(
-          width: 32,
           height: 32,
-          child: Stack(
-            alignment: Alignment.center,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                failed ? Icons.error_outline : Icons.closed_caption_outlined,
-                color: color,
-                size: 18,
+              SizedBox(
+                width: 32,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Icon(
+                      failed
+                          ? Icons.error_outline
+                          : Icons.closed_caption_outlined,
+                      color: color,
+                      size: 18,
+                    ),
+                    if (progress.busy)
+                      SizedBox(
+                        width: 26,
+                        height: 26,
+                        child: CircularProgressIndicator(
+                          key: const ValueKey('ai-subtitle-busy'),
+                          strokeWidth: 1.5,
+                          color: color,
+                        ),
+                      ),
+                  ],
+                ),
               ),
-              if (progress.busy)
-                SizedBox(
-                  width: 26,
-                  height: 26,
-                  child: CircularProgressIndicator(
-                    key: const ValueKey('ai-subtitle-busy'),
-                    strokeWidth: 1.5,
-                    color: color,
+              if (percentage != null)
+                Padding(
+                  padding: const EdgeInsetsDirectional.only(end: 6),
+                  child: ExcludeSemantics(
+                    child: Text(
+                      percentage,
+                      style: TextStyle(
+                        color: color,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ),
                 ),
             ],

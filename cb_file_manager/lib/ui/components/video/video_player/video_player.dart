@@ -12,7 +12,6 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:media_kit/media_kit.dart' as mk; // TEMP-DIAG
 import 'package:cb_file_manager/services/media/media_kit_playback.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:path/path.dart' as pathlib;
@@ -884,29 +883,13 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
   }
 
   void _setupPlayerEventListeners() {
-    if (_player == null) return;
+    final player = _player;
+    if (player == null) return;
+    bool isCurrent() => mounted && identical(_player, player);
 
     // Track buffering state - but ignore buffering during seek to prevent UI flicker
-    _player!.stream.buffering.listen((buffering) {
-      // TEMP-DIAG
-      if (_player?.controller.platform case final mk.NativePlayer n) {
-        () async {
-          final p = await (
-            n.getProperty('core-idle'),
-            n.getProperty('paused-for-cache'),
-            n.getProperty('hwdec-current'),
-            n.getProperty('time-pos'),
-            n.getProperty('pause'),
-            n.getProperty('seeking'),
-          ).wait;
-          tempDiag(
-            'buffering=$buffering isSeeking=$_isSeeking isLoading=$_isLoading '
-            'core-idle=${p.$1} pfc=${p.$2} hwdec=${p.$3} pos=${p.$4} '
-            'pause=${p.$5} seeking=${p.$6}',
-          );
-        }();
-      }
-      if (!_isSeeking && mounted) {
+    player.stream.buffering.listen((buffering) {
+      if (!_isSeeking && isCurrent()) {
         setState(() {
           _isLoading = buffering;
         });
@@ -914,8 +897,8 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
     });
 
     // Track play state changes
-    _player!.stream.playing.listen((playing) {
-      if (mounted && _isPlaying != playing) {
+    player.stream.playing.listen((playing) {
+      if (isCurrent() && _isPlaying != playing) {
         setState(() {
           _isPlaying = playing;
         });
@@ -930,24 +913,27 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
 
     // Persist only user changes (in the volume mixin). media_kit's initial default
     // volume must not overwrite the restored volume or mute preference.
-    _player!.stream.volume.listen((_) {
-      if (mounted) setState(() {});
+    player.stream.volume.listen((_) {
+      if (isCurrent()) setState(() {});
     });
-    _player!.stream.duration.listen((duration) {
-      if (mounted && duration > Duration.zero) _extractVideoMetadata();
+    player.stream.duration.listen((duration) {
+      if (isCurrent() && duration > Duration.zero) _extractVideoMetadata();
     });
-    _player!.stream.width.listen((width) {
-      if (mounted && width != null) _extractVideoMetadata();
+    player.stream.width.listen((width) {
+      if (isCurrent() && width != null) _extractVideoMetadata();
     });
-    _player!.stream.completed.listen((completed) {
-      if (!completed || !mounted || _advancedToNextVideo || _cutMode) return;
+    player.stream.completed.listen((completed) {
+      if (!completed || !isCurrent() || _advancedToNextVideo || _cutMode) {
+        return;
+      }
       if (widget.looping || !widget.hasNextVideo) return;
       _advancedToNextVideo = true;
       widget.onNextVideo?.call();
     });
 
     // Track errors
-    _player!.stream.error.listen((error) {
+    player.stream.error.listen((error) {
+      if (!isCurrent()) return;
       debugPrint('Player error: $error');
 
       // A missing/unavailable audio device (no sound card, disabled output,
@@ -2751,24 +2737,11 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
     if (!mounted) return;
     await RouteUtils.showAcrylicDialog(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(context.tr.aiSubtitles),
-        content: SizedBox(
-          width: 520,
-          child: SingleChildScrollView(
-            child: SubtitleSettingsPanel(
-              models: services.models,
-              downloads: services.downloads,
-              onManageModels: () => showLocalModelManagerDialog(dialogContext),
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: Text(context.tr.close),
-          ),
-        ],
+      builder: (_) => SubtitleSettingsDialog(
+        models: services.models,
+        downloads: services.downloads,
+        preferences: services.preferences,
+        onManageModels: showLocalModelManagerDialog,
       ),
     );
   }

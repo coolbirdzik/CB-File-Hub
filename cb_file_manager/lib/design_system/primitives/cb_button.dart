@@ -16,8 +16,7 @@ import 'cb_pressable.dart';
 /// outlined / text) invite inconsistency because the difference between them
 /// is decorative rather than semantic.
 ///
-/// Every variant is flat: weight is carried by the fill alone, never by a
-/// border.
+/// Variants are flat by default. A call site can opt into a hairline outline.
 enum CbButtonVariant {
   /// Solid accent fill. The single most important action in a view.
   primary,
@@ -67,6 +66,7 @@ class CbButton extends StatelessWidget {
 
   /// Stretches the button to its parent's width.
   final bool expand;
+  final bool outlined;
 
   /// Replaces the leading icon with a spinner and blocks interaction.
   final bool loading;
@@ -84,6 +84,7 @@ class CbButton extends StatelessWidget {
     this.variant = CbButtonVariant.secondary,
     this.size = CbButtonSize.md,
     this.expand = false,
+    this.outlined = false,
     this.loading = false,
     this.tooltip,
     this.focusNode,
@@ -102,6 +103,7 @@ class CbButton extends StatelessWidget {
     required String this.tooltip,
     this.variant = CbButtonVariant.ghost,
     this.size = CbButtonSize.md,
+    this.outlined = false,
     this.loading = false,
     this.focusNode,
     this.autofocus = false,
@@ -270,8 +272,17 @@ class CbButton extends StatelessWidget {
             borderRadius: CbRadii.all(_radius),
             // The focus ring sits outside the shape, so focus stays visible
             // on every variant including the accent fill.
-            boxShadow: state.focused ? CbDecorations.focusRing(c) : null,
+            border: state.focused ? CbDecorations.focusRing(c) : null,
           ),
+          foregroundDecoration: outlined
+              ? BoxDecoration(
+                  borderRadius: CbRadii.all(_radius),
+                  border: Border.all(
+                    color: state.disabled ? c.strokeSubtle : c.strokeStrong,
+                    width: CbStrokes.hairline,
+                  ),
+                )
+              : null,
           child: Row(
             mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,

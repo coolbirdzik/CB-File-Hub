@@ -47,6 +47,8 @@ class GgufLlamaCppLocalAiChatRuntime
   final int maxResponseTokens;
   final int? parallelSlots, threads;
   final bool allowCpuFallback;
+  final bool? backgroundInference;
+  final void Function(Process)? onProcessStarted;
   bool _cpuFallback = false;
 
   GgufLlamaCppLocalAiChatRuntime({
@@ -57,7 +59,11 @@ class GgufLlamaCppLocalAiChatRuntime
     this.parallelSlots,
     this.threads,
     this.allowCpuFallback = false,
+    this.backgroundInference,
+    this.onProcessStarted,
   });
+
+  bool get _background => backgroundInference ?? parallelSlots == 1;
 
   Process? _serverProcess;
   bool _disposed = false;
@@ -113,6 +119,60 @@ class GgufLlamaCppLocalAiChatRuntime
         maxTokens: contextTokens,
       )) {}
     }
+  }
+
+  /// A shared subtitle server is pinned to one model and context. Coalesce
+  /// both the first load and a replacement after an unexpected server exit.
+  Future<void> prepareSharedModel({
+    required InstalledLocalModel model,
+    required int contextTokens,
+  }) async {
+    final previous = _preparation;
+    if (previous != null) {
+      try {
+        await previous;
+      } catch (_) {
+        if (identical(_preparation, previous)) _preparation = null;
+        rethrow;
+      }
+      if (_serverProcess == null && identical(_preparation, previous)) {
+        _preparation = null;
+      }
+    }
+    final preparing = prepareModel(model: model, contextTokens: contextTokens);
+    try {
+      await preparing;
+    } catch (_) {
+      if (identical(_preparation, preparing)) _preparation = null;
+      rethrow;
+    }
+  }
+
+  /// Use a caller-owned connection: cancelling one video must not close the
+  /// other videos' requests or restart their shared server.
+  Stream<String> sendPreparedDirectConversationStream({
+    required InstalledLocalModel model,
+    required List<Map<String, String>> messages,
+    required HttpClient requestClient,
+    required int contextTokens,
+  }) async* {
+    if (_disposed ||
+        _serverProcess == null ||
+        _loadedModelPath != model.localPath ||
+        _loadedContextSize != contextTokens) {
+      throw StateError('Shared subtitle translation server is not ready');
+    }
+    final port = _serverPort!;
+    yield* LlamaCppChatClient(requestClient).stream(
+      baseUri: Uri.parse('http://127.0.0.1:$port'),
+      messages: [
+        {'role': 'system', 'content': 'You are a helpful assistant.'},
+        ...messages,
+      ],
+      maxResponseTokens: maxResponseTokens,
+      catalogId: model.catalogId,
+      enableThinking: false,
+    );
   }
 
   /// Kill-on-close Job Object so the OS reaps the server if the app dies.
@@ -276,10 +336,12 @@ class GgufLlamaCppLocalAiChatRuntime
         gpuLayers: _cpuFallback ? 0 : nGpuLayers,
         parallelSlots: parallelSlots,
         threads: threads,
+        boundedInference: backgroundInference == true,
       ),
       workingDirectory: launch.workingDirectory,
       environment: launch.environment,
     );
+    onProcessStarted?.call(process);
     if (_disposed) {
       process.kill();
       await process.exitCode;
@@ -292,10 +354,7 @@ class GgufLlamaCppLocalAiChatRuntime
     // automatically if this app process dies (crash, taskkill, or normal exit),
     // preventing orphaned llama-server.exe processes that would hold VRAM/port.
     if (Platform.isWindows) {
-      _killOnCloseJob.assignProcess(
-        process.pid,
-        background: parallelSlots == 1,
-      );
+      _killOnCloseJob.assignProcess(process.pid, background: _background);
     }
 
     // Drain output so the process does not block on a full pipe buffer.
@@ -356,7 +415,7 @@ class GgufLlamaCppLocalAiChatRuntime
     }
 
     _loadedModelPath = modelPath;
-    if (Platform.isWindows && parallelSlots == 1) {
+    if (Platform.isWindows && _background) {
       _killOnCloseJob.lowerPriority(process.pid);
     }
     _loadedContextSize = maxTokens;
@@ -414,6 +473,11 @@ class GgufLlamaCppLocalAiChatRuntime
       await process.exitCode.timeout(const Duration(seconds: 5));
     } on TimeoutException {
       process.kill(ProcessSignal.sigkill);
+      // A replacement shared server must not load a second copy of the
+      // weights while the previous process still owns its GPU allocations.
+      if (backgroundInference == true) {
+        await process.exitCode.timeout(const Duration(seconds: 5));
+      }
     }
   }
 

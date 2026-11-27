@@ -172,9 +172,8 @@ class CbSurface extends StatelessWidget {
       decoration: BoxDecoration(
         color: background,
         borderRadius: CbRadii.all(r),
-        boxShadow: state.focused
-            ? [...shadow, ...CbDecorations.focusRing(c)]
-            : shadow,
+        boxShadow: shadow,
+        border: state.focused ? CbDecorations.focusRing(c) : null,
       ),
       child: child,
     );

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:material_ui/material_ui.dart';
 
 import '../../../../config/languages/app_localizations.dart';
+import '../../../../design_system/cb_design_system.dart';
 import '../../utils/format_utils.dart';
 import '../../../../services/media/subtitle_cache.dart';
 
@@ -76,17 +77,14 @@ class _SubtitleCacheControlsState extends State<SubtitleCacheControls> {
             '${l.aiSubtitleCacheFailed}\n$_error',
             style: TextStyle(color: Theme.of(context).colorScheme.error),
           ),
-        TextButton.icon(
+        const SizedBox(height: CbSpacing.sm),
+        CbButton(
           key: const ValueKey('ai-subtitle-clear-cache'),
-          onPressed: _busy ? null : _clear,
-          icon: _busy
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.delete_sweep_outlined),
-          label: Text(l.aiSubtitleCacheClear),
+          onPressed: _clear,
+          icon: Icons.delete_sweep_outlined,
+          label: l.aiSubtitleCacheClear,
+          loading: _busy,
+          outlined: true,
         ),
       ],
     );

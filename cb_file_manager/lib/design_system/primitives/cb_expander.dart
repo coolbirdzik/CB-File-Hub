@@ -132,7 +132,7 @@ class _CbExpanderState extends State<CbExpander>
               ? c.fillPressed
               : (state.hovered ? c.fillHover : Colors.transparent),
           borderRadius: CbRadii.smAll,
-          boxShadow: state.focused ? CbDecorations.focusRing(c) : null,
+          border: state.focused ? CbDecorations.focusRing(c) : null,
         ),
         child: Row(
           children: [

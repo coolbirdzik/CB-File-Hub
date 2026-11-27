@@ -5325,7 +5325,44 @@ class ChineseLocalizations implements AppLocalizations {
   @override
   String get cleanerLeftoversScan => '查找残留';
   @override
+  String get cleanerLeftoversNormalScan => '常规扫描';
+  @override
+  String get cleanerLeftoversDeepScan => '深度扫描';
+  @override
+  String get cleanerLeftoversDeepScanHint =>
+      '检查更多位置中的应用程序文件，包括便携版应用。此过程可能需要更长时间。';
+  @override
+  String get cleanerLeftoversDeepScanLoading => '正在更多位置检查应用程序文件和便携版应用...';
+  @override
+  String get cleanerLeftoversDeepScanResult =>
+      '在检查更多已安装应用和便携版应用的位置后，这些文件夹可能是残留项。请在清理前检查每个文件夹。';
+  @override
+  String get cleanerLeftoversDeepScanPartial => '深度扫描未能验证所有位置。请在清理前检查剩余文件夹。';
+  @override
+  String get cleanerLeftoversDeepScanNoMatch => '未找到匹配的应用';
+  @override
+  String get cleanerLeftoversDeepScanNoMatchHint =>
+      '在已检查的位置中未找到匹配的已安装应用或便携版应用。';
+  @override
+  String cleanerLeftoversPossibleSize(String size) => '可能的残留项：$size';
+  @override
   String get cleanerLeftoversMeasuring => '正在测量残留文件夹...';
+  @override
+  String get cleanerLeftoversStageReadingApps => '正在读取已安装应用列表...';
+  @override
+  String get cleanerLeftoversStageListing => '正在列出应用数据文件夹...';
+  @override
+  String get cleanerLeftoversStageCandidates => '正在检查残留文件夹中是否有程序...';
+  @override
+  String get cleanerLeftoversStagePath => '正在检查 PATH 中的文件夹(命令行工具)...';
+  @override
+  String cleanerLeftoversStageDrive(String drive) => '正在 $drive 中查找便携版应用...';
+  @override
+  String cleanerLeftoversStageDriveDetail(
+    int finished,
+    int drives,
+    int entries,
+  ) => '已完成 $finished/$drives 个驱动器 · 已检查 $entries 项';
   @override
   String cleanerLeftoversReclaimable(String size) => '最多可释放 $size';
   @override
@@ -7012,4 +7049,228 @@ class ChineseLocalizations implements AppLocalizations {
   @override
   String cleanerDockerFreed(String size) =>
       'Docker 已释放 $size。Docker Desktop 会在稍后将空间归还给磁盘。';
+
+  // AI subtitle queue
+  @override
+  String get subtitleQueueTitle => 'AI 字幕队列';
+  @override
+  String get subtitleQueueDesktopOnly => '字幕队列仅在桌面版中可用。';
+  @override
+  String get subtitleQueueTabQueue => '队列';
+  @override
+  String get subtitleQueueTabRules => '规则';
+  @override
+  String get subtitleQueueStart => '开始';
+  @override
+  String get subtitleQueuePause => '暂停';
+  @override
+  String get subtitleQueueStatePaused => '已暂停';
+  @override
+  String get subtitleQueueStateIdle => '运行中 · 等待视频';
+  @override
+  String get subtitleQueueStateRunning => '正在生成字幕';
+  @override
+  String get subtitleQueueStateWatching => '正在播放带 AI 字幕的视频，稍后继续';
+  @override
+  String subtitleQueueStateBlocked(String model) => '模型未安装：$model';
+  @override
+  String get subtitleQueueStateOtherWindow => '正在另一个窗口中运行';
+  @override
+  String get subtitleQueuePauseWhileWatching => '观看视频时暂停';
+  @override
+  String get subtitleQueuePauseWhileWatchingHint => '为播放器让出 GPU；中断的任务会从中断处继续。';
+  @override
+  String get subtitleQueueScanAll => '扫描所有规则';
+  @override
+  String get subtitleQueueAddVideos => '添加视频';
+  @override
+  String get subtitleQueueRetryFailed => '重试失败项';
+  @override
+  String get subtitleQueueClearFinished => '清除已完成';
+  @override
+  String get subtitleQueueCleanGenerated => '清理已生成的字幕';
+  @override
+  String get subtitleQueueCleanPause => '请暂停队列并等待正在运行的任务停止后再清理。';
+  @override
+  String subtitleQueueCleanConfirm(String scope) =>
+      '删除 $scope 已生成的字幕及可识别的缓存？清理后的任务将返回等待队列。保留原始视频、已编辑或无法验证的字幕。';
+  @override
+  String subtitleQueueCleanResult(int cleaned, int retained, int failed) =>
+      '已清理 $cleaned · 保留 $retained · 失败 $failed';
+  @override
+  String get subtitleQueueGeneratedModels => '生成模型元数据';
+  @override
+  String get subtitleQueueLegacyModels => '旧任务设置；无已验证的生成元数据。';
+  @override
+  String get subtitleQueueEmpty => '队列为空。请创建规则并扫描，或直接添加视频。';
+  @override
+  String get subtitleQueueStatusPending => '等待中';
+  @override
+  String get subtitleQueueStatusRunning => '处理中';
+  @override
+  String get subtitleQueueStatusDone => '完成';
+  @override
+  String get subtitleQueueStatusSkipped => '已跳过';
+  @override
+  String get subtitleQueueStatusFailed => '失败';
+  @override
+  String get subtitleQueueStatusCancelled => '已取消';
+  @override
+  String get subtitleQueueAll => '全部';
+  @override
+  String subtitleQueueScanResult(int added, int queued, int skipped) =>
+      '已加入 $added 个视频 · $queued 个已在该规则的队列中 · $skipped 个已有字幕';
+  @override
+  String get subtitleQueueChooseRule => '使用规则的设置';
+  @override
+  String get subtitleQueueNeedRule => '请先创建规则：添加的视频将使用其字幕设置。';
+  @override
+  String get subtitleRuleNew => '新建规则';
+  @override
+  String get subtitleRuleEdit => '编辑规则';
+  @override
+  String get subtitleRuleName => '规则名称';
+  @override
+  String get subtitleRuleDefaultName => '字幕规则';
+  @override
+  String get subtitleRuleEnabled => '包含在“扫描所有规则”中';
+  @override
+  String get subtitleRuleSources => '来源';
+  @override
+  String get subtitleRuleAddFolder => '添加文件夹';
+  @override
+  String get subtitleRuleAddLibrary => '添加视频库';
+  @override
+  String get subtitleRuleNoSources => '请至少添加一个文件夹或视频库。';
+  @override
+  String get subtitleRuleIncludeSubfolders => '包含子文件夹';
+  @override
+  String get subtitleRuleFilters => '筛选';
+  @override
+  String get subtitleRuleExtensions => '文件类型';
+  @override
+  String get subtitleRuleExtensionsHint => '例如 mp4, mkv。留空表示所有视频类型。';
+  @override
+  String get subtitleRuleNamePattern => '文件名';
+  @override
+  String get subtitleRuleNamePatternHint => '名称包含的文本，或带 * 的模式，例如 *S01E*';
+  @override
+  String get subtitleRuleSkipExisting => '跳过已有目标语言字幕的视频';
+  @override
+  String get subtitleRuleScanNow => '立即扫描';
+  @override
+  String subtitleRuleDeleteConfirm(String name) =>
+      '删除“$name”及其在队列中的视频？已生成的字幕文件会保留。';
+  @override
+  String get subtitleRuleEmpty => '还没有规则。规则用于选择文件夹或视频库以及生成字幕的设置。';
+  @override
+  String subtitleRuleSourceCount(int count) => '$count 个来源';
+  @override
+  String get subtitleRuleModelMissing => '未安装。启动队列前请在 AI 字幕设置中下载。';
+  @override
+  String get subtitleRuleAutoDetect => '自动检测';
+  @override
+  String get subtitleRuleFollowApp => '跟随应用语言';
+  @override
+  String subtitleQueueWaitingCount(int count) => '$count 个视频等待中';
+  @override
+  String get subtitleQueueAllDone => '没有等待的视频。扫描规则或添加视频以继续。';
+  @override
+  String get subtitleQueueGuideTitle => '一次为多个视频生成字幕';
+  @override
+  String get subtitleQueueGuideStep1 => '创建规则：选择文件夹或视频库、语言以及字幕保存位置。';
+  @override
+  String get subtitleQueueGuideStep2 => '匹配的视频会立即加入队列。之后重新扫描规则即可加入新视频。';
+  @override
+  String get subtitleQueueGuideStep3 => '点击开始。视频会在后台逐个处理，即使关闭此标签页也会继续。';
+  @override
+  String get subtitleRuleSourcesHint => '这些文件夹或视频库中的视频会加入队列。';
+  @override
+  String get subtitleRuleSaveAndScan => '保存并扫描';
+  @override
+  String get subtitleQueueSortQueue => '队列顺序';
+  @override
+  String get subtitleQueueColumnStatus => '状态';
+  @override
+  String get subtitleQueueColumnProgress => '进度';
+  @override
+  String get subtitleQueueColumnAdded => '添加时间';
+  @override
+  String get subtitleQueueColumnUpdated => '更新时间';
+  @override
+  String get subtitleQueueColumnRule => '规则';
+  @override
+  String get subtitleQueueSearchHint => '搜索队列中的视频';
+  @override
+  String get subtitleQueueAllRules => '所有规则';
+  @override
+  String subtitleRuleVideoCount(int count) => '$count 个视频';
+  @override
+  String subtitleQueueStartRule(String name) => '运行“$name”';
+  @override
+  String subtitleQueueRunScope(String name) => '运行范围：$name';
+  @override
+  String get subtitleQueueParallelJobs => '同时处理的视频';
+  @override
+  String get subtitleQueueParallelHint => '每个视频单独加载模型：占用更多内存和显存';
+  @override
+  String subtitleQueueParallelOption(int count) => '$count 个视频';
+  @override
+  String subtitleQueueRunningCount(int count) => '$count 个视频处理中';
+  @override
+  String get subtitleQueueParallelAuto => '自动（推荐）';
+  @override
+  String get subtitleQueueErrorDetails => '错误详情';
+  @override
+  String get subtitleQueueTechnicalDetails => '技术详情';
+  @override
+  String get subtitleQueueResources => '字幕队列资源（语音识别和翻译）';
+  @override
+  String get subtitleQueueDisk => '磁盘';
+  @override
+  String subtitleQueueAutoLimit(int count) => '自动：同时 $count 个';
+  @override
+  String subtitleQueueRetrying(int attempt, int max) => '等待重试（$attempt/$max）';
+  @override
+  String subtitleBatchFailureTitle(String kind) => switch (kind) {
+    'slowRead' => '读取文件太慢',
+    'fileMissing' => '找不到文件',
+    'unreadable' => '无法读取音频',
+    'noAudio' => '视频没有音轨',
+    'language' => '无法识别语言',
+    'speechModel' => '语音模型加载失败',
+    'translation' => '翻译失败',
+    'runtimeMissing' => '缺少字幕运行时',
+    'runtimeCrashed' => '字幕进程已停止',
+    'stalledIdle' => '在结束前卡住',
+    'stalledSlow' => '10 分钟没有进展',
+    'unknown' => '未知错误',
+    _ => '未知错误',
+  };
+  @override
+  String subtitleBatchFailureHint(String kind) => switch (kind) {
+    'slowRead' => '读取文件的这一部分耗时过长：磁盘繁忙，或文件过大难以跳转。新的失败会自动重试；请点击重试。',
+    'fileMissing' => '文件已被移动、重命名或删除，或其磁盘未连接。',
+    'unreadable' => '文件已损坏或使用了不支持的音频格式。',
+    'noAudio' => '此视频没有可识别的音轨。',
+    'language' => '请在规则中选择具体的语音语言，而不是自动检测。',
+    'speechModel' => '模型文件可能已损坏，或内存/显存不足。请在 AI 字幕设置中重新下载。',
+    'translation' => '翻译模型无法运行，通常是内存或显存不足。释放一些内存后重试。',
+    'runtimeMissing' => '请重新安装或重新构建应用。',
+    'runtimeCrashed' => '通常是内存/显存耗尽或 GPU 过载。已自动重试；请减少同时处理的视频数。',
+    'stalledIdle' => '视频的剩余部分没有被安排处理。重试即可，已完成的部分会保留。',
+    'stalledSlow' => '电脑负载过高（游戏或其他应用正在使用 GPU）。请在空闲时重试。',
+    'unknown' => '请查看下方的技术详情。',
+    _ => '请查看下方的技术详情。',
+  };
+  @override
+  String subtitleQueueAutoReason(String reason) => switch (reason) {
+    'measuring' => '正在测速',
+    'probing' => '正在尝试多处理 1 个',
+    'faster' => '多处理更快，已保留',
+    'noGain' => '多处理并未更快',
+    'lowMemory' => '可用内存/显存不足',
+    'failures' => '读取失败，已减少',
+    _ => '',
+  };
 }

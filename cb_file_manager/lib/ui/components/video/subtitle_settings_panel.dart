@@ -21,17 +21,83 @@ String modelPurposeLabel(AppLocalizations l, LocalModelPurpose purpose) =>
       LocalModelPurpose.translation => l.aiModelTranslation,
     };
 
+class SubtitleSettingsDialog extends StatelessWidget {
+  final LocalAiAdvisorService models;
+  final LocalModelDownloads downloads;
+  final SubtitlePreferences preferences;
+  final ValueChanged<BuildContext> onManageModels;
+  final SubtitleCache? cache;
+
+  const SubtitleSettingsDialog({
+    super.key,
+    required this.models,
+    required this.downloads,
+    required this.preferences,
+    required this.onManageModels,
+    this.cache,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context)!;
+    return CbDialog(
+      title: l.aiSubtitles,
+      showCloseButton: false,
+      headerTrailing: ListenableBuilder(
+        listenable: preferences,
+        builder: (context, _) => Semantics(
+          label: l.aiSubtitles,
+          child: Switch.adaptive(
+            key: const ValueKey('ai-subtitles-enabled'),
+            value: preferences.enabled,
+            onChanged: preferences.setEnabled,
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+        ),
+      ),
+      content: SizedBox(
+        width: double.infinity,
+        child: SubtitleSettingsPanel(
+          models: models,
+          downloads: downloads,
+          cache: cache,
+          compact: true,
+          showEnabledSwitch: false,
+        ),
+      ),
+      actions: [
+        CbButton(
+          key: const ValueKey('ai-subtitles-manage-models'),
+          onPressed: () => onManageModels(context),
+          icon: PhosphorIconsLight.slidersHorizontal,
+          label: l.aiSubtitleManage,
+          outlined: true,
+        ),
+        CbButton(
+          onPressed: () => Navigator.of(context).pop(),
+          label: l.close,
+          outlined: true,
+        ),
+      ],
+    );
+  }
+}
+
 class SubtitleSettingsPanel extends StatefulWidget {
   final LocalAiAdvisorService models;
   final LocalModelDownloads downloads;
   final VoidCallback? onManageModels;
   final SubtitleCache? cache;
+  final bool compact;
+  final bool showEnabledSwitch;
   const SubtitleSettingsPanel({
     super.key,
     required this.models,
     required this.downloads,
     this.onManageModels,
     this.cache,
+    this.compact = false,
+    this.showEnabledSwitch = true,
   });
   @override
   State<SubtitleSettingsPanel> createState() => _SubtitleSettingsPanelState();
@@ -75,6 +141,7 @@ class _SubtitleSettingsPanelState extends State<SubtitleSettingsPanel> {
     final l = AppLocalizations.of(context)!;
     final prefs = _prefs;
     if (prefs == null) return const LinearProgressIndicator();
+    final compact = widget.compact;
     final source =
         _languageChoice(l.aiSubtitleSource, prefs.resolvedSourceLanguage, {
           if (subtitleModelDetectsLanguage(prefs.speechModel))
@@ -85,28 +152,40 @@ class _SubtitleSettingsPanelState extends State<SubtitleSettingsPanel> {
       SubtitlePreferences.followApp: 'Follow app language',
       ...subtitleTargetLanguages,
     }, prefs.setTarget);
+    final fileSettings = [
+      _fileModeChoice(l, prefs),
+      if (compact) const SizedBox(height: CbSpacing.md),
+      SubtitleCacheControls(cache: widget.cache),
+    ];
     return Padding(
-      padding: const EdgeInsets.all(16),
+      padding: compact ? EdgeInsets.zero : const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          SwitchListTile.adaptive(
-            key: const ValueKey('ai-subtitles-enabled'),
-            contentPadding: EdgeInsets.zero,
-            title: Text(l.aiSubtitles),
-            subtitle: Text(l.aiSubtitlesHint),
-            value: prefs.enabled,
-            onChanged: prefs.setEnabled,
+          if (widget.showEnabledSwitch)
+            SwitchListTile.adaptive(
+              key: const ValueKey('ai-subtitles-enabled'),
+              contentPadding: EdgeInsets.zero,
+              title: Text(
+                l.aiSubtitles,
+                style: compact ? Theme.of(context).textTheme.titleLarge : null,
+              ),
+              subtitle: compact ? null : Text(l.aiSubtitlesHint),
+              value: prefs.enabled,
+              onChanged: prefs.setEnabled,
+            ),
+          _sectionHeader(
+            l.aiSubtitleModelsSection,
+            top: widget.showEnabledSwitch ? CbSpacing.lg : 0,
           ),
-          _sectionHeader(l.aiSubtitleModelsSection),
           _modelChoice(
             l,
             LocalModelPurpose.speech,
             prefs.speechModel,
             prefs.setSpeechModel,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: CbSpacing.md),
           _modelChoice(
             l,
             LocalModelPurpose.translation,
@@ -116,28 +195,32 @@ class _SubtitleSettingsPanelState extends State<SubtitleSettingsPanel> {
           if (widget.onManageModels != null)
             Align(
               alignment: AlignmentDirectional.centerStart,
-              child: TextButton.icon(
+              child: CbButton(
                 key: const ValueKey('ai-subtitles-manage-models'),
                 onPressed: widget.onManageModels,
-                icon: const Icon(Icons.tune, size: 18),
-                label: Text(l.aiSubtitleManage),
+                icon: PhosphorIconsLight.slidersHorizontal,
+                label: l.aiSubtitleManage,
+                outlined: true,
               ),
             ),
           _sectionHeader(l.aiSubtitleLanguagesSection),
-          // Side by side only when each field keeps room for long names; the
-          // 520 px player dialog stays single-column.
           LayoutBuilder(
-            builder: (context, constraints) => constraints.maxWidth >= 560
+            builder: (context, constraints) =>
+                constraints.maxWidth >= (compact ? 440 : 560)
                 ? Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(child: source),
-                      const SizedBox(width: 16),
+                      const SizedBox(width: CbSpacing.lg),
                       Expanded(child: target),
                     ],
                   )
                 : Column(
-                    children: [source, const SizedBox(height: 12), target],
+                    children: [
+                      source,
+                      const SizedBox(height: CbSpacing.md),
+                      target,
+                    ],
                   ),
           ),
           SwitchListTile.adaptive(
@@ -146,9 +229,24 @@ class _SubtitleSettingsPanelState extends State<SubtitleSettingsPanel> {
             value: prefs.bilingual,
             onChanged: prefs.setBilingual,
           ),
-          _sectionHeader(l.aiSubtitleFilesSection),
-          _fileModeChoice(l, prefs),
-          SubtitleCacheControls(cache: widget.cache),
+          if (compact) ...[
+            const Divider(height: 1),
+            ExpansionTile(
+              tilePadding: EdgeInsets.zero,
+              childrenPadding: const EdgeInsets.symmetric(
+                vertical: CbSpacing.sm,
+              ),
+              shape: const Border(),
+              collapsedShape: const Border(),
+              maintainState: true,
+              title: Text(l.aiSubtitleFilesSection),
+              children: fileSettings,
+            ),
+            const SizedBox(height: CbSpacing.sm),
+          ] else ...[
+            _sectionHeader(l.aiSubtitleFilesSection),
+            ...fileSettings,
+          ],
         ],
       ),
     );
@@ -200,15 +298,13 @@ class _SubtitleSettingsPanelState extends State<SubtitleSettingsPanel> {
     );
   }
 
-  Widget _sectionHeader(String title) {
-    final theme = Theme.of(context);
+  Widget _sectionHeader(String title, {double top = CbSpacing.lg}) {
     return Padding(
-      padding: const EdgeInsets.only(top: 16, bottom: 10),
+      padding: EdgeInsets.only(top: top, bottom: CbSpacing.sm),
       child: Text(
         title,
-        style: theme.textTheme.titleSmall?.copyWith(
-          color: theme.colorScheme.primary,
-          fontWeight: FontWeight.w600,
+        style: CbTypography.headingSm.copyWith(
+          color: context.cbColors.textPrimary,
         ),
       ),
     );
@@ -295,8 +391,8 @@ class _SubtitleSettingsPanelState extends State<SubtitleSettingsPanel> {
           ],
           onChanged: (value) => unawaited(changed(value)),
         ),
-        if (selectedEntry != null) ...[
-          const SizedBox(height: 8),
+        if (selectedEntry != null && !widget.compact) ...[
+          const SizedBox(height: CbSpacing.sm),
           Wrap(
             spacing: 6,
             runSpacing: 6,
@@ -319,39 +415,40 @@ class _SubtitleSettingsPanelState extends State<SubtitleSettingsPanel> {
             const SizedBox(height: 6),
             Text(selectedEntry.description!, style: muted),
           ],
-          if (!installed) ...[
-            const SizedBox(height: 8),
-            if (download != null && !download.failed)
-              Row(
-                children: [
-                  Expanded(
-                    child: LinearProgressIndicator(value: download.progress),
-                  ),
-                  const SizedBox(width: 8),
-                  TextButton(
-                    onPressed: () => widget.downloads.cancel(selected),
-                    child: Text(l.cancel),
-                  ),
-                ],
-              )
-            else
-              FilledButton.tonalIcon(
-                key: ValueKey('subtitle-model-install:$selected'),
-                onPressed: () => widget.downloads.start(selectedEntry),
-                icon: const Icon(Icons.download_outlined, size: 18),
-                label: Text(
+        ],
+        if (selectedEntry != null && !installed) ...[
+          const SizedBox(height: 8),
+          if (download != null && !download.failed)
+            Row(
+              children: [
+                Expanded(
+                  child: LinearProgressIndicator(value: download.progress),
+                ),
+                const SizedBox(width: CbSpacing.sm),
+                CbButton(
+                  onPressed: () => widget.downloads.cancel(selected),
+                  label: l.cancel,
+                  outlined: true,
+                ),
+              ],
+            )
+          else
+            CbButton(
+              key: ValueKey('subtitle-model-install:$selected'),
+              onPressed: () => widget.downloads.start(selectedEntry),
+              icon: PhosphorIconsLight.downloadSimple,
+              label:
                   '${download?.failed == true ? l.retry : l.installModel} · ${_size(selectedEntry)}',
-                ),
+              outlined: true,
+            ),
+          if (download?.error != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                download!.error!,
+                style: TextStyle(color: theme.colorScheme.error),
               ),
-            if (download?.error != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text(
-                  download!.error!,
-                  style: TextStyle(color: theme.colorScheme.error),
-                ),
-              ),
-          ],
+            ),
         ],
       ],
     );

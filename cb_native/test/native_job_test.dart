@@ -28,6 +28,53 @@ void main() {
 
   String name(String path) => path.split(RegExp(r'[\\/]')).last;
 
+  test('startExecutableWalk lists runnable files, driven synchronously', () {
+    File('${root.path}/a/tool.EXE').writeAsBytesSync([0]);
+    File('${root.path}/a/b/run.cmd').writeAsBytesSync([0]);
+    Directory('${root.path}/Skip').createSync();
+    File('${root.path}/Skip/hidden.exe').writeAsBytesSync([0]);
+    final walk = NativeFs.startExecutableWalk(
+      root: root.path,
+      extensions: const ['.exe', '.cmd'],
+      skipNames: const ['SKIP'],
+    );
+    expect(walk, isNotNull);
+    final paths = <String>[];
+    try {
+      while (true) {
+        paths.addAll(walk!.poll());
+        if (walk.ended) break;
+        sleep(const Duration(milliseconds: 1));
+      }
+      expect(walk.failed, isFalse);
+      final progress = walk.progress();
+      expect(progress.matches, 2);
+      expect(progress.incomplete, 0);
+      // one.jpg a .hidden Skip | two.JPG b tool.EXE | three.png note.txt
+      // run.cmd | four.jpg. Skip is listed but not entered.
+      expect(progress.visited, 11);
+    } finally {
+      walk!.dispose();
+    }
+    expect(paths.map(name).toList()..sort(), ['run.cmd', 'tool.EXE']);
+  }, skip: skip);
+
+  test('volumeDisks finds the system drive disk; MFT needs a volume', () {
+    final drive = '${Platform.environment['SystemDrive'] ?? 'C:'}\\';
+    // A folder belongs to its drive's disks; a path without a drive to none.
+    final disks = NativeFs.volumeDisks([drive, root.path, 'no drive']);
+    expect(disks, hasLength(3));
+    expect(disks![0].disks, isNotEmpty);
+    expect(disks[1].disks, disks[0].disks);
+    expect(disks[2].disks, isEmpty);
+    expect(disks[2].seekPenalty, isNull);
+    // Only a drive root can be read from the MFT.
+    expect(
+      NativeFs.startMftExecutables(root: root.path, extensions: const ['.exe']),
+      isNull,
+    );
+  }, skip: skip ?? (Platform.isWindows ? null : 'Windows volumes only'));
+
   test('rootSizes sizes each root on its own', () async {
     final result = await NativeFs.rootSizes([
       '${root.path}/a',

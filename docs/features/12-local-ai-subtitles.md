@@ -65,6 +65,7 @@ for commercial use, pinned by SHA-256 and size):
 | Speech | Whisper Large v3 Turbo | 1.62 GB | MIT | Most accurate |
 | Speech | Whisper Large v3 Q5_0 | 1.08 GB | MIT | Most accurate |
 | Speech | Kotoba Whisper v2.0 Q5_0 (Japanese only) | 538 MB | Apache 2.0 | Balanced |
+| Speech | NVIDIA Nemotron 3.5 ASR 0.6B Q8_0 (Windows) | 742 MB | OpenMDW-1.1 | Balanced |
 | Translation | Hy-MT2 1.8B Q4_K_M (default, recommended) | 1.13 GB | Apache 2.0 | Fast |
 | Translation | Hy-MT2 1.8B Q8_0 | 1.91 GB | Apache 2.0 | Balanced |
 | Translation | Hy-MT2 7B Q4_K_M | 4.62 GB | Apache 2.0 | Most accurate |
@@ -82,7 +83,16 @@ duplicate download next to the CB Agent copy), TranslateGemma (Gemma terms and a
 structured prompt template), distil-large-v3.5 (English only, 1.5 GB) and
 community PhoWhisper ggml conversions (unofficial, unverified).
 
-The current native integration uses Whisper. Qwen3-ASR, Cohere and other candidates in the
+The Windows native integration also supports Nemotron 3.5 through the pinned
+NeMo-Speech.cpp SDK. It defaults to CPU, with its own subprocess and DLL
+directory; no Python or PyTorch installation is needed at runtime. Its language
+picker exposes only transcription-ready and broad-coverage languages. Auto
+may lack a language tag; Kana/Hangul provide a fallback, otherwise Auto remains
+unknown rather than inventing a language. NVIDIA's [model card](https://huggingface.co/nvidia/nemotron-3.5-asr-streaming-0.6b)
+reports FLEURS JA CER 11.48%, VI WER 11.18%, EN WER 7.91% (explicit language,
+1.12 s context; lower is better), and 240–2,400 real-time concurrent streams on
+one H100 depending on chunk size. These are publisher results, not Q8 accuracy
+or desktop throughput measurements. Qwen3-ASR, Cohere and other candidates in the
 [research](../technical/15-local-live-subtitles-research.md) remain future
 backends rather than advertised working choices.
 
@@ -205,6 +215,61 @@ before moving/removing their weights. Windows child processes use the existing
 kill-on-close Job Object. A file held by another process can still require that
 window to close before deletion succeeds.
 
+Subtitle Queue sessions that use the same translation model share one
+llama-server in the queue runner. It supports four concurrent inference slots
+with 2048 context tokens per slot; a separate HTTP connection per video keeps
+cancellation independent. Different model artifacts use separate servers.
+The final lease stops the shared process and releases its model weights; a
+failed process can be reloaded once for subsequent requests. Interactive video
+subtitles retain their dedicated single-slot server.
+
+The Subtitle Queue resource meters count only its registered recognition and
+translation child processes: CPU as a share of all CPU cores, private resident
+RAM, GPU engine utilization, dedicated VRAM and read/write I/O throughput.
+The shared translation server is counted once. Other app processes and
+interactive subtitle previews are excluded. The runner publishes its live
+process IDs under its queue lease so secondary windows show the same scope.
+The automatic concurrency scaler still samples whole-machine resources to
+avoid exhausting RAM or VRAM; process I/O is not whole-disk utilization.
+
+The queue prioritizes waiting videos by the source file's modification time
+(newest first, insertion order for ties). Dates are captured on enqueue/rescan;
+older databases are backfilled without changing job status or saved progress.
+Each subtitle worker keeps its FFmpeg input open for the current video/audio
+track, reusing its stream information and seek index instead of reopening the
+large media file for every recognition chunk. A failed I/O request discards
+the reader and retries once with a fresh input; errors include FFmpeg's reason.
+The queue also retries transient open/read failures and stalled jobs (bounded
+to three attempts), resuming from committed cache ranges. Completion compares
+the actual covered timeline at the same millisecond precision as the cache,
+not the displayed rounded percent, so a sub-millisecond duration tail does
+not leave a job stuck and a genuine missing range is never marked complete.
+The metadata migration runs before date-dependent operations even if the shared
+database connection was already opened, including Flutter hot reload.
+The Date modified sort and column use the source video, not the job update
+timestamp. Every row has an open-folder action that selects the original video;
+the generated SRT location remains available separately in its context menu.
+The View mode menu offers List, Details, Tiles and Grid. Grid uses the file
+browser's video thumbnail cache and shows each video's status, progress and
+queue actions. The selected view mode is remembered.
+
+Completed batch generations record the speech and configured translation model
+IDs, language options, generation time, exact cache key and exported SRT SHA-256
+in a separate SQLite table (independent of clearing queue history). SRT exports
+also receive a `<file>.srt.cbmeta.json` companion where writable. The completed
+job's context menu exposes the model metadata. **Clean generated subtitles**
+on the toolbar (or More on narrow windows) acts on completed jobs of the chosen
+rule/all rules while the queue is paused. It removes verified generated SRTs,
+their companion metadata and identifiable cache entries, then requeues the
+cleaned jobs and equivalent completed twins. It never removes source videos or
+skipped/external subtitles. Edited SRTs are kept; legacy output without a checksum
+requires the writer's remembered path and no modification later than completion.
+Legacy cache keys that cannot be identified are retained.
+Deleting a rule removes its queue rows, but keeps source videos and generated
+subtitle files. A late scan cannot re-add jobs for a deleted rule. If that rule
+was the running scope, the queue pauses instead of starting unrelated rules;
+rule and job lists refresh together, including changes made in another window.
+
 Inference sends no audio or transcript to a cloud API. Hugging Face downloads
 require connectivity; decoding a network video still reads its original source.
 
@@ -220,8 +285,9 @@ A rebuild is required; hot reload cannot install the helper executable.
   `CB_SUBTITLE_VULKAN=OFF` produces a CPU-only build. Runtime GPU failures retry
   in a fresh CPU worker. Base/Small can produce CPU results while the GPU warms
   up, switching to the ready GPU without waiting for a losing CPU operation.
-  Translation uses the existing bundled llama.cpp runtime with one slot and a
-  bounded CPU thread budget, and can retry on CPU. Subtitle child processes run
+  Translation uses the existing bundled llama.cpp runtime with one interactive
+  slot or shared batch slots and a bounded CPU thread budget, and can retry on
+  CPU. Subtitle child processes run
   below normal priority. The baseline x64 build uses AVX2.
 - **macOS:** `scripts/bundle_macos_subtitle_runtime.sh` builds each Xcode target
   architecture and combines helpers with `lipo`. It builds pinned static FFmpeg

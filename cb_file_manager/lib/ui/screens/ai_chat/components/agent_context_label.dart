@@ -34,6 +34,7 @@ class AgentContextLabel extends StatelessWidget {
     if (path.startsWith('#album')) return l.albums;
     if (path.startsWith('#video')) return l.videoHubTitle;
     if (path.startsWith('#torrents')) return l.torrents;
+    if (path == '#subtitle-queue') return l.subtitleQueueTitle;
     return switch (path) {
       '#home' => l.home,
       '#gallery' => l.imageGallery,

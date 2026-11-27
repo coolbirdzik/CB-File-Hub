@@ -5684,7 +5684,53 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get cleanerLeftoversScan => 'Tìm dữ liệu còn sót';
   @override
+  String get cleanerLeftoversNormalScan => 'Quét thường';
+  @override
+  String get cleanerLeftoversDeepScan => 'Quét sâu';
+  @override
+  String get cleanerLeftoversDeepScanHint =>
+      'Kiểm tra thêm các vị trí có tệp ứng dụng, kể cả ứng dụng portable. Quá trình này có thể lâu hơn.';
+  @override
+  String get cleanerLeftoversDeepScanLoading =>
+      'Đang kiểm tra tệp ứng dụng và ứng dụng portable ở nhiều vị trí hơn...';
+  @override
+  String get cleanerLeftoversDeepScanResult =>
+      'Đây là dữ liệu nghi còn sót sau khi kiểm tra thêm các vị trí của ứng dụng đã cài và ứng dụng portable. Hãy kiểm tra từng thư mục trước khi dọn dẹp.';
+  @override
+  String get cleanerLeftoversDeepScanPartial =>
+      'Quét sâu chưa xác minh được tất cả vị trí. Hãy kiểm tra các thư mục còn lại trước khi dọn dẹp.';
+  @override
+  String get cleanerLeftoversDeepScanNoMatch =>
+      'Không tìm thấy ứng dụng tương ứng';
+  @override
+  String get cleanerLeftoversDeepScanNoMatchHint =>
+      'Không tìm thấy ứng dụng đã cài hoặc ứng dụng portable tương ứng tại các vị trí đã kiểm tra.';
+  @override
+  String cleanerLeftoversPossibleSize(String size) =>
+      'Dữ liệu nghi còn sót: $size';
+  @override
   String get cleanerLeftoversMeasuring => 'Đang đo các thư mục còn sót...';
+  @override
+  String get cleanerLeftoversStageReadingApps =>
+      'Đang đọc danh sách ứng dụng đã cài...';
+  @override
+  String get cleanerLeftoversStageListing =>
+      'Đang liệt kê các thư mục dữ liệu ứng dụng...';
+  @override
+  String get cleanerLeftoversStageCandidates =>
+      'Đang kiểm tra thư mục còn sót có chứa chương trình không...';
+  @override
+  String get cleanerLeftoversStagePath =>
+      'Đang kiểm tra các thư mục trong PATH (công cụ dòng lệnh)...';
+  @override
+  String cleanerLeftoversStageDrive(String drive) =>
+      'Đang tìm ứng dụng portable trên ổ $drive...';
+  @override
+  String cleanerLeftoversStageDriveDetail(
+    int finished,
+    int drives,
+    int entries,
+  ) => 'Xong $finished/$drives ổ · đã xét $entries mục';
   @override
   String cleanerLeftoversReclaimable(String size) =>
       'Có thể giải phóng tối đa $size';
@@ -7480,4 +7526,254 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String cleanerDockerFreed(String size) =>
       'Docker đã giải phóng $size. Docker Desktop sẽ trả lại dung lượng cho ổ đĩa ngay sau đó.';
+
+  // AI subtitle queue
+  @override
+  String get subtitleQueueTitle => 'Hàng đợi phụ đề AI';
+  @override
+  String get subtitleQueueDesktopOnly =>
+      'Hàng đợi phụ đề chỉ có trên ứng dụng máy tính.';
+  @override
+  String get subtitleQueueTabQueue => 'Hàng đợi';
+  @override
+  String get subtitleQueueTabRules => 'Quy tắc';
+  @override
+  String get subtitleQueueStart => 'Bắt đầu';
+  @override
+  String get subtitleQueuePause => 'Tạm dừng';
+  @override
+  String get subtitleQueueStatePaused => 'Đã tạm dừng';
+  @override
+  String get subtitleQueueStateIdle => 'Đang chạy · chờ video mới';
+  @override
+  String get subtitleQueueStateRunning => 'Đang tạo phụ đề';
+  @override
+  String get subtitleQueueStateWatching => 'Đang nhường cho video bạn đang xem';
+  @override
+  String subtitleQueueStateBlocked(String model) => 'Chưa cài model: $model';
+  @override
+  String get subtitleQueueStateOtherWindow => 'Đang chạy ở cửa sổ khác';
+  @override
+  String get subtitleQueuePauseWhileWatching => 'Tạm dừng khi đang xem video';
+  @override
+  String get subtitleQueuePauseWhileWatchingHint =>
+      'Nhường GPU cho trình phát; video đang làm dở sẽ tiếp tục từ chỗ đã dừng.';
+  @override
+  String get subtitleQueueScanAll => 'Quét tất cả quy tắc';
+  @override
+  String get subtitleQueueAddVideos => 'Thêm video';
+  @override
+  String get subtitleQueueRetryFailed => 'Thử lại mục lỗi';
+  @override
+  String get subtitleQueueClearFinished => 'Xoá mục đã xong';
+  @override
+  String get subtitleQueueCleanGenerated => 'Dọn phụ đề đã tạo';
+  @override
+  String get subtitleQueueCleanPause =>
+      'Hãy tạm dừng queue và chờ các job đang chạy dừng trước khi dọn.';
+  @override
+  String subtitleQueueCleanConfirm(String scope) =>
+      'Xoá phụ đề đã sinh và cache xác định được của $scope? Các job đã dọn sẽ trở về hàng chờ. Video gốc và phụ đề đã sửa hoặc không xác minh được sẽ được giữ lại.';
+  @override
+  String subtitleQueueCleanResult(int cleaned, int retained, int failed) =>
+      'Đã dọn $cleaned · Giữ lại $retained · Lỗi $failed';
+  @override
+  String get subtitleQueueGeneratedModels => 'Metadata model đã tạo';
+  @override
+  String get subtitleQueueLegacyModels =>
+      'Cấu hình của job cũ; chưa có metadata xác minh lần tạo.';
+  @override
+  String get subtitleQueueEmpty =>
+      'Hàng đợi trống. Hãy tạo quy tắc rồi quét, hoặc thêm video trực tiếp.';
+  @override
+  String get subtitleQueueStatusPending => 'Đang chờ';
+  @override
+  String get subtitleQueueStatusRunning => 'Đang xử lý';
+  @override
+  String get subtitleQueueStatusDone => 'Xong';
+  @override
+  String get subtitleQueueStatusSkipped => 'Bỏ qua';
+  @override
+  String get subtitleQueueStatusFailed => 'Lỗi';
+  @override
+  String get subtitleQueueStatusCancelled => 'Đã huỷ';
+  @override
+  String get subtitleQueueAll => 'Tất cả';
+  @override
+  String subtitleQueueScanResult(int added, int queued, int skipped) =>
+      'Đã thêm $added video · $queued đã có trong hàng đợi của quy tắc · $skipped đã có phụ đề';
+  @override
+  String get subtitleQueueChooseRule => 'Dùng cài đặt của quy tắc';
+  @override
+  String get subtitleQueueNeedRule =>
+      'Hãy tạo một quy tắc trước: video thêm vào sẽ dùng cài đặt phụ đề của nó.';
+  @override
+  String get subtitleRuleNew => 'Tạo quy tắc';
+  @override
+  String get subtitleRuleEdit => 'Sửa quy tắc';
+  @override
+  String get subtitleRuleName => 'Tên quy tắc';
+  @override
+  String get subtitleRuleDefaultName => 'Quy tắc phụ đề';
+  @override
+  String get subtitleRuleEnabled => 'Có trong “Quét tất cả quy tắc”';
+  @override
+  String get subtitleRuleSources => 'Nguồn video';
+  @override
+  String get subtitleRuleAddFolder => 'Thêm thư mục';
+  @override
+  String get subtitleRuleAddLibrary => 'Thêm thư viện video';
+  @override
+  String get subtitleRuleNoSources =>
+      'Hãy thêm ít nhất một thư mục hoặc thư viện video.';
+  @override
+  String get subtitleRuleIncludeSubfolders => 'Gồm cả thư mục con';
+  @override
+  String get subtitleRuleFilters => 'Bộ lọc';
+  @override
+  String get subtitleRuleExtensions => 'Loại tệp';
+  @override
+  String get subtitleRuleExtensionsHint =>
+      'Ví dụ: mp4, mkv. Để trống để lấy mọi loại video.';
+  @override
+  String get subtitleRuleNamePattern => 'Tên tệp';
+  @override
+  String get subtitleRuleNamePatternHint =>
+      'Chuỗi có trong tên, hoặc mẫu có *, ví dụ *S01E*';
+  @override
+  String get subtitleRuleSkipExisting =>
+      'Bỏ qua video đã có phụ đề ngôn ngữ đích';
+  @override
+  String get subtitleRuleScanNow => 'Quét ngay';
+  @override
+  String subtitleRuleDeleteConfirm(String name) =>
+      'Xoá “$name” cùng các video của nó trong hàng đợi? Các file phụ đề đã tạo vẫn được giữ.';
+  @override
+  String get subtitleRuleEmpty =>
+      'Chưa có quy tắc. Mỗi quy tắc chọn thư mục hoặc thư viện video và cài đặt phụ đề để tạo.';
+  @override
+  String subtitleRuleSourceCount(int count) => '$count nguồn';
+  @override
+  String get subtitleRuleModelMissing =>
+      'Chưa cài. Hãy tải model trong cài đặt phụ đề AI trước khi chạy hàng đợi.';
+  @override
+  String get subtitleRuleAutoDetect => 'Tự nhận diện';
+  @override
+  String get subtitleRuleFollowApp => 'Theo ngôn ngữ ứng dụng';
+  @override
+  String subtitleQueueWaitingCount(int count) => '$count video đang chờ';
+  @override
+  String get subtitleQueueAllDone =>
+      'Không còn video nào chờ. Quét quy tắc hoặc thêm video để tiếp tục.';
+  @override
+  String get subtitleQueueGuideTitle => 'Tạo phụ đề cho nhiều video cùng lúc';
+  @override
+  String get subtitleQueueGuideStep1 =>
+      'Tạo quy tắc: chọn thư mục hoặc thư viện video, ngôn ngữ và nơi lưu phụ đề.';
+  @override
+  String get subtitleQueueGuideStep2 =>
+      'Video khớp quy tắc được đưa vào hàng đợi ngay. Quét lại quy tắc sau này để lấy video mới.';
+  @override
+  String get subtitleQueueGuideStep3 =>
+      'Bấm Bắt đầu. Video được xử lý lần lượt ở chế độ nền, kể cả khi đóng tab này.';
+  @override
+  String get subtitleRuleSourcesHint =>
+      'Video trong các thư mục hoặc thư viện video này sẽ được đưa vào hàng đợi.';
+  @override
+  String get subtitleRuleSaveAndScan => 'Lưu và quét';
+  @override
+  String get subtitleQueueSortQueue => 'Thứ tự hàng đợi';
+  @override
+  String get subtitleQueueColumnStatus => 'Trạng thái';
+  @override
+  String get subtitleQueueColumnProgress => 'Tiến độ';
+  @override
+  String get subtitleQueueColumnAdded => 'Ngày thêm';
+  @override
+  String get subtitleQueueColumnUpdated => 'Cập nhật';
+  @override
+  String get subtitleQueueColumnRule => 'Quy tắc';
+  @override
+  String get subtitleQueueSearchHint => 'Tìm video trong hàng đợi';
+  @override
+  String get subtitleQueueAllRules => 'Tất cả quy tắc';
+  @override
+  String subtitleRuleVideoCount(int count) => '$count video';
+  @override
+  String subtitleQueueStartRule(String name) => 'Chạy “$name”';
+  @override
+  String subtitleQueueRunScope(String name) => 'Đang chạy: $name';
+  @override
+  String get subtitleQueueParallelJobs => 'Số video chạy cùng lúc';
+  @override
+  String get subtitleQueueParallelHint =>
+      'Mỗi video nạp riêng mô hình: tốn thêm RAM và VRAM';
+  @override
+  String subtitleQueueParallelOption(int count) => '$count video';
+  @override
+  String subtitleQueueRunningCount(int count) => '$count video đang tạo';
+  @override
+  String get subtitleQueueParallelAuto => 'Tự động (đề xuất)';
+  @override
+  String get subtitleQueueErrorDetails => 'Chi tiết lỗi';
+  @override
+  String get subtitleQueueTechnicalDetails => 'Chi tiết kỹ thuật';
+  @override
+  String get subtitleQueueResources => 'Tài nguyên Subtitle Queue (ASR + dịch)';
+  @override
+  String get subtitleQueueDisk => 'Ổ đĩa';
+  @override
+  String subtitleQueueAutoLimit(int count) => 'Tự động: $count video cùng lúc';
+  @override
+  String subtitleQueueRetrying(int attempt, int max) =>
+      'Đang chờ thử lại ($attempt/$max)';
+  @override
+  String subtitleBatchFailureTitle(String kind) => switch (kind) {
+    'slowRead' => 'Đọc file quá chậm',
+    'fileMissing' => 'Không tìm thấy file',
+    'unreadable' => 'Không đọc được âm thanh',
+    'noAudio' => 'Video không có âm thanh',
+    'language' => 'Không nhận ra ngôn ngữ',
+    'speechModel' => 'Không nạp được mô hình giọng nói',
+    'translation' => 'Lỗi khi dịch',
+    'runtimeMissing' => 'Thiếu bộ xử lý phụ đề',
+    'runtimeCrashed' => 'Bộ xử lý phụ đề bị dừng',
+    'stalledIdle' => 'Bị kẹt trước khi xong',
+    'stalledSlow' => 'Không tiến triển trong 10 phút',
+    'unknown' => 'Lỗi không xác định',
+    _ => 'Lỗi không xác định',
+  };
+  @override
+  String subtitleBatchFailureHint(String kind) => switch (kind) {
+    'slowRead' =>
+      'Đọc đoạn này của file mất quá lâu: ổ đĩa đang bận, hoặc file lớn khó tua tới. Lỗi mới sẽ được tự thử lại; bấm Thử lại.',
+    'fileMissing' =>
+      'File đã bị chuyển, đổi tên hoặc xoá, hoặc ổ đĩa chưa kết nối.',
+    'unreadable' => 'File bị hỏng hoặc dùng định dạng âm thanh chưa hỗ trợ.',
+    'noAudio' => 'Video này không có rãnh âm thanh để nhận dạng.',
+    'language' => 'Chọn ngôn ngữ nói trong quy tắc thay vì Tự nhận diện.',
+    'speechModel' =>
+      'Tệp mô hình có thể bị hỏng, hoặc thiếu RAM/VRAM. Tải lại mô hình trong Cài đặt phụ đề AI.',
+    'translation' =>
+      'Mô hình dịch không chạy được, thường do thiếu RAM hoặc VRAM. Giải phóng bớt bộ nhớ rồi thử lại.',
+    'runtimeMissing' => 'Cài lại hoặc build lại ứng dụng.',
+    'runtimeCrashed' =>
+      'Thường do hết RAM/VRAM hoặc GPU quá tải. Ứng dụng đã tự thử lại; hãy giảm số video chạy cùng lúc.',
+    'stalledIdle' =>
+      'Phần còn lại của video không được xếp lịch. Bấm Thử lại: phần đã làm được giữ lại.',
+    'stalledSlow' =>
+      'Máy đang quá tải (game hoặc ứng dụng khác đang dùng GPU). Thử lại khi máy rảnh hơn.',
+    'unknown' => 'Xem chi tiết kỹ thuật bên dưới.',
+    _ => 'Xem chi tiết kỹ thuật bên dưới.',
+  };
+  @override
+  String subtitleQueueAutoReason(String reason) => switch (reason) {
+    'measuring' => 'đang đo tốc độ',
+    'probing' => 'đang thử thêm 1 video',
+    'faster' => 'chạy thêm nhanh hơn nên giữ',
+    'noGain' => 'chạy thêm không nhanh hơn',
+    'lowMemory' => 'không đủ RAM/VRAM trống',
+    'failures' => 'đọc file lỗi nên giảm bớt',
+    _ => '',
+  };
 }

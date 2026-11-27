@@ -19,7 +19,11 @@ void main() {
   late LocalModelDownloads downloads;
   late SubtitlePreferences preferences;
 
-  Future<void> showPanel(WidgetTester tester) async {
+  Future<void> showPanel(
+    WidgetTester tester, {
+    bool compact = false,
+    VoidCallback? onManageModels,
+  }) async {
     SharedPreferences.setMockInitialValues({});
     final prefs = await SharedPreferences.getInstance();
     preferences = SubtitlePreferences.shared(prefs);
@@ -41,13 +45,36 @@ void main() {
           GlobalCupertinoLocalizations.delegate,
         ],
         home: Scaffold(
-          body: SingleChildScrollView(
-            child: SubtitleSettingsPanel(models: models, downloads: downloads),
-          ),
+          body: onManageModels == null
+              ? SingleChildScrollView(
+                  child: SubtitleSettingsPanel(
+                    models: models,
+                    downloads: downloads,
+                    compact: compact,
+                  ),
+                )
+              : Builder(
+                  builder: (context) => TextButton(
+                    onPressed: () => showDialog<void>(
+                      context: context,
+                      builder: (_) => SubtitleSettingsDialog(
+                        models: models,
+                        downloads: downloads,
+                        preferences: preferences,
+                        onManageModels: (_) => onManageModels(),
+                      ),
+                    ),
+                    child: const Text('Open'),
+                  ),
+                ),
         ),
       ),
     );
     await tester.pumpAndSettle();
+    if (onManageModels != null) {
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+    }
   }
 
   CbSelect<String> field(WidgetTester tester, String key) =>
@@ -271,6 +298,96 @@ void main() {
     await tester.pumpAndSettle();
     expect(preferences.fileMode, SubtitleFileMode.subsFolder);
     expect(hint(), contains('Subs/'));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the compact CC panel shows core controls and folds files away', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(420, 560);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await showPanel(tester, compact: true);
+
+    expect(find.text('Phụ đề AI local'), findsOneWidget);
+    expect(find.byKey(const ValueKey('ai-subtitles-enabled')), findsOneWidget);
+    expect(field(tester, 'Ngôn ngữ audio:auto').value, 'auto');
+    expect(
+      find.byKey(ValueKey('subtitle-model-install:${preferences.speechModel}')),
+      findsOneWidget,
+    );
+    final model = models.catalogEntryFor(preferences.speechModel)!;
+    expect(find.text(model.description!), findsNothing);
+
+    final files = find.text('File phụ đề');
+    final fileMode = find.byKey(
+      const ValueKey('ai-subtitle-file-mode:appOnly'),
+    );
+    expect(fileMode, findsNothing);
+    await tester.ensureVisible(files);
+    await tester.tap(files);
+    await tester.pumpAndSettle();
+    expect(fileMode, findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('ai-subtitle-clear-cache')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the CC dialog aligns and outlines its actions', (tester) async {
+    tester.view.physicalSize = const Size(420, 560);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    var opened = 0;
+    await showPanel(tester, onManageModels: () => opened++);
+
+    expect(find.byType(CbDialog), findsOneWidget);
+    final title = find.text('Phụ đề AI local');
+    expect(title, findsOneWidget);
+    final enabled = find.byKey(const ValueKey('ai-subtitles-enabled'));
+    final manage = find.byKey(const ValueKey('ai-subtitles-manage-models'));
+    final close = find.widgetWithText(CbButton, 'Đóng');
+    expect(tester.widget<CbButton>(manage).outlined, isTrue);
+    expect(tester.widget<CbButton>(close).outlined, isTrue);
+    expect(tester.getCenter(manage).dy, tester.getCenter(close).dy);
+
+    final wasEnabled = preferences.enabled;
+    await tester.tap(enabled);
+    await tester.pumpAndSettle();
+    expect(preferences.enabled, !wasEnabled);
+    await tester.tap(manage);
+    expect(opened, 1);
+
+    final files = find.text('File phụ đề');
+    await tester.ensureVisible(files);
+    await tester.tap(files);
+    await tester.pumpAndSettle();
+    final fileHeader = find.ancestor(
+      of: files,
+      matching: find.byType(ListTile),
+    );
+    final fileMode = find.byKey(
+      const ValueKey('ai-subtitle-file-mode:appOnly'),
+    );
+    expect(
+      tester.getTopLeft(fileMode).dy - tester.getBottomLeft(fileHeader).dy,
+      greaterThanOrEqualTo(CbSpacing.sm),
+    );
+    final fileHint = find.byKey(const ValueKey('ai-subtitle-file-mode-hint'));
+    final cacheTitle = find.text('Cache phụ đề');
+    expect(
+      tester.getTopLeft(cacheTitle).dy - tester.getBottomLeft(fileHint).dy,
+      greaterThanOrEqualTo(CbSpacing.md),
+    );
+    final clear = find.byKey(const ValueKey('ai-subtitle-clear-cache'));
+    await tester.ensureVisible(clear);
+    expect(tester.widget<CbButton>(clear).outlined, isTrue);
+    expect(tester.getTopLeft(clear).dx, tester.getTopLeft(title).dx);
+
+    await tester.tap(close);
+    await tester.pumpAndSettle();
+    expect(find.byType(SubtitleSettingsDialog), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

@@ -2123,7 +2123,7 @@ class _HoverRow extends StatelessWidget {
               ? c.fillHover
               : null,
           borderRadius: CbRadii.all(CbRadii.md),
-          boxShadow: state.focused ? CbDecorations.focusRing(c) : null,
+          border: state.focused ? CbDecorations.focusRing(c) : null,
         ),
         child: child,
       ),

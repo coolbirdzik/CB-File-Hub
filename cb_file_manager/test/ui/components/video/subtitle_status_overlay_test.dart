@@ -17,6 +17,7 @@ void main() {
     SubtitleProgress progress, {
     Size size = const Size(720, 420),
     bool controls = true,
+    String caption = 'Hello world',
     VoidCallback? retry,
     VoidCallback? settings,
     VoidCallback? regenerate,
@@ -41,8 +42,9 @@ void main() {
                 children: [
                   const Positioned.fill(child: ColoredBox(color: Colors.black)),
                   SubtitleCaptionOverlay(
-                    caption: 'Hello world',
+                    caption: caption,
                     controlsVisible: controls,
+                    progress: progress,
                   ),
                   if (controls)
                     Align(
@@ -102,6 +104,7 @@ void main() {
       contains('Using saved subtitles'),
     );
     expect(find.byKey(const ValueKey('ai-subtitle-busy')), findsNothing);
+    expect(find.text('100%'), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('ai-subtitle-control')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('ai-subtitle-regenerate')));
@@ -236,8 +239,55 @@ void main() {
     expect(find.byKey(const ValueKey('ai-subtitle-status')), findsNothing);
     expect(find.byKey(const ValueKey('ai-subtitle-timeline')), findsNothing);
     expect(find.byKey(const ValueKey('ai-subtitle-caption')), findsOneWidget);
+    expect(find.text('Hello world'), findsOneWidget);
+    expect(find.text('Generating subtitles…'), findsNothing);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('loading appears in the subtitle area with controls hidden', (
+    tester,
+  ) async {
+    await show(
+      tester,
+      const SubtitleProgress(
+        phase: SubtitlePhase.loading,
+        stage: SubtitleWorkStage.loadingSpeech,
+        duration: Duration.zero,
+        position: Duration.zero,
+      ),
+      controls: false,
+      caption: '',
+    );
+    expect(find.byKey(const ValueKey('ai-subtitle-control')), findsNothing);
+    expect(find.text('Generating subtitles…'), findsOneWidget);
+  });
+
+  testWidgets('CC counts finished ranges and shows wait text only in gaps', (
+    tester,
+  ) async {
+    SubtitleProgress progressAt(int seconds) => SubtitleProgress(
+      phase: SubtitlePhase.processing,
+      duration: const Duration(seconds: 100),
+      position: Duration(seconds: seconds),
+      completed: const [
+        SubtitleTimeRange(Duration.zero, Duration(seconds: 5)),
+        SubtitleTimeRange(Duration(seconds: 40), Duration(seconds: 60)),
+      ],
+      pending: const SubtitleTimeRange(
+        Duration(seconds: 60),
+        Duration(seconds: 68),
+      ),
+    );
+
+    await show(tester, progressAt(60), caption: '');
+    expect(find.text('25%'), findsOneWidget);
+    expect(find.text('Generating subtitles…'), findsOneWidget);
+
+    await show(tester, progressAt(45), caption: '');
+    expect(find.text('25%'), findsOneWidget);
+    expect(find.byKey(const ValueKey('ai-subtitle-caption')), findsNothing);
+  });
+
   testWidgets('CC menu offers retry and subtitle settings after failure', (
     tester,
   ) async {

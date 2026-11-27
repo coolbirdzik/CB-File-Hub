@@ -6,7 +6,9 @@ import 'package:cb_file_manager/services/app_insights/app_leftover_finder.dart';
 import 'package:cb_file_manager/services/app_insights/app_leftover_scanner.dart';
 import 'package:cb_file_manager/services/disk_cleaner/cleaner_models.dart';
 import 'package:cb_file_manager/ui/screens/cb_agent_cleaner/cleaner_leftovers_view.dart';
+import 'package:cb_file_manager/ui/screens/cb_agent_cleaner/cleaner_progress_widgets.dart';
 import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_localizations/flutter_localizations.dart'
     hide GlobalMaterialLocalizations, GlobalCupertinoLocalizations;
@@ -20,11 +22,15 @@ const String _pyCharm = r'C:\Users\me\AppData\Local\JetBrains\PyCharm2021.3';
 void main() {
   final now = DateTime(2026, 10, 1, 12);
 
-  AppLeftoverReport fixtureReport({bool inventoryUnavailable = false}) {
+  AppLeftoverReport fixtureReport({
+    bool inventoryUnavailable = false,
+    bool isPartial = false,
+  }) {
     return AppLeftoverReport(
       drivePath: r'C:\',
       generatedAt: now,
       inventoryUnavailable: inventoryUnavailable,
+      isPartial: isPartial,
       candidates: inventoryUnavailable
           ? const <AppLeftoverCandidate>[]
           : const <AppLeftoverCandidate>[
@@ -73,8 +79,13 @@ void main() {
     void Function(String)? onOpenFolder,
     AppLeftoverCleanAction? onClean,
     VoidCallback? onScan,
+    VoidCallback? onDeepScan,
+    VoidCallback? onCancel,
+    bool supportsDeepScan = false,
+    bool deepScan = false,
     bool usesTrash = false,
     bool settle = true,
+    ValueListenable<AppLeftoverScanProgress?>? scanProgress,
   }) async {
     tester.view.physicalSize = const Size(1200, 1000);
     tester.view.devicePixelRatio = 1;
@@ -96,7 +107,12 @@ void main() {
             onOpenFolder: onOpenFolder,
             onClean: onClean,
             onScan: onScan,
+            onDeepScan: onDeepScan,
+            onCancel: onCancel,
+            supportsDeepScan: supportsDeepScan,
+            deepScan: deepScan,
             usesTrash: usesTrash,
+            scanProgress: scanProgress,
           ),
         ),
       ),
@@ -128,6 +144,220 @@ void main() {
       find.byKey(const ValueKey<String>('cleaner-leftovers-scan')),
     );
     expect(scans, 1);
+    expect(
+      find.byKey(const ValueKey<String>('cleaner-leftovers-deep-scan')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('shows which stage, drive and folder the scan is reading', (
+    tester,
+  ) async {
+    final cubit = CleanerAppLeftoversCubit(nowProvider: () => now)
+      ..setLoading();
+    addTearDown(cubit.close);
+    final progress = ValueNotifier<AppLeftoverScanProgress?>(
+      const AppLeftoverScanProgress(
+        stage: AppLeftoverScanStage.searchingDrive,
+        root: r'D:\',
+        path: r'D:\Games\Studio\bin',
+        done: 1,
+        total: 2,
+        visited: 42,
+      ),
+    );
+    addTearDown(progress.dispose);
+
+    await pumpView(
+      tester,
+      cubit: cubit,
+      deepScan: true,
+      supportsDeepScan: true,
+      scanProgress: progress,
+      settle: false,
+    );
+    expect(find.text(r'Searching D:\ for portable apps...'), findsOneWidget);
+    expect(find.text('1 of 2 drives done · 42 items checked'), findsOneWidget);
+    expect(find.text(r'D:\Games\Studio\bin'), findsOneWidget);
+
+    // Drives on different disks are searched at the same time.
+    progress.value = const AppLeftoverScanProgress(
+      stage: AppLeftoverScanStage.searchingDrive,
+      root: r'D:\, E:\',
+      path: r'E:\Tools\Portable',
+      done: 1,
+      total: 3,
+      visited: 90,
+    );
+    await tester.pump();
+    expect(
+      find.text(r'Searching D:\, E:\ for portable apps...'),
+      findsOneWidget,
+    );
+    expect(find.text('1 of 3 drives done · 90 items checked'), findsOneWidget);
+    expect(find.text(r'E:\Tools\Portable'), findsOneWidget);
+    expect(find.text(r'D:\Games\Studio\bin'), findsNothing);
+
+    cubit.setReport(fixtureReport(), scanning: true);
+    progress.value = const AppLeftoverScanProgress(
+      stage: AppLeftoverScanStage.measuring,
+      path: _oldTool,
+      done: 1,
+      total: 3,
+    );
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey<String>('cleaner-leftovers-progress')),
+        matching: find.text(_oldTool),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('scan bar stays put while stage, detail and path change', (
+    tester,
+  ) async {
+    final cubit = CleanerAppLeftoversCubit(nowProvider: () => now)
+      ..setLoading();
+    addTearDown(cubit.close);
+    final progress = ValueNotifier<AppLeftoverScanProgress?>(
+      const AppLeftoverScanProgress(stage: AppLeftoverScanStage.readingApps),
+    );
+    addTearDown(progress.dispose);
+    await pumpView(
+      tester,
+      cubit: cubit,
+      deepScan: true,
+      scanProgress: progress,
+      settle: false,
+    );
+    Rect bar() => tester.getRect(find.byType(CleanerProgressBar));
+    final start = bar();
+
+    for (final tick in <AppLeftoverScanProgress>[
+      const AppLeftoverScanProgress(
+        stage: AppLeftoverScanStage.searchingDrive,
+        root: r'D:\',
+        path: r'D:\a',
+        total: 1,
+      ),
+      AppLeftoverScanProgress(
+        stage: AppLeftoverScanStage.searchingDrive,
+        root: r'D:\',
+        // Long enough to wrap onto two lines inside the 360px panel.
+        path: 'D:\\${List.filled(12, 'SomeLongFolderName').join(r'\')}',
+        total: 1,
+        visited: 5,
+      ),
+      const AppLeftoverScanProgress(
+        stage: AppLeftoverScanStage.searchingDrive,
+        root: r'D:\',
+        path: r'D:\b',
+        total: 1,
+        visited: 9,
+      ),
+    ]) {
+      progress.value = tick;
+      await tester.pump();
+      expect(bar(), start, reason: 'bar moved at ${tick.path}');
+      final indicator = tester.widget<LinearProgressIndicator>(
+        find.byType(LinearProgressIndicator),
+      );
+      expect(indicator.value, isNull);
+    }
+  });
+
+  testWidgets('offers distinct normal and deep scans on supported platforms', (
+    tester,
+  ) async {
+    final cubit = CleanerAppLeftoversCubit(nowProvider: () => now);
+    addTearDown(cubit.close);
+    var scans = 0;
+    var deepScans = 0;
+
+    await pumpView(
+      tester,
+      cubit: cubit,
+      onScan: () => scans++,
+      onDeepScan: () => deepScans++,
+      supportsDeepScan: true,
+    );
+    expect(find.text('Normal scan'), findsNWidgets(2));
+    expect(find.text('Deep scan'), findsNWidgets(2));
+    tester.view.physicalSize = const Size(420, 800);
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey<String>('cleaner-leftovers-deep-scan')),
+    );
+    await tester.tap(
+      find.byKey(const ValueKey<String>('cleaner-leftovers-scan')),
+    );
+    await tester.tap(
+      find.byKey(const ValueKey<String>('cleaner-leftovers-deep-rescan')),
+    );
+    expect(scans, 1);
+    expect(deepScans, 2);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('deep scan shows discovery progress and only cancel while busy', (
+    tester,
+  ) async {
+    final cubit = CleanerAppLeftoversCubit(nowProvider: () => now)
+      ..setLoading();
+    addTearDown(cubit.close);
+    var cancels = 0;
+
+    await pumpView(
+      tester,
+      cubit: cubit,
+      supportsDeepScan: true,
+      deepScan: true,
+      onCancel: () => cancels++,
+      settle: false,
+    );
+    expect(
+      find.text(
+        'Checking for app files and portable apps in additional locations...',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey<String>('cleaner-leftovers-deep-rescan')),
+      findsNothing,
+    );
+    await tester.tap(
+      find.byKey(const ValueKey<String>('cleaner-leftovers-rescan')),
+    );
+    expect(cancels, 1);
+  });
+
+  testWidgets('deep scan partial results are presented as possible leftovers', (
+    tester,
+  ) async {
+    final cubit = CleanerAppLeftoversCubit(nowProvider: () => now)
+      ..setReport(fixtureReport(isPartial: true))
+      ..addMeasurement(_oldGame, measured(300));
+    addTearDown(cubit.close);
+
+    await pumpView(
+      tester,
+      cubit: cubit,
+      supportsDeepScan: true,
+      deepScan: true,
+    );
+    expect(
+      find.textContaining('Deep scan · Possible leftovers:'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('Deep scan could not verify every location.'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('Up to'), findsNothing);
+    expect(find.text('No app match found'), findsOneWidget);
+    expect(find.text('Apps no longer installed'), findsNothing);
   });
 
   testWidgets('groups folders by reason and location as they are measured', (

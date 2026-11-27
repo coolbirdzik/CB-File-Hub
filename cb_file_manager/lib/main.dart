@@ -51,6 +51,7 @@ import 'core/service_locator.dart';
 import 'e2e/cb_e2e_config.dart';
 import 'services/app_update/app_update_models.dart';
 import 'services/app_update/app_update_service.dart';
+import 'services/media/subtitle_batch/subtitle_batch_queue.dart';
 import 'ui/components/app_update/app_update_dialog.dart';
 import 'ui/components/common/app_toast.dart';
 import 'config/languages/app_localizations.dart';
@@ -206,6 +207,20 @@ void main(List<String> args) {
     (error, stackTrace) {
       debugPrint('Error during app initialization: $error');
       debugPrint('$stackTrace');
+      // Keep uncaught Dart errors available after the debug console/window
+      // disappears. Native crashes still rely on Windows Error Reporting.
+      try {
+        final log = File(
+          '${Directory.systemTemp.path}/cb-file-hub-uncaught.log',
+        );
+        final mode = log.existsSync() && log.lengthSync() > 256 * 1024
+            ? FileMode.write
+            : FileMode.append;
+        log.writeAsStringSync(
+          '${DateTime.now().toIso8601String()} pid=$pid $error\n$stackTrace\n',
+          mode: mode,
+        );
+      } catch (_) {}
     },
     zoneSpecification: ZoneSpecification(
       print: (self, parent, zone, line) {
@@ -845,6 +860,12 @@ Future<void> runCbFileApp() async {
 
   if (!isSecondaryWindow && !kCbE2E && !backgroundTorrentLaunch) {
     AppUpdateService.instance.scheduleStartupCheck(_announceAppUpdate);
+  }
+  if (!isSecondaryWindow && !kCbE2E && SubtitleBatchQueue.supported) {
+    // The main window runs the AI subtitle queue and resumes it when it was
+    // left running. A paused queue costs one small query per tick.
+    final subtitleQueue = SubtitleBatchQueue.instance..runsJobs = true;
+    Timer(const Duration(seconds: 15), subtitleQueue.ensureStarted);
   }
 
   final WindowStartupPayload? startupPayload =

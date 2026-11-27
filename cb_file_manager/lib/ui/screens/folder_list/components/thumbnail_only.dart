@@ -5,6 +5,7 @@ import 'package:cb_file_manager/ui/widgets/thumbnail_loader.dart';
 import 'package:cb_file_manager/helpers/files/file_type_registry.dart';
 import 'package:cb_file_manager/helpers/files/file_icon_helper.dart';
 import 'package:path/path.dart' as p;
+import 'subtitle_thumbnail_badge.dart';
 
 /// A widget that displays only the thumbnail of a file item.
 /// This widget is designed to be constant and not rebuild on selection changes.
@@ -106,20 +107,31 @@ class _ThumbnailOnlyState extends State<ThumbnailOnly>
     return ValueListenableBuilder<FileThumbnailFitMode>(
       valueListenable: UserPreferences.instance.fileThumbnailFitMode,
       builder: (context, fitMode, _) => RepaintBoundary(
-        child: ThumbnailLoader(
-          key: ValueKey('thumb-loader-${widget.file.path}'),
-          filePath: widget.file.path,
-          isVideo: isVideo,
-          isImage: isImage,
-          width: double.infinity,
-          height: double.infinity,
-          fit: fitMode == FileThumbnailFitMode.contain
-              ? BoxFit.contain
-              : BoxFit.cover,
-          isPriority:
-              false, // Don't mark all as priority to reduce concurrent loads
-          borderRadius: BorderRadius.circular(0),
-          showLoadingIndicator: true,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            ThumbnailLoader(
+              key: ValueKey('thumb-loader-${widget.file.path}'),
+              filePath: widget.file.path,
+              isVideo: isVideo,
+              isImage: isImage,
+              width: double.infinity,
+              height: double.infinity,
+              fit: fitMode == FileThumbnailFitMode.contain
+                  ? BoxFit.contain
+                  : BoxFit.cover,
+              isPriority:
+                  false, // Don't mark all as priority to reduce concurrent loads
+              borderRadius: BorderRadius.circular(0),
+              showLoadingIndicator: true,
+            ),
+            if (isVideo)
+              Positioned(
+                right: 4,
+                bottom: 4,
+                child: SubtitleThumbnailBadge(videoPath: widget.file.path),
+              ),
+          ],
         ),
       ),
     );

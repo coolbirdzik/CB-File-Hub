@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:cb_file_manager/config/languages/app_localizations_delegate.dart';
+import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:cb_file_manager/models/local_ai/local_ai_advisor_model.dart';
 import 'package:cb_file_manager/services/local_ai/local_ai_advisor_service.dart';
 import 'package:cb_file_manager/services/local_ai/local_model_downloads.dart';
@@ -142,6 +143,84 @@ void main() {
     server.body.add([1]);
     await until(() => downloads.downloads.isEmpty);
     await server.body.close();
+  });
+
+  testWidgets('the model manager opens on models and folds advanced settings', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(420, 560);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    GetIt.instance
+      ..registerSingleton<LocalAiAdvisorService>(service)
+      ..registerSingleton<LocalModelDownloads>(downloads);
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('en'),
+        localizationsDelegates: const [
+          AppLocalizationsDelegate(),
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => TextButton(
+              onPressed: () => showLocalModelManagerDialog(context),
+              child: const Text('Open'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Open'));
+    await tester.pump();
+
+    final install = find.byKey(const ValueKey('local-ai-install-model'));
+    for (var i = 0; i < 100 && install.evaluate().isEmpty; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 10)),
+      );
+      await tester.pump(const Duration(milliseconds: 20));
+    }
+    await tester.pumpAndSettle();
+    expect(find.byType(CbDialog), findsOneWidget);
+    expect(tester.widget(install), isA<CbButton>());
+    expect(find.byKey(const ValueKey('ai-subtitles-enabled')), findsNothing);
+    expect(find.text('Hugging Face Token'), findsNothing);
+
+    final heading = find.text('Installed Models');
+    final title = find.text('Manage AI models');
+    final advanced = find.text('Advanced Settings');
+    final left = tester.getTopLeft(title).dx;
+    expect(tester.getTopLeft(heading).dx, left);
+    expect(tester.getTopLeft(advanced).dx, left);
+
+    await tester.tap(advanced);
+    await tester.pumpAndSettle();
+    for (final label in [
+      'Hugging Face Token',
+      'Model storage location',
+      'Context window',
+    ]) {
+      expect(tester.getTopLeft(find.text(label)).dx, left);
+    }
+    final apply = find.widgetWithText(CbButton, 'Save');
+    final paste = find.widgetWithText(CbButton, 'Paste Token');
+    final input = find.byType(CbTextField);
+    expect(tester.getSize(apply).height, CbSizes.controlMd);
+    expect(tester.getCenter(input).dy, tester.getCenter(apply).dy);
+    expect(tester.getTopLeft(apply).dx, tester.getTopLeft(paste).dx);
+    expect(tester.getTopRight(apply).dx, tester.getTopRight(install).dx);
+
+    const tokens = 4096;
+    await tester.ensureVisible(input);
+    await tester.enterText(find.byType(TextField), '$tokens');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+    expect(service.getMaxContextTokens(), tokens);
+    expect(tester.takeException(), isNull);
   });
 
   for (final recommendedModelId in [

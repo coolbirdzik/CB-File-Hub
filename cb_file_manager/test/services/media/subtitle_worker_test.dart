@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:ffi';
 
 import 'package:cb_file_manager/services/media/subtitle_worker.dart';
+import 'package:cb_file_manager/services/media/subtitle_batch/subtitle_batch_processes.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:win32/win32.dart' as win;
@@ -43,7 +44,7 @@ Future<void> main(List<String> args) async {
       if (gpu && args[0] == 'wait') { await Completer<void>().future; }
       stdout.writeln(jsonEncode({'id':event['id'],'protocol':1,'ready':true}));
     } else {
-      if (gpu && args[0] == 'compute-crash') exit(23);
+      if ((gpu && args[0] == 'compute-crash') || args[0] == 'compute-crash-all') exit(23);
       stdout.writeln(jsonEncode({'id':event['id'],'language':'ja','segments':[]}));
     }
   }
@@ -57,14 +58,31 @@ Future<void> main(List<String> args) async {
     workers.clear();
     await root.delete(recursive: true);
   });
-  SubtitleWorker worker(String mode) {
+  SubtitleWorker worker(String mode, {SubtitleBatchProcesses? registry}) {
     final value = SubtitleWorker(
       executableOverride: dartExecutable(),
       arguments: [fixture.path, mode, trace.path],
+      onProcessStarted: registry?.register,
     );
     workers.add(value);
     return value;
   }
+
+  test(
+    'only registered queue workers are counted, including CPU fallback',
+    () async {
+      final registry = SubtitleBatchProcesses();
+      final queued = worker('reject', registry: registry);
+      final preview = worker('ready');
+      await queued.start('model.bin');
+      await preview.start('model.bin');
+      expect(queued.gpuRequested, isFalse);
+      expect(registry.ids, [queued.processId]);
+      expect(registry.ids, isNot(contains(preview.processId)));
+      await queued.stop();
+      expect(registry.ids, isEmpty);
+    },
+  );
 
   test(
     'recognition process runs below the player CPU priority on Windows',
@@ -112,6 +130,27 @@ Future<void> main(List<String> args) async {
     expect(w.gpuRequested, isFalse);
     expect(await trace.readAsLines(), ['true', 'false']);
   });
+  test('Nemotron selects its own runtime and starts on CPU', () async {
+    const model = 'nemotron-3.5-asr-streaming-0.6b.q8_0.gguf';
+    expect(
+      SubtitleWorker.runtimeForModel(model),
+      endsWith('subtitles/nemo/cb-subtitle-nemo-worker.exe'),
+    );
+    final w = worker('ready');
+    await w.start(model);
+    expect(w.gpuRequested, isFalse);
+    expect(await trace.readAsLines(), ['false']);
+  });
+  test(
+    'a crashed CPU worker fails requests without writing to its dead pipe',
+    () async {
+      final w = worker('compute-crash-all');
+      await w.start('model.bin');
+      await expectLater(w.request({'command': 'transcribe'}), throwsStateError);
+      await expectLater(w.request({'command': 'transcribe'}), throwsStateError);
+      expect(w.processId, isNull);
+    },
+  );
   test(
     'cancellation during GPU initialization does not launch a CPU replacement',
     () async {

@@ -93,10 +93,12 @@ features:
     paths:
       - cb_file_manager/lib/services/app_insights/app_leftover_finder.dart
       - cb_file_manager/lib/services/app_insights/app_leftover_scanner.dart
+      - cb_file_manager/lib/services/app_insights/windows_leftover_presence.dart
       - cb_file_manager/lib/services/app_insights/posix_app_leftover_finder.dart
       - cb_file_manager/lib/services/app_insights/posix_app_inventory.dart
       - cb_file_manager/lib/bloc/cleaner_app_leftovers/
       - cb_file_manager/lib/ui/screens/cb_agent_cleaner/cleaner_leftovers_view.dart
+      - cb_file_manager/lib/ui/screens/cb_agent_cleaner/cb_agent_cleaner_screen.dart
     focused_tests:
       - "flutter test test/services/app_insights/app_leftover_finder_test.dart"
       - "flutter test test/services/app_insights/app_leftover_scanner_test.dart"
@@ -105,6 +107,7 @@ features:
       - "flutter test test/services/app_insights/posix_app_inventory_test.dart"
       - "flutter test test/bloc/cleaner_app_leftovers_cubit_test.dart"
       - "flutter test test/ui/screens/cb_agent_cleaner/cleaner_leftovers_view_test.dart"
+      - "flutter test test/ui/screens/cb_agent_cleaner/cleaner_leftover_navigation_test.dart"
 
   cleaner_smart_clean:
     paths:

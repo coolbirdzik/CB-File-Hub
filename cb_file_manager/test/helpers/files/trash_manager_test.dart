@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:cb_file_manager/helpers/files/trash_manager.dart';
+import 'package:cb_native/cb_native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/services.dart';
 
@@ -113,6 +114,37 @@ void main() {
           }
         },
       );
+
+      test('onChunkStart alone still reports advancing progress', () async {
+        final paths = <String>[];
+        for (var index = 0; index < 6; index++) {
+          final file = File(
+            '${tempDirectory.path}${Platform.pathSeparator}start_$index.tmp',
+          );
+          await file.writeAsString('temporary data');
+          paths.add(file.path);
+        }
+
+        final reported = <int>[];
+        await TrashManager().deleteMultiplePermanently(
+          paths,
+          useNative: useNative,
+          chunkSize: 3,
+          onChunkStart: (_, done, total) {
+            expect(total, paths.length);
+            reported.add(done);
+          },
+        );
+
+        expect(reported, isNotEmpty);
+        expect(reported, orderedEquals([...reported]..sort()));
+        expect(reported.last, lessThanOrEqualTo(paths.length));
+        // Native reports per result, so the last tick is the full count. The
+        // Dart workers report before each delete, so theirs is concurrent.
+        if (useNative && CbNative.isAvailable) {
+          expect(reported.last, paths.length);
+        }
+      });
 
       test('treats an already missing path as successfully deleted', () async {
         final missingPath =

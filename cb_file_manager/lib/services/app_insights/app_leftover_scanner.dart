@@ -10,7 +10,11 @@ import 'package:win32/win32.dart' as win32;
 import '../disk_cleaner/disk_tree_node.dart';
 import 'app_insights_models.dart';
 import 'app_leftover_finder.dart';
+import 'app_leftover_scan_progress.dart';
 import 'posix_app_leftover_finder.dart';
+
+export 'app_leftover_scan_progress.dart';
+import 'windows_leftover_presence.dart';
 
 /// Size and newest activity of one leftover folder.
 class AppLeftoverMeasurement {
@@ -73,10 +77,10 @@ class _NewestActivity {
 
 /// Finds leftover folders without a full-disk scan.
 ///
-/// Discovery only lists the app-data and program folders two levels deep,
-/// which takes moments, and [measure] then walks each candidate on its own
-/// isolate and streams one result per folder, so the list fills in while
-/// the walk is still running.
+/// Discovery lists the app-data and program folders two levels deep. Windows
+/// additionally checks for unregistered applications in each candidate and,
+/// in deep mode, across the fixed local drives. [measure] then walks each
+/// remaining candidate on its own isolate and streams one result per folder.
 class AppLeftoverScanner {
   static const int defaultMaxEntriesPerFolder = 500000;
 
@@ -92,28 +96,141 @@ class AppLeftoverScanner {
     required Map<String, String> environment,
     List<String> excludedPaths = const <String>[],
     String? operatingSystem,
-  }) {
-    final os = operatingSystem ?? Platform.operatingSystem;
-    return Isolate.run(
-      () => os == 'windows'
-          ? discoverAppLeftoversSync(
-              apps: inventory.apps,
-              environment: environment,
-              excludedPaths: excludedPaths,
-              inventoryIsPartial: inventory.isPartial,
-            )
-          : discoverPosixAppLeftoversSync(
-              inventory: inventory,
-              environment: environment,
-              excludedPaths: excludedPaths,
-              operatingSystem: os,
-            ),
+    bool deepScan = false,
+  }) async {
+    final job = await startDiscovery(
+      inventory: inventory,
+      environment: environment,
+      excludedPaths: excludedPaths,
+      operatingSystem: operatingSystem,
+      deepScan: deepScan,
     );
+    return (await job.result)!;
   }
 
-  Future<AppLeftoverMeasureJob> measure(List<String> paths) {
-    return AppLeftoverMeasureJob._start(paths, maxEntriesPerFolder);
+  /// Starts discovery in a cancellable isolate. Deep Scan may examine a very
+  /// large number of directories, so cancel must stop discovery as well as the
+  /// later measurement stage. [onProgress] receives throttled status ticks
+  /// (stage and current folder) on the calling isolate.
+  Future<AppLeftoverDiscoveryJob> startDiscovery({
+    required AppLeftoverInventory inventory,
+    required Map<String, String> environment,
+    List<String> excludedPaths = const <String>[],
+    String? operatingSystem,
+    bool deepScan = false,
+    void Function(AppLeftoverScanProgress progress)? onProgress,
+  }) {
+    return AppLeftoverDiscoveryJob._start((
+      inventory: inventory,
+      environment: environment,
+      excludedPaths: excludedPaths,
+      operatingSystem: operatingSystem ?? Platform.operatingSystem,
+      deepScan: deepScan,
+      reportProgress: onProgress != null,
+    ), onProgress);
   }
+
+  /// [onProgress] receives one tick as each folder starts being measured.
+  Future<AppLeftoverMeasureJob> measure(
+    List<String> paths, {
+    void Function(AppLeftoverScanProgress progress)? onProgress,
+  }) {
+    return AppLeftoverMeasureJob._start(
+      paths,
+      maxEntriesPerFolder,
+      onProgress,
+    );
+  }
+}
+
+typedef _DiscoveryRequest = ({
+  AppLeftoverInventory inventory,
+  Map<String, String> environment,
+  List<String> excludedPaths,
+  String operatingSystem,
+  bool deepScan,
+  bool reportProgress,
+});
+
+/// A single background candidate discovery. [result] resolves to null only
+/// when cancelled, and errors surface to the caller instead of masquerading as
+/// an empty scan result.
+class AppLeftoverDiscoveryJob {
+  final Isolate _isolate;
+  final ReceivePort _port;
+  final Completer<AppLeftoverReport?> _result = Completer();
+
+  AppLeftoverDiscoveryJob._(this._isolate, this._port);
+
+  Future<AppLeftoverReport?> get result => _result.future;
+
+  static Future<AppLeftoverDiscoveryJob> _start(
+    _DiscoveryRequest request,
+    void Function(AppLeftoverScanProgress progress)? onProgress,
+  ) async {
+    final port = ReceivePort();
+    try {
+      final isolate = await Isolate.spawn(
+        _discoverEntry,
+        (port.sendPort, request),
+        onExit: port.sendPort,
+        onError: port.sendPort,
+      );
+      final job = AppLeftoverDiscoveryJob._(isolate, port);
+      port.listen((message) {
+        if (job._result.isCompleted) return;
+        // Must come before the catch-all below, which ends the job.
+        if (message is AppLeftoverScanProgress) {
+          onProgress?.call(message);
+          return;
+        }
+        if (message is AppLeftoverReport) {
+          job._result.complete(message);
+        } else if (message is List && message.length == 2) {
+          job._result.completeError(
+            StateError(message.first.toString()),
+            StackTrace.fromString(message.last.toString()),
+          );
+        } else {
+          job._result.completeError(StateError('Leftover discovery stopped'));
+        }
+        port.close();
+      });
+      return job;
+    } catch (_) {
+      port.close();
+      rethrow;
+    }
+  }
+
+  void cancel() {
+    if (_result.isCompleted) return;
+    _isolate.kill(priority: Isolate.immediate);
+    _port.close();
+    _result.complete(null);
+  }
+}
+
+void _discoverEntry((SendPort, _DiscoveryRequest) args) {
+  final (port, request) = args;
+  final onProgress = request.reportProgress ? port.send : null;
+  final report = request.operatingSystem == 'windows'
+      ? discoverAppLeftoversSync(
+          apps: request.inventory.apps,
+          environment: request.environment,
+          excludedPaths: request.excludedPaths,
+          inventoryIsPartial: request.inventory.isPartial,
+          deepScan: request.deepScan,
+          onProgress: onProgress,
+        )
+      : discoverPosixAppLeftoversSync(
+          inventory: request.inventory,
+          environment: request.environment,
+          excludedPaths: request.excludedPaths,
+          operatingSystem: request.operatingSystem,
+          onProgress: onProgress,
+        );
+  port.send(report);
 }
 
 /// Builds a shallow tree of the base folders from the filesystem and runs
@@ -123,10 +240,19 @@ AppLeftoverReport discoverAppLeftoversSync({
   required Map<String, String> environment,
   List<String> excludedPaths = const <String>[],
   bool inventoryIsPartial = false,
+  bool deepScan = false,
+  List<String>? deepSearchRoots,
+  int maxDeepEntriesPerRoot = 5000000,
   DateTime? generatedAt,
+  void Function(AppLeftoverScanProgress progress)? onProgress,
+  bool useNative = true,
 }) {
+  final report = onProgress == null
+      ? null
+      : AppLeftoverProgressThrottle(onProgress).call;
   final roots = <String, DiskTreeNode>{};
   final listed = Set<DiskTreeNode>.identity();
+  var discoveryPartial = false;
 
   DiskTreeNode ensure(String path) {
     final drive = '${path.substring(0, 2).toUpperCase()}\\';
@@ -159,6 +285,12 @@ AppLeftoverReport discoverAppLeftoversSync({
   void fill(DiskTreeNode node, int levels) {
     if (levels <= 0) return;
     if (listed.add(node)) {
+      report?.call(
+        AppLeftoverScanProgress(
+          stage: AppLeftoverScanStage.listingFolders,
+          path: node.fullPath,
+        ),
+      );
       final existing = {
         for (final child in node.children) child.name.toUpperCase(),
       };
@@ -173,8 +305,11 @@ AppLeftoverReport discoverAppLeftoversSync({
             node.addChild(DiskTreeNode(name: name, fullPath: entity.path));
           }
         }
-      } on FileSystemException {
-        // An unreadable folder simply contributes no candidates.
+      } on FileSystemException catch (error) {
+        // Missing optional bases (e.g. LocalLow) are normal; unreadable
+        // directories mean that the discovery did not cover everything.
+        final code = error.osError?.errorCode;
+        if (code != 2 && code != 3) discoveryPartial = true;
       }
     }
     for (final child in node.children) {
@@ -201,11 +336,25 @@ AppLeftoverReport discoverAppLeftoversSync({
         generatedAt: generated,
       ),
   ];
+  final presence = verifyWindowsLeftoverPresence(
+    candidates: [for (final report in reports) ...report.candidates],
+    environment: environment,
+    deepScan: deepScan,
+    deepSearchRoots: deepSearchRoots,
+    maxCandidateEntries: deepScan ? 500000 : 10000,
+    maxDeepEntriesPerRoot: maxDeepEntriesPerRoot,
+    onProgress: report,
+    useNative: useNative,
+  );
   return AppLeftoverReport(
     drivePath: roots.keys.isEmpty ? '' : roots.keys.first,
-    candidates: [for (final report in reports) ...report.candidates],
+    candidates: presence.candidates,
     generatedAt: generated,
-    isPartial: inventoryIsPartial,
+    isPartial:
+        inventoryIsPartial ||
+        discoveryPartial ||
+        presence.isPartial ||
+        reports.any((report) => report.isPartial),
     inventoryUnavailable:
         reports.isEmpty || reports.any((report) => report.inventoryUnavailable),
   );
@@ -219,12 +368,20 @@ AppLeftoverReport discoverPosixAppLeftoversSync({
   required String operatingSystem,
   List<String> excludedPaths = const <String>[],
   DateTime? generatedAt,
+  void Function(AppLeftoverScanProgress progress)? onProgress,
 }) {
   final listing = <(PosixLeftoverBase, List<String>)>[];
   for (final base in PosixAppLeftoverFinder.bases(
     environment,
     operatingSystem: operatingSystem,
   )) {
+    // A handful of base folders, listed one level deep: no throttle needed.
+    onProgress?.call(
+      AppLeftoverScanProgress(
+        stage: AppLeftoverScanStage.listingFolders,
+        path: base.path,
+      ),
+    );
     final names = <String>[];
     try {
       for (final entity in Directory(base.path).listSync(followLinks: false)) {
@@ -258,12 +415,13 @@ class AppLeftoverMeasureJob {
   static Future<AppLeftoverMeasureJob> _start(
     List<String> paths,
     int maxEntries,
+    void Function(AppLeftoverScanProgress progress)? onProgress,
   ) async {
     final port = ReceivePort();
     final controller = StreamController<(String, AppLeftoverMeasurement)>();
     final isolate = await Isolate.spawn(
       _measureEntry,
-      <Object>[port.sendPort, paths, maxEntries],
+      <Object>[port.sendPort, paths, maxEntries, onProgress != null],
       onExit: port.sendPort,
       onError: port.sendPort,
     );
@@ -271,6 +429,11 @@ class AppLeftoverMeasureJob {
     port.listen((message) {
       if (message is (String, AppLeftoverMeasurement)) {
         controller.add(message);
+        return;
+      }
+      // Must come before the catch-all below, which ends the job.
+      if (message is AppLeftoverScanProgress) {
+        if (!controller.isClosed) onProgress?.call(message);
         return;
       }
       // Done marker, exit notice or an uncaught error: the walk is over.
@@ -294,7 +457,19 @@ void _measureEntry(List<Object> args) {
   final port = args[0] as SendPort;
   final paths = args[1] as List<String>;
   final maxEntries = args[2] as int;
-  for (final path in paths) {
+  final reportProgress = args[3] as bool;
+  for (var i = 0; i < paths.length; i++) {
+    final path = paths[i];
+    if (reportProgress) {
+      port.send(
+        AppLeftoverScanProgress(
+          stage: AppLeftoverScanStage.measuring,
+          path: path,
+          done: i,
+          total: paths.length,
+        ),
+      );
+    }
     port.send((path, measureAppLeftoverSync(path, maxEntries)));
   }
   port.send(null);

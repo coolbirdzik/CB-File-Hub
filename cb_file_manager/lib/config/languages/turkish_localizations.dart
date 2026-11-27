@@ -5744,7 +5744,51 @@ class TurkishLocalizations implements AppLocalizations {
   @override
   String get cleanerLeftoversScan => 'Kalıntıları bul';
   @override
+  String get cleanerLeftoversNormalScan => 'Normal tarama';
+  @override
+  String get cleanerLeftoversDeepScan => 'Derin tarama';
+  @override
+  String get cleanerLeftoversDeepScanHint =>
+      'Taşınabilir uygulamalar da dahil olmak üzere uygulama dosyalarını daha fazla konumda kontrol eder. Bu işlem daha uzun sürebilir.';
+  @override
+  String get cleanerLeftoversDeepScanLoading =>
+      'Ek konumlarda uygulama dosyaları ve taşınabilir uygulamalar kontrol ediliyor...';
+  @override
+  String get cleanerLeftoversDeepScanResult =>
+      'Kurulu ve taşınabilir uygulamalar için daha fazla konum kontrol edildiğinde bunlar olası kalıntılar olarak bulundu. Temizlemeden önce her klasörü inceleyin.';
+  @override
+  String get cleanerLeftoversDeepScanPartial =>
+      'Derin tarama tüm konumları doğrulayamadı. Temizlemeden önce kalan klasörleri inceleyin.';
+  @override
+  String get cleanerLeftoversDeepScanNoMatch => 'Eşleşen uygulama bulunamadı';
+  @override
+  String get cleanerLeftoversDeepScanNoMatchHint =>
+      'Kontrol edilen konumlarda eşleşen kurulu veya taşınabilir uygulama bulunamadı.';
+  @override
+  String cleanerLeftoversPossibleSize(String size) => 'Olası kalıntılar: $size';
+  @override
   String get cleanerLeftoversMeasuring => 'Kalan klasörler ölçülüyor...';
+  @override
+  String get cleanerLeftoversStageReadingApps =>
+      'Yüklü uygulamaların listesi okunuyor...';
+  @override
+  String get cleanerLeftoversStageListing =>
+      'Uygulama veri klasörleri listeleniyor...';
+  @override
+  String get cleanerLeftoversStageCandidates =>
+      'Kalan klasörlerde program olup olmadığı kontrol ediliyor...';
+  @override
+  String get cleanerLeftoversStagePath =>
+      'PATH klasörleri komut satırı araçları için kontrol ediliyor...';
+  @override
+  String cleanerLeftoversStageDrive(String drive) =>
+      '$drive sürücüsünde taşınabilir uygulamalar aranıyor...';
+  @override
+  String cleanerLeftoversStageDriveDetail(
+    int finished,
+    int drives,
+    int entries,
+  ) => '$finished/$drives sürücü tamamlandı · $entries öğe kontrol edildi';
   @override
   String cleanerLeftoversReclaimable(String size) =>
       'En fazla $size boşaltılabilir';
@@ -7557,4 +7601,258 @@ class TurkishLocalizations implements AppLocalizations {
   @override
   String cleanerDockerFreed(String size) =>
       'Docker $size boşalttı. Docker Desktop alanı kısa süre sonra diske geri verir.';
+
+  // AI subtitle queue
+  @override
+  String get subtitleQueueTitle => 'AI altyazı kuyruğu';
+  @override
+  String get subtitleQueueDesktopOnly =>
+      'Altyazı kuyruğu masaüstü uygulamasında kullanılabilir.';
+  @override
+  String get subtitleQueueTabQueue => 'Kuyruk';
+  @override
+  String get subtitleQueueTabRules => 'Kurallar';
+  @override
+  String get subtitleQueueStart => 'Başlat';
+  @override
+  String get subtitleQueuePause => 'Duraklat';
+  @override
+  String get subtitleQueueStatePaused => 'Duraklatıldı';
+  @override
+  String get subtitleQueueStateIdle => 'Çalışıyor · video bekleniyor';
+  @override
+  String get subtitleQueueStateRunning => 'Altyazı oluşturuluyor';
+  @override
+  String get subtitleQueueStateWatching =>
+      'AI altyazılı video oynatılırken bekleniyor';
+  @override
+  String subtitleQueueStateBlocked(String model) => 'Model yüklü değil: $model';
+  @override
+  String get subtitleQueueStateOtherWindow => 'Başka bir pencerede çalışıyor';
+  @override
+  String get subtitleQueuePauseWhileWatching => 'Video izlerken duraklat';
+  @override
+  String get subtitleQueuePauseWhileWatchingHint =>
+      'GPU\'yu oynatıcıya bırakır; yarım kalan iş kaldığı yerden devam eder.';
+  @override
+  String get subtitleQueueScanAll => 'Tüm kuralları tara';
+  @override
+  String get subtitleQueueAddVideos => 'Video ekle';
+  @override
+  String get subtitleQueueRetryFailed => 'Başarısızları yeniden dene';
+  @override
+  String get subtitleQueueClearFinished => 'Bitenleri temizle';
+  @override
+  String get subtitleQueueCleanGenerated => 'Oluşturulan altyazıları temizle';
+  @override
+  String get subtitleQueueCleanPause =>
+      'Temizlemeden önce kuyruğu duraklatın ve çalışan görevlerin durmasını bekleyin.';
+  @override
+  String subtitleQueueCleanConfirm(String scope) =>
+      '$scope için oluşturulan altyazılar ve bilinen önbellek silinsin mi? Temizlenen görevler bekleme kuyruğuna döner. Orijinal videolar, düzenlenmiş veya doğrulanamayan altyazılar korunur.';
+  @override
+  String subtitleQueueCleanResult(int cleaned, int retained, int failed) =>
+      'Temizlendi $cleaned · Korundu $retained · Başarısız $failed';
+  @override
+  String get subtitleQueueGeneratedModels => 'Oluşturma modeli üst verileri';
+  @override
+  String get subtitleQueueLegacyModels =>
+      'Eski görev ayarları; doğrulanmış oluşturma üst verisi yok.';
+  @override
+  String get subtitleQueueEmpty =>
+      'Kuyruk boş. Bir kural oluşturup tarayın veya doğrudan video ekleyin.';
+  @override
+  String get subtitleQueueStatusPending => 'Bekliyor';
+  @override
+  String get subtitleQueueStatusRunning => 'İşleniyor';
+  @override
+  String get subtitleQueueStatusDone => 'Tamamlandı';
+  @override
+  String get subtitleQueueStatusSkipped => 'Atlandı';
+  @override
+  String get subtitleQueueStatusFailed => 'Başarısız';
+  @override
+  String get subtitleQueueStatusCancelled => 'İptal edildi';
+  @override
+  String get subtitleQueueAll => 'Tümü';
+  @override
+  String subtitleQueueScanResult(int added, int queued, int skipped) =>
+      '$added video eklendi · $queued zaten bu kuralın kuyruğunda · $skipped videoda zaten altyazı var';
+  @override
+  String get subtitleQueueChooseRule => 'Şu kuralın ayarlarını kullan';
+  @override
+  String get subtitleQueueNeedRule =>
+      'Önce bir kural oluşturun: eklenen videolar onun altyazı ayarlarını kullanır.';
+  @override
+  String get subtitleRuleNew => 'Yeni kural';
+  @override
+  String get subtitleRuleEdit => 'Kuralı düzenle';
+  @override
+  String get subtitleRuleName => 'Kural adı';
+  @override
+  String get subtitleRuleDefaultName => 'Altyazı kuralı';
+  @override
+  String get subtitleRuleEnabled => '“Tüm kuralları tara”ya dahil';
+  @override
+  String get subtitleRuleSources => 'Kaynaklar';
+  @override
+  String get subtitleRuleAddFolder => 'Klasör ekle';
+  @override
+  String get subtitleRuleAddLibrary => 'Video kitaplığı ekle';
+  @override
+  String get subtitleRuleNoSources =>
+      'En az bir klasör veya video kitaplığı ekleyin.';
+  @override
+  String get subtitleRuleIncludeSubfolders => 'Alt klasörleri dahil et';
+  @override
+  String get subtitleRuleFilters => 'Filtreler';
+  @override
+  String get subtitleRuleExtensions => 'Dosya türleri';
+  @override
+  String get subtitleRuleExtensionsHint =>
+      'Örn. mp4, mkv. Tüm video türleri için boş bırakın.';
+  @override
+  String get subtitleRuleNamePattern => 'Dosya adı';
+  @override
+  String get subtitleRuleNamePatternHint =>
+      'Adın içerdiği metin veya * içeren desen, örn. *S01E*';
+  @override
+  String get subtitleRuleSkipExisting =>
+      'Hedef dilde altyazısı olan videoları atla';
+  @override
+  String get subtitleRuleScanNow => 'Şimdi tara';
+  @override
+  String subtitleRuleDeleteConfirm(String name) =>
+      '“$name” ve kuyruktaki videoları silinsin mi? Oluşturulan altyazı dosyaları korunur.';
+  @override
+  String get subtitleRuleEmpty =>
+      'Henüz kural yok. Bir kural klasörleri veya video kitaplıklarını ve altyazı ayarlarını seçer.';
+  @override
+  String subtitleRuleSourceCount(int count) => '$count kaynak';
+  @override
+  String get subtitleRuleModelMissing =>
+      'Yüklü değil. Kuyruğu başlatmadan önce AI altyazı ayarlarından indirin.';
+  @override
+  String get subtitleRuleAutoDetect => 'Otomatik algıla';
+  @override
+  String get subtitleRuleFollowApp => 'Uygulama dilini izle';
+  @override
+  String subtitleQueueWaitingCount(int count) => '$count video bekliyor';
+  @override
+  String get subtitleQueueAllDone =>
+      'Bekleyen video yok. Devam etmek için bir kuralı tarayın veya video ekleyin.';
+  @override
+  String get subtitleQueueGuideTitle =>
+      'Birçok video için tek seferde altyazı oluşturun';
+  @override
+  String get subtitleQueueGuideStep1 =>
+      'Bir kural oluşturun: klasörleri veya video kitaplıklarını, dilleri ve altyazıların kaydedileceği yeri seçin.';
+  @override
+  String get subtitleQueueGuideStep2 =>
+      'Eşleşen videolar hemen kuyruğa eklenir. Yeni videolar için kuralı daha sonra yeniden tarayın.';
+  @override
+  String get subtitleQueueGuideStep3 =>
+      'Başlat\'a basın. Videolar, bu sekme kapalı olsa bile arka planda tek tek işlenir.';
+  @override
+  String get subtitleRuleSourcesHint =>
+      'Bu klasörlerdeki veya video kitaplıklarındaki videolar kuyruğa eklenir.';
+  @override
+  String get subtitleRuleSaveAndScan => 'Kaydet ve tara';
+  @override
+  String get subtitleQueueSortQueue => 'Kuyruk sırası';
+  @override
+  String get subtitleQueueColumnStatus => 'Durum';
+  @override
+  String get subtitleQueueColumnProgress => 'İlerleme';
+  @override
+  String get subtitleQueueColumnAdded => 'Eklenme';
+  @override
+  String get subtitleQueueColumnUpdated => 'Güncellenme';
+  @override
+  String get subtitleQueueColumnRule => 'Kural';
+  @override
+  String get subtitleQueueSearchHint => 'Kuyruktaki videolarda ara';
+  @override
+  String get subtitleQueueAllRules => 'Tüm kurallar';
+  @override
+  String subtitleRuleVideoCount(int count) => '$count video';
+  @override
+  String subtitleQueueStartRule(String name) => '“$name” çalıştır';
+  @override
+  String subtitleQueueRunScope(String name) => 'Çalışan: $name';
+  @override
+  String get subtitleQueueParallelJobs => 'Aynı anda işlenen video';
+  @override
+  String get subtitleQueueParallelHint =>
+      'Her video kendi modellerini yükler: daha fazla RAM ve VRAM';
+  @override
+  String subtitleQueueParallelOption(int count) => '$count video';
+  @override
+  String subtitleQueueRunningCount(int count) => '$count video işleniyor';
+  @override
+  String get subtitleQueueParallelAuto => 'Otomatik (önerilen)';
+  @override
+  String get subtitleQueueErrorDetails => 'Hata ayrıntıları';
+  @override
+  String get subtitleQueueTechnicalDetails => 'Teknik ayrıntılar';
+  @override
+  String get subtitleQueueResources =>
+      'Altyazı kuyruğu kaynakları (ASR ve çeviri)';
+  @override
+  String get subtitleQueueDisk => 'Disk';
+  @override
+  String subtitleQueueAutoLimit(int count) => 'Otomatik: aynı anda $count';
+  @override
+  String subtitleQueueRetrying(int attempt, int max) =>
+      'Yeniden denenecek ($attempt/$max)';
+  @override
+  String subtitleBatchFailureTitle(String kind) => switch (kind) {
+    'slowRead' => 'Dosya okuma çok yavaş',
+    'fileMissing' => 'Dosya bulunamadı',
+    'unreadable' => 'Ses okunamıyor',
+    'noAudio' => 'Ses parçası yok',
+    'language' => 'Dil tanınamadı',
+    'speechModel' => 'Konuşma modeli yüklenemedi',
+    'translation' => 'Çeviri başarısız',
+    'runtimeMissing' => 'Altyazı çalışma zamanı eksik',
+    'runtimeCrashed' => 'Altyazı işlemi durdu',
+    'stalledIdle' => 'Bitmeden takıldı',
+    'stalledSlow' => '10 dakikadır ilerleme yok',
+    'unknown' => 'Bilinmeyen hata',
+    _ => 'Bilinmeyen hata',
+  };
+  @override
+  String subtitleBatchFailureHint(String kind) => switch (kind) {
+    'slowRead' =>
+      'Dosyanın bu kısmını okumak çok uzun sürdü: meşgul bir sürücü veya atlaması yavaş büyük bir dosya. Yeni hatalar otomatik yeniden denenir; Yeniden dene\'ye basın.',
+    'fileMissing' =>
+      'Dosya taşındı, yeniden adlandırıldı veya silindi ya da sürücüsü bağlı değil.',
+    'unreadable' =>
+      'Dosya bozuk veya desteklenmeyen bir ses biçimi kullanıyor.',
+    'noAudio' => 'Bu videoda tanınacak ses parçası yok.',
+    'language' => 'Kuralda Otomatik algıla yerine konuşulan dili seçin.',
+    'speechModel' =>
+      'Model dosyası bozuk olabilir veya RAM/VRAM yetmedi. AI altyazı ayarlarından yeniden indirin.',
+    'translation' =>
+      'Çeviri modeli çalışamadı, genellikle RAM veya VRAM yetersiz. Biraz bellek boşaltıp yeniden deneyin.',
+    'runtimeMissing' => 'Uygulamayı yeniden yükleyin veya derleyin.',
+    'runtimeCrashed' =>
+      'Genellikle RAM/VRAM bitti veya GPU aşırı yüklendi. Otomatik olarak yeniden denendi; aynı anda daha az video çalıştırın.',
+    'stalledIdle' =>
+      'Videonun geri kalanı hiç planlanmadı. Yeniden deneyin: biten kısım korunur.',
+    'stalledSlow' =>
+      'Bilgisayar aşırı yüklü (bir oyun veya başka bir uygulama GPU kullanıyor). Daha az meşgulken yeniden deneyin.',
+    'unknown' => 'Aşağıdaki teknik ayrıntılara bakın.',
+    _ => 'Aşağıdaki teknik ayrıntılara bakın.',
+  };
+  @override
+  String subtitleQueueAutoReason(String reason) => switch (reason) {
+    'measuring' => 'hız ölçülüyor',
+    'probing' => 'bir tane daha deneniyor',
+    'faster' => 'fazlası daha hızlıydı',
+    'noGain' => 'fazlası daha hızlı değildi',
+    'lowMemory' => 'yeterli boş RAM/VRAM yok',
+    'failures' => 'okumalar başarısız, azaltıldı',
+    _ => '',
+  };
 }

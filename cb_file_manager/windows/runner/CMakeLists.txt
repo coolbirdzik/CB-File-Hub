@@ -16,6 +16,7 @@ add_executable(${BINARY_NAME} WIN32
   "d3d11_threading_guard.cpp"
   "d3d11_threading_guard.h"
   "main.cpp"
+  "media_kit_reference_cleanup.h"
   "utils.cpp"
   "torrent_launch.cpp"
   "torrent_launch.h"

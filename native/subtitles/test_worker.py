@@ -52,13 +52,30 @@ class WorkerTest(unittest.TestCase):
         return events
 
     def test_resample_seek_and_unicode_source(self):
-        first, second = self.run_worker(
+        first, second, rewind = self.run_worker(
             {'command': 'decode', 'source': str(self.wav), 'start_ms': 0, 'duration_ms': 1000},
-            {'command': 'decode', 'source': str(self.wav), 'start_ms': 2500, 'duration_ms': 1000})
+            {'command': 'decode', 'source': str(self.wav), 'start_ms': 2500, 'duration_ms': 1000},
+            {'command': 'decode', 'source': str(self.wav), 'start_ms': 0, 'duration_ms': 1000})
         self.assertEqual(first['samples'], 16000)
         self.assertEqual(first['rms'], 0)
+        self.assertFalse(first['reused_input'])
         self.assertEqual(second['samples'], 16000)
         self.assertGreater(second['rms'], 0.1)
+        self.assertTrue(second['reused_input'])
+        self.assertTrue(rewind['reused_input'])
+        self.assertEqual(rewind['samples'], 16000)
+        self.assertEqual(rewind['rms'], 0)
+
+    def test_bad_input_does_not_poison_the_next_request(self):
+        first, missing, next_chunk = self.run_worker(
+            {'command': 'decode', 'source': str(self.wav), 'start_ms': 0, 'duration_ms': 1000},
+            {'command': 'decode', 'source': str(self.root / 'missing.wav')},
+            {'command': 'decode', 'source': str(self.wav), 'start_ms': 2500, 'duration_ms': 1000})
+        self.assertFalse(first['reused_input'])
+        self.assertIn('Cannot open media audio:', missing['error'])
+        self.assertFalse(next_chunk['reused_input'])
+        self.assertEqual(next_chunk['samples'], 16000)
+        self.assertGreater(next_chunk['rms'], 0.1)
 
     def test_errors_are_protocol_messages(self):
         bad, missing, unknown = self.run_worker(
@@ -74,11 +91,16 @@ class WorkerTest(unittest.TestCase):
         subprocess.run([str(args.ffmpeg), '-v', 'error', '-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=stereo',
                         '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=44100', '-t', '4',
                         '-map', '0:a', '-map', '1:a', '-c:a', 'pcm_s16le', str(media)], check=True, timeout=30)
-        silence, tone = self.run_worker(
+        silence, tone, tone_again = self.run_worker(
             {'command': 'decode', 'source': str(media), 'audio_track': 0, 'start_ms': 1000, 'duration_ms': 1000},
-            {'command': 'decode', 'source': str(media), 'audio_track': 1, 'start_ms': 1000, 'duration_ms': 1000})
+            {'command': 'decode', 'source': str(media), 'audio_track': 1, 'start_ms': 1000, 'duration_ms': 1000},
+            {'command': 'decode', 'source': str(media), 'audio_track': 1, 'start_ms': 2000, 'duration_ms': 1000})
         self.assertEqual(silence['rms'], 0)
         self.assertGreater(tone['rms'], 0.05)
+        self.assertFalse(silence['reused_input'])
+        self.assertFalse(tone['reused_input'])
+        self.assertTrue(tone_again['reused_input'])
+        self.assertGreater(tone_again['rms'], 0.05)
 
     @unittest.skipUnless(args.model and args.speech_sample, 'Pass --model and --speech-sample for inference')
     def test_real_model_unicode_path_and_timestamps(self):

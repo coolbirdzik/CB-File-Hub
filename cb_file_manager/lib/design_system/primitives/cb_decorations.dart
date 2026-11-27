@@ -103,7 +103,7 @@ class CbDecorations {
         pressed: pressed,
       ),
       borderRadius: CbRadii.all(radius),
-      boxShadow: focused ? focusRing(c) : const <BoxShadow>[],
+      border: focused ? focusRing(c) : null,
     );
   }
 
@@ -307,9 +307,17 @@ class CbDecorations {
 
   /// The 2px keyboard focus ring, drawn outside the shape so it stays
   /// visible on every fill, including the accent one.
-  static List<BoxShadow> focusRing(CbColorTokens c) => [
-    BoxShadow(color: c.focusRing, spreadRadius: CbStrokes.emphasis),
-  ];
+  ///
+  /// A border, not a spread [BoxShadow]: Flutter paints a shadow as a solid
+  /// shape behind the box, so behind the translucent fills of secondary,
+  /// ghost and card controls it filled the whole control with the ring
+  /// colour and the label became hard to read. An outside stroke adds no
+  /// layout inset, so focusing does not move anything.
+  static Border focusRing(CbColorTokens c) => Border.all(
+    color: c.focusRing,
+    width: CbStrokes.emphasis,
+    strokeAlign: BorderSide.strokeAlignOutside,
+  );
 }
 
 /// Applies the flat field recipe to a Material [InputDecoration].

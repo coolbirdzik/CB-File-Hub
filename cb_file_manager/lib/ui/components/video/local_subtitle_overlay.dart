@@ -121,6 +121,7 @@ class _LocalSubtitleOverlayState extends State<LocalSubtitleOverlay> {
               return SubtitleCaptionOverlay(
                 caption: caption,
                 controlsVisible: widget.controlsVisible,
+                progress: caption.isEmpty ? session.progress : null,
               );
             },
           ),

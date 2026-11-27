@@ -28,6 +28,7 @@ class LlamaCppServerLaunch {
     required int gpuLayers,
     int? parallelSlots,
     int? threads,
+    bool boundedInference = false,
   }) => [
     ...argumentsPrefix,
     '-m',
@@ -45,9 +46,9 @@ class LlamaCppServerLaunch {
       '--parallel',
       '${parallelSlots.clamp(1, 8)}',
     ],
-    if (!isAndroid && parallelSlots == 1) ...[
+    if (!isAndroid && (parallelSlots == 1 || boundedInference)) ...[
       '--batch-size',
-      '128',
+      '${128 * (parallelSlots ?? 1).clamp(1, 4)}',
       '--ubatch-size',
       '128',
       '--cache-ram',

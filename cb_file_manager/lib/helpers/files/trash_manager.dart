@@ -785,6 +785,10 @@ class TrashManager {
           onChunkStart?.call(progress.currentPath, done, filePaths.length);
         },
         onResult: (result) {
+          // Count outside the null-aware calls: `onChunkDone?.call(++done)`
+          // skips the increment when no onChunkDone is passed, which froze
+          // the cleaner's progress at 0 for the whole native batch.
+          done++;
           onChunkStart?.call(result.path, done, filePaths.length);
           if (result.succeeded) {
             succeeded.add(result.path);
@@ -800,10 +804,12 @@ class TrashManager {
               error: error,
             );
           }
-          onChunkDone?.call(++done, filePaths.length);
+          onChunkDone?.call(done, filePaths.length);
         },
       );
       if (native != null) return succeeded;
+      // The Dart fallback below walks every path again.
+      done = 0;
     }
 
     Future<void> worker() async {

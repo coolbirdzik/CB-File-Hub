@@ -85,7 +85,7 @@ class CbColorSwatch extends StatelessWidget {
             decoration: BoxDecoration(
               color: fill,
               shape: BoxShape.circle,
-              boxShadow: state.focused ? CbDecorations.focusRing(c) : null,
+              border: state.focused ? CbDecorations.focusRing(c) : null,
             ),
             child: content,
           ),

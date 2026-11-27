@@ -104,12 +104,40 @@ install(TARGETS cb-subtitle-worker RUNTIME DESTINATION "${CB_SUBTITLE_INSTALL_DI
 install(FILES "${whisper_SOURCE_DIR}/LICENSE" DESTINATION "${CB_SUBTITLE_INSTALL_DIR}" RENAME LICENSE-whisper COMPONENT Runtime)
 install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/THIRD_PARTY_NOTICES.md" DESTINATION "${CB_SUBTITLE_INSTALL_DIR}" COMPONENT Runtime)
 if(WIN32)
+  # Keep each SDK's GGML and Vulkan loader in its own process directory.
+  set(CB_NEMO_SPEECH_ROOT "${CMAKE_CURRENT_LIST_DIR}/../../cb_file_manager/windows/nemo-speech"
+    CACHE PATH "Pinned NeMo-Speech.cpp ASR runtime")
+  if(CB_SUBTITLE_VULKAN)
+    set(CB_NEMO_BACKEND vulkan)
+  else()
+    set(CB_NEMO_BACKEND cpu)
+  endif()
+  set(CB_NEMO_SPEECH_DIR "${CB_NEMO_SPEECH_ROOT}/${CB_NEMO_BACKEND}")
+  find_package(Python3 REQUIRED COMPONENTS Interpreter)
+  execute_process(COMMAND "${Python3_EXECUTABLE}"
+    "${CMAKE_CURRENT_LIST_DIR}/../../scripts/fetch_nemo_speech_runtime.py"
+    --destination "${CB_NEMO_SPEECH_DIR}" --backend "${CB_NEMO_BACKEND}" RESULT_VARIABLE CB_NEMO_RESULT
+    TIMEOUT 300)
+  if(NOT CB_NEMO_RESULT EQUAL 0)
+    message(FATAL_ERROR "Cannot prepare pinned NeMo-Speech.cpp runtime: ${CB_NEMO_RESULT}")
+  endif()
+  add_executable(cb-subtitle-nemo-worker worker.cpp)
+  target_compile_features(cb-subtitle-nemo-worker PRIVATE cxx_std_17)
+  target_compile_definitions(cb-subtitle-nemo-worker PRIVATE CB_SUBTITLE_NEMO NOMINMAX _CRT_SECURE_NO_WARNINGS)
+  target_include_directories(cb-subtitle-nemo-worker PRIVATE "${CMAKE_CURRENT_BINARY_DIR}" "${CB_SUBTITLE_FFMPEG_DIR}/include" "${CB_NEMO_SPEECH_DIR}/include")
+  target_link_directories(cb-subtitle-nemo-worker PRIVATE "${CB_SUBTITLE_FFMPEG_DIR}/lib" "${CB_NEMO_SPEECH_DIR}/lib")
+  target_link_libraries(cb-subtitle-nemo-worker PRIVATE nemo_speech_asr_c avformat avcodec avutil swresample)
+  set_target_properties(cb-subtitle-nemo-worker PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/nemo/bin")
+  install(TARGETS cb-subtitle-nemo-worker RUNTIME DESTINATION "${CB_SUBTITLE_INSTALL_DIR}/nemo" COMPONENT Runtime)
+  install(DIRECTORY "${CB_NEMO_SPEECH_DIR}/bin/" DESTINATION "${CB_SUBTITLE_INSTALL_DIR}/nemo" COMPONENT Runtime FILES_MATCHING PATTERN "*.dll")
+  install(DIRECTORY "${CB_NEMO_SPEECH_DIR}/share/licenses/nemo-speech/" DESTINATION "${CB_SUBTITLE_INSTALL_DIR}/nemo/licenses" COMPONENT Runtime)
   if(CB_SUBTITLE_VULKAN)
     # Keep the real loader isolated from Flutter/ANGLE's app-root DLL. The
     # loader is also available on machines where inference falls back to CPU.
     install(FILES "${CB_SUBTITLE_VULKAN_TOOLS}/Bin/vulkan-1.dll"
       "${CB_SUBTITLE_VULKAN_TOOLS}/LICENSE-VulkanRT.txt"
       DESTINATION "${CB_SUBTITLE_INSTALL_DIR}" COMPONENT Runtime)
+    install(FILES "${CB_SUBTITLE_VULKAN_TOOLS}/Bin/vulkan-1.dll" DESTINATION "${CB_SUBTITLE_INSTALL_DIR}/nemo" COMPONENT Runtime)
   endif()
   # FFmpeg is shared at the app root. SubtitleWorker adds that directory to
   # this child's DLL search path while keeping the real Vulkan loader here.
