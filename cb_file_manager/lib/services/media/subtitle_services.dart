@@ -27,10 +27,10 @@ class SubtitleServices {
     final downloads = GetIt.I.isRegistered<LocalModelDownloads>()
         ? GetIt.I<LocalModelDownloads>()
         : LocalModelDownloads(models);
-    return SubtitleServices(
-      models,
-      downloads,
-      SubtitlePreferences.shared(prefs),
+    final preferences = SubtitlePreferences.shared(prefs);
+    await preferences.keepLegacySpeechDefault(
+      models.getManagedModels().map((m) => m.catalogId),
     );
+    return SubtitleServices(models, downloads, preferences);
   }
 }

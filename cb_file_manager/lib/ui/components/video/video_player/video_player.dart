@@ -13,6 +13,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cb_file_manager/services/media/media_kit_playback.dart';
+import 'package:cb_file_manager/services/media/vr_video_shader.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:path/path.dart' as pathlib;
 import 'package:image/image.dart' as img;
@@ -442,6 +443,19 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
   @override
   Duration? _sleepDuration;
 
+  // GPU VR 180/360 projection state
+  @override
+  VrViewState _vrView = const VrViewState();
+  final VrShaderController _vrShader = VrShaderController();
+
+  // Viewport-capped output texture sizing (prevents 8K DXGI surface OOM)
+  Timer? _outputSizeTimer;
+  Size _lastViewportSize = Size.zero;
+  double _lastViewportDpr = 1.0;
+
+  // Throttle mouse-move control timer resets so hovering doesn't setState every pixel
+  DateTime _lastHoverRefresh = DateTime.fromMillisecondsSinceEpoch(0);
+
   // Video statistics - placeholder for future use
   Timer? _statsUpdateTimer;
 
@@ -642,6 +656,9 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
 
   void _disposeResources() {
     try {
+      _outputSizeTimer?.cancel();
+      _outputSizeTimer = null;
+      _vrShader.dispose();
       _releaseMediaResources();
       // Clear video controller reference before disposing the player
       _videoController = null;
@@ -687,6 +704,12 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
       _isHoveringSeekBar = false;
       _fastSeekTimer?.cancel();
       _isFastSeeking = false;
+      _outputSizeTimer?.cancel();
+      _outputSizeTimer = null;
+      if (_vrView.isActive) {
+        _vrView = const VrViewState();
+        unawaited(_vrShader.clear(_player));
+      }
       // Cleared so a later full dispose does not close or delete them twice.
       _tempRaf?.close();
       _tempRaf = null;
@@ -841,10 +864,13 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
 
       {
         if (_player == null) {
+          final isNetworkSource =
+              widget.smbMrl != null || widget.streamingUrl != null;
           _player = PlaybackPlayer(
             configuration: PlaybackConfiguration(
-              networkCaching: const Duration(seconds: 1),
+              networkCaching: Duration(seconds: isNetworkSource ? 5 : 1),
               looping: widget.looping,
+              bufferSizeMb: math.max(_bufferSize, 64),
             ),
           );
           _videoController = PlaybackVideoController(
@@ -920,7 +946,13 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
       if (isCurrent() && duration > Duration.zero) _extractVideoMetadata();
     });
     player.stream.width.listen((width) {
-      if (isCurrent() && width != null) _extractVideoMetadata();
+      if (isCurrent() && width != null) {
+        _extractVideoMetadata();
+        _scheduleOutputSizeSync();
+      }
+    });
+    player.stream.videoParams.listen((_) {
+      if (isCurrent()) _scheduleOutputSizeSync();
     });
     player.stream.completed.listen((completed) {
       if (!completed || !isCurrent() || _advancedToNextVideo || _cutMode) {
@@ -959,7 +991,14 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
       // in place, and the choice is persisted for next time.
       if (PlaybackPlayer.isHardwareDecodeError(error)) {
         final firstFailure = !_hwDecodeFallbackAttempted;
-        _persistSoftwareDecodingPreference();
+        // On 4K/8K videos, a GPU error is often transient VRAM pressure rather
+        // than a broken driver: fall back for this session without permanently
+        // locking future playback to CPU decoding.
+        if (!(_player?.isLargeVideo ?? false)) {
+          _persistSoftwareDecodingPreference();
+        } else {
+          _hwDecodeFallbackAttempted = true;
+        }
         if (_player?.fellBackToSoftware ?? false) {
           if (firstFailure && mounted) {
             AppToast.warning(
@@ -1278,7 +1317,16 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
               onPointerSignal: _handlePointerSignal,
               child: MouseRegion(
                 onHover: (_) {
-                  _showControlsWithTimer();
+                  if (!_showControls) {
+                    _showControlsWithTimer();
+                  } else {
+                    final now = DateTime.now();
+                    if (now.difference(_lastHoverRefresh) >=
+                        const Duration(milliseconds: 500)) {
+                      _lastHoverRefresh = now;
+                      _startHideControlsTimer();
+                    }
+                  }
                 },
                 child: GestureDetector(
                   onTap: () {
@@ -1299,6 +1347,11 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
                         Positioned.fill(
                           child: IgnorePointer(child: _buildLoadingWidget()),
                         ),
+                      if (_vrView.isActive &&
+                          !_isAndroidPip &&
+                          widget.showControls &&
+                          _showControls)
+                        _buildVrHud(),
                       if (!_isAndroidPip &&
                           widget.showControls &&
                           _showControls)
@@ -1312,20 +1365,20 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
           );
   }
 
-  // Tránh clip tròn trên desktop để giảm jank; cô lập bề mặt video bằng RepaintBoundary
+  // Tránh clip tròn trên desktop để giảm jank; _buildVideoWidget đã cô lập bằng RepaintBoundary.
   Widget _buildPrimaryVideoSurface() {
     final isDesktop =
         Platform.isWindows || Platform.isLinux || Platform.isMacOS;
     final surface = _buildVideoWidget();
     if (isDesktop) {
       // No rounded corners on desktop to prevent expensive saveLayer while playing
-      return RepaintBoundary(child: surface);
+      return surface;
     }
     return ClipRRect(
       borderRadius: _isFullScreen
           ? BorderRadius.zero
           : BorderRadius.circular(16.0),
-      child: RepaintBoundary(child: surface),
+      child: surface,
     );
   }
 
@@ -1388,6 +1441,11 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
           ),
           if (_isLoading)
             Positioned.fill(child: IgnorePointer(child: _buildLoadingWidget())),
+          if (_vrView.isActive &&
+              !_isAndroidPip &&
+              widget.showControls &&
+              _showControls)
+            _buildVrHud(),
           if (widget.showControls && _showControls) _buildCustomControls(),
           if (widget.smbMrl != null && !_isAndroidPip && !_suspendVideoSurface)
             if (_player case final player?)
@@ -1408,23 +1466,176 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
     );
   }
 
+  @override
+  void _setVrView(VrViewState next) {
+    if (!mounted) return;
+    final modeChanged = next.mode != _vrView.mode;
+    setState(() => _vrView = next);
+    final player = _player;
+    if (player != null) {
+      unawaited(_vrShader.apply(player, next));
+    }
+    if (modeChanged) {
+      _scheduleOutputSizeSync(immediate: true);
+    }
+  }
+
+  void _scheduleOutputSizeSync({bool immediate = false}) {
+    _outputSizeTimer?.cancel();
+    void run() {
+      if (!mounted) return;
+      final player = _player;
+      if (player == null) return;
+      final videoW = player.state.width ?? 0;
+      final videoH = player.state.height ?? 0;
+      if (videoW <= 0 || videoH <= 0) return;
+      if (_lastViewportSize.width <= 0 || _lastViewportSize.height <= 0) return;
+
+      if (!player.isLargeVideo && !_vrView.isActive) {
+        unawaited(player.setOutputSize(width: null, height: null));
+        return;
+      }
+      final capped = PlaybackPlayer.computeCappedOutputSize(
+        videoWidth: videoW,
+        videoHeight: videoH,
+        viewportWidth: _lastViewportSize.width,
+        viewportHeight: _lastViewportSize.height,
+        devicePixelRatio: _lastViewportDpr,
+        forceViewportSize: _vrView.isActive,
+      );
+      unawaited(
+        player.setOutputSize(width: capped?.width, height: capped?.height),
+      );
+    }
+
+    if (immediate) {
+      run();
+    } else {
+      _outputSizeTimer = Timer(const Duration(milliseconds: 120), run);
+    }
+  }
+
+  void _onVrPanUpdate(DragUpdateDetails details) {
+    if (!_vrView.isSpherical) return;
+    final sensitivity = (_vrView.fovDeg / 95.0) * 0.22;
+    _setVrView(
+      _vrView.copyWith(
+        yawDeg: _vrView.yawDeg - details.delta.dx * sensitivity,
+        pitchDeg: _vrView.pitchDeg + details.delta.dy * sensitivity,
+      ),
+    );
+  }
+
+  Widget _buildVrHud() {
+    return PositionedDirectional(
+      top: 12,
+      start: 12,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.72),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.white24),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                PhosphorIconsLight.goggles,
+                color: Colors.lightBlueAccent,
+                size: 16,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                _vrView.isSpherical
+                    ? '${_vrModeLabel(context, _vrView.mode)} · ${_vrView.fovDeg.round()}°'
+                    : _vrModeLabel(context, _vrView.mode),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              if (_vrView.isSpherical) ...[
+                const SizedBox(width: 4),
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 28,
+                    minHeight: 28,
+                  ),
+                  tooltip: context.tr.vpVrResetView,
+                  icon: const Icon(
+                    PhosphorIconsLight.arrowsCounterClockwise,
+                    color: Colors.white70,
+                    size: 15,
+                  ),
+                  onPressed: () => _setVrView(_vrView.resetView()),
+                ),
+              ],
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                tooltip: context.tr.vpOff,
+                icon: const Icon(
+                  PhosphorIconsLight.x,
+                  color: Colors.white70,
+                  size: 15,
+                ),
+                onPressed: () => _setVrView(const VrViewState()),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildVideoWidget() {
-    final boxFit = VideoPlayerUtils.getBoxFitFromString(_videoScaleMode);
+    final boxFit = _vrView.isActive
+        ? BoxFit.cover
+        : VideoPlayerUtils.getBoxFitFromString(_videoScaleMode);
 
     // Check for media_kit player first (works on all platforms)
     if (_videoController != null) {
-      return RepaintBoundary(
-        key: _screenshotKey,
-        child: Visibility(
-          visible: !_suspendVideoSurface,
-          maintainState: true,
-          child: PlaybackVideo(
-            controller: _videoController!,
-
-            fill: Colors.black,
-            fit: boxFit,
-          ),
-        ),
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          final dpr = MediaQuery.devicePixelRatioOf(context);
+          final nextSize = constraints.biggest;
+          if (nextSize.isFinite &&
+              nextSize.width > 0 &&
+              nextSize.height > 0 &&
+              ((nextSize.width - _lastViewportSize.width).abs() > 8 ||
+                  (nextSize.height - _lastViewportSize.height).abs() > 8 ||
+                  (dpr - _lastViewportDpr).abs() > 0.05)) {
+            _lastViewportSize = nextSize;
+            _lastViewportDpr = dpr;
+            _scheduleOutputSizeSync();
+          }
+          Widget videoSurface = RepaintBoundary(
+            key: _screenshotKey,
+            child: Visibility(
+              visible: !_suspendVideoSurface,
+              maintainState: true,
+              child: PlaybackVideo(
+                controller: _videoController!,
+                fill: Colors.black,
+                fit: boxFit,
+              ),
+            ),
+          );
+          if (_vrView.isSpherical) {
+            videoSurface = GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onPanUpdate: _onVrPanUpdate,
+              child: videoSurface,
+            );
+          }
+          return videoSurface;
+        },
       );
     } else {
       return _buildLoadingWidget();
@@ -1765,6 +1976,16 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
       // F for fullscreen
       else if (event.logicalKey == LogicalKeyboardKey.keyF) {
         _toggleFullScreen();
+        return KeyEventResult.handled;
+      }
+      // R to reset VR camera view
+      else if (event.logicalKey == LogicalKeyboardKey.keyR &&
+          _vrView.isSpherical) {
+        _setVrView(_vrView.resetView());
+        _flashOsd(
+          icon: PhosphorIconsLight.goggles,
+          label: context.tr.vpVrResetView,
+        );
         return KeyEventResult.handled;
       }
       // Escape to exit fullscreen
@@ -2145,8 +2366,22 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
       return;
     }
     GestureBinding.instance.pointerSignalResolver.register(event, (_) {
-      // Wheel up = louder / forward.
+      // Wheel up = zoom in (narrower FOV) / louder / forward.
       final up = dy < 0;
+      if (_vrView.isSpherical) {
+        final next = _vrView.copyWith(
+          fovDeg: _vrView.fovDeg + (up ? -5.0 : 5.0),
+        );
+        _setVrView(next);
+        _flashOsd(
+          icon: PhosphorIconsLight.goggles,
+          label: 'FOV ${next.fovDeg.round()}°',
+          progress:
+              (next.fovDeg - VrViewState.minFovDeg) /
+              (VrViewState.maxFovDeg - VrViewState.minFovDeg),
+        );
+        return;
+      }
       switch (_videoWheelAction) {
         case VideoWheelAction.volume:
           if (up) {
@@ -2446,9 +2681,13 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
     // A progressive fileStream cannot be opened by a second decoder.
     final source = widget.file?.path ?? widget.streamingUrl ?? widget.smbMrl;
     if (source == null) return null;
+    final state = _player?.state;
+    final width = state?.width ?? 0;
+    final height = state?.height ?? 0;
     return _seekHoverFrames ??= VideoSeekPreviewController(
       source: source,
       enableHardwareAcceleration: _hardwareAcceleration,
+      videoAspectRatio: width > 0 && height > 0 ? width / height : null,
     );
   }
 
@@ -2741,7 +2980,8 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
         models: services.models,
         downloads: services.downloads,
         preferences: services.preferences,
-        onManageModels: showLocalModelManagerDialog,
+        onManageModels: (context) =>
+            showLocalModelManagerDialog(context, subtitleOnly: true),
       ),
     );
   }
@@ -3399,6 +3639,9 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
       onSpeed: _showPlaybackSpeedDialog,
       onPip: _togglePictureInPicture,
       onFilters: _showVideoFiltersDialog,
+      onVrMode: widget.fileType == FileCategory.video
+          ? _showVrModeDialog
+          : null,
       onSleepTimer: _showSleepTimerDialog,
       onSettings: _showSettingsDialog,
       hasSubtitles:
@@ -3408,6 +3651,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
           Platform.isLinux,
       playbackSpeed: _playbackSpeed,
       isPictureInPicture: _isPictureInPicture,
+      isVrModeActive: _vrView.isActive,
       sleepDuration: _sleepDuration,
     );
   }
@@ -3781,15 +4025,14 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
   }
 
   /// [exact] previews land on the target frame. Keyframe previews are cheaper,
-  /// but land on the keyframe before the target, which can be seconds back:
-  /// playback then shows those older frames until the final exact seek jumps
-  /// forward. Only long fast-seek steps, which clear a GOP anyway, use them.
-  void _seekDuringDrag(double value, {bool exact = true}) {
+  /// and on 4K/8K streams avoid decoding dozens of giant frames per drag tick;
+  /// releasing the slider still lands on the exact target in [_finishSeekDrag].
+  void _seekDuringDrag(double value, {bool? exact}) {
     final target = Duration(milliseconds: value.toInt());
     setState(() => _seekDragPosition = target);
 
     _pendingSeekPreview = target;
-    _pendingSeekPreviewExact = exact;
+    _pendingSeekPreviewExact = exact ?? !(_player?.isLargeVideo ?? false);
     if (_seekPreviewTimer == null) _flushSeekPreview();
   }
 

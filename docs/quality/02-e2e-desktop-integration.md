@@ -161,6 +161,20 @@ startup only when those are the subject of the investigation (`--full-screenshot
 
 ## CI and release
 
+For file-browser interaction tests, use `scrollableForE2EItem` from
+`integration_test/e2e_wait.dart` to select the viewport containing the fixture
+item. `find.byType(Scrollable).first` can select the sidebar or breadcrumb
+instead. Bring a listed fixture into view before clicking and assert it is
+hit-testable; do not suppress a missed-tap warning to make the test pass.
+
+If a JSON report contains `testDone` with `result: error` but no structured
+`error` event, the digest labels the missing detail explicitly. Its last printed
+warning is context, not proof of the root cause. Inspect the matching run's
+diagnostics artifact and last phase marker. A root teardown failure invalidates
+the combined run, even when earlier suites have passing assertions; those
+results must not seed trusted pass caches. Suites failing immediately after a
+stalled suite are not, by themselves, evidence of separate UI regressions.
+
 CI selects suites from changed paths with ordered rules. `main` and explicit
 full-run requests select the complete gate; other branches select affected
 suites. Existing trusted pass records only apply to the same source fingerprint,

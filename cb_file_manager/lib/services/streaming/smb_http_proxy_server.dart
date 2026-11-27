@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:io';
 
 import 'package:flutter/services.dart';
@@ -152,25 +153,45 @@ class SmbHttpProxyServer {
         return Response(statusCode, headers: headers);
       }
 
-      // Pull one chunk at a time so HTTP backpressure bounds memory, and
-      // cancellation during a seek closes the previous SMB reader.
+      // Pipeline a small number of SMB reads ahead of HTTP delivery so high-
+      // bitrate 4K/8K VR streams are not bottlenecked by one round-trip per
+      // chunk, while HTTP backpressure still bounds memory (~3-4 MB max).
       Stream<List<int>> body() async* {
-        var offset = start;
+        const prefetchDepth = 3;
+        var nextOffset = start;
+        final pending = Queue<Future<List<int>?>>();
+
+        void enqueueNext() {
+          if (nextOffset > end) return;
+          // Deliver the first block promptly, then amortize channel calls.
+          final chunkSize = nativeReader != null && nextOffset != start
+              ? 1024 * 1024
+              : 256 * 1024;
+          final remaining = end - nextOffset + 1;
+          final count = remaining.clamp(0, chunkSize);
+          final offset = nextOffset;
+          nextOffset += count;
+          pending.add(read(offset, count));
+        }
+
         try {
-          while (offset <= end) {
-            // Deliver the first block promptly, then amortize channel calls.
-            final chunkSize = nativeReader != null && offset != start
-                ? 1024 * 1024
-                : 256 * 1024;
-            final remaining = end - offset + 1;
-            final count = remaining.clamp(0, chunkSize);
-            final chunk = await read(offset, count);
+          // Send the first small block immediately, then fill the pipeline.
+          enqueueNext();
+          while (pending.isNotEmpty) {
+            while (pending.length < prefetchDepth && nextOffset <= end) {
+              enqueueNext();
+            }
+            final chunk = await pending.removeFirst();
             if (chunk == null || chunk.isEmpty) break;
             source.bytesRead += chunk.length;
             yield chunk;
-            offset += chunk.length;
           }
         } finally {
+          // Drain/ignore any in-flight prefetched reads before closing.
+          for (final future in pending) {
+            unawaited(future.then((_) {}, onError: (_) {}));
+          }
+          pending.clear();
           await close();
         }
       }

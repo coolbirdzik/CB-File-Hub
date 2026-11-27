@@ -114,6 +114,29 @@ class SubtitleBatchStore {
     )).isNotEmpty;
   }
 
+  /// Only the latest owner of a shared output may remove it with its video.
+  Future<List<SubtitleGeneratedMetadata>> generatedForVideo(String path) async {
+    final db = await _generatedDatabase();
+    final rows = await db.rawQuery(
+      '''
+      SELECT g.metadata FROM $_generated g
+      WHERE g.path = ? AND g.output_path IS NOT NULL AND g.rowid = (
+        SELECT latest.rowid FROM $_generated latest
+        WHERE latest.output_path = g.output_path
+        ORDER BY latest.generated_at DESC, latest.rowid DESC LIMIT 1
+      )''',
+      [path],
+    );
+    return [
+      for (final row in rows)
+        SubtitleGeneratedMetadata.fromJson(
+          Map<String, Object?>.from(
+            jsonDecode(row['metadata'] as String) as Map,
+          ),
+        ),
+    ];
+  }
+
   /// Reset all completed twins because they share the same generated result.
   Future<void> resetCleanedGeneration(SubtitleBatchJob job) async {
     final db = await _generatedDatabase();

@@ -6043,6 +6043,14 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get vpVideoFilters => 'Bộ lọc video';
   @override
+  String get vpVrMode => 'Chế độ VR';
+  @override
+  String get vpVrModeActive => 'Chế độ VR (Đang bật)';
+  @override
+  String get vpVrResetView => 'Đặt lại góc nhìn VR';
+  @override
+  String get vpVrDragHint => 'Kéo để xoay góc nhìn · Cuộn chuột để chỉnh FOV';
+  @override
   String get vpSleepTimer => 'Hẹn giờ tắt';
   @override
   String get vpSleepTimerActive => 'Hẹn giờ tắt (Đang bật)';

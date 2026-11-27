@@ -5648,6 +5648,14 @@ class ChineseLocalizations implements AppLocalizations {
   @override
   String get vpVideoFilters => '视频滤镜';
   @override
+  String get vpVrMode => 'VR 模式';
+  @override
+  String get vpVrModeActive => 'VR 模式（已启用）';
+  @override
+  String get vpVrResetView => '重置 VR 视角';
+  @override
+  String get vpVrDragHint => '拖动旋转视角 · 滚轮缩放视场角';
+  @override
   String get vpSleepTimer => '睡眠定时器';
   @override
   String get vpSleepTimerActive => '睡眠定时器（已启用）';

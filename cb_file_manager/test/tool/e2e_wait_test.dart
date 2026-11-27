@@ -4,6 +4,50 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../integration_test/e2e_wait.dart';
 
 void main() {
+  testWidgets('item scrolling chooses its viewport, not the first sidebar', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Row(
+            children: [
+              SizedBox(
+                width: 100,
+                child: ListView(children: const [Text('sidebar')]),
+              ),
+              Expanded(
+                child: SingleChildScrollView(
+                  key: const ValueKey('files'),
+                  child: const Column(
+                    children: [SizedBox(height: 1200), Text('file_0.txt')],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    final file = find.text('file_0.txt');
+    final viewport = scrollableForE2EItem(file);
+    final expected = find.descendant(
+      of: find.byKey(const ValueKey('files')),
+      matching: find.byType(Scrollable),
+    );
+    expect(viewport.evaluate().single, same(expected.evaluate().single));
+    expect(
+      viewport.evaluate().single,
+      isNot(same(find.byType(Scrollable).evaluate().first)),
+    );
+    await tester.ensureVisible(file);
+    await settleE2EUi(tester);
+    expect(file.hitTestable(), findsOneWidget);
+    await tester.drag(viewport, const Offset(0, 200));
+    await settleE2EUi(tester);
+    expect(viewport, findsOneWidget);
+  });
+
   testWidgets(
     'idle UI settles with a short frame instead of a seconds-long wait',
     (tester) async {

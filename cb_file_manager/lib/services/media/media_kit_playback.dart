@@ -36,7 +36,7 @@ class PlaybackPlayer {
   PlaybackPlayer({
     this.configuration = const PlaybackConfiguration(),
     mk.Player? player,
-  }) : _player = player ?? _createPlayer() {
+  }) : _player = player ?? _createPlayer(configuration) {
     _durationSubscription = stream.duration.listen((duration) {
       if (duration > Duration.zero && _pendingSeek != null) {
         final position = _pendingSeek!;
@@ -45,9 +45,12 @@ class PlaybackPlayer {
       }
     });
     _sizeSubscriptions = [
-      stream.width.listen((_) => _applyLargeVideoDecoder()),
-      stream.height.listen((_) => _applyLargeVideoDecoder()),
+      stream.width.listen((_) => _onVideoDimensionsChanged()),
+      stream.height.listen((_) => _onVideoDimensionsChanged()),
     ];
+    _videoParamsSubscription = stream.videoParams.listen((_) {
+      _reapplyDesiredOutputSize();
+    });
     // Subscribed before any UI listener, so [fellBackToSoftware] is already
     // set when theirs runs for the same error.
     _errorSubscription = stream.error.listen(_onError);
@@ -88,13 +91,63 @@ class PlaybackPlayer {
       error.toLowerCase().contains('error decoding audio');
 
   /// Long edge from which [PlaybackVideoConfiguration.gpuDecodeLargeVideos]
-  /// switches to hardware decoding.
+  /// switches to hardware decoding and fast 4K/8K render tuning activates.
   static const largeVideoLongEdge = 3840;
 
-  static mk.Player _createPlayer() {
+  /// Computes a GPU-friendly output texture size capped to the display viewport
+  /// so 4K/8K videos do not allocate giant DXGI/EGL surfaces when rendered in a
+  /// smaller window. Returns null if no downscaling is needed.
+  static ({int width, int height})? computeCappedOutputSize({
+    required int videoWidth,
+    required int videoHeight,
+    required double viewportWidth,
+    required double viewportHeight,
+    required double devicePixelRatio,
+    int maxEdge = 3840,
+    bool forceViewportSize = false,
+  }) {
+    if (videoWidth <= 0 || videoHeight <= 0) return null;
+    final dpr = devicePixelRatio.clamp(1.0, 4.0);
+    final rawW = (viewportWidth * dpr).round();
+    final rawH = (viewportHeight * dpr).round();
+    if (rawW <= 0 || rawH <= 0) return null;
+
+    int even(int v) => (v < 2 ? 2 : (v & ~1));
+
+    if (forceViewportSize) {
+      // VR projection renders a fresh viewport at display aspect ratio.
+      final scale = (rawW > maxEdge || rawH > maxEdge)
+          ? maxEdge / (rawW > rawH ? rawW : rawH)
+          : 1.0;
+      return (
+        width: even((rawW * scale).round()),
+        height: even((rawH * scale).round()),
+      );
+    }
+
+    final capW = rawW < maxEdge ? rawW : maxEdge;
+    final capH = rawH < maxEdge ? rawH : maxEdge;
+    if (videoWidth <= capW && videoHeight <= capH) return null;
+
+    final scaleW = capW / videoWidth;
+    final scaleH = capH / videoHeight;
+    final scale = scaleW < scaleH ? scaleW : scaleH;
+    return (
+      width: even((videoWidth * scale).round()),
+      height: even((videoHeight * scale).round()),
+    );
+  }
+
+  static mk.Player _createPlayer(PlaybackConfiguration configuration) {
     mk.MediaKit.ensureInitialized();
+    final bytes = configuration.framePreview
+        ? 8 * 1024 * 1024
+        : configuration.bufferSizeMb.clamp(8, 512) * 1024 * 1024;
     return mk.Player(
-      configuration: const mk.PlayerConfiguration(title: 'CB File Hub'),
+      configuration: mk.PlayerConfiguration(
+        title: 'CB File Hub',
+        bufferSize: bytes,
+      ),
     );
   }
 
@@ -151,10 +204,127 @@ class PlaybackPlayer {
 
   late final StreamSubscription<Duration> _durationSubscription;
   late final List<StreamSubscription<int?>> _sizeSubscriptions;
+  late final StreamSubscription<mk.VideoParams> _videoParamsSubscription;
   PlaybackVideoConfiguration? _videoConfiguration;
   bool _largeVideoHwdec = false;
+  bool _largeVideoTuned = false;
+  int? _desiredOutputWidth;
+  int? _desiredOutputHeight;
+  int? _lastOutputWidth;
+  int? _lastOutputHeight;
   late final StreamSubscription<String> _errorSubscription;
   bool _softwareFallback = false;
+
+  /// Heuristic for filenames that are clearly 4K/8K so Windows `auto` mode
+  /// starts on GPU decoding from frame 0 instead of probing on CPU first.
+  static bool isLikelyLargeVideoSource(String source) => RegExp(
+    r'(?:^|[\s._\-\[\(])(8k|4k|4320p|2160p|uhd)(?:$|[\s._\-\]\)])',
+    caseSensitive: false,
+  ).hasMatch(source);
+
+  /// True when the active video's long edge is 4K (3840px) or larger.
+  bool get isLargeVideo {
+    final width = state.width ?? 0;
+    final height = state.height ?? 0;
+    return (width > height ? width : height) >= largeVideoLongEdge;
+  }
+
+  /// Sets a raw libmpv property safely if the native player is ready.
+  Future<void> setNativeProperty(String name, String value) async {
+    if (_player.platform case final mk.NativePlayer native) {
+      try {
+        if (!await _nativeReady(native) || _disposal != null) return;
+        await native.setProperty(name, value, waitForInitialization: false);
+      } catch (e) {
+        if (_disposal == null) {
+          debugPrint('Could not set mpv property $name=$value: $e');
+        }
+      }
+    }
+  }
+
+  /// Updates the demuxer buffer and network cache settings on the live player.
+  Future<void> applyBufferSettings({
+    required int bufferSizeMb,
+    required Duration networkCaching,
+  }) async {
+    if (_player.platform case final mk.NativePlayer native) {
+      try {
+        if (!await _nativeReady(native) || _disposal != null) return;
+        final clampedMb = bufferSizeMb.clamp(8, 512);
+        final maxBytes = clampedMb * 1024 * 1024;
+        final backBytes = (clampedMb ~/ 2).clamp(4, 256) * 1024 * 1024;
+        final cacheSecs = (networkCaching.inMilliseconds / 1000)
+            .clamp(1.0, 120.0)
+            .toStringAsFixed(1);
+        await native.setProperty(
+          'demuxer-max-bytes',
+          maxBytes.toString(),
+          waitForInitialization: false,
+        );
+        if (_disposal != null) return;
+        await native.setProperty(
+          'demuxer-max-back-bytes',
+          backBytes.toString(),
+          waitForInitialization: false,
+        );
+        if (_disposal != null) return;
+        await native.setProperty(
+          'cache-secs',
+          cacheSecs,
+          waitForInitialization: false,
+        );
+        if (_disposal != null) return;
+        await native.setProperty(
+          'demuxer-readahead-secs',
+          cacheSecs,
+          waitForInitialization: false,
+        );
+      } catch (e) {
+        if (_disposal == null) {
+          debugPrint('Could not update buffer settings: $e');
+        }
+      }
+    }
+  }
+
+  /// Resizes the native video output texture (e.g. capping 8K video to the
+  /// viewport pixel size) while avoiding redundant texture reallocations.
+  Future<void> setOutputSize({int? width, int? height}) async {
+    _desiredOutputWidth = width;
+    _desiredOutputHeight = height;
+    final controller = _videoController;
+    if (controller == null || _disposal != null) return;
+    if (_lastOutputWidth == width && _lastOutputHeight == height) return;
+    _lastOutputWidth = width;
+    _lastOutputHeight = height;
+    try {
+      await controller.setSize(width: width, height: height);
+    } catch (e) {
+      if (_disposal == null) {
+        debugPrint('Could not resize video output: $e');
+      }
+    }
+  }
+
+  /// media_kit_video's NativeVideoController listens to `videoParams` and calls
+  /// `VideoOutputManager.SetSize(videoWidth, videoHeight)`, which would reset a
+  /// capped 8K texture back to 8192x4096. Re-apply our desired size right after.
+  void _reapplyDesiredOutputSize() {
+    final w = _desiredOutputWidth;
+    final h = _desiredOutputHeight;
+    final controller = _videoController;
+    if (w == null || h == null || controller == null || _disposal != null) {
+      return;
+    }
+    Future<void>.delayed(const Duration(milliseconds: 50), () async {
+      if (_disposal != null) return;
+      if (_desiredOutputWidth != w || _desiredOutputHeight != h) return;
+      try {
+        await controller.setSize(width: w, height: h);
+      } catch (_) {}
+    });
+  }
 
   mk.Player get controller => _player;
   mk.PlayerState get state => _player.state;
@@ -276,28 +446,74 @@ class PlaybackPlayer {
       }
       if (_disposal != null) return;
       if (_player.platform case final mk.NativePlayer native) {
-        // The previous file may have been large; probe the next one with the
-        // configured decoder until its size is known.
-        if (_largeVideoHwdec) {
-          _largeVideoHwdec = false;
+        // Pre-enable GPU decoding from frame 0 for sources that are clearly
+        // 4K/8K (e.g. `*_8K.mp4`); otherwise reset to the configured decoder
+        // until the stream dimensions are known.
+        final preEnableGpu =
+            (_videoConfiguration?.gpuDecodeLargeVideos ?? false) &&
+            !configuration.framePreview &&
+            isLikelyLargeVideoSource(media.uri);
+        if (_largeVideoHwdec != preEnableGpu) {
+          _largeVideoHwdec = preEnableGpu;
           await _applyHwdec();
+        }
+        if (_largeVideoTuned) {
+          _largeVideoTuned = false;
+          await _applyLargeVideoRenderTuning(false);
         }
         if (!await _nativeReady(native) || _disposal != null) return;
         await native.setProperty(
+          'hwdec-codecs',
+          'all',
+          waitForInitialization: false,
+        );
+        if (_disposal != null) return;
+        await native.setProperty(
+          'vd-lavc-threads',
+          '0',
+          waitForInitialization: false,
+        );
+        if (_disposal != null) return;
+        final isNetwork =
+            uri.scheme == 'smb' ||
+            uri.scheme == 'http' ||
+            uri.scheme == 'https';
+        final effectiveCache =
+            isNetwork &&
+                configuration.networkCaching < const Duration(seconds: 5)
+            ? const Duration(seconds: 5)
+            : configuration.networkCaching;
+        await native.setProperty(
           'cache-secs',
-          (configuration.networkCaching.inMilliseconds / 1000).toString(),
+          (effectiveCache.inMilliseconds / 1000).toString(),
+          waitForInitialization: false,
+        );
+        if (_disposal != null) return;
+        await native.setProperty(
+          'demuxer-readahead-secs',
+          (effectiveCache.inMilliseconds / 1000).toString(),
           waitForInitialization: false,
         );
         if (configuration.framePreview) {
-          // Hover previews need a frame quickly, not sound or exact frames.
-          if (_disposal != null) return;
-          await native.setProperty('aid', 'no', waitForInitialization: false);
-          if (_disposal != null) return;
-          await native.setProperty(
-            'hr-seek',
-            'no',
-            waitForInitialization: false,
-          );
+          // Hover previews need a small frame quickly, not sound, exact seeks,
+          // or full-quality deblocking/scaling.
+          for (final prop in const {
+            'aid': 'no',
+            'hr-seek': 'no',
+            'vd-lavc-fast': 'yes',
+            'vd-lavc-skiploopfilter': 'all',
+            'vd-lavc-skipframe': 'nonref',
+            'scale': 'bilinear',
+            'dscale': 'bilinear',
+            'dither-depth': 'no',
+          }.entries) {
+            if (_disposal != null) return;
+            await native.setProperty(
+              prop.key,
+              prop.value,
+              waitForInitialization: false,
+            );
+          }
         }
       }
       if (_disposal != null) return;
@@ -380,6 +596,7 @@ class PlaybackPlayer {
     try {
       await _durationSubscription.cancel();
       await _errorSubscription.cancel();
+      await _videoParamsSubscription.cancel();
       for (final subscription in _sizeSubscriptions) {
         await subscription.cancel();
       }
@@ -402,6 +619,8 @@ class PlaybackPlayer {
   video.VideoController _configureVideo(PlaybackVideoConfiguration config) {
     _videoConfiguration = config;
     if (_videoController == null) {
+      _lastOutputWidth = config.outputWidth;
+      _lastOutputHeight = config.outputHeight;
       _videoController = video.VideoController(
         _player,
         configuration: video.VideoControllerConfiguration(
@@ -410,6 +629,8 @@ class PlaybackPlayer {
           enableHardwareAcceleration:
               config.enableHardwareAcceleration || config.gpuDecodeLargeVideos,
           hwdec: _hwdec,
+          width: config.outputWidth,
+          height: config.outputHeight,
         ),
       );
     } else {
@@ -427,7 +648,15 @@ class PlaybackPlayer {
     final gpu =
         config.enableHardwareAcceleration ||
         (config.gpuDecodeLargeVideos && _largeVideoHwdec);
-    return gpu ? 'auto-safe' : 'no';
+    if (!gpu) return 'no';
+    // On Windows with media_kit's ANGLE OpenGL backend, `auto-safe` only tries
+    // zero-copy decoders and silently falls back to CPU on 8K 10-bit HEVC when
+    // D3D11-EGL interop is unavailable. Include copy-back decoders so NVDEC /
+    // D3D11VA hardware ASICs still decode 8K60 instead of pegging the CPU.
+    if (!kIsWeb && Platform.isWindows) {
+      return 'd3d11va,d3d11va-copy,nvdec-copy,auto-copy';
+    }
+    return 'auto-safe';
   }
 
   Future<void> _applyHwdec() async {
@@ -443,6 +672,15 @@ class PlaybackPlayer {
     }
   }
 
+  void _onVideoDimensionsChanged() {
+    _applyLargeVideoDecoder();
+    final large = isLargeVideo;
+    if (large != _largeVideoTuned && !configuration.framePreview) {
+      _largeVideoTuned = large;
+      unawaited(_applyLargeVideoRenderTuning(large));
+    }
+  }
+
   /// 4K software decoding needs hundreds of ms per precise seek when keyframes
   /// are sparse; the GPU decoder lands on the same frame several times faster.
   void _applyLargeVideoDecoder() {
@@ -455,6 +693,48 @@ class PlaybackPlayer {
     if (large == _largeVideoHwdec) return;
     _largeVideoHwdec = large;
     if (!config.enableHardwareAcceleration) unawaited(_applyHwdec());
+  }
+
+  /// Applies lightweight GPU scaling and larger demuxer cache for 4K/8K video
+  /// so ANGLE/OpenGL does not choke on high-bitrate 60fps streams.
+  Future<void> _applyLargeVideoRenderTuning(bool large) async {
+    if (_player.platform case final mk.NativePlayer native) {
+      try {
+        if (!await _nativeReady(native) || _disposal != null) return;
+        final props = large
+            ? <String, String>{
+                'scale': 'bilinear',
+                'dscale': 'bilinear',
+                'cscale': 'bilinear',
+                'dither-depth': 'no',
+                'correct-downscaling': 'no',
+                'linear-downscaling': 'no',
+                'sigmoid-upscaling': 'no',
+                'framedrop': 'vo',
+                'demuxer-max-bytes': '${160 * 1024 * 1024}',
+                'demuxer-max-back-bytes': '${64 * 1024 * 1024}',
+              }
+            : <String, String>{
+                'scale': 'spline36',
+                'dscale': 'mitchell',
+                'cscale': 'bilinear',
+                'dither-depth': 'auto',
+                'framedrop': 'vo',
+              };
+        for (final entry in props.entries) {
+          if (_disposal != null) return;
+          await native.setProperty(
+            entry.key,
+            entry.value,
+            waitForInitialization: false,
+          );
+        }
+      } catch (e) {
+        if (_disposal == null) {
+          debugPrint('Could not apply 4K/8K render tuning: $e');
+        }
+      }
+    }
   }
 
   /// Recover a failing GPU decoder on the CPU without reopening the media.
@@ -473,12 +753,16 @@ class PlaybackConfiguration {
     this.networkCaching = const Duration(seconds: 1),
     this.looping = false,
     this.framePreview = false,
+    this.bufferSizeMb = 64,
   });
   final Duration networkCaching;
   final bool looping;
 
   /// Silent decoder that seeks to keyframes, for seek bar thumbnails.
   final bool framePreview;
+
+  /// Demuxer cache size in megabytes for libmpv.
+  final int bufferSizeMb;
 }
 
 class PlaybackMedia {
@@ -490,11 +774,18 @@ class PlaybackVideoConfiguration {
   const PlaybackVideoConfiguration({
     this.enableHardwareAcceleration = false,
     this.gpuDecodeLargeVideos = false,
+    this.outputWidth,
+    this.outputHeight,
   });
   final bool enableHardwareAcceleration;
 
   /// Keep software decoding, but use the GPU decoder for 4K and larger.
   final bool gpuDecodeLargeVideos;
+
+  /// Optional fixed texture dimensions (e.g. small hover previews or viewport-
+  /// capped 4K/8K output).
+  final int? outputWidth;
+  final int? outputHeight;
 
   /// Maps the persisted `video_decoder` choice: 'auto', 'hardware' or
   /// 'software'.

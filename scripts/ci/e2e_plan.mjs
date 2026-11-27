@@ -87,6 +87,10 @@ export function failureDigest(content, output = '', { maxPrints = 30, tail = 15,
     const failed = test.errors.length > 0 || ['error', 'failure'].includes(test.result);
     if (!failed && test.done) continue;
     const out = [`✖ ${test.name}${test.done ? '' : '  (never finished — hung or killed)'}`];
+    if (failed && test.errors.length === 0) {
+      out.push(`  Runner reported result=${test.result} without structured error details.`);
+      out.push('  The last output below is context, not the failure reason. Inspect the full diagnostics log.');
+    }
     for (const item of test.errors) {
       out.push(clip(String(item.error), 2000));
       out.push(...String(item.stackTrace ?? '').split(/\r?\n/).filter(Boolean).slice(0, maxStack).map(l => `    ${l}`));

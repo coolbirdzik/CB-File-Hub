@@ -1,5 +1,6 @@
-import 'package:cb_file_manager/design_system/primitives/cb_popover_transition.dart';
+import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/services/media/subtitle_progress.dart';
@@ -227,37 +228,48 @@ class SubtitleControlButton extends StatelessWidget {
         }
       },
       itemBuilder: (context) => [
-        PopupMenuItem<_SubtitleAction>(
-          enabled: false,
-          height: 0,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Text(
-              detail,
-              key: const ValueKey('ai-subtitle-status'),
-              style: const TextStyle(fontSize: 12),
+        _SubtitleStatusCard(
+          progress: progress,
+          title: title,
+          percentage: percentage,
+          color: color,
+          failed: failed,
+          model: model,
+          languages: languages,
+          cacheLabel: cacheLabel,
+          // Kept as text: the timeline cannot show where processing stands
+          // for a screen reader.
+          semanticsDetail: detail,
+          actions: [
+            (
+              _SubtitleAction.settings,
+              PhosphorIconsLight.gearSix,
+              l.aiSubtitles,
+              'ai-subtitle-settings',
             ),
-          ),
+            if (failed)
+              (
+                _SubtitleAction.retry,
+                PhosphorIconsLight.arrowClockwise,
+                l.retry,
+                'ai-subtitle-retry',
+              ),
+            if (onExport != null && progress.completed.isNotEmpty)
+              (
+                _SubtitleAction.export,
+                PhosphorIconsLight.downloadSimple,
+                l.aiSubtitleExportSrt,
+                'ai-subtitle-export',
+              ),
+            if (onRegenerate != null)
+              (
+                _SubtitleAction.regenerate,
+                PhosphorIconsLight.arrowsClockwise,
+                l.aiSubtitleRegenerate,
+                'ai-subtitle-regenerate',
+              ),
+          ],
         ),
-        const PopupMenuDivider(),
-        PopupMenuItem(
-          value: _SubtitleAction.settings,
-          child: Text(l.aiSubtitles),
-        ),
-        if (failed)
-          PopupMenuItem(value: _SubtitleAction.retry, child: Text(l.retry)),
-        if (onExport != null && progress.completed.isNotEmpty)
-          PopupMenuItem(
-            key: const ValueKey('ai-subtitle-export'),
-            value: _SubtitleAction.export,
-            child: Text(l.aiSubtitleExportSrt),
-          ),
-        if (onRegenerate != null)
-          PopupMenuItem(
-            key: const ValueKey('ai-subtitle-regenerate'),
-            value: _SubtitleAction.regenerate,
-            child: Text(l.aiSubtitleRegenerate),
-          ),
       ],
       child: Semantics(
         button: true,
@@ -307,6 +319,201 @@ class SubtitleControlButton extends StatelessWidget {
                     ),
                   ),
                 ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+typedef _CardAction = (_SubtitleAction, IconData, String label, String key);
+
+/// The CC popover: status at a glance, details as icon rows, actions as icons.
+/// A custom entry because a disabled [PopupMenuItem] cannot host buttons.
+class _SubtitleStatusCard extends PopupMenuEntry<_SubtitleAction> {
+  final SubtitleProgress progress;
+  final String title;
+  final String? percentage, model, languages;
+  final String cacheLabel, semanticsDetail;
+  final Color color;
+  final bool failed;
+  final List<_CardAction> actions;
+
+  const _SubtitleStatusCard({
+    required this.progress,
+    required this.title,
+    required this.percentage,
+    required this.color,
+    required this.failed,
+    required this.model,
+    required this.languages,
+    required this.cacheLabel,
+    required this.semanticsDetail,
+    required this.actions,
+  });
+
+  @override
+  double get height => 160;
+
+  @override
+  bool represents(_SubtitleAction? value) => false;
+
+  @override
+  State<_SubtitleStatusCard> createState() => _SubtitleStatusCardState();
+}
+
+class _SubtitleStatusCardState extends State<_SubtitleStatusCard> {
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context)!;
+    final colors = context.cbColors;
+    final progress = widget.progress;
+    final muted = CbTypography.bodySm.copyWith(color: colors.textSecondary);
+    final cacheIcon = switch (progress.cacheState) {
+      SubtitleCacheState.failed ||
+      SubtitleCacheState.unavailable => PhosphorIconsLight.warning,
+      SubtitleCacheState.saved ||
+      SubtitleCacheState.reused => PhosphorIconsLight.checkCircle,
+      _ => PhosphorIconsLight.database,
+    };
+    final error = progress.error;
+
+    Widget info(IconData icon, String text, {Color? tint, int lines = 1}) =>
+        Padding(
+          padding: const EdgeInsets.only(top: CbSpacing.xs),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, size: CbSizes.iconSm, color: tint ?? colors.icon),
+              const SizedBox(width: CbSpacing.sm),
+              Expanded(
+                child: Text(
+                  text,
+                  maxLines: lines,
+                  overflow: TextOverflow.ellipsis,
+                  style: tint == null ? muted : muted.copyWith(color: tint),
+                ),
+              ),
+            ],
+          ),
+        );
+
+    return Semantics(
+      container: true,
+      label: widget.semanticsDetail,
+      child: Padding(
+        key: const ValueKey('ai-subtitle-status'),
+        padding: const EdgeInsets.fromLTRB(
+          CbSpacing.md,
+          CbSpacing.xs,
+          CbSpacing.sm,
+          0,
+        ),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 240),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              ExcludeSemantics(
+                child: Row(
+                  children: [
+                    Icon(
+                      widget.failed
+                          ? PhosphorIconsLight.warningCircle
+                          : PhosphorIconsLight.closedCaptioning,
+                      size: CbSizes.iconMd,
+                      color: widget.color,
+                    ),
+                    const SizedBox(width: CbSpacing.sm),
+                    Expanded(
+                      child: Text(
+                        widget.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: CbTypography.label,
+                      ),
+                    ),
+                    if (widget.percentage != null)
+                      Padding(
+                        padding: const EdgeInsetsDirectional.only(
+                          end: CbSpacing.xs,
+                        ),
+                        child: Text(
+                          widget.percentage!,
+                          style: CbTypography.label.copyWith(
+                            color: widget.color,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              if (progress.duration > Duration.zero)
+                Padding(
+                  padding: const EdgeInsets.only(
+                    top: CbSpacing.sm,
+                    right: CbSpacing.xs,
+                  ),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: colors.fill,
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                    child: SizedBox(
+                      height: 4,
+                      child: CustomPaint(
+                        painter: SubtitleTimelinePainter(
+                          progress,
+                          showPosition: false,
+                          showBackground: false,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ExcludeSemantics(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const SizedBox(height: CbSpacing.xs),
+                    if (widget.model != null)
+                      info(PhosphorIconsLight.waveform, widget.model!),
+                    if (widget.languages != null)
+                      info(PhosphorIconsLight.translate, widget.languages!),
+                    info(cacheIcon, widget.cacheLabel),
+                    if (progress.lagging)
+                      info(
+                        PhosphorIconsLight.hourglassMedium,
+                        l.aiSubtitleLag,
+                        tint: colors.status.warning,
+                      ),
+                    if (error != null)
+                      info(
+                        PhosphorIconsLight.warningCircle,
+                        error,
+                        tint: colors.status.danger,
+                        lines: 3,
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: CbSpacing.sm),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                spacing: CbSpacing.xs,
+                children: [
+                  for (final (action, icon, label, key) in widget.actions)
+                    CbButton.icon(
+                      key: ValueKey(key),
+                      icon: icon,
+                      tooltip: label,
+                      variant: CbButtonVariant.subtle,
+                      onPressed: () => Navigator.of(context).pop(action),
+                    ),
+                ],
+              ),
             ],
           ),
         ),

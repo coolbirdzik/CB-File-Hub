@@ -43,6 +43,13 @@ Future<void> exportSubtitleSrt(
     );
     if (saved == null) return;
     final path = saved.isScheme('file') ? saved.toFilePath() : '$saved';
+    if (local != null) {
+      await session.srtWriter.rememberOutput(
+        videoPath: local,
+        outputPath: path,
+        bytes: bytes,
+      );
+    }
     show(
       complete
           ? l.aiSubtitleExportSaved(path)

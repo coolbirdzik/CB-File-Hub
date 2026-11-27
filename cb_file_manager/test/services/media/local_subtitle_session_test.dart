@@ -159,6 +159,7 @@ void main() {
     await translation.writeAsBytes([1]);
     SharedPreferences.setMockInitialValues({
       'ai_subtitles_enabled': true,
+      'ai_subtitles_speech': 'whisper/small',
       'ai_subtitles_target': 'en',
       'local_ai_installed_models': jsonEncode([
         InstalledLocalModel(

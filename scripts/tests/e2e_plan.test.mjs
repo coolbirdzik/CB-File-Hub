@@ -102,3 +102,18 @@ test('failure digest keeps errors and drops warnings and passing chatter', async
   assert.match(digest, /error C1083/);
   assert.doesNotMatch(digest, /C4244|FrameTimingOptimizer|app ok/);
 });
+
+test('a transport-style error without details is not presented as a tap warning failure', async () => {
+  const { failureDigest } = await import('../ci/e2e_plan.mjs');
+  const content = report(
+    start(1, 'semantics_stability AX report'),
+    { type: 'print', testID: 1, message: 'Warning: tap would not hit test the widget' },
+    { type: 'print', testID: 1, message: '[AX] phase -> scroll' },
+    end(1, { result: 'error' }),
+    { type: 'done', success: false },
+  );
+  const digest = failureDigest(content);
+  assert.match(digest, /result=error without structured error details/);
+  assert.match(digest, /context, not the failure reason/);
+  assert.match(digest, /\[AX\] phase -> scroll/);
+});

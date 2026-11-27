@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 import 'dart:io';
 
 import 'package:cb_native/cb_native.dart';
@@ -9,6 +10,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:win32/win32.dart' as win32;
 
 import '../../utils/app_logger.dart';
+import '../../services/media/subtitle_video_deletion.dart';
 import '../../services/disk_cleaner/macos_cleaner_platform.dart';
 import 'recycle_bin_reader.dart' as direct_reader;
 import 'windows_file_operations.dart';
@@ -18,11 +20,42 @@ const int defaultPermanentDeleteConcurrency = 8;
 
 /// A class that manages the trash bin functionality with platform-specific implementation
 class TrashManager {
+  static const _subtitleCascade = #cbGeneratedSubtitleDeletion;
+
+  bool _includeGeneratedSubtitles(Iterable<String> paths) =>
+      Zone.current[_subtitleCascade] != true &&
+      paths.any(SubtitleVideoDeletion.isVideo);
+
+  Future<Set<String>> _withGeneratedSubtitles(
+    List<String> paths,
+    SubtitleDeleteBatch operation, {
+    void Function(String path, Object error)? onError,
+  }) => runZoned(
+    () => (_subtitleDeletion ?? SubtitleVideoDeletion()).delete(
+      paths,
+      operation: operation,
+      onError: (path, error) {
+        AppLogger.warning(
+          '[TrashManager] Generated subtitle cleanup failed: $path',
+          error: error,
+        );
+        onError?.call(path, error);
+      },
+    ),
+    // Internal batch fallbacks and companion deletes belong to this operation.
+    // Keep the public API unchanged for every caller/platform implementation.
+    zoneValues: {_subtitleCascade: true},
+  );
   static final TrashManager _instance = TrashManager._internal();
 
   factory TrashManager() => _instance;
 
-  TrashManager._internal();
+  final SubtitleVideoDeletion? _subtitleDeletion;
+  TrashManager._internal() : _subtitleDeletion = null;
+
+  @visibleForTesting
+  TrashManager.forTesting(SubtitleVideoDeletion subtitles)
+    : _subtitleDeletion = subtitles;
 
   /// The name of the internal trash directory (used when native trash is not available)
   static const String trashDirName = '.trash';
@@ -397,6 +430,16 @@ class TrashManager {
 
   /// Move a file to trash using platform-specific mechanisms when possible
   Future<bool> moveToTrash(String filePath) async {
+    if (_includeGeneratedSubtitles([filePath])) {
+      final deleted = await _withGeneratedSubtitles([filePath], (paths) async {
+        final done = <String>{};
+        for (final path in paths) {
+          if (await moveToTrash(path)) done.add(path);
+        }
+        return done;
+      });
+      return deleted.contains(filePath);
+    }
     try {
       final file = File(filePath);
       final dir = Directory(filePath);
@@ -686,6 +729,20 @@ class TrashManager {
     void Function(String path, Object error)? onError,
   }) async {
     if (filePaths.isEmpty) return <String>{};
+    if (_includeGeneratedSubtitles(filePaths)) {
+      return _withGeneratedSubtitles(
+        filePaths,
+        (paths) => moveMultipleToTrashBatched(
+          paths,
+          chunkSize: chunkSize,
+          onChunkStart: paths == filePaths ? onChunkStart : null,
+          onChunkDone: paths == filePaths ? onChunkDone : null,
+          timeoutOverride: timeoutOverride,
+          onError: onError,
+        ),
+        onError: onError,
+      );
+    }
 
     if (Platform.isWindows && WindowsFileOperations.isAvailable) {
       return _runDeleteBatch(
@@ -769,6 +826,21 @@ class TrashManager {
     bool useNative = true,
   }) async {
     if (filePaths.isEmpty) return <String>{};
+    if (_includeGeneratedSubtitles(filePaths)) {
+      return _withGeneratedSubtitles(
+        filePaths,
+        (paths) => deleteMultiplePermanently(
+          paths,
+          chunkSize: chunkSize,
+          onChunkStart: paths == filePaths ? onChunkStart : null,
+          onChunkDone: paths == filePaths ? onChunkDone : null,
+          timeoutOverride: timeoutOverride,
+          onError: onError,
+          useNative: useNative,
+        ),
+        onError: onError,
+      );
+    }
 
     final succeeded = <String>{};
     var nextIndex = 0;
@@ -876,6 +948,12 @@ class TrashManager {
     required bool permanent,
   }) async {
     if (!Platform.isWindows || failedPaths.isEmpty) return <String>{};
+    if (_includeGeneratedSubtitles(failedPaths)) {
+      return _withGeneratedSubtitles(
+        failedPaths,
+        (paths) => retryDeleteAsAdministrator(paths, permanent: permanent),
+      );
+    }
 
     final exactPaths = failedPaths.toSet().toList(growable: false);
     await WindowsFileOperations.deleteItems(

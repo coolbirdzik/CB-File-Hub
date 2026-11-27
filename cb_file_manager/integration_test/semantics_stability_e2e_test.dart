@@ -331,12 +331,17 @@ void main() {
 
         phase = _enterPhase('click-row');
         final firstRow = find.textContaining('file_0.txt');
-        if (firstRow.evaluate().isEmpty) {
-          debugPrint('[AX] click-row skipped: no file_0.txt row on screen');
-        } else {
-          await tester.tap(firstRow.first);
-          await settleE2EUi(tester);
-        }
+        expect(
+          firstRow,
+          findsWidgets,
+          reason: 'the sandbox file must be listed',
+        );
+        final fileViewport = scrollableForE2EItem(firstRow);
+        await tester.ensureVisible(firstRow.first);
+        await settleE2EUi(tester);
+        expect(firstRow.first.hitTestable(), findsOneWidget);
+        await tester.tap(firstRow.first);
+        await settleE2EUi(tester);
 
         phase = _enterPhase('arrow-keys');
         for (var i = 0; i < 6; i++) {
@@ -344,10 +349,13 @@ void main() {
           await settleE2EUi(tester);
         }
 
-        phase = _enterPhase('scroll');
-        await tester.drag(find.byType(Scrollable).first, const Offset(0, -400));
+        phase = _enterPhase('scroll-forward');
+        await tester.drag(fileViewport, const Offset(0, -400));
+        phase = _enterPhase('scroll-forward-settle');
         await settleE2EUi(tester);
-        await tester.drag(find.byType(Scrollable).first, const Offset(0, 400));
+        phase = _enterPhase('scroll-back');
+        await tester.drag(fileViewport, const Offset(0, 400));
+        phase = _enterPhase('scroll-back-settle');
         await settleE2EUi(tester);
 
         phase = _enterPhase('toggle-drawer-section');

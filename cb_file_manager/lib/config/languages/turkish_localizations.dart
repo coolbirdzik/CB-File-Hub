@@ -6101,6 +6101,14 @@ class TurkishLocalizations implements AppLocalizations {
   @override
   String get vpVideoFilters => 'Video filtreleri';
   @override
+  String get vpVrMode => 'VR Modu';
+  @override
+  String get vpVrModeActive => 'VR Modu (Etkin)';
+  @override
+  String get vpVrResetView => 'VR Görünümünü Sıfırla';
+  @override
+  String get vpVrDragHint => 'Bakmak için sürükleyin · FOV için kaydırın';
+  @override
   String get vpSleepTimer => 'Uyku zamanlayıcısı';
   @override
   String get vpSleepTimerActive => 'Uyku zamanlayıcısı (Etkin)';

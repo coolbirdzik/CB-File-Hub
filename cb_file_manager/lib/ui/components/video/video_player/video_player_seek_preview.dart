@@ -13,16 +13,36 @@ class VideoSeekPreviewController extends ChangeNotifier {
   VideoSeekPreviewController({
     required this.source,
     required this.enableHardwareAcceleration,
+    this.videoAspectRatio,
   });
 
   final String source;
   final bool enableHardwareAcceleration;
+  final double? videoAspectRatio;
+
+  /// Cap preview texture width so hovering an 8K video never allocates a second
+  /// 8K D3D11/EGL surface or stalls the GPU decoder.
+  static const int maxPreviewWidth = 320;
+  static const int maxPreviewHeight = 240;
 
   PlaybackPlayer? _player;
   PlaybackVideoController? _video;
   Timer? _seekThrottle;
   Duration? _pendingSeek;
   bool _disposed = false;
+
+  /// Computes even thumbnail dimensions for the hover preview texture.
+  static ({int width, int height}) previewTextureSize(double? aspectRatio) {
+    final ar = (aspectRatio ?? (16 / 9)).clamp(0.5, 2.5);
+    var width = maxPreviewWidth;
+    var height = (width / ar).round();
+    if (height > maxPreviewHeight) {
+      height = maxPreviewHeight;
+      width = (height * ar).round();
+    }
+    int even(int v) => v < 2 ? 2 : (v & ~1);
+    return (width: even(width), height: even(height));
+  }
 
   /// Null until the first [seek] opens the preview decoder.
   PlaybackVideoController? get video => _video;
@@ -35,14 +55,20 @@ class VideoSeekPreviewController extends ChangeNotifier {
   }
 
   void _open() {
+    final size = previewTextureSize(videoAspectRatio);
     final player = PlaybackPlayer(
-      configuration: const PlaybackConfiguration(framePreview: true),
+      configuration: const PlaybackConfiguration(
+        framePreview: true,
+        bufferSizeMb: 8,
+      ),
     );
     _player = player;
     _video = PlaybackVideoController(
       player,
       configuration: PlaybackVideoConfiguration(
         enableHardwareAcceleration: enableHardwareAcceleration,
+        outputWidth: size.width,
+        outputHeight: size.height,
       ),
     );
     notifyListeners();
@@ -58,7 +84,7 @@ class VideoSeekPreviewController extends ChangeNotifier {
     _pendingSeek = null;
     final player = _player;
     if (target == null || player == null) return;
-    unawaited(player.seek(target));
+    unawaited(player.seek(target, exact: false));
     // Keyframe seeks are cheap, but hover events arrive faster than frames can
     // be shown. Keep only the newest position between flushes.
     _seekThrottle = Timer(const Duration(milliseconds: 60), () {

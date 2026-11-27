@@ -240,4 +240,67 @@ void main() {
     final media = mk.Media(playbackMediaSource(url));
     expect(media.uri.replaceAll('/', r'\'), r'\\nas\share\My video#%.mp4');
   }, skip: !Platform.isWindows);
+
+  test('computeCappedOutputSize downscales 8K video to viewport size', () {
+    final capped = PlaybackPlayer.computeCappedOutputSize(
+      videoWidth: 7680,
+      videoHeight: 3840,
+      viewportWidth: 1280,
+      viewportHeight: 720,
+      devicePixelRatio: 1.5,
+    );
+    expect(capped, isNotNull);
+    expect(capped!.width, 1920);
+    expect(capped.height, 960);
+    expect(capped.width.isEven, isTrue);
+    expect(capped.height.isEven, isTrue);
+  });
+
+  test('computeCappedOutputSize does not upscale smaller videos', () {
+    final uncapped = PlaybackPlayer.computeCappedOutputSize(
+      videoWidth: 1920,
+      videoHeight: 1080,
+      viewportWidth: 2560,
+      viewportHeight: 1440,
+      devicePixelRatio: 1.0,
+    );
+    expect(uncapped, isNull);
+  });
+
+  test('computeCappedOutputSize uses viewport aspect when VR is active', () {
+    final vrOutput = PlaybackPlayer.computeCappedOutputSize(
+      videoWidth: 8192,
+      videoHeight: 4096,
+      viewportWidth: 1920,
+      viewportHeight: 1080,
+      devicePixelRatio: 1.0,
+      forceViewportSize: true,
+    );
+    expect(vrOutput, (width: 1920, height: 1080));
+  });
+
+  test('isLikelyLargeVideoSource detects 4K and 8K filenames', () {
+    expect(
+      PlaybackPlayer.isLikelyLargeVideoSource(
+        r'P:\Reco\SAVR-1165_8K\489155.com@SAVR-1165_1_8K.mp4',
+      ),
+      isTrue,
+    );
+    expect(
+      PlaybackPlayer.isLikelyLargeVideoSource('demo_4K_60fps.mkv'),
+      isTrue,
+    );
+    expect(PlaybackPlayer.isLikelyLargeVideoSource('clip_1080p.mp4'), isFalse);
+  });
+
+  test('isLikelyLargeVideoSource detects 4K and 8K filenames', () {
+    expect(
+      PlaybackPlayer.isLikelyLargeVideoSource(
+        r'P:\Reco\SAVR-1165_8K\489155.com@SAVR-1165_1_8K.mp4',
+      ),
+      isTrue,
+    );
+    expect(PlaybackPlayer.isLikelyLargeVideoSource('demo_4K_60fps.mkv'), isTrue);
+    expect(PlaybackPlayer.isLikelyLargeVideoSource('clip_1080p.mp4'), isFalse);
+  });
 }

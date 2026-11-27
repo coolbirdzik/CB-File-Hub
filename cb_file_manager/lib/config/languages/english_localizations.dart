@@ -6062,6 +6062,14 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get vpVideoFilters => 'Video Filters';
   @override
+  String get vpVrMode => 'VR Mode';
+  @override
+  String get vpVrModeActive => 'VR Mode (Active)';
+  @override
+  String get vpVrResetView => 'Reset VR View';
+  @override
+  String get vpVrDragHint => 'Drag to look around · Scroll to zoom FOV';
+  @override
   String get vpSleepTimer => 'Sleep Timer';
   @override
   String get vpSleepTimerActive => 'Sleep Timer (Active)';

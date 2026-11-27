@@ -2565,6 +2565,10 @@ abstract class AppLocalizations {
   String get vpPictureInPicture;
   String get vpExitPip;
   String get vpVideoFilters;
+  String get vpVrMode;
+  String get vpVrModeActive;
+  String get vpVrResetView;
+  String get vpVrDragHint;
   String get vpSleepTimer;
   String get vpSleepTimerActive;
   String get vpVideoSettings;

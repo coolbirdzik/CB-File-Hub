@@ -63,12 +63,14 @@ class VideoPlayerAdvancedMenu extends StatelessWidget {
   final VoidCallback? onSpeed;
   final VoidCallback? onPip;
   final VoidCallback? onFilters;
+  final VoidCallback? onVrMode;
   final VoidCallback? onSleepTimer;
   final VoidCallback? onSettings;
 
   final bool hasSubtitles;
   final double playbackSpeed;
   final bool isPictureInPicture;
+  final bool isVrModeActive;
   final Duration? sleepDuration;
 
   const VideoPlayerAdvancedMenu({
@@ -91,11 +93,13 @@ class VideoPlayerAdvancedMenu extends StatelessWidget {
     this.onSpeed,
     this.onPip,
     this.onFilters,
+    this.onVrMode,
     this.onSleepTimer,
     this.onSettings,
     this.hasSubtitles = false,
     this.playbackSpeed = 1.0,
     this.isPictureInPicture = false,
+    this.isVrModeActive = false,
     this.sleepDuration,
   });
 
@@ -136,6 +140,9 @@ class VideoPlayerAdvancedMenu extends StatelessWidget {
         break;
       case 'filters':
         onFilters?.call();
+        break;
+      case 'vr_mode':
+        onVrMode?.call();
         break;
       case 'sleep_timer':
         onSleepTimer?.call();
@@ -281,6 +288,18 @@ class VideoPlayerAdvancedMenu extends StatelessWidget {
         title: context.tr.vpVideoFilters,
       ),
     ),
+    if (onVrMode != null)
+      PopupMenuItem<String>(
+        value: 'vr_mode',
+        child: _VideoPlayerMenuTile(
+          icon: PhosphorIconsLight.goggles,
+          title: isVrModeActive
+              ? context.tr.vpVrModeActive
+              : context.tr.vpVrMode,
+          iconColor: isVrModeActive ? Colors.lightBlueAccent : Colors.white,
+          titleColor: isVrModeActive ? Colors.lightBlueAccent : Colors.white,
+        ),
+      ),
     PopupMenuItem<String>(
       value: 'sleep_timer',
       child: _VideoPlayerMenuTile(

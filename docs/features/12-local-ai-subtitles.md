@@ -60,8 +60,8 @@ for commercial use, pinned by SHA-256 and size):
 | --- | --- | --- | --- | --- |
 | Speech | Whisper Tiny | 78 MB | MIT | Fast |
 | Speech | Whisper Base | 148 MB | MIT | Fast |
-| Speech | Whisper Small (default) | 488 MB | MIT | Balanced |
-| Speech | Whisper Large v3 Turbo Q5_0 (recommended) | 574 MB | MIT | Balanced |
+| Speech | Whisper Small | 488 MB | MIT | Balanced |
+| Speech | Whisper Large v3 Turbo Q5_0 (default, recommended) | 574 MB | MIT | Balanced |
 | Speech | Whisper Large v3 Turbo | 1.62 GB | MIT | Most accurate |
 | Speech | Whisper Large v3 Q5_0 | 1.08 GB | MIT | Most accurate |
 | Speech | Kotoba Whisper v2.0 Q5_0 (Japanese only) | 538 MB | Apache 2.0 | Balanced |
@@ -69,6 +69,11 @@ for commercial use, pinned by SHA-256 and size):
 | Translation | Hy-MT2 1.8B Q4_K_M (default, recommended) | 1.13 GB | Apache 2.0 | Fast |
 | Translation | Hy-MT2 1.8B Q8_0 | 1.91 GB | Apache 2.0 | Balanced |
 | Translation | Hy-MT2 7B Q4_K_M | 4.62 GB | Apache 2.0 | Most accurate |
+
+Whisper Small was the speech default before Turbo Q5_0. Installing a model
+never saves a choice, so a user who installed Small without picking a model is
+pinned to Small on first load (`SubtitlePreferences.keepLegacySpeechDefault`)
+rather than switched to an uninstalled default.
 
 These are artifact sizes, not RAM requirements. Whisper artifacts come from
 `ggerganov/whisper.cpp`; Kotoba from `kotoba-tech/kotoba-whisper-v2.0-ggml`; Hy-MT2
@@ -160,6 +165,16 @@ AI file becomes `movie.vi.ai.srt`. Identical content is not rewritten. Turning o
 a file mode after a video was finished in app-only mode writes the file at once.
 Previews never write files. Sources that are not local files or network shares
 (http and SMB proxies) report once that automatic files need a local video.
+
+Deleting a video through CB File Hub also deletes its verified AI-generated SRT
+exports and matching `.cbmeta.json` files, using the same Recycle Bin or permanent
+delete mode. Automatic and manual exports record their source video and SHA-256
+under `ai_subtitles_srt_owner:` preferences; older batch exports use their saved
+generation metadata. A subtitle is removed only after the video is successfully
+deleted and its current bytes still match the recorded hash. External subtitles,
+edited exports and older exports without verifiable provenance are kept. A
+subtitle cleanup failure is reported even if the video was already deleted.
+The app's subtitle cache is unaffected.
 
 Recognition can prepare one chunk while translation processes the preceding
 chunk. Translation tokens appear provisionally in the subtitle area; completed

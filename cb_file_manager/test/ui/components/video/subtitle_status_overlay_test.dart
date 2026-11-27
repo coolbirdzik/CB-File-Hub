@@ -222,6 +222,43 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+  testWidgets('the icon popover opens without overflow in a PiP window', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 180);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await show(
+      tester,
+      const SubtitleProgress(
+        phase: SubtitlePhase.failed,
+        modelName: 'Whisper Large v3 Turbo · Q5_0',
+        sourceLanguage: 'ja',
+        targetLanguage: 'vi',
+        duration: Duration(minutes: 2),
+        position: Duration.zero,
+        completed: [SubtitleTimeRange(Duration.zero, Duration(seconds: 30))],
+        error:
+            'Speech model could not be loaded because the file is missing '
+            'or was moved to another folder.',
+      ),
+      size: const Size(320, 180),
+      regenerate: () {},
+      export: () {},
+    );
+    await tester.tap(find.byKey(const ValueKey('ai-subtitle-control')));
+    await tester.pumpAndSettle();
+    for (final key in [
+      'ai-subtitle-settings',
+      'ai-subtitle-retry',
+      'ai-subtitle-export',
+      'ai-subtitle-regenerate',
+    ]) {
+      expect(find.byKey(ValueKey(key)), findsOneWidget, reason: key);
+    }
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('hidden controls leave only caption text in the picture', (
     tester,
   ) async {
@@ -306,12 +343,14 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('ai-subtitle-control')));
     await tester.pumpAndSettle();
     expect(find.textContaining('Model could not load'), findsOneWidget);
-    await tester.tap(find.text('Retry'));
+    // Actions are icon-only; their labels live in tooltips.
+    expect(find.text('Retry'), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('ai-subtitle-retry')));
     expect(retried, isTrue);
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('ai-subtitle-control')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Local AI subtitles'));
+    await tester.tap(find.byKey(const ValueKey('ai-subtitle-settings')));
     await tester.pumpAndSettle();
     expect(opened, isTrue);
     expect(find.byKey(const ValueKey('ai-subtitle-busy')), findsNothing);

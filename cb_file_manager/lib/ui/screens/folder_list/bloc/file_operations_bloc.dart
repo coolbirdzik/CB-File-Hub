@@ -301,6 +301,7 @@ class FileOperationsBloc
           )
         : await trashManager.moveMultipleToTrashBatched(
             pathsList,
+            onError: (path, error) => failureErrors[path] = error,
             onChunkDone: (done, total) {
               completed = done;
               progressThrottle.maybeUpdate(
@@ -421,6 +422,7 @@ class FileOperationsBloc
           )
         : await trashManager.moveMultipleToTrashBatched(
             pathsList,
+            onError: (path, error) => failureErrors[path] = error,
             onChunkDone: (done, t) {
               completed = done;
               progressThrottle.maybeUpdate(

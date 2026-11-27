@@ -6,6 +6,7 @@
 #include "priority_message_loop.h"
 #include "utils.h"
 #include "d3d11_threading_guard.h"
+#include "mpv_egl_device_query_shim.h"
 #include "torrent_launch.h"
 #include "folder_defaults.h"
 #include "fc_native_video_thumbnail_plugin.h"
@@ -177,6 +178,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   ::CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
   // Before the first engine creates its ANGLE D3D11 device.
   InstallD3D11ThreadingGuard();
+  // Before the first player creates its render context.
+  InstallMpvEglDeviceQueryShim();
 
   flutter::DartProject project(L"data");
   project.set_ui_thread_policy(PreferredUIThreadPolicy());

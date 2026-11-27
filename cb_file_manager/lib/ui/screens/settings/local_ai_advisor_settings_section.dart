@@ -42,11 +42,16 @@ class LocalAiAdvisorSettingsSection extends StatefulWidget {
 
   final bool compact;
 
+  /// Limits installed models, downloads and the installer to these purposes.
+  /// Null shows every purpose.
+  final Set<LocalModelPurpose>? purposes;
+
   const LocalAiAdvisorSettingsSection({
     super.key,
     required this.buildSectionCard,
     required this.buildCompactSettingTile,
     this.compact = false,
+    this.purposes,
   });
 
   @override
@@ -185,8 +190,10 @@ class _LocalAiAdvisorSettingsSectionState
                 _buildTokenSection(context, l),
                 const SizedBox(height: CbSpacing.lg),
                 _buildModelStorageSection(context, l),
-                const SizedBox(height: CbSpacing.lg),
-                _buildContextWindowSection(context, l),
+                if (_shows(LocalModelPurpose.chat)) ...[
+                  const SizedBox(height: CbSpacing.lg),
+                  _buildContextWindowSection(context, l),
+                ],
               ],
             ),
           ] else ...[
@@ -233,11 +240,18 @@ class _LocalAiAdvisorSettingsSectionState
     );
   }
 
+  bool _shows(LocalModelPurpose purpose) =>
+      widget.purposes?.contains(purpose) ?? true;
+
   Widget _buildInstalledModelsSection(
     BuildContext context,
     AppLocalizations l,
   ) {
     final colors = context.cbColors;
+    final installed = _installed.where((m) => _shows(m.purpose)).toList();
+    final downloads = _downloads.downloads
+        .where((d) => _shows(d.entry.purpose))
+        .toList();
     return Padding(
       padding: widget.compact
           ? EdgeInsets.zero
@@ -268,13 +282,13 @@ class _LocalAiAdvisorSettingsSectionState
               ),
             ],
           ),
-          for (final download in _downloads.downloads)
+          for (final download in downloads)
             _DownloadTile(
               download: download,
               onCancel: () => _downloads.cancel(download.entry.id),
               onRetry: () => _downloads.start(download.entry),
             ),
-          if (_installed.isEmpty && _downloads.downloads.isEmpty)
+          if (installed.isEmpty && downloads.isEmpty)
             CbSurface(
               padding: const EdgeInsets.all(CbSpacing.md),
               child: Text(
@@ -282,7 +296,7 @@ class _LocalAiAdvisorSettingsSectionState
                 style: CbTypography.body.copyWith(color: colors.textSecondary),
               ),
             ),
-          for (final model in _installed)
+          for (final model in installed)
             _buildInstalledModelTile(
               context,
               l,
@@ -703,6 +717,7 @@ class _LocalAiAdvisorSettingsSectionState
         service: _service,
         downloads: _downloads,
         installedIds: _installed.map((m) => m.catalogId).toSet(),
+        purposes: widget.purposes,
       ),
     );
   }
@@ -748,11 +763,13 @@ class _ModelBrowserDialog extends StatefulWidget {
   final LocalAiAdvisorService service;
   final LocalModelDownloads downloads;
   final Set<String> installedIds;
+  final Set<LocalModelPurpose>? purposes;
 
   const _ModelBrowserDialog({
     required this.service,
     required this.downloads,
     required this.installedIds,
+    this.purposes,
   });
 
   @override
@@ -806,8 +823,10 @@ class _ModelBrowserDialogState extends State<_ModelBrowserDialog> {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
+    final allowed = widget.purposes;
     final catalog = _catalog
-        ?.where((e) => _purpose == null || e.purpose == _purpose)
+        ?.where((e) => allowed == null || allowed.contains(e.purpose))
+        .where((e) => _purpose == null || e.purpose == _purpose)
         .toList();
     final recommendedId = widget.service.pinnedModel.id;
 
@@ -849,10 +868,11 @@ class _ModelBrowserDialogState extends State<_ModelBrowserDialog> {
                   onSelected: (_) => setState(() => _purpose = null),
                 ),
                 for (final purpose in LocalModelPurpose.values)
-                  if (purpose == LocalModelPurpose.chat ||
-                      Platform.isWindows ||
-                      Platform.isMacOS ||
-                      Platform.isLinux)
+                  if ((allowed == null || allowed.contains(purpose)) &&
+                      (purpose == LocalModelPurpose.chat ||
+                          Platform.isWindows ||
+                          Platform.isMacOS ||
+                          Platform.isLinux))
                     ChoiceChip(
                       label: Text(modelPurposeLabel(l, purpose)),
                       selected: _purpose == purpose,
@@ -1273,36 +1293,42 @@ class _MoveModelsProgressDialogState extends State<_MoveModelsProgressDialog> {
 }
 
 /// Reuses the Settings model manager from a standalone video/PiP window.
-Future<void> showLocalModelManagerDialog(BuildContext context) =>
-    CbDialog.show<void>(
-      context: context,
-      dialog: CbDialog(
-        title: context.tr.aiSubtitleManage,
-        content: SizedBox(
-          width: double.infinity,
-          child: LocalAiAdvisorSettingsSection(
-            compact: true,
-            buildSectionCard:
-                ({required title, required icon, required children}) => Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: children,
-                ),
-            buildCompactSettingTile:
-                ({
-                  required title,
-                  required subtitle,
-                  required icon,
-                  trailing,
-                  onTap,
-                }) => ListTile(
-                  title: Text(title),
-                  subtitle: Text(subtitle),
-                  leading: Icon(icon),
-                  trailing: trailing,
-                  onTap: onTap,
-                ),
-          ),
-        ),
+/// [subtitleOnly] hides chat models, which the player never uses.
+Future<void> showLocalModelManagerDialog(
+  BuildContext context, {
+  bool subtitleOnly = false,
+}) => CbDialog.show<void>(
+  context: context,
+  dialog: CbDialog(
+    title: context.tr.aiSubtitleManage,
+    content: SizedBox(
+      width: double.infinity,
+      child: LocalAiAdvisorSettingsSection(
+        compact: true,
+        purposes: subtitleOnly
+            ? const {LocalModelPurpose.speech, LocalModelPurpose.translation}
+            : null,
+        buildSectionCard:
+            ({required title, required icon, required children}) => Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: children,
+            ),
+        buildCompactSettingTile:
+            ({
+              required title,
+              required subtitle,
+              required icon,
+              trailing,
+              onTap,
+            }) => ListTile(
+              title: Text(title),
+              subtitle: Text(subtitle),
+              leading: Icon(icon),
+              trailing: trailing,
+              onTap: onTap,
+            ),
       ),
-    );
+    ),
+  ),
+);

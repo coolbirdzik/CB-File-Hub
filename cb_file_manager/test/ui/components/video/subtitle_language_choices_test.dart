@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:cb_file_manager/config/languages/app_localizations_delegate.dart';
 import 'package:cb_file_manager/config/theme_config.dart';
 import 'package:cb_file_manager/design_system/cb_design_system.dart';
@@ -23,11 +26,18 @@ void main() {
     WidgetTester tester, {
     bool compact = false,
     VoidCallback? onManageModels,
+    Map<String, Object> initial = const {},
+    Directory? documents,
   }) async {
-    SharedPreferences.setMockInitialValues({});
+    SharedPreferences.setMockInitialValues(initial);
     final prefs = await SharedPreferences.getInstance();
     preferences = SubtitlePreferences.shared(prefs);
-    models = LocalAiAdvisorService(prefs: prefs);
+    models = documents == null
+        ? LocalAiAdvisorService(prefs: prefs)
+        : LocalAiAdvisorService(
+            prefs: prefs,
+            documentsDirectoryProvider: () async => documents,
+          );
     downloads = LocalModelDownloads(models);
     addTearDown(() async {
       downloads.dispose();
@@ -97,6 +107,8 @@ void main() {
     'audio uses the complete ASR list, in English A–Z even in Vietnamese UI',
     (tester) async {
       await showPanel(tester);
+      await preferences.setSpeechModel('whisper/small');
+      await tester.pumpAndSettle();
       final audio = field(tester, 'Ngôn ngữ audio:auto');
       expect(audio.items.length, 100); // Auto + all 99 Base/Small languages.
       expect(labels(audio).first, 'Auto detect');
@@ -244,6 +256,76 @@ void main() {
     }
   });
 
+  testWidgets('an installed model is uninstalled inline after confirming', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(520, 1600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final sandbox = (await tester.runAsync(
+      () => Directory.systemTemp.createTemp('subtitle-uninstall-'),
+    ))!;
+    addTearDown(() => tester.runAsync(() => sandbox.delete(recursive: true)));
+    final artifact = File('${sandbox.path}/ggml-small.bin');
+    await tester.runAsync(() => artifact.writeAsBytes([1]));
+    final small = SubtitleModelCatalog.entries.firstWhere(
+      (e) => e.id == 'whisper/small',
+    );
+    await showPanel(
+      tester,
+      documents: sandbox,
+      initial: {
+        'ai_subtitles_speech': small.id,
+        'local_ai_installed_models': jsonEncode([
+          InstalledLocalModel(
+            catalogId: small.id,
+            displayName: small.displayName,
+            localPath: artifact.path,
+            sizeBytes: small.sizeBytes!,
+            installedAt: DateTime(2026, 11, 28),
+            runtimeArtifactId: small.artifactFileName,
+            purpose: LocalModelPurpose.speech,
+          ).toJson(),
+        ]),
+      },
+    );
+    final uninstall = find.byKey(
+      const ValueKey('subtitle-model-uninstall:whisper/small'),
+    );
+    final install = find.byKey(
+      const ValueKey('subtitle-model-install:whisper/small'),
+    );
+    expect(uninstall, findsOneWidget);
+    expect(install, findsNothing);
+
+    await tester.tap(uninstall);
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('subtitle-model-uninstall-cancel')),
+    );
+    await tester.pumpAndSettle();
+    expect(models.getManagedModels(), hasLength(1));
+
+    await tester.tap(uninstall);
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('subtitle-model-uninstall-confirm')),
+    );
+    // Uninstalling deletes the file and rewrites the registry on real IO.
+    for (var i = 0; i < 100 && models.getManagedModels().isNotEmpty; i++) {
+      await tester.pump(const Duration(milliseconds: 20));
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 10)),
+      );
+    }
+    await tester.pumpAndSettle();
+    expect(models.getManagedModels(), isEmpty);
+    expect(await tester.runAsync(artifact.exists), isFalse);
+    expect(uninstall, findsNothing);
+    expect(install, findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('open model menus list every model with its size', (
     tester,
   ) async {
@@ -266,8 +348,9 @@ void main() {
           reason: entry.id,
         );
       }
+      // Whisper Tiny's size: listed only in the open speech menu.
       expect(
-        find.textContaining('574 MB'),
+        find.textContaining('78 MB'),
         purpose == LocalModelPurpose.speech ? findsWidgets : findsNothing,
       );
       expect(tester.takeException(), isNull, reason: purpose.name);

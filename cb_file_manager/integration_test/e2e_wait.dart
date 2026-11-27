@@ -1,4 +1,24 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/widgets.dart';
+
+/// The viewport containing an item, rather than an unrelated sidebar or path bar.
+/// Capture its Element so recycling the item does not invalidate later gestures.
+Finder scrollableForE2EItem(Finder item) {
+  final ancestors = find.ancestor(
+    of: item.first,
+    matching: find.byType(Scrollable),
+  );
+  if (ancestors.evaluate().isEmpty) {
+    throw StateError(
+      'No scrollable viewport contains the requested item: $item',
+    );
+  }
+  final viewport = ancestors.evaluate().first;
+  return find.byElementPredicate(
+    (element) => identical(element, viewport),
+    description: 'scrollable viewport containing the requested item',
+  );
+}
 
 /// UI animation settling only. Async I/O must use [waitForE2ECondition] and
 /// assert its result: an idle frame does not prove a directory/model is ready.

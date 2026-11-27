@@ -28,6 +28,10 @@ abstract class _VideoPlayerSettingsHost extends _VideoPlayerVolumeHost {
   // Sleep timer
   Duration? get _sleepDuration;
 
+  // VR projection state
+  VrViewState get _vrView;
+  void _setVrView(VrViewState next);
+
   // Technical settings
   String get _selectedCodec;
   set _selectedCodec(String v);
@@ -149,6 +153,101 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  String _vrModeLabel(BuildContext context, VrProjectionMode mode) =>
+      switch (mode) {
+        VrProjectionMode.off => context.tr.vpOff,
+        VrProjectionMode.sbsMono => 'SBS Single Eye (2D)',
+        VrProjectionMode.ouMono => 'Over-Under Single Eye (2D)',
+        VrProjectionMode.vr180Sbs => 'VR 180° Side-by-Side (SBS)',
+        VrProjectionMode.vr180Ou => 'VR 180° Over-Under (OU)',
+        VrProjectionMode.vr360Mono => 'VR 360° Mono',
+        VrProjectionMode.vr360Sbs => 'VR 360° Side-by-Side (SBS)',
+        VrProjectionMode.vr360Ou => 'VR 360° Over-Under (OU)',
+      };
+
+  void _showVrModeDialog() {
+    final hint = VrVideoShader.detectHintFromFileName(widget.fileName);
+    RouteUtils.showAcrylicDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          final current = _vrView;
+          return AlertDialog(
+            title: Text(context.tr.vpVrMode),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (hint != VrProjectionMode.off &&
+                      current.mode == VrProjectionMode.off) ...[
+                    FilledButton.tonalIcon(
+                      onPressed: () {
+                        _setVrView(VrViewState(mode: hint));
+                        setDialogState(() {});
+                      },
+                      icon: const Icon(PhosphorIconsLight.goggles, size: 18),
+                      label: Text(_vrModeLabel(context, hint)),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  CbSelect<VrProjectionMode>(
+                    value: current.mode,
+                    expand: true,
+                    items: [
+                      for (final mode in VrProjectionMode.values)
+                        CbSelectItem(
+                          value: mode,
+                          label: _vrModeLabel(context, mode),
+                        ),
+                    ],
+                    onChanged: (mode) {
+                      _setVrView(VrViewState(mode: mode));
+                      setDialogState(() {});
+                    },
+                  ),
+                  if (current.isSpherical) ...[
+                    const SizedBox(height: 16),
+                    VideoPlayerLabeledSlider(
+                      label: 'FOV: ${current.fovDeg.round()}°',
+                      value: current.fovDeg,
+                      min: VrViewState.minFovDeg,
+                      max: VrViewState.maxFovDeg,
+                      divisions: 75,
+                      onChanged: (value) {
+                        _setVrView(current.copyWith(fovDeg: value));
+                        setDialogState(() {});
+                      },
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      context.tr.vpVrDragHint,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              if (current.isSpherical)
+                TextButton(
+                  onPressed: () {
+                    _setVrView(current.resetView());
+                    setDialogState(() {});
+                  },
+                  child: Text(context.tr.vpVrResetView),
+                ),
+              TextButton(
+                onPressed: () => RouteUtils.safePopDialog(context),
+                child: Text(context.tr.close),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -304,11 +403,18 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
                       label: context.tr.vpBufferSize(_bufferSize),
                       value: _bufferSize.toDouble(),
                       min: 1,
-                      max: 100,
-                      divisions: 99,
+                      max: 256,
+                      divisions: 255,
                       onChanged: (value) {
-                        setDialogState(() => _bufferSize = value.round());
-                        setState(() => _bufferSize = value.round());
+                        final nextMb = value.round();
+                        setDialogState(() => _bufferSize = nextMb);
+                        setState(() => _bufferSize = nextMb);
+                        unawaited(
+                          _player?.applyBufferSettings(
+                            bufferSizeMb: nextMb,
+                            networkCaching: const Duration(seconds: 5),
+                          ),
+                        );
                         _saveSettings();
                       },
                     ),

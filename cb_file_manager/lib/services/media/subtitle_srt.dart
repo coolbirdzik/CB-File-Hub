@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'media_kit_playback.dart';
 import 'subtitle_cache.dart';
+import 'subtitle_srt_ownership.dart';
 
 /// Where finished AI subtitles go besides the app's own SQLite cache.
 enum SubtitleFileMode {
@@ -127,6 +128,9 @@ class SubtitleSrtWriter {
     required List<int> bytes,
   }) async {
     assert(mode.writesAutomatically);
+    if (!await File(videoPath).exists()) {
+      throw FileSystemException('Source video no longer exists', videoPath);
+    }
     final folder = mode == SubtitleFileMode.subsFolder
         ? pathlib.join(pathlib.dirname(videoPath), 'Subs')
         : pathlib.dirname(videoPath);
@@ -149,6 +153,11 @@ class SubtitleSrtWriter {
     final existing = File(target);
     if (await existing.exists() && _same(await existing.readAsBytes(), bytes)) {
       if (hidden) await setHidden(target, true);
+      await rememberOutput(
+        videoPath: videoPath,
+        outputPath: target,
+        bytes: bytes,
+      );
       return SubtitleSrtWrite(target, false);
     }
     await Directory(folder).create(recursive: true);
@@ -157,6 +166,9 @@ class SubtitleSrtWriter {
       await temp.writeAsBytes(bytes, flush: true);
       // Windows refuses to replace a hidden file with a normal one.
       if (await existing.exists()) await setHidden(target, false);
+      if (!await File(videoPath).exists()) {
+        throw FileSystemException('Source video no longer exists', videoPath);
+      }
       await temp.rename(target);
     } finally {
       try {
@@ -176,8 +188,32 @@ class SubtitleSrtWriter {
           ? remembered.sublist(remembered.length - _maxRemembered)
           : remembered,
     );
+    await rememberOutput(
+      videoPath: videoPath,
+      outputPath: target,
+      bytes: bytes,
+    );
+    if (!await File(videoPath).exists()) {
+      // Do not leave a late export behind after deletion of the source video.
+      if (await existing.exists() &&
+          _same(await existing.readAsBytes(), bytes)) {
+        await existing.delete();
+      }
+      throw FileSystemException('Source video no longer exists', videoPath);
+    }
     return SubtitleSrtWrite(target, true);
   }
+
+  Future<void> rememberOutput({
+    required String videoPath,
+    required String outputPath,
+    required List<int> bytes,
+  }) => SubtitleSrtOwnership.remember(
+    prefs,
+    video: videoPath,
+    output: outputPath,
+    bytes: bytes,
+  );
 
   static String _key(String path) {
     final normal = pathlib.normalize(pathlib.absolute(path));

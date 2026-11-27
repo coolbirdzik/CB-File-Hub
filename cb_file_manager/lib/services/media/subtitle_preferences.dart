@@ -25,9 +25,28 @@ class SubtitlePreferences extends ChangeNotifier {
     LanguageController().languageNotifier.addListener(_localeChanged);
   }
   static const followApp = 'app';
+  static const defaultSpeechModel = 'whisper/large-v3-turbo-q5_0';
+
+  /// The default before [defaultSpeechModel]; installing a model never
+  /// stores a choice, so users who only ever used it have no saved value.
+  static const legacyDefaultSpeechModel = 'whisper/small';
+  static const _speechKey = 'ai_subtitles_speech';
+
   bool get enabled => prefs.getBool('ai_subtitles_enabled') ?? false;
-  String get speechModel =>
-      prefs.getString('ai_subtitles_speech') ?? 'whisper/small';
+  String get speechModel => prefs.getString(_speechKey) ?? defaultSpeechModel;
+
+  /// Keeps users on the old default when they installed it but never chose a
+  /// model, instead of switching them to an uninstalled [defaultSpeechModel].
+  Future<void> keepLegacySpeechDefault(Iterable<String> installedIds) async {
+    if (prefs.containsKey(_speechKey)) return;
+    final installed = installedIds.toSet();
+    if (!installed.contains(legacyDefaultSpeechModel) ||
+        installed.contains(defaultSpeechModel)) {
+      return;
+    }
+    await setSpeechModel(legacyDefaultSpeechModel);
+  }
+
   String get translationModel =>
       prefs.getString('ai_subtitles_translation') ?? 'tencent/Hy-MT2-1.8B-GGUF';
   String get sourceLanguage => prefs.getString('ai_subtitles_source') ?? 'auto';

@@ -5,6 +5,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../config/languages/app_localizations.dart';
+import 'package:cb_file_manager/config/translation_helper.dart';
 import '../../../../design_system/cb_design_system.dart';
 import '../../../../models/local_ai/local_ai_advisor_model.dart';
 import '../../../../services/local_ai/local_ai_advisor_service.dart';
@@ -66,11 +67,14 @@ class SubtitleSettingsDialog extends StatelessWidget {
         ),
       ),
       actions: [
-        CbButton(
+        // Models install, switch and uninstall inline above; the manager only
+        // holds storage and token settings, so it stays a secondary icon.
+        CbButton.icon(
           key: const ValueKey('ai-subtitles-manage-models'),
           onPressed: () => onManageModels(context),
           icon: PhosphorIconsLight.slidersHorizontal,
-          label: l.aiSubtitleManage,
+          tooltip: l.aiSubtitleManage,
+          variant: CbButtonVariant.secondary,
           outlined: true,
         ),
         CbButton(
@@ -119,8 +123,12 @@ class _SubtitleSettingsPanelState extends State<SubtitleSettingsPanel> {
   Future<void> _load() async {
     final shared = await SharedPreferences.getInstance();
     if (!mounted) return;
-    _prefs = SubtitlePreferences.shared(shared);
-    _prefs!.addListener(_changed);
+    final prefs = SubtitlePreferences.shared(shared);
+    await prefs.keepLegacySpeechDefault(
+      widget.models.getManagedModels().map((m) => m.catalogId),
+    );
+    if (!mounted) return;
+    _prefs = prefs..addListener(_changed);
     setState(() {});
   }
 
@@ -368,29 +376,45 @@ class _SubtitleSettingsPanelState extends State<SubtitleSettingsPanel> {
     final muted = theme.textTheme.bodySmall?.copyWith(
       color: theme.colorScheme.onSurfaceVariant,
     );
+    final select = CbSelect<String>(
+      key: ValueKey('subtitle-model:${purpose.name}:$selected'),
+      label: modelPurposeLabel(l, purpose),
+      value: selectedEntry?.id,
+      expand: true,
+      items: [
+        for (final e in entries)
+          CbSelectItem(
+            value: e.id,
+            label: e.sizeBytes == null
+                ? e.displayName
+                : '${e.displayName} · ${_size(e)}',
+            triggerLabel: e.displayName,
+            icon: installedIds.contains(e.id)
+                ? PhosphorIconsLight.checkCircle
+                : null,
+          ),
+      ],
+      onChanged: (value) => unawaited(changed(value)),
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        CbSelect<String>(
-          key: ValueKey('subtitle-model:${purpose.name}:$selected'),
-          label: modelPurposeLabel(l, purpose),
-          value: selectedEntry?.id,
-          expand: true,
-          items: [
-            for (final e in entries)
-              CbSelectItem(
-                value: e.id,
-                label: e.sizeBytes == null
-                    ? e.displayName
-                    : '${e.displayName} · ${_size(e)}',
-                triggerLabel: e.displayName,
-                icon: installedIds.contains(e.id)
-                    ? PhosphorIconsLight.checkCircle
-                    : null,
+        if (installed && selectedEntry != null)
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            spacing: CbSpacing.sm,
+            children: [
+              Expanded(child: select),
+              CbButton.icon(
+                key: ValueKey('subtitle-model-uninstall:$selected'),
+                icon: PhosphorIconsLight.trash,
+                tooltip: '${l.uninstallModel} · ${_size(selectedEntry)}',
+                onPressed: () => unawaited(_uninstall(selectedEntry)),
               ),
-          ],
-          onChanged: (value) => unawaited(changed(value)),
-        ),
+            ],
+          )
+        else
+          select,
         if (selectedEntry != null && !widget.compact) ...[
           const SizedBox(height: CbSpacing.sm),
           Wrap(
@@ -452,6 +476,42 @@ class _SubtitleSettingsPanelState extends State<SubtitleSettingsPanel> {
         ],
       ],
     );
+  }
+
+  Future<void> _uninstall(HuggingFaceModelEntry entry) async {
+    final l = AppLocalizations.of(context)!;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => CbDialog(
+        title: '${l.uninstallModel}: ${entry.displayName}',
+        content: Text(context.tr.laRemoveModelConfirm),
+        actions: [
+          CbButton(
+            key: const ValueKey('subtitle-model-uninstall-cancel'),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            label: l.cancel,
+            outlined: true,
+          ),
+          CbButton(
+            key: const ValueKey('subtitle-model-uninstall-confirm'),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            icon: PhosphorIconsLight.trash,
+            label: l.uninstallModel,
+            variant: CbButtonVariant.danger,
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await widget.models.uninstallModel(entry.id);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          SnackBar(content: Text(context.tr.aiModelRemoveFailed)),
+        );
+      }
+    }
   }
 
   Widget _tag(String label, {bool highlight = false, IconData? icon}) {

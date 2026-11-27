@@ -76,4 +76,23 @@ void main() {
       isNot(VietnameseLocalizations().fileThumbnailFit),
     );
   });
+
+  test('VR mode labels have complete localized copy', () {
+    final localizations = <AppLocalizations>[
+      EnglishLocalizations(),
+      VietnameseLocalizations(),
+    ];
+
+    for (final l10n in localizations) {
+      expect(l10n.vpVrMode, isNotEmpty);
+      expect(l10n.vpVrModeActive, isNotEmpty);
+      expect(l10n.vpVrResetView, isNotEmpty);
+      expect(l10n.vpVrDragHint, isNotEmpty);
+    }
+
+    expect(
+      EnglishLocalizations().vpVrMode,
+      isNot(VietnameseLocalizations().vpVrMode),
+    );
+  });
 }
