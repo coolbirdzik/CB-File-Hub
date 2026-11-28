@@ -30,6 +30,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 
 import 'e2e_helpers.dart';
+import 'e2e_file_browser_target.dart';
 import 'e2e_semantics_probe.dart';
 
 class _NodeSnap {
@@ -330,18 +331,10 @@ void main() {
         );
 
         phase = _enterPhase('click-row');
-        final firstRow = find.textContaining('file_0.txt');
-        expect(
-          firstRow,
-          findsWidgets,
-          reason: 'the sandbox file must be listed',
+        final fileViewport = await selectE2EFileBrowserItem(
+          tester,
+          p.join(dir.path, 'file_0.txt'),
         );
-        final fileViewport = scrollableForE2EItem(firstRow);
-        await tester.ensureVisible(firstRow.first);
-        await settleE2EUi(tester);
-        expect(firstRow.first.hitTestable(), findsOneWidget);
-        await tester.tap(firstRow.first);
-        await settleE2EUi(tester);
 
         phase = _enterPhase('arrow-keys');
         for (var i = 0; i < 6; i++) {

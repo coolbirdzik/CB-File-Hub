@@ -127,7 +127,6 @@
         "cb_file_manager/{.gitignore,.metadata,desktop.ini,logo.psd}",
         "cb_file_manager/{.github,.vscode,#tags,bin,test_driver}/**",
         "cb_file_manager/integration_test/showcase_screenshots_e2e_test.dart",
-        "cb_file_manager/integration_test/semantics_stability_e2e_test.dart",
         "cb_file_manager/integration_test/tooltip_semantics_e2e_test.dart",
         "cb_file_manager/integration_test/video_player_chrome_semantics_e2e_test.dart",
         "cb_file_manager/integration_test/zz_tmp_focus_latency_e2e_test.dart",
@@ -203,6 +202,14 @@
         "cb_file_manager/integration_test/torrent_e2e_fixture.dart"
       ],
       "suites": ["torrent_library"]
+    },
+    {
+      "why": "Changes to the interactive file-row locator must exercise the accessibility probe",
+      "paths": [
+        "cb_file_manager/integration_test/semantics_stability_e2e_test.dart",
+        "cb_file_manager/integration_test/e2e_file_browser_target.dart"
+      ],
+      "suites": ["semantics_stability"]
     },
     {
       "why": "Breadcrumb bar lives inside the folder list, so the core flows cover it too",
