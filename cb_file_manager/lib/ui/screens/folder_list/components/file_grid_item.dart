@@ -24,6 +24,7 @@ import '../../../utils/item_interaction_style.dart';
 import 'grid_tag_strip.dart';
 import 'thumbnail_only.dart';
 import '../../../components/common/file_entry_presentation.dart';
+import '../../../components/common/file_browser_options_scope.dart';
 
 class FileGridItem extends StatefulWidget {
   final FileSystemEntity file;
@@ -271,6 +272,7 @@ class _FileGridItemState extends State<FileGridItem> {
   }) {
     return OptimizedInteractionLayer(
       key: key,
+      fileBrowserActivation: widget.isDesktopMode,
       onTap: _handlePrimaryTap,
       onDoubleTap: _handleDoubleTap,
       onSecondaryTapUp: (details) {
@@ -290,7 +292,13 @@ class _FileGridItemState extends State<FileGridItem> {
   Widget build(BuildContext context) {
     return FileTagsTooltip(
       path: widget.file.path,
-      child: _buildSelection(context),
+      child: FileSelectionFrame(
+        grid: true,
+        selected: widget.isSelected,
+        onToggle: () =>
+            widget.toggleFileSelection(widget.file.path, ctrlSelect: true),
+        child: _buildSelection(context),
+      ),
     );
   }
 
@@ -308,7 +316,7 @@ class _FileGridItemState extends State<FileGridItem> {
 
   Widget _buildItem(BuildContext context, bool isVisuallySelected) {
     final ThemeData theme = Theme.of(context);
-    final String fileName = FileEntryPresentation.nameOf(
+    final String fileName = FileEntryPresentation.fileNameOf(
       context,
       widget.file.path,
       fallback: FileTypeUtils.getFileName(widget.file.path),

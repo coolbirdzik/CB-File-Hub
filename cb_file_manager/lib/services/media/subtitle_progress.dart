@@ -2,6 +2,7 @@ enum SubtitlePhase { off, missingModels, loading, processing, ready, failed }
 
 enum SubtitleWorkStage {
   idle,
+  unloadingModels,
   loadingSpeech,
   recognizing,
   loadingTranslation,

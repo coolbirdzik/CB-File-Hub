@@ -9,6 +9,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:cb_file_manager/design_system/fluent_chrome_surface.dart';
 import 'package:cb_file_manager/design_system/primitives/cb_panel_reveal.dart';
+import 'package:cb_file_manager/design_system/primitives/cb_loading_text.dart';
 import 'package:cb_file_manager/design_system/cb_tokens.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/config/translation_helper.dart';
@@ -447,19 +448,23 @@ class AggregateProgressIndicator extends StatelessWidget {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          CircularProgressIndicator(
-            value: aggregate.isIndeterminate ? null : aggregate.fraction,
-            strokeWidth: 3,
-            color: color,
-            backgroundColor: theme.colorScheme.surfaceContainerHighest,
-          ),
-          Icon(
-            aggregate.hasError
-                ? PhosphorIconsLight.warningCircle
-                : PhosphorIconsLight.arrowsClockwise,
-            size: size * 0.52,
-            color: color,
-          ),
+          if (aggregate.isIndeterminate || aggregate.fraction == null)
+            CbLoadingText(compact: true, highlightColor: color)
+          else ...[
+            CircularProgressIndicator(
+              value: aggregate.fraction,
+              strokeWidth: 3,
+              color: color,
+              backgroundColor: theme.colorScheme.surfaceContainerHighest,
+            ),
+            Icon(
+              aggregate.hasError
+                  ? PhosphorIconsLight.warningCircle
+                  : PhosphorIconsLight.arrowsClockwise,
+              size: size * 0.52,
+              color: color,
+            ),
+          ],
         ],
       ),
     );

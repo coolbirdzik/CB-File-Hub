@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/design_system/primitives/cb_refresh_indicator.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -68,7 +69,7 @@ class _NetworkConnectionScreenState extends State<NetworkConnectionScreen> {
       child: ClipRect(
         child: BlocBuilder<NetworkBrowsingBloc, NetworkBrowsingState>(
           builder: (context, state) {
-            return RefreshIndicator(
+            return CbRefreshIndicator(
               onRefresh: () async {
                 context.read<NetworkBrowsingBloc>().add(
                   const NetworkServicesListRequested(),

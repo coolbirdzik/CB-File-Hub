@@ -168,13 +168,7 @@ class _StorageSectionWidgetState extends State<StorageSectionWidget> {
             if (state.isLoading)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 12),
-                child: Center(
-                  child: SizedBox(
-                    height: 24,
-                    width: 24,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                ),
+                child: Center(child: CbLoadingText()),
               )
             else if (state.storageLocations.isEmpty)
               ListTile(

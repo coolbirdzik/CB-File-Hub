@@ -1,4 +1,5 @@
 import 'dart:io';
+import '../../../components/common/file_browser_options_scope.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:cb_file_manager/helpers/core/io_extensions.dart';
@@ -174,6 +175,20 @@ class _FolderDetailsItemState extends State<FolderDetailsItem> {
 
   @override
   Widget build(BuildContext context) {
+    return FileSelectionFrame(
+      details: true,
+      selected: _visuallySelected,
+      onToggle: widget.toggleFolderSelection == null
+          ? null
+          : () => widget.toggleFolderSelection!(
+              widget.folder.path,
+              ctrlSelect: true,
+            ),
+      child: _buildItem(context),
+    );
+  }
+
+  Widget _buildItem(BuildContext context) {
     final ThemeData theme = Theme.of(context);
     final bool isBeingCut = ItemInteractionStyle.isBeingCut(widget.folder.path);
 
@@ -218,6 +233,7 @@ class _FolderDetailsItemState extends State<FolderDetailsItem> {
               // Replace with optimized interaction layer
               Positioned.fill(
                 child: OptimizedInteractionLayer(
+                  fileBrowserActivation: widget.isDesktopMode,
                   onTap: () {
                     if (widget.isDesktopMode &&
                         widget.toggleFolderSelection != null) {
@@ -259,6 +275,9 @@ class _FolderDetailsItemState extends State<FolderDetailsItem> {
       DetailsColumn.name => DetailsCell(
         child: Row(
           children: [
+            if (FileBrowserOptionsScope.of(context).selectionCheckboxes &&
+                widget.toggleFolderSelection != null)
+              const SizedBox(width: FileSelectionFrame.checkWidth),
             Icon(
               _tagName != null
                   ? PhosphorIconsLight.tag

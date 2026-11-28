@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/design_system/primitives/cb_refresh_indicator.dart';
 import 'package:cb_file_manager/design_system/primitives/cb_popover_transition.dart';
 import 'package:cb_file_manager/ui/widgets/gallery_nsfw_toggle.dart';
 import 'package:material_ui/material_ui.dart';
@@ -322,7 +323,7 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
                         ),
                       )
                     : BoxDecoration(color: darkBackgroundColor)),
-          child: RefreshIndicator(
+          child: CbRefreshIndicator(
             onRefresh: _refreshData,
             child: CustomScrollView(
               controller: _scrollController,
@@ -403,7 +404,7 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
     final l10n = AppLocalizations.of(context)!;
     final isLight = theme.brightness == Brightness.light;
     final items = <Object>[..._libraries, ...sources];
-    return RefreshIndicator(
+    return CbRefreshIndicator(
       onRefresh: () async {
         await Future.wait([refreshDevice(), _refreshData()]);
       },

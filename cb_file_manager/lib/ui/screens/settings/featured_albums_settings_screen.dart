@@ -45,7 +45,7 @@ class _FeaturedAlbumsSettingsScreenState
         future: Future.wait([_configFuture, _allAlbumsFuture]),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(child: CbLoadingText());
           }
 
           if (snapshot.hasError) {

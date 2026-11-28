@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:math';
 import 'dart:ui' as ui;
 
+import 'package:cb_file_manager/design_system/primitives/cb_loading_text.dart';
 import 'package:cb_file_manager/design_system/primitives/cb_slider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/gestures.dart';
@@ -804,9 +805,9 @@ class ImageEditorScreenState extends State<ImageEditorScreen> {
                       key: ValueKey<String>('saving'),
                       width: 16,
                       height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.black54,
+                      child: CbLoadingText(
+                        compact: true,
+                        highlightColor: Colors.black54,
                       ),
                     )
                   : const Icon(
@@ -1185,10 +1186,7 @@ class ImageEditorScreenState extends State<ImageEditorScreen> {
         child: SizedBox(
           width: 28,
           height: 28,
-          child: CircularProgressIndicator(
-            strokeWidth: 2.2,
-            color: Colors.white60,
-          ),
+          child: CbLoadingText(compact: true, highlightColor: Colors.white60),
         ),
       );
     } else if (_tool == EditorTool.crop && !_comparing) {
@@ -1239,9 +1237,9 @@ class ImageEditorScreenState extends State<ImageEditorScreen> {
                         const SizedBox(
                           width: 12,
                           height: 12,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 1.6,
-                            color: Colors.white,
+                          child: CbLoadingText(
+                            compact: true,
+                            highlightColor: Colors.white,
                           ),
                         ),
                         const SizedBox(width: 8),

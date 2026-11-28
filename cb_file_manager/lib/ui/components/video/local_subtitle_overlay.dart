@@ -151,6 +151,7 @@ class LocalSubtitleControls extends StatelessWidget {
     final session = LocalSubtitleScope.of(context);
     return SubtitleControlButton(
       progress: session?.progress,
+      onEnabledChanged: session?.preferences.setEnabled,
       onSettings: onSettings,
       onRetry: session?.restart ?? onSettings,
       onExport: session == null

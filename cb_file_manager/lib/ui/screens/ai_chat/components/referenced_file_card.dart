@@ -191,28 +191,9 @@ class ReferencedFileCard extends StatelessWidget {
     bool isDark,
   ) {
     if (!file.contentLoaded || file.content == null) {
-      return Row(
-        children: [
-          SizedBox(
-            width: 10,
-            height: 10,
-            child: CircularProgressIndicator(
-              strokeWidth: 1.5,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(width: 6),
-          Text(
-            context.tr.aiLoadingContent,
-            style: TextStyle(
-              fontSize: 10,
-              color: isDark
-                  ? Colors.white.withValues(alpha: 0.4)
-                  : Colors.black.withValues(alpha: 0.4),
-              fontStyle: FontStyle.italic,
-            ),
-          ),
-        ],
+      return CbLoadingText(
+        text: context.tr.aiLoadingContent,
+        textAlign: TextAlign.start,
       );
     }
 

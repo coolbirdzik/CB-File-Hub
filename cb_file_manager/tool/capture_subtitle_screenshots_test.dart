@@ -261,7 +261,9 @@ void main() {
           await mount(false);
           await capture('player');
           await mount(true);
-          await tester.tap(find.byKey(const ValueKey('ai-subtitle-control')));
+          await tester.tap(
+            find.byKey(const ValueKey('ai-subtitle-settings-control')),
+          );
           await tester.pump();
           await tester.pump(const Duration(milliseconds: 300));
           expect(
@@ -386,6 +388,7 @@ class _Controls extends StatelessWidget {
         ),
         SubtitleControlButton(
           progress: progress,
+          onEnabledChanged: (_) {},
           onSettings: () {},
           onRetry: () {},
           onRegenerate: () {},

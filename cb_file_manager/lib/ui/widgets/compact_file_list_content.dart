@@ -28,7 +28,13 @@ class CompactFileListContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = displayName ?? FileEntryPresentation.nameOf(context, path);
+    final name = isFolder || isTag
+        ? displayName ?? FileEntryPresentation.nameOf(context, path)
+        : FileEntryPresentation.fileNameOf(
+            context,
+            path,
+            fallback: displayName,
+          );
     final rename = InlineRenameScope.maybeOf(context);
     final isRenaming = rename != null && rename.renamingPath == path;
     final style = Theme.of(context).textTheme.bodyMedium;

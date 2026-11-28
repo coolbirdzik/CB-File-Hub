@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:cb_file_manager/design_system/primitives/cb_loading_text.dart';
 import 'package:cb_file_manager/config/languages/app_localizations_delegate.dart';
 import 'package:cb_file_manager/design_system/cb_theme_builder.dart';
 import 'package:cb_file_manager/ui/components/common/shared_file_context_menu.dart';
@@ -162,7 +163,7 @@ void main() {
           loadChildSections: (_) {
             calls++;
             loadingWasPainted = find
-                .byType(CircularProgressIndicator)
+                .byType(CbLoadingText)
                 .evaluate()
                 .isNotEmpty;
             return pending.future;
@@ -194,7 +195,7 @@ void main() {
         pending.complete(loadedActions);
       }
       await tester.pumpAndSettle();
-      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(find.byType(CbLoadingText), findsNothing);
       expect(
         RendererBinding.instance.mouseTracker.debugDeviceActiveCursor(1),
         isNot(SystemMouseCursors.progress),

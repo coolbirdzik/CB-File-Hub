@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:cb_file_manager/design_system/primitives/cb_loading_text.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
@@ -555,24 +556,15 @@ class _LoadingRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = context.cbColors;
     return Padding(
       padding: const EdgeInsets.symmetric(
         horizontal: CbSpacing.lg,
         vertical: CbSpacing.md,
       ),
-      child: Row(
-        children: [
-          const SizedBox.square(
-            dimension: CbSizes.iconMd,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-          const SizedBox(width: CbSpacing.md),
-          Text(
-            label,
-            style: CbTypography.body.copyWith(color: c.textSecondary),
-          ),
-        ],
+      child: CbLoadingText(
+        text: label,
+        style: CbTypography.body,
+        textAlign: TextAlign.start,
       ),
     );
   }

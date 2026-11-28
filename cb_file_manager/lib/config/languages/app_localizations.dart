@@ -62,6 +62,7 @@ abstract class AppLocalizations {
   String get aiSubtitleRegenerate;
   String aiSubtitleCacheStats(int entries, String size);
   String get aiSubtitleLoadingSpeech;
+  String get aiSubtitleUnloadingModels;
   String get aiSubtitleLoadingTranslation;
   String get aiSubtitleRecognizing;
   String get aiSubtitleTranslating;
@@ -1148,6 +1149,17 @@ abstract class AppLocalizations {
   String get fileType;
   String get fileLastModified;
   String get fileAccessed;
+  String get propertiesOverview;
+  String get propertiesDetails;
+  String get propertiesMedia;
+  String get propertiesChecksum;
+  String get propertiesFileSystem;
+  String get propertiesExactSize;
+  String get propertiesMetadataChanged;
+  String get propertiesCalculateChecksum;
+  String get propertiesChecksumHint;
+  String get propertiesChecksumChanged;
+  String get propertiesChecksumCopied;
   String get loadingVideo;
   String get errorLoadingImage;
   String errorLoadingImageWithError(String error);
@@ -3330,4 +3342,18 @@ abstract class AppLocalizations {
 
   /// [reason] is a SubtitleBatchAutoReason name.
   String subtitleQueueAutoReason(String reason);
+
+  String get fileBrowserSettings;
+  String get showFileExtensions;
+  String get showFileExtensionsDescription;
+  String get showHiddenItems;
+  String get showHiddenItemsDescription;
+  String get showSystemItems;
+  String get showSystemItemsDescription;
+  String get fileSelectionCheckboxes;
+  String get fileSelectionCheckboxesDescription;
+  String get singleClickToOpen;
+  String get singleClickToOpenDescription;
+  String get fileBrowserSaveFailed;
+  String get fileBrowserRenameExtensionDescription;
 }

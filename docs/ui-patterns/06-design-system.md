@@ -95,6 +95,17 @@ Status colours (`c.status.danger`, `.success`, …) are independent of the accen
 | `CbTextField` | `TextField` + `InputDecoration` | 32px tall, static label above the field, no floating label |
 | `CbDialog` | `AlertDialog` | Built on `CbSurface`; `showCbConfirmDialog` covers the common case |
 | `CbKbd` | hand-drawn shortcut labels | Key caps (`Ctrl` `K`, `↵`, `Esc`) for menus and the command palette |
+| `CbLoadingText` | indeterminate circular/activity spinners | Ambient left-to-right text highlight, localized default and reduced-motion support |
+| `CbRefreshIndicator` | `RefreshIndicator` | Same pull-to-refresh gesture, with a text-based status instead of a spinner |
+
+### Loading states
+
+Use `CbLoadingText(text: ...)` for the operation's actual localized status;
+omit `text` only for a generic loading state. Animate the existing action
+label with `CbButton(loading: true, ...)` instead of adding a second indicator.
+In fixed-width icon-only slots, `CbLoadingText(compact: true)` uses a small
+ellipsis with an accessible loading label. Keep determinate progress bars and
+rings for actual measured progress, and skeletons for content placeholders.
 
 ## Library toolbar actions
 

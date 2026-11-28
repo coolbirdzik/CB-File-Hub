@@ -146,7 +146,7 @@ class _AutoRulesScreenState extends State<AutoRulesScreen> {
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CbLoadingText())
           : _rules.isEmpty
           ? _buildEmptyState(theme)
           : _buildRulesList(theme),
@@ -582,7 +582,7 @@ class _CreateAutoRuleDialogState extends State<CreateAutoRuleDialog> {
                   ? const Center(
                       child: Padding(
                         padding: EdgeInsets.all(48),
-                        child: CircularProgressIndicator(),
+                        child: CbLoadingText(),
                       ),
                     )
                   : SingleChildScrollView(
@@ -1061,7 +1061,7 @@ class _EditAutoRuleDialogState extends State<EditAutoRuleDialog> {
                   ? const Center(
                       child: Padding(
                         padding: EdgeInsets.all(48),
-                        child: CircularProgressIndicator(),
+                        child: CbLoadingText(),
                       ),
                     )
                   : SingleChildScrollView(

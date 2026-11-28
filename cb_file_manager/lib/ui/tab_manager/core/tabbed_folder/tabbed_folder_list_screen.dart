@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/design_system/primitives/cb_loading_text.dart';
 import 'package:cb_file_manager/design_system/primitives/cb_popover_transition.dart';
 import 'package:cb_file_manager/ui/widgets/file_properties_pane.dart';
 import 'package:cb_file_manager/ui/widgets/file_pane_layout.dart';
@@ -25,6 +26,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
+import 'package:cb_file_manager/helpers/files/file_browser_options.dart';
 import 'package:cb_file_manager/ui/widgets/thumbnail_loader.dart';
 import 'package:cb_file_manager/helpers/files/archive_path_utils.dart';
 import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
@@ -266,6 +268,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
   Set<String> _pendingDeletedFocusPaths = const {};
   String? _pendingNextFocusPathAfterDelete;
   bool _allowFileExtensionRename = false;
+  late FileBrowserOptions _lastBrowserOptions;
   bool _isMasonryLayout = false;
 
   /// Actual grid crossAxisCount from the file list (for arrow up/down in grid).
@@ -581,6 +584,13 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
       folderListBloc: _folderListBloc,
       clearKeyboardFocus: () => _keyboardController.clearFocus(),
     );
+    _lastBrowserOptions = UserPreferences.instance.fileBrowserOptions.value;
+    UserPreferences.instance.fileBrowserOptions.addListener(
+      _onBrowserOptionsChanged,
+    );
+    UserPreferences.instance.allowFileExtensionRename.addListener(
+      _onRenameExtensionPreferenceChanged,
+    );
 
     // Register mobile file actions controller for mobile UI
     if (Platform.isAndroid || Platform.isIOS) {
@@ -624,6 +634,12 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
 
   @override
   void dispose() {
+    UserPreferences.instance.fileBrowserOptions.removeListener(
+      _onBrowserOptionsChanged,
+    );
+    UserPreferences.instance.allowFileExtensionRename.removeListener(
+      _onRenameExtensionPreferenceChanged,
+    );
     VideoThumbnailHelper.clearFocusedFolderFill(widget.tabId);
     TabWindowTransfer.unregister(widget.tabId, _captureWindowState);
     _transferRestoreSubscription?.cancel();
@@ -830,6 +846,16 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
     _selectionCoordinator.clearSelection();
   }
 
+  void _onBrowserOptionsChanged() {
+    final next = UserPreferences.instance.fileBrowserOptions.value;
+    // Never leave selected items hidden from view after turning visibility off.
+    if ((_lastBrowserOptions.showHidden && !next.showHidden) ||
+        (_lastBrowserOptions.showSystem && !next.showSystem)) {
+      _clearSelection();
+    }
+    _lastBrowserOptions = next;
+  }
+
   void _startFileDrag(List<String> paths) {
     if (!Platform.isWindows || paths.isEmpty) return;
     WindowsExplorerDragDropService.startFileDrag(paths).then((result) {
@@ -971,32 +997,28 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
   Future<void> _loadAllowFileExtensionRenamePreference() async {
     final prefs = UserPreferences.instance;
     await prefs.init();
-    final allowFileExtensionRename = await prefs.getAllowFileExtensionRename();
-    if (!mounted) {
-      return;
-    }
-
-    setState(() {
-      _allowFileExtensionRename = allowFileExtensionRename;
-    });
-    _inlineRenameController.allowFileExtensionRename = allowFileExtensionRename;
+    _onRenameExtensionPreferenceChanged();
   }
 
   Future<void> _setAllowFileExtensionRename(bool value) async {
     final prefs = UserPreferences.instance;
     await prefs.init();
     await prefs.setAllowFileExtensionRename(value);
-    if (!mounted) {
-      return;
-    }
+  }
 
+  void _onRenameExtensionPreferenceChanged() {
+    if (!mounted) return;
+    final value = UserPreferences.instance.allowFileExtensionRename.value;
     setState(() {
       _allowFileExtensionRename = value;
     });
     _inlineRenameController.allowFileExtensionRename = value;
 
-    final controller = MobileFileActionsController.forTab(widget.tabId);
-    controller.allowFileExtensionRename = value;
+    if (Platform.isAndroid || Platform.isIOS) {
+      MobileFileActionsController.forTab(
+        widget.tabId,
+      ).allowFileExtensionRename = value;
+    }
   }
 
   void _handleCreatedFile(String createdPath) {
@@ -2343,23 +2365,10 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
     final color = theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.85);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(
-            width: 12,
-            height: 12,
-            child: CircularProgressIndicator(
-              strokeWidth: 1.5,
-              valueColor: AlwaysStoppedAnimation<Color>(color),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            context.tr.restoringTab,
-            style: theme.textTheme.bodySmall?.copyWith(color: color),
-          ),
-        ],
+      child: CbLoadingText(
+        text: context.tr.restoringTab,
+        style: theme.textTheme.bodySmall,
+        baseColor: color,
       ),
     );
   }

@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/design_system/primitives/cb_loading_text.dart';
 import '../../../design_system/primitives/cb_button.dart';
 import 'dart:convert';
 import 'package:material_ui/material_ui.dart';
@@ -563,7 +564,7 @@ class _WebDAVBrowserScreenState extends State<WebDAVBrowserScreen>
                 const SizedBox(
                   width: 20,
                   height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2.0),
+                  child: CbLoadingText(compact: true),
                 )
               else ...[
                 IconButton(

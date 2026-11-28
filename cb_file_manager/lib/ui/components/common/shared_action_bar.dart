@@ -12,6 +12,7 @@ import '../../../config/languages/app_localizations.dart';
 import '../../utils/grid_zoom_constraints.dart';
 import '../../utils/route.dart';
 import 'column_chooser_dialog.dart';
+import 'file_browser_preference_option.dart';
 
 class SharedActionBar {
   /// Tạo popup menu item cho các tùy chọn sắp xếp
@@ -456,30 +457,36 @@ class SharedActionBar {
             }
 
             if (onAllowFileExtensionRenameChanged != null) {
-              items.add(
-                PopupMenuItem<String>(
-                  value: 'toggle_file_extension_rename',
-                  child: Row(
-                    children: [
-                      Icon(
-                        PhosphorIconsLight.textAa,
-                        size: 20,
-                        color: allowFileExtensionRename
-                            ? Theme.of(context).colorScheme.primary
-                            : null,
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(child: Text(l10n.allowFileExtensionRename)),
-                      if (allowFileExtensionRename)
-                        Icon(
-                          PhosphorIconsLight.check,
-                          size: 18,
-                          color: Theme.of(context).colorScheme.primary,
+              items.add(const PopupMenuDivider());
+              for (final option in FileBrowserPreferenceOption.available()) {
+                final enabled =
+                    option == FileBrowserPreferenceOption.renameExtension
+                    ? allowFileExtensionRename
+                    : option.isEnabled(UserPreferences.instance);
+                items.add(
+                  PopupMenuItem<String>(
+                    value: option.menuId,
+                    child: Row(
+                      children: [
+                        Icon(option.icon, size: 20),
+                        const SizedBox(width: 10),
+                        Expanded(child: Text(option.label(l10n))),
+                        const SizedBox(width: 8),
+                        SizedBox(
+                          width: 18,
+                          child: enabled
+                              ? Icon(
+                                  PhosphorIconsLight.check,
+                                  size: 18,
+                                  color: Theme.of(context).colorScheme.primary,
+                                )
+                              : null,
                         ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              );
+                );
+              }
             }
 
             if (additionalMoreOptions != null &&
@@ -489,7 +496,7 @@ class SharedActionBar {
 
             return items;
           },
-          onSelected: (String value) {
+          onSelected: (String value) async {
             switch (value) {
               case 'selection_mode':
                 onSelectionModeToggled();
@@ -505,6 +512,15 @@ class SharedActionBar {
                 );
                 break;
               default:
+                if (onAllowFileExtensionRenameChanged != null) {
+                  for (final option
+                      in FileBrowserPreferenceOption.available()) {
+                    if (option.menuId == value) {
+                      await option.toggleFromMenu(context);
+                      return;
+                    }
+                  }
+                }
                 onAdditionalMoreOptionSelected?.call(value);
                 break;
             }

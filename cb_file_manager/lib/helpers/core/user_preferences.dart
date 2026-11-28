@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_display_preferences.dart';
+import 'package:cb_file_manager/helpers/files/file_browser_options.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:cb_file_manager/models/database/database_manager.dart';
 import 'package:path_provider/path_provider.dart';
@@ -52,6 +53,10 @@ class UserPreferences {
   final ValueNotifier<FileThumbnailFitMode> fileThumbnailFitMode =
       ValueNotifier<FileThumbnailFitMode>(FileThumbnailFitMode.cover);
   final ValueNotifier<bool> showRecentFoldersOnHome = ValueNotifier<bool>(true);
+  final ValueNotifier<FileBrowserOptions> fileBrowserOptions = ValueNotifier(
+    const FileBrowserOptions(),
+  );
+  final ValueNotifier<bool> allowFileExtensionRename = ValueNotifier(false);
 
   /// Whether Home shows the keyboard tip card (desktop). Dismissing the card
   /// clears it; the keyboard shortcuts page turns it back on.
@@ -65,6 +70,7 @@ class UserPreferences {
 
   // Shared preferences keys
   static const String _viewModeKey = 'view_mode';
+  static const String _fileBrowserOptionsKey = 'file_browser_options_v1';
   static const String _folderViewModePreferenceKey =
       'folder_view_mode_preference';
   static const String _sortOptionKey = 'sort_option';
@@ -236,6 +242,31 @@ class UserPreferences {
     } catch (_) {
       videoThumbnailViewportOnly.value = true;
     }
+
+    try {
+      final raw = await _getPreference<String>(_fileBrowserOptionsKey);
+      fileBrowserOptions.value = raw == null
+          ? const FileBrowserOptions()
+          : FileBrowserOptions.fromJson(
+              jsonDecode(raw) as Map<String, dynamic>,
+            );
+    } catch (_) {
+      fileBrowserOptions.value = const FileBrowserOptions();
+    }
+    try {
+      allowFileExtensionRename.value = await getAllowFileExtensionRename();
+    } catch (_) {
+      allowFileExtensionRename.value = false;
+    }
+  }
+
+  Future<bool> setFileBrowserOptions(FileBrowserOptions options) async {
+    final saved = await _savePreference<String>(
+      _fileBrowserOptionsKey,
+      jsonEncode(options.toJson()),
+    );
+    if (saved) fileBrowserOptions.value = options;
+    return saved;
   }
 
   /// Check if preferences have been initialized
@@ -746,7 +777,12 @@ class UserPreferences {
   }
 
   Future<bool> setAllowFileExtensionRename(bool value) async {
-    return await _savePreference<bool>(_allowFileExtensionRenameKey, value);
+    final saved = await _savePreference<bool>(
+      _allowFileExtensionRenameKey,
+      value,
+    );
+    if (saved) allowFileExtensionRename.value = value;
+    return saved;
   }
 
   /// Get trash bin view mode preference

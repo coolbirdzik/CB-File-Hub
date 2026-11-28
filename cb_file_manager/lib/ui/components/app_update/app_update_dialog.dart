@@ -768,24 +768,11 @@ class _BusyRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = context.cbColors;
-    return Row(
-      children: [
-        SizedBox.square(
-          dimension: 16,
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-            color: c.accent.base,
-          ),
-        ),
-        const SizedBox(width: CbSpacing.md),
-        Expanded(
-          child: Text(
-            text,
-            style: CbTypography.body.copyWith(color: c.textSecondary),
-          ),
-        ),
-      ],
+    return CbLoadingText(
+      text: text,
+      style: CbTypography.body,
+      maxLines: 2,
+      textAlign: TextAlign.start,
     );
   }
 }

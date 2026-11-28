@@ -1,27 +1,37 @@
-import 'package:cb_file_manager/ui/widgets/file_properties_details.dart';
-import 'package:cb_file_manager/design_system/tokens/cb_geometry_tokens.dart';
+import 'dart:async';
 import 'dart:io';
 
-import 'package:cb_file_manager/helpers/core/io_extensions.dart';
+import 'package:cb_file_manager/config/languages/app_localizations.dart';
+import 'package:cb_file_manager/design_system/cb_design_system.dart';
+import 'package:cb_file_manager/ui/controllers/selection_tags_controller.dart';
 import 'package:cb_file_manager/ui/dialogs/open_with_dialog.dart';
-import 'package:cb_file_manager/ui/utils/base_screen.dart';
+import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
+import 'package:cb_file_manager/ui/utils/format_utils.dart';
+import 'package:cb_file_manager/ui/widgets/file_properties_tabs.dart';
+import 'package:cb_file_manager/ui/widgets/selection_tag_editor.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:path/path.dart' as pathlib;
-import 'package:flutter/services.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
-import 'package:cb_file_manager/ui/widgets/tag_management_section.dart';
-import 'package:cb_file_manager/config/languages/app_localizations.dart';
-import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
-import 'package:cb_file_manager/ui/components/common/app_toast.dart';
+
 import '../../utils/route.dart';
 
 class FileDetailsScreen extends StatefulWidget {
   final File file;
 
-  /// Tab index to show initially (0 = default details tab)
+  /// 0 opens the overview; 1 is the existing Manage Tags navigation target.
   final int initialTab;
 
   const FileDetailsScreen({super.key, required this.file, this.initialTab = 0});
+
+  /// Keep the current folder or search view behind the Properties inspector.
+  static Future<void> show(
+    BuildContext context, {
+    required File file,
+    int initialTab = 0,
+  }) => RouteUtils.showAcrylicDialog<void>(
+    context: context,
+    builder: (_) => FileDetailsScreen(file: file, initialTab: initialTab),
+  );
 
   @override
   State<FileDetailsScreen> createState() => _FileDetailsScreenState();
@@ -29,389 +39,80 @@ class FileDetailsScreen extends StatefulWidget {
 
 class _FileDetailsScreenState extends State<FileDetailsScreen> {
   late Future<FileStat> _fileStatFuture;
-  bool _inAndroidPip = false;
-  bool _showTagSection = false;
+  final _inspectorKey = GlobalKey();
 
   @override
   void initState() {
     super.initState();
     _fileStatFuture = widget.file.stat();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        setState(() {
-          _showTagSection = true;
-        });
-      }
-    });
-    // Listen PiP changes to hide BaseScreen AppBar when in PiP
-    const channel = MethodChannel('cb_file_manager/pip');
-    channel.setMethodCallHandler((call) async {
-      if (call.method == 'onPipChanged') {
-        final args = call.arguments;
-        bool inPip = false;
-        if (args is Map) {
-          inPip = args['inPip'] == true;
-        }
-        if (mounted) {
-          setState(() => _inAndroidPip = inPip);
-        }
-      }
-    });
+  }
 
-    // Set initial tab if specified
-    if (widget.initialTab > 0) {
-      // We'll switch to the specified tab after the build is complete
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        // For now, just scroll to the Tags section if initialTab = 1
-        if (widget.initialTab == 1) {
-          // Find a simpler way to scroll to the Tags section
-          final scrollController = PrimaryScrollController.of(context);
-          // Scroll to the estimated position of the Tags section (value based on UI height)
-          scrollController.animateTo(
-            500, // Estimated position of the Tags section
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeInOut,
-          );
-        }
-      });
+  @override
+  void didUpdateWidget(covariant FileDetailsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.file.path != widget.file.path) {
+      _fileStatFuture = widget.file.stat();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final localizations = AppLocalizations.of(context)!;
-    final bool isImage = FileTypeUtils.isImageFile(widget.file.path);
-    final bool isAudio = FileTypeUtils.isAudioFile(widget.file.path);
-
-    final theme = Theme.of(context);
-    final bool isDesktop =
-        Platform.isWindows || Platform.isLinux || Platform.isMacOS;
-    final Color bgColor = theme.colorScheme.surface;
-    final Color cardColor = theme.cardColor;
-    final Color textColor = theme.colorScheme.onSurface;
-    final Color secondaryTextColor = theme.colorScheme.onSurfaceVariant;
-
-    return BaseScreen(
-      title: _inAndroidPip ? '' : localizations.properties,
-      showAppBar: !_inAndroidPip,
-      actions: [
-        if (!_inAndroidPip)
-          IconButton(
-            icon: const Icon(PhosphorIconsLight.arrowSquareOut),
-            tooltip: localizations.openWith,
-            onPressed: () {
-              _showOpenWithDialog();
-            },
-          ),
-        if (!_inAndroidPip)
-          IconButton(
-            icon: const Icon(PhosphorIconsLight.shareFat),
-            onPressed: () {
-              AppToast.error(context, localizations.operationFailed);
-            },
-          ),
-      ],
-      // When in PiP, avoid extra paddings/margins that could be captured.
-      body: Container(
-        color: bgColor,
-        child: Padding(
-          padding: EdgeInsets.only(
-            top: (isDesktop && !_inAndroidPip)
-                ? MediaQuery.of(context).padding.top + kToolbarHeight
-                : 0,
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // File preview section with hero animation
-                if (isImage || isAudio)
-                  Container(
-                    width: double.infinity,
-                    decoration: const BoxDecoration(color: Colors.black),
+    final l = AppLocalizations.of(context)!;
+    final media = MediaQuery.of(context);
+    final contentHeight = (media.size.height - media.viewInsets.vertical - 144)
+        .clamp(160.0, 420.0);
+    return CbDialog(
+      title: l.properties,
+      width: 680,
+      content: SizedBox(
+        width: double.infinity,
+        height: contentHeight,
+        child: FutureBuilder<FileStat>(
+          future: _fileStatFuture,
+          builder: (context, snapshot) {
+            final stat = snapshot.data;
+            final isDirectory = stat?.type == FileSystemEntityType.directory;
+            return LayoutBuilder(
+              builder: (context, constraints) {
+                final compact = constraints.maxHeight < 280;
+                final inspector = FilePropertiesTabs(
+                  key: _inspectorKey,
+                  filePath: widget.file.path,
+                  statFuture: _fileStatFuture,
+                  isDirectory: isDirectory,
+                  scrollContent: !compact,
+                  initialTab: widget.initialTab == 1
+                      ? FilePropertiesTab.tags
+                      : FilePropertiesTab.overview,
+                  tags: isDirectory
+                      ? null
+                      : _PropertiesTags(
+                          key: ValueKey(widget.file.path),
+                          filePath: widget.file.path,
+                        ),
+                );
+                final header = _header(context, l, stat, isDirectory);
+                if (compact) {
+                  return SingleChildScrollView(
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        if (isImage) _buildImagePreview(),
-                        if (isAudio) _buildAudioPreview(),
+                        header,
+                        const SizedBox(height: CbSpacing.lg),
+                        inspector,
                       ],
                     ),
-                  ),
-
-                const SizedBox(height: 16),
-
-                // Basic file info card
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: Card(
-                    elevation: 0,
-                    color: cardColor,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildHeaderSection(),
-                          const SizedBox(height: 16),
-                          _buildFileDetails(textColor, secondaryTextColor),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 16),
-
-                // Tags section
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: Card(
-                    elevation: 0,
-                    color: cardColor,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(
-                                PhosphorIconsLight.bookmark,
-                                color: textColor,
-                                size: 20,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                localizations.tags,
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: textColor,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          // Use the common tag management component
-                          if (_showTagSection)
-                            TagManagementSection(
-                              filePath: widget.file.path,
-                              showFileTagsHeader: false,
-                              onTagsUpdated: () {
-                                // Optional callback if needed
-                              },
-                            )
-                          else
-                            const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 12),
-                              child: Center(
-                                child: SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 24),
-
-                // Actions section
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: Card(
-                    elevation: 0,
-                    color: cardColor,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Column(
-                        children: [
-                          ListTile(
-                            leading: Icon(
-                              PhosphorIconsLight.arrowSquareOut,
-                              color: textColor,
-                            ),
-                            title: Text(
-                              localizations.openWith,
-                              style: TextStyle(color: textColor),
-                            ),
-                            onTap: () => _showOpenWithDialog(),
-                          ),
-                          const Divider(height: 1),
-                          ListTile(
-                            leading: Icon(
-                              PhosphorIconsLight.squaresFour,
-                              color: textColor,
-                            ),
-                            title: Text(
-                              localizations.chooseDefaultApp,
-                              style: TextStyle(color: textColor),
-                            ),
-                            onTap: () => _showOpenWithDialog(
-                              saveAsDefaultOnSelect: true,
-                            ),
-                          ),
-                          const Divider(height: 1),
-                          ListTile(
-                            leading: Icon(
-                              PhosphorIconsLight.fileText,
-                              color: textColor,
-                            ),
-                            title: Text(
-                              localizations.createCopy,
-                              style: TextStyle(color: textColor),
-                            ),
-                            onTap: () {
-                              // Make a copy functionality
-                              AppToast.error(
-                                context,
-                                localizations.operationFailed,
-                              );
-                            },
-                          ),
-                          const Divider(height: 1),
-                          ListTile(
-                            leading: Icon(
-                              PhosphorIconsLight.trash,
-                              color: theme.colorScheme.error,
-                            ),
-                            title: Text(
-                              localizations.deleteFile,
-                              style: TextStyle(color: theme.colorScheme.error),
-                            ),
-                            onTap: () {
-                              // Delete functionality
-                              AppToast.error(
-                                context,
-                                localizations.operationFailed,
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 24),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHeaderSection() {
-    final theme = Theme.of(context);
-    final Color textColor = theme.colorScheme.onSurface;
-
-    IconData fileIcon;
-    Color iconColor;
-
-    // Set icon based on file type using FileTypeUtils
-    if (FileTypeUtils.isImageFile(widget.file.path)) {
-      fileIcon = PhosphorIconsLight.image;
-      iconColor = theme.colorScheme.primary;
-    } else if (FileTypeUtils.isVideoFile(widget.file.path)) {
-      fileIcon = PhosphorIconsLight.videoCamera;
-      iconColor = theme.colorScheme.error;
-    } else if (FileTypeUtils.isAudioFile(widget.file.path)) {
-      fileIcon = PhosphorIconsLight.musicNotes;
-      iconColor = theme.colorScheme.tertiary;
-    } else if (FileTypeUtils.isDocumentFile(widget.file.path)) {
-      fileIcon = PhosphorIconsLight.fileText;
-      iconColor = theme.colorScheme.primary;
-    } else if (FileTypeUtils.isSpreadsheetFile(widget.file.path)) {
-      fileIcon = PhosphorIconsLight.squaresFour;
-      iconColor = theme.colorScheme.tertiary;
-    } else {
-      fileIcon = PhosphorIconsLight.file;
-      iconColor = theme.colorScheme.onSurfaceVariant;
-    }
-
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: iconColor.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Icon(fileIcon, size: 28, color: iconColor),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                pathlib.basename(widget.file.path),
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: textColor,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              Text(
-                widget.file.extension().toUpperCase(),
-                style: TextStyle(
-                  fontSize: 14,
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildImagePreview() {
-    final localizations = AppLocalizations.of(context)!;
-    return Container(
-      width: double.infinity,
-      height: 300,
-      color: Colors.black,
-      child: Hero(
-        tag: widget.file.path,
-        child: Image.file(
-          widget.file,
-          fit: BoxFit.contain,
-          filterQuality: FilterQuality.high,
-          errorBuilder: (context, error, stackTrace) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(
-                    PhosphorIconsLight.imageBroken,
-                    size: 64,
-                    color: Colors.white54,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    localizations.errorLoadingImage,
-                    style: const TextStyle(color: Colors.white70),
-                  ),
-                ],
-              ),
+                  );
+                }
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    header,
+                    const SizedBox(height: CbSpacing.lg),
+                    Expanded(child: inspector),
+                  ],
+                );
+              },
             );
           },
         ),
@@ -419,80 +120,118 @@ class _FileDetailsScreenState extends State<FileDetailsScreen> {
     );
   }
 
-  Widget _buildAudioPreview() {
-    final localizations = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 16),
-      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+  IconData _fileIcon(bool isDirectory) {
+    final filePath = widget.file.path;
+    if (isDirectory) return PhosphorIconsLight.folder;
+    if (FileTypeUtils.isImageFile(filePath)) return PhosphorIconsLight.image;
+    if (FileTypeUtils.isVideoFile(filePath)) {
+      return PhosphorIconsLight.videoCamera;
+    }
+    if (FileTypeUtils.isAudioFile(filePath)) {
+      return PhosphorIconsLight.musicNotes;
+    }
+    if (FileTypeUtils.isDocumentFile(filePath)) {
+      return PhosphorIconsLight.fileText;
+    }
+    if (FileTypeUtils.isSpreadsheetFile(filePath)) {
+      return PhosphorIconsLight.squaresFour;
+    }
+    return PhosphorIconsLight.file;
+  }
+
+  Widget _header(
+    BuildContext context,
+    AppLocalizations l,
+    FileStat? stat,
+    bool isDirectory,
+  ) {
+    final c = context.cbColors;
+    final filePath = widget.file.path;
+    final type = isDirectory
+        ? l.folder
+        : FileTypeUtils.getFileTypeLabel(
+            context,
+            FileTypeUtils.getFileExtension(filePath),
+          );
+    final size =
+        stat != null && !isDirectory && stat.type == FileSystemEntityType.file
+        ? FormatUtils.formatFileSizeExact(stat.size)
+        : null;
+    return CbSurface(
+      radius: CbRadii.md,
+      padding: const EdgeInsets.all(CbSpacing.lg),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.tertiary.withValues(alpha: 0.2),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              PhosphorIconsLight.musicNotes,
-              size: 64,
-              color: theme.colorScheme.tertiary,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            pathlib.basename(widget.file.path),
-            style: const TextStyle(color: Colors.white, fontSize: 18),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 24),
           Row(
-            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              IconButton(
-                icon: const Icon(
-                  PhosphorIconsLight.skipBack,
-                  color: Colors.white,
-                ),
-                iconSize: 36,
-                onPressed: () {},
-              ),
-              const SizedBox(width: 16),
-              ElevatedButton(
-                onPressed: () {
-                  AppToast.error(context, localizations.operationFailed);
-                },
-                style: ElevatedButton.styleFrom(
-                  shape: const RoundedRectangleBorder(
-                    borderRadius: CbRadii.buttonAll,
+              CbSurface(
+                radius: CbRadii.md,
+                color: c.fill,
+                width: CbSpacing.xxxl,
+                height: CbSpacing.xxxl,
+                child: Center(
+                  child: Icon(
+                    _fileIcon(isDirectory),
+                    size: CbSizes.iconXl,
+                    color: c.icon,
                   ),
-                  padding: const EdgeInsets.all(20),
-                  backgroundColor: theme.colorScheme.tertiary,
                 ),
-                child: const Icon(PhosphorIconsLight.play, size: 32),
               ),
-              const SizedBox(width: 16),
-              IconButton(
-                icon: const Icon(
-                  PhosphorIconsLight.skipForward,
-                  color: Colors.white,
+              const SizedBox(width: CbSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      pathlib.basename(filePath),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: CbTypography.headingLg.copyWith(
+                        color: c.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: CbSpacing.xxs),
+                    Text(
+                      [type, ?size].join(' · '),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: CbTypography.bodySm.copyWith(
+                        color: c.textSecondary,
+                      ),
+                    ),
+                  ],
                 ),
-                iconSize: 36,
-                onPressed: () {},
               ),
             ],
           ),
+          if (!isDirectory) ...[
+            const SizedBox(height: CbSpacing.md),
+            Wrap(
+              spacing: CbSpacing.sm,
+              runSpacing: CbSpacing.xs,
+              children: [
+                CbButton(
+                  label: l.openWith,
+                  icon: PhosphorIconsLight.arrowSquareOut,
+                  size: CbButtonSize.sm,
+                  onPressed: _showOpenWithDialog,
+                ),
+                CbButton(
+                  label: l.chooseDefaultApp,
+                  icon: PhosphorIconsLight.squaresFour,
+                  size: CbButtonSize.sm,
+                  variant: CbButtonVariant.ghost,
+                  onPressed: () =>
+                      _showOpenWithDialog(saveAsDefaultOnSelect: true),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
   }
-
-  Widget _buildFileDetails(Color textColor, Color secondaryTextColor) =>
-      FilePropertiesDetails(
-        filePath: widget.file.path,
-        statFuture: _fileStatFuture,
-      );
 
   void _showOpenWithDialog({bool saveAsDefaultOnSelect = false}) {
     RouteUtils.showAcrylicDialog(
@@ -500,6 +239,68 @@ class _FileDetailsScreenState extends State<FileDetailsScreen> {
       builder: (context) => OpenWithDialog(
         filePath: widget.file.path,
         saveAsDefaultOnSelect: saveAsDefaultOnSelect,
+      ),
+    );
+  }
+}
+
+/// The same immediate-save tag editor used by the docked Properties pane.
+class _PropertiesTags extends StatefulWidget {
+  const _PropertiesTags({super.key, required this.filePath});
+  final String filePath;
+
+  @override
+  State<_PropertiesTags> createState() => _PropertiesTagsState();
+}
+
+class _PropertiesTagsState extends State<_PropertiesTags> {
+  final _controller = SelectionTagsController();
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_controller.select([widget.filePath]));
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context)!;
+    return ListenableBuilder(
+      listenable: _controller,
+      builder: (context, _) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final failure in _controller.failures)
+            Padding(
+              padding: const EdgeInsets.only(bottom: CbSpacing.sm),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '${l.propertiesTagFailure}: ${failure.paths.length}',
+                      style: CbTypography.bodySm.copyWith(
+                        color: context.cbColors.status.danger,
+                      ),
+                    ),
+                  ),
+                  CbButton(
+                    label: l.retry,
+                    size: CbButtonSize.xs,
+                    onPressed: _controller.saving
+                        ? null
+                        : () => _controller.retry(failure),
+                  ),
+                ],
+              ),
+            ),
+          SelectionTagEditor(controller: _controller),
+        ],
       ),
     );
   }

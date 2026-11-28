@@ -16,6 +16,7 @@ class SubtitleWorker {
   String? _modelPath;
   String? _runtimePath;
   Future<void>? _cpuRecovery;
+  Future<void>? _launching, _closing;
   SubtitleWorker({
     this.executableOverride,
     this.arguments = const [],
@@ -88,7 +89,16 @@ class SubtitleWorker {
     }
   }
 
-  Future<void> _launch(String path) async {
+  Future<void> _launch(String path) {
+    if (_stopped) {
+      return Future.error(StateError('Subtitle processing cancelled'));
+    }
+    return _launching = _launchProcess(
+      path,
+    ).whenComplete(() => _launching = null);
+  }
+
+  Future<void> _launchProcess(String path) async {
     final process = await Process.start(
       path,
       arguments,
@@ -256,21 +266,31 @@ class SubtitleWorker {
 
   Future<void> stop() async {
     _stopped = true;
+    final launching = _launching;
     await _closeProcess();
+    if (launching != null) {
+      try {
+        await launching;
+      } catch (_) {
+        // A cancelled launch waits for its child to exit before throwing.
+      }
+    }
   }
 
-  Future<void> _closeProcess() async {
+  Future<void> _closeProcess() =>
+      _closing ??= _terminateProcess().whenComplete(() => _closing = null);
+
+  Future<void> _terminateProcess() async {
     final process = _process;
     _process = null;
     _fail(StateError('Subtitle processing cancelled'));
     if (process == null) return;
     process.kill();
-    await process.exitCode.timeout(
-      const Duration(seconds: 3),
-      onTimeout: () {
-        process.kill(ProcessSignal.sigkill);
-        return -1;
-      },
-    );
+    try {
+      await process.exitCode.timeout(const Duration(seconds: 3));
+    } on TimeoutException {
+      process.kill(ProcessSignal.sigkill);
+      await process.exitCode.timeout(const Duration(seconds: 5));
+    }
   }
 }

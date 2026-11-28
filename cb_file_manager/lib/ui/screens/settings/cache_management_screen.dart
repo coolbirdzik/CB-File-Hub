@@ -358,7 +358,7 @@ class _CacheManagementScreenState extends State<CacheManagementScreen> {
                       ? const SizedBox(
                           width: 16,
                           height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
+                          child: CbLoadingText(compact: true),
                         )
                       : const Icon(
                           PhosphorIconsLight.arrowsClockwise,
@@ -393,7 +393,7 @@ class _CacheManagementScreenState extends State<CacheManagementScreen> {
               ? const SizedBox(
                   width: 18,
                   height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+                  child: CbLoadingText(compact: true),
                 )
               : const Icon(PhosphorIconsLight.arrowsClockwise),
         ),
@@ -489,7 +489,7 @@ class _CacheManagementScreenState extends State<CacheManagementScreen> {
               ? const SizedBox(
                   width: 18,
                   height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+                  child: CbLoadingText(compact: true),
                 )
               : const Icon(PhosphorIconsLight.trash),
           label: Text(l10n?.clearAllCache ?? 'Clear all cache'),
@@ -849,7 +849,7 @@ class _CacheManagementScreenState extends State<CacheManagementScreen> {
                       ? const SizedBox(
                           width: 14,
                           height: 14,
-                          child: CircularProgressIndicator(strokeWidth: 2),
+                          child: CbLoadingText(compact: true),
                         )
                       : const Icon(PhosphorIconsLight.broom, size: 16),
                   label: Text(

@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/design_system/primitives/cb_loading_text.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
@@ -251,11 +252,7 @@ class _FtpConnectionFormState extends State<FtpConnectionForm> {
               FilledButton(
                 onPressed: _isLoading ? null : _connect,
                 child: _isLoading
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
+                    ? CbLoadingText(text: l10n.connect)
                     : Text(l10n.connect),
               ),
             ],

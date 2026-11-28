@@ -1,4 +1,5 @@
 import 'dart:io';
+import '../../../components/common/file_browser_options_scope.dart';
 import 'package:cb_file_manager/ui/widgets/file_tags_tooltip.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:cb_file_manager/helpers/files/file_attributes.dart';
@@ -199,7 +200,16 @@ class _FileDetailsItemState extends State<FileDetailsItem> {
 
   @override
   Widget build(BuildContext context) {
-    return FileTagsTooltip(path: widget.file.path, child: _buildItem(context));
+    return FileTagsTooltip(
+      path: widget.file.path,
+      child: FileSelectionFrame(
+        details: true,
+        selected: _visuallySelected,
+        onToggle: () =>
+            widget.toggleFileSelection(widget.file.path, ctrlSelect: true),
+        child: _buildItem(context),
+      ),
+    );
   }
 
   Widget _buildItem(BuildContext context) {
@@ -256,6 +266,7 @@ class _FileDetailsItemState extends State<FileDetailsItem> {
               // Add optimized interaction layer on top
               Positioned.fill(
                 child: OptimizedInteractionLayer(
+                  fileBrowserActivation: widget.isDesktopMode,
                   onTap: () {
                     if (widget.isDesktopMode) {
                       _handleFileSelection();
@@ -298,6 +309,8 @@ class _FileDetailsItemState extends State<FileDetailsItem> {
       DetailsColumn.name => DetailsCell(
         child: Row(
           children: [
+            if (FileBrowserOptionsScope.of(context).selectionCheckboxes)
+              const SizedBox(width: FileSelectionFrame.checkWidth),
             // Use a dedicated widget for file icon with a key to prevent rebuilds
             _OptimizedFileIcon(
               key: _thumbnailKey,
@@ -425,7 +438,7 @@ class _FileDetailsItemState extends State<FileDetailsItem> {
         renameController.renamingPath == widget.file.path;
 
     final textWidget = Text(
-      FileEntryPresentation.nameOf(
+      FileEntryPresentation.fileNameOf(
         context,
         widget.file.path,
         fallback: FileTypeUtils.getFileName(widget.file.path),

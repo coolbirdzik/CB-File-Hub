@@ -1,5 +1,7 @@
 import 'dart:io';
 import 'package:flutter/gestures.dart';
+import 'package:flutter/services.dart';
+import 'file_browser_options_scope.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:path/path.dart' as p;
 import '../../widgets/file_drag_drop_item.dart';
@@ -20,6 +22,9 @@ class OptimizedInteractionLayer extends StatefulWidget {
   final void Function(TapUpDetails)? onSecondaryTapUp;
   final void Function(TapUpDetails)? onTertiaryTapUp;
 
+  /// Opt in only for file browser open gestures, never other double taps.
+  final bool fileBrowserActivation;
+
   const OptimizedInteractionLayer({
     super.key,
     this.child,
@@ -30,6 +35,7 @@ class OptimizedInteractionLayer extends StatefulWidget {
     this.onSecondaryTap,
     this.onSecondaryTapUp,
     this.onTertiaryTapUp,
+    this.fileBrowserActivation = false,
   });
 
   @override
@@ -44,6 +50,7 @@ class OptimizedInteractionLayerState extends State<OptimizedInteractionLayer> {
   TapDownDetails? _deferredTap;
   int _deferredTapTime = 0;
   bool _pressHandled = false;
+  bool _singleActivation = false;
   static const int _doubleTapTimeout = 300; // milliseconds
   static const double _doubleTapMaxDistance = 40.0; // pixels
 
@@ -53,7 +60,8 @@ class OptimizedInteractionLayerState extends State<OptimizedInteractionLayer> {
   /// only after the button came back up.
   void _handlePointerDown(PointerDownEvent event) {
     _pressHandled = false;
-    if (event.kind != PointerDeviceKind.mouse ||
+    if (_singleActivation ||
+        event.kind != PointerDeviceKind.mouse ||
         event.buttons != kPrimaryMouseButton ||
         widget.onLongPress != null ||
         widget.onLongPressStart != null) {
@@ -72,7 +80,7 @@ class OptimizedInteractionLayerState extends State<OptimizedInteractionLayer> {
   }
 
   void _handleTapDown(TapDownDetails details) {
-    if (_pressHandled) return;
+    if (_singleActivation || _pressHandled) return;
     _pressDown(details);
   }
 
@@ -130,6 +138,23 @@ class OptimizedInteractionLayerState extends State<OptimizedInteractionLayer> {
   }
 
   void _handleTap() {
+    if (_singleActivation) {
+      // Do not activate on pointer-down; a drag must not open the item.
+      _deferredTap = null;
+      _pressHandled = false;
+      _lastTapTime = 0;
+      _lastTapPosition = null;
+      _skipNextTap = false;
+      final keyboard = HardwareKeyboard.instance;
+      if (keyboard.isShiftPressed ||
+          keyboard.isControlPressed ||
+          keyboard.isMetaPressed) {
+        widget.onTap();
+      } else {
+        widget.onDoubleTap?.call();
+      }
+      return;
+    }
     final deferred = _deferredTap;
     _deferredTap = null;
     _pressHandled = false;
@@ -156,6 +181,10 @@ class OptimizedInteractionLayerState extends State<OptimizedInteractionLayer> {
 
   @override
   Widget build(BuildContext context) {
+    _singleActivation =
+        widget.fileBrowserActivation &&
+        widget.onDoubleTap != null &&
+        FileBrowserOptionsScope.of(context).singleClickToOpen;
     return Listener(
       onPointerDown: _handlePointerDown,
       child: _buildGestureDetector(),

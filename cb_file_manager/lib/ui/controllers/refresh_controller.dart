@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:cb_file_manager/design_system/primitives/cb_refresh_indicator.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_bloc.dart';
@@ -123,11 +124,7 @@ class RefreshController {
     required VoidCallback onRefreshStart,
     required VoidCallback onRefreshComplete,
   }) {
-    return RefreshIndicator(
-      // Improve mobile experience with better colors and behavior
-      color: Theme.of(context).colorScheme.primary,
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      strokeWidth: 2.0,
+    return CbRefreshIndicator(
       displacement: Platform.isAndroid || Platform.isIOS ? 40.0 : 60.0,
       onRefresh: () async {
         // Add haptic feedback for mobile

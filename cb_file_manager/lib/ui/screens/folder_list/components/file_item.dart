@@ -1,5 +1,6 @@
 import 'package:cb_file_manager/ui/widgets/compact_file_list_content.dart';
 import 'dart:io';
+import '../../../components/common/file_browser_options_scope.dart';
 import 'package:cb_file_manager/ui/widgets/file_tags_tooltip.dart';
 import 'dart:async'; // Thêm import cho StreamSubscription
 // For lerpDouble
@@ -417,7 +418,19 @@ class _FileItemState extends State<FileItem> {
 
   @override
   Widget build(BuildContext context) {
-    return FileTagsTooltip(path: widget.file.path, child: _buildItem(context));
+    return FileTagsTooltip(
+      path: widget.file.path,
+      child: FileSelectionFrame(
+        grid:
+            widget.isDesktopMode &&
+            widget.showItemBackground &&
+            !widget.compact,
+        selected: widget.isSelected,
+        onToggle: () =>
+            widget.toggleFileSelection(widget.file.path, ctrlSelect: true),
+        child: _buildItem(context),
+      ),
+    );
   }
 
   Widget _buildItem(BuildContext context) {
@@ -505,6 +518,8 @@ class _FileItemState extends State<FileItem> {
                               ? 36
                               : 80, // Vùng icon + padding
                           child: OptimizedInteractionLayer(
+                            fileBrowserActivation:
+                                widget.isDesktopMode && widget.compact,
                             onTap: () {
                               // Click vào icon sẽ select item
                               _handleSelection();
@@ -537,6 +552,7 @@ class _FileItemState extends State<FileItem> {
                             right: 0,
                             bottom: 0,
                             child: OptimizedInteractionLayer(
+                              fileBrowserActivation: widget.isDesktopMode,
                               onTap: () {
                                 if (widget.isDesktopMode) {
                                   _handleSelection();
@@ -1030,7 +1046,9 @@ class _FileItemContentState extends State<_FileItemContent> {
     }
 
     return Text(
-      _getDisplayName(widget.file),
+      FileBrowserOptionsScope.of(
+        context,
+      ).fileLabel(_getDisplayName(widget.file)),
       style: Theme.of(
         context,
       ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w500),

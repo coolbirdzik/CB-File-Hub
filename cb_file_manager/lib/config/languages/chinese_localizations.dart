@@ -122,6 +122,8 @@ class ChineseLocalizations implements AppLocalizations {
   @override
   String get aiSubtitleLoadingSpeech => '正在加载语音模型';
   @override
+  String get aiSubtitleUnloadingModels => '正在卸载旧模型';
+  @override
   String get aiSubtitleLoadingTranslation => '正在加载翻译模型';
   @override
   String get aiSubtitleRecognizing => '正在识别音频';
@@ -2366,6 +2368,28 @@ class ChineseLocalizations implements AppLocalizations {
   String get fileLastModified => '最后修改';
   @override
   String get fileAccessed => '访问时间';
+  @override
+  String get propertiesOverview => '概览';
+  @override
+  String get propertiesDetails => '详细信息';
+  @override
+  String get propertiesMedia => '媒体';
+  @override
+  String get propertiesChecksum => '校验和';
+  @override
+  String get propertiesFileSystem => '文件系统';
+  @override
+  String get propertiesExactSize => '精确大小';
+  @override
+  String get propertiesMetadataChanged => '元数据修改时间';
+  @override
+  String get propertiesCalculateChecksum => '计算 SHA-256';
+  @override
+  String get propertiesChecksumHint => '仅在需要时计算校验和。大文件可能需要一些时间。';
+  @override
+  String get propertiesChecksumChanged => '计算过程中文件发生了变化，请重新计算。';
+  @override
+  String get propertiesChecksumCopied => '已将校验和复制到剪贴板';
   @override
   String get loadingVideo => '正在加载视频...';
   @override
@@ -7295,4 +7319,32 @@ class ChineseLocalizations implements AppLocalizations {
     'failures' => '读取失败，已减少',
     _ => '',
   };
+
+  @override
+  String get fileBrowserSettings => '文件浏览';
+  @override
+  String get showFileExtensions => '显示文件扩展名';
+  @override
+  String get showFileExtensionsDescription => '显示包含扩展名的完整文件名。';
+  @override
+  String get showHiddenItems => '显示隐藏项目';
+  @override
+  String get showHiddenItemsDescription => '显示系统标记为隐藏的项目或 Unix 中以点开头的项目。';
+  @override
+  String get showSystemItems => '显示 Windows 系统项目';
+  @override
+  String get showSystemItemsDescription => '包含具有 Windows 系统属性的项目。';
+  @override
+  String get fileSelectionCheckboxes => '项目选择复选框';
+  @override
+  String get fileSelectionCheckboxesDescription =>
+      '无需按住 Ctrl 或 Command 即可选择或取消选择项目。';
+  @override
+  String get singleClickToOpen => '单击打开';
+  @override
+  String get singleClickToOpenDescription => '单击而不是双击打开项目；修饰键仍用于选择。';
+  @override
+  String get fileBrowserSaveFailed => '无法保存文件浏览设置。';
+  @override
+  String get fileBrowserRenameExtensionDescription => '重命名时允许修改扩展名；否则锁定扩展名。';
 }

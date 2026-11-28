@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/design_system/primitives/cb_loading_text.dart';
 import 'package:cb_file_manager/helpers/core/search_query.dart';
 import 'package:cb_file_manager/helpers/core/search_request_guard.dart';
 import 'package:cb_file_manager/helpers/core/text_utils.dart';
@@ -280,7 +281,7 @@ class _SearchDialogState extends State<SearchDialog> {
         builder: (context) => Positioned.fill(
           child: Container(
             color: Colors.black.withValues(alpha: 0.3),
-            child: const Center(child: CircularProgressIndicator()),
+            child: const Center(child: CbLoadingText()),
           ),
         ),
       );
@@ -527,12 +528,7 @@ class _SearchDialogState extends State<SearchDialog> {
                 widget.onFileSelected!(file);
               } else {
                 // Fallback cho màn hình cũ
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => FileDetailsScreen(file: file),
-                  ),
-                );
+                FileDetailsScreen.show(this.context, file: file);
               }
             },
           );
@@ -552,12 +548,7 @@ class _SearchDialogState extends State<SearchDialog> {
           widget.onFileSelected!(file);
         } else {
           // Fallback cho màn hình cũ
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => FileDetailsScreen(file: file),
-            ),
-          );
+          FileDetailsScreen.show(context, file: file);
         }
       },
     );

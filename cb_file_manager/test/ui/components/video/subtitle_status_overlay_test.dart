@@ -1,7 +1,7 @@
 import 'dart:ui' as ui;
 
 import 'package:cb_file_manager/config/languages/app_localizations_delegate.dart';
-import 'package:cb_file_manager/design_system/primitives/cb_slider.dart';
+import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:cb_file_manager/services/media/subtitle_progress.dart';
 import 'package:cb_file_manager/ui/components/video/subtitle_status_overlay.dart';
 import 'package:cupertino_ui/cupertino_ui.dart';
@@ -20,6 +20,7 @@ void main() {
     String caption = 'Hello world',
     VoidCallback? retry,
     VoidCallback? settings,
+    ValueChanged<bool>? onEnabledChanged,
     VoidCallback? regenerate,
     VoidCallback? export,
   }) async {
@@ -61,6 +62,7 @@ void main() {
                           ),
                           SubtitleControlButton(
                             progress: progress,
+                            onEnabledChanged: onEnabledChanged ?? (_) {},
                             onSettings: settings ?? () {},
                             onRetry: retry ?? () {},
                             onRegenerate: regenerate,
@@ -98,18 +100,75 @@ void main() {
     expect(
       tester
           .widget<PopupMenuButton<dynamic>>(
-            find.byKey(const ValueKey('ai-subtitle-control')),
+            find.byKey(const ValueKey('ai-subtitle-settings-control')),
           )
           .tooltip,
       contains('Using saved subtitles'),
     );
     expect(find.byKey(const ValueKey('ai-subtitle-busy')), findsNothing);
     expect(find.text('100%'), findsOneWidget);
-    await tester.tap(find.byKey(const ValueKey('ai-subtitle-control')));
+    await tester.tap(
+      find.byKey(const ValueKey('ai-subtitle-settings-control')),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('ai-subtitle-regenerate')));
     await tester.pumpAndSettle();
     expect(regenerated, isTrue);
+  });
+
+  testWidgets('CC toggles directly and progress is the settings trigger', (
+    tester,
+  ) async {
+    final toggles = <bool>[];
+    var settingsOpened = 0;
+    const progress = SubtitleProgress(
+      phase: SubtitlePhase.ready,
+      duration: Duration(minutes: 2),
+      position: Duration.zero,
+      completed: [SubtitleTimeRange(Duration.zero, Duration(minutes: 1))],
+    );
+    final cc = find.byKey(const ValueKey('ai-subtitle-control'));
+    final settings = find.byKey(const ValueKey('ai-subtitle-settings-control'));
+    final popover = find.byKey(const ValueKey('ai-subtitle-status'));
+    await show(
+      tester,
+      progress,
+      onEnabledChanged: toggles.add,
+      settings: () => settingsOpened++,
+    );
+    expect(
+      find.descendant(of: settings, matching: find.text('50%')),
+      findsOneWidget,
+    );
+    await tester.tap(cc);
+    await tester.pumpAndSettle();
+    expect(toggles, [false]);
+    expect(popover, findsNothing);
+    expect(settingsOpened, 0);
+    await tester.tap(find.text('50%'));
+    await tester.pumpAndSettle();
+    expect(popover, findsOneWidget);
+    expect(toggles, [false]);
+    await tester.tap(find.byKey(const ValueKey('ai-subtitle-settings')));
+    await tester.pumpAndSettle();
+    expect(settingsOpened, 1);
+
+    await show(
+      tester,
+      const SubtitleProgress(
+        phase: SubtitlePhase.off,
+        duration: Duration.zero,
+        position: Duration.zero,
+      ),
+      onEnabledChanged: toggles.add,
+      settings: () => settingsOpened++,
+    );
+    expect(find.text('50%'), findsNothing);
+    await tester.tap(settings);
+    expect(settingsOpened, 2);
+    await tester.tap(cc);
+    expect(toggles, [false, true]);
+    expect(popover, findsNothing);
   });
 
   testWidgets('finished subtitles can be exported as SRT on request', (
@@ -123,7 +182,9 @@ void main() {
       completed: [SubtitleTimeRange(Duration.zero, Duration(seconds: 40))],
     );
     await show(tester, progress, export: () => exported++);
-    await tester.tap(find.byKey(const ValueKey('ai-subtitle-control')));
+    await tester.tap(
+      find.byKey(const ValueKey('ai-subtitle-settings-control')),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('ai-subtitle-export')));
     await tester.pumpAndSettle();
@@ -138,7 +199,9 @@ void main() {
       ),
       export: () => exported++,
     );
-    await tester.tap(find.byKey(const ValueKey('ai-subtitle-control')));
+    await tester.tap(
+      find.byKey(const ValueKey('ai-subtitle-settings-control')),
+    );
     // The busy spinner never settles; give the menu its opening time.
     await tester.pump(const Duration(milliseconds: 400));
     expect(find.byKey(const ValueKey('ai-subtitle-status')), findsOneWidget);
@@ -160,7 +223,7 @@ void main() {
       ),
     );
     final details = tester.widget<PopupMenuButton<dynamic>>(
-      find.byKey(const ValueKey('ai-subtitle-control')),
+      find.byKey(const ValueKey('ai-subtitle-settings-control')),
     );
     expect(details.tooltip, contains('Japanese → Vietnamese'));
     expect(tester.takeException(), isNull);
@@ -194,7 +257,7 @@ void main() {
       expect(find.text('Whisper Small'), findsNothing);
       expect(find.byKey(const ValueKey('ai-subtitle-busy')), findsOneWidget);
       final details = tester.widget<PopupMenuButton<dynamic>>(
-        find.byKey(const ValueKey('ai-subtitle-control')),
+        find.byKey(const ValueKey('ai-subtitle-settings-control')),
       );
       expect(details.tooltip, contains('Whisper Small'));
       expect(details.tooltip, contains('Subtitles processed to 00:08 / 02:00'));
@@ -246,7 +309,9 @@ void main() {
       regenerate: () {},
       export: () {},
     );
-    await tester.tap(find.byKey(const ValueKey('ai-subtitle-control')));
+    await tester.tap(
+      find.byKey(const ValueKey('ai-subtitle-settings-control')),
+    );
     await tester.pumpAndSettle();
     for (final key in [
       'ai-subtitle-settings',
@@ -296,7 +361,132 @@ void main() {
       caption: '',
     );
     expect(find.byKey(const ValueKey('ai-subtitle-control')), findsNothing);
-    expect(find.text('Generating subtitles…'), findsOneWidget);
+    expect(find.text('Loading speech model'), findsOneWidget);
+  });
+
+  for (final size in [const Size(720, 420), const Size(240, 120)]) {
+    testWidgets('system status is distinct from dialogue at $size', (
+      tester,
+    ) async {
+      const progress = SubtitleProgress(
+        phase: SubtitlePhase.loading,
+        stage: SubtitleWorkStage.unloadingModels,
+        duration: Duration(minutes: 2),
+        position: Duration.zero,
+      );
+      final status = find.byKey(const ValueKey('ai-subtitle-system-status'));
+      final caption = find.byKey(const ValueKey('ai-subtitle-caption'));
+      await show(tester, progress, size: size, caption: '');
+      expect(status, findsOneWidget);
+      expect(caption, findsNothing);
+      expect(
+        find.descendant(of: status, matching: find.byType(CbLoadingText)),
+        findsOneWidget,
+      );
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      final statusText = tester.widget<Text>(
+        find.text('Unloading previous models'),
+      );
+      final surface = tester.widget<CbSurface>(status);
+      final colors = CbColorTokens.of(Brightness.dark, Colors.blue);
+      expect(surface.radius, CbRadii.sm);
+      expect(surface.color, colors.surfaceOverlay);
+      expect(surface.level, CbSurfaceLevel.flat);
+      final loading = tester.widget<CbLoadingText>(
+        find.descendant(of: status, matching: find.byType(CbLoadingText)),
+      );
+      expect(loading.baseColor, colors.textSecondary);
+      expect(loading.highlightColor, isNot(loading.baseColor));
+      expect(statusText.style!.fontFamily, CbTypography.uiFamily);
+      expect(statusText.style!.fontWeight, CbTypography.regular);
+      final decoration =
+          tester
+                  .widget<AnimatedContainer>(
+                    find.descendant(
+                      of: status,
+                      matching: find.byType(AnimatedContainer),
+                    ),
+                  )
+                  .decoration
+              as BoxDecoration;
+      expect(decoration.border, isNull);
+      expect(tester.getSize(status).width, lessThan(size.width));
+      expect(tester.takeException(), isNull);
+
+      await show(tester, progress, size: size);
+      expect(status, findsNothing);
+      expect(caption, findsOneWidget);
+      final dialogue = tester.widget<Text>(caption);
+      expect(dialogue.style!.color, Colors.white);
+      expect(
+        dialogue.style!.fontSize,
+        greaterThan(statusText.style!.fontSize!),
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('caption and CC reflect each current subtitle work stage', (
+    tester,
+  ) async {
+    for (final (stage, phase, label) in [
+      (
+        SubtitleWorkStage.unloadingModels,
+        SubtitlePhase.loading,
+        'Unloading previous models',
+      ),
+      (
+        SubtitleWorkStage.readingCache,
+        SubtitlePhase.loading,
+        'Checking saved subtitles',
+      ),
+      (
+        SubtitleWorkStage.loadingSpeech,
+        SubtitlePhase.loading,
+        'Loading speech model',
+      ),
+      (
+        SubtitleWorkStage.recognizing,
+        SubtitlePhase.processing,
+        'Recognizing audio',
+      ),
+      (
+        SubtitleWorkStage.loadingTranslation,
+        SubtitlePhase.processing,
+        'Loading translation model',
+      ),
+      (
+        SubtitleWorkStage.translating,
+        SubtitlePhase.processing,
+        'Translating subtitles',
+      ),
+      (
+        SubtitleWorkStage.idle,
+        SubtitlePhase.loading,
+        'Loading subtitle model…',
+      ),
+    ]) {
+      await show(
+        tester,
+        SubtitleProgress(
+          phase: phase,
+          stage: stage,
+          duration: const Duration(minutes: 2),
+          position: Duration.zero,
+        ),
+        caption: '',
+      );
+      expect(find.text(label), findsOneWidget);
+      expect(find.text('Generating subtitles…'), findsNothing);
+      expect(
+        tester
+            .widget<PopupMenuButton<dynamic>>(
+              find.byKey(const ValueKey('ai-subtitle-settings-control')),
+            )
+            .tooltip,
+        contains(label),
+      );
+    }
   });
 
   testWidgets('CC counts finished ranges and shows wait text only in gaps', (
@@ -319,10 +509,18 @@ void main() {
     await show(tester, progressAt(60), caption: '');
     expect(find.text('25%'), findsOneWidget);
     expect(find.text('Generating subtitles…'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('ai-subtitle-system-status')),
+      findsOneWidget,
+    );
 
     await show(tester, progressAt(45), caption: '');
     expect(find.text('25%'), findsOneWidget);
     expect(find.byKey(const ValueKey('ai-subtitle-caption')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('ai-subtitle-system-status')),
+      findsNothing,
+    );
   });
 
   testWidgets('CC menu offers retry and subtitle settings after failure', (
@@ -340,7 +538,9 @@ void main() {
       retry: () => retried = true,
       settings: () => opened = true,
     );
-    await tester.tap(find.byKey(const ValueKey('ai-subtitle-control')));
+    await tester.tap(
+      find.byKey(const ValueKey('ai-subtitle-settings-control')),
+    );
     await tester.pumpAndSettle();
     expect(find.textContaining('Model could not load'), findsOneWidget);
     // Actions are icon-only; their labels live in tooltips.
@@ -348,7 +548,9 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('ai-subtitle-retry')));
     expect(retried, isTrue);
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('ai-subtitle-control')));
+    await tester.tap(
+      find.byKey(const ValueKey('ai-subtitle-settings-control')),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('ai-subtitle-settings')));
     await tester.pumpAndSettle();

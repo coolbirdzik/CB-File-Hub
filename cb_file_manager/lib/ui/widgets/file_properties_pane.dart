@@ -10,6 +10,7 @@ import 'package:cb_file_manager/helpers/files/lazy_path_size_calculator.dart';
 import 'package:cb_file_manager/ui/controllers/selection_tags_controller.dart';
 import 'package:cb_file_manager/ui/utils/format_utils.dart';
 import 'package:cb_file_manager/ui/widgets/file_properties_details.dart';
+import 'package:cb_file_manager/ui/widgets/file_properties_tabs.dart';
 import 'package:cb_file_manager/ui/widgets/selection_tag_editor.dart';
 
 /// Each folder pane owns its selection and controller. The controller remains
@@ -142,9 +143,10 @@ class _FilePropertiesPaneState extends State<FilePropertiesPane> {
       ),
       children: [
         if (_paths.length == 1)
-          FilePropertiesDetails(
+          FilePropertiesTabs(
             filePath: _paths.single,
             statFuture: _stat!,
+            isDirectory: widget.folderPaths.contains(_paths.single),
             dense: true,
           ),
         if (showSize)

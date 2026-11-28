@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:cb_file_manager/design_system/primitives/cb_loading_text.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -147,9 +148,12 @@ class _FolderPickerDialogState extends State<FolderPickerDialog> {
         builder: (context) => AlertDialog(
           content: Row(
             children: [
-              const CircularProgressIndicator(),
-              const SizedBox(width: 16),
-              Text(context.tr.albumAddingFolder),
+              Flexible(
+                child: CbLoadingText(
+                  text: context.tr.albumAddingFolder,
+                  maxLines: 2,
+                ),
+              ),
             ],
           ),
         ),
@@ -308,7 +312,7 @@ class _FolderPickerDialogState extends State<FolderPickerDialog> {
             // Directory list
             Expanded(
               child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
+                  ? const Center(child: CbLoadingText())
                   : _directories.isEmpty
                   ? Center(
                       child: Column(

@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/design_system/primitives/cb_loading_text.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:file_picker/file_picker.dart';
@@ -95,11 +96,7 @@ class _BatchAddDialogState extends State<BatchAddDialog> {
       content: _isProcessing
           ? Column(
               mainAxisSize: MainAxisSize.min,
-              children: [
-                const CircularProgressIndicator(),
-                const SizedBox(height: 16),
-                Text(_statusMessage),
-              ],
+              children: [CbLoadingText(text: _statusMessage)],
             )
           : Column(
               mainAxisSize: MainAxisSize.min,

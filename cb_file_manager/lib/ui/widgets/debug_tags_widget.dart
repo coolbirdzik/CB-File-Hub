@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/design_system/primitives/cb_loading_text.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
@@ -213,7 +214,7 @@ Popular Tags: $popularTags
               child: SizedBox(
                 width: 20,
                 height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2),
+                child: CbLoadingText(compact: true),
               ),
             )
           else ...[
@@ -235,7 +236,7 @@ Popular Tags: $popularTags
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CbLoadingText())
           : SingleChildScrollView(
               padding: const EdgeInsets.all(16),
               child: Column(

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:cb_file_manager/design_system/primitives/cb_loading_text.dart';
 import '../../../design_system/primitives/cb_button.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -283,7 +284,7 @@ class _FTPBrowserScreenState extends State<FTPBrowserScreen>
             ? const SizedBox(
                 width: 20,
                 height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2.0),
+                child: CbLoadingText(compact: true),
               )
             : Icon(
                 PhosphorIconsLight.arrowCircleRight,

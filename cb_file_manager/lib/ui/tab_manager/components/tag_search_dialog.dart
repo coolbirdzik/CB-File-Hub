@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/design_system/primitives/cb_loading_text.dart';
 import 'package:cb_file_manager/ui/components/common/search_text_field.dart';
 import 'package:material_ui/material_ui.dart';
 import 'dart:io';
@@ -175,11 +176,7 @@ class _TagSearchDialogState extends State<TagSearchDialog> {
         ElevatedButton(
           onPressed: _isSearching ? null : _performSearch,
           child: _isSearching
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2.0),
-                )
+              ? CbLoadingText(text: context.tr.search.toUpperCase())
               : Text(context.tr.search.toUpperCase()),
         ),
       ],

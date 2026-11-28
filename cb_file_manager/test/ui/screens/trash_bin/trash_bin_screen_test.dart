@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:cb_file_manager/design_system/primitives/cb_loading_text.dart';
 import 'package:cb_file_manager/config/languages/app_localizations_delegate.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/helpers/files/trash_manager.dart';
@@ -89,7 +90,7 @@ void main() {
       final manager = _FakeTrashManager();
       await mount(tester, manager);
       expect(find.text('Emptying trash…'), findsOneWidget);
-      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(find.byType(CbLoadingText), findsOneWidget);
       expect(manager.emptyCalls, 1);
       final shells = tester.widgetList<FileViewShell>(
         find.byType(FileViewShell),

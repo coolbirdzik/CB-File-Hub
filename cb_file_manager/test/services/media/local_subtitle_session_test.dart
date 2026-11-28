@@ -45,6 +45,7 @@ class _Worker extends SubtitleWorker {
   final requests = <Map<String, Object?>>[];
   Completer<Map<String, dynamic>>? gate;
   Completer<void>? startGate;
+  Completer<void>? stopGate;
   @override
   Future<void> start(String model) async {
     await startGate?.future;
@@ -72,6 +73,7 @@ class _Worker extends SubtitleWorker {
   @override
   Future<void> stop() async {
     stopped = true;
+    await stopGate?.future;
   }
 }
 
@@ -100,6 +102,7 @@ class _Translator extends GgufLlamaCppLocalAiChatRuntime {
   int preparations = 0;
   bool disposed = false;
   Completer<void>? gate;
+  Completer<void>? disposeGate;
   Object? preparationError;
   @override
   Future<void> prepareModel({
@@ -131,6 +134,7 @@ class _Translator extends GgufLlamaCppLocalAiChatRuntime {
     if (gate != null && !gate!.isCompleted) {
       gate!.completeError(StateError('disposed'));
     }
+    await disposeGate?.future;
     await super.dispose();
   }
 }
@@ -208,6 +212,25 @@ void main() {
     expect(condition(), isTrue);
   }
 
+  Future<void> installAlternative(String id, LocalModelPurpose purpose) async {
+    final file = File('${sandbox.path}/alternative-${purpose.name}.gguf');
+    await file.writeAsBytes([2]);
+    final registry =
+        jsonDecode(prefs.getString('local_ai_installed_models')!) as List;
+    registry.add(
+      InstalledLocalModel(
+        catalogId: id,
+        displayName: id,
+        localPath: file.path,
+        sizeBytes: 1,
+        installedAt: DateTime(2026),
+        purpose: purpose,
+      ).toJson(),
+    );
+    await prefs.setString('local_ai_installed_models', jsonEncode(registry));
+    await models.refreshInstalledModels();
+  }
+
   LocalSubtitleSession session(
     SubtitleWorker Function() factory, {
     Future<String> Function(InstalledLocalModel, String, String)? translate,
@@ -283,6 +306,59 @@ void main() {
     expect(s.cues.first.text, 'hello world');
     expect(s.cues.any((c) => c.text == 'old Vietnamese target'), isFalse);
   });
+  test('changing speech model waits for the old process to unload', () async {
+    await installAlternative('whisper/base', LocalModelPurpose.speech);
+    final old = _Worker()
+      ..gate = Completer<Map<String, dynamic>>()
+      ..stopGate = Completer<void>();
+    final replacement = _Worker();
+    var created = 0;
+    final s = session(() => created++ == 0 ? old : replacement);
+    await until(() => old.requests.isNotEmpty);
+    await preferences.setSpeechModel('whisper/base');
+    await until(() => old.stopped);
+    // The request can be cancelled before the process has released its weights.
+    old.gate!.completeError(StateError('cancelled'));
+    try {
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+      expect(created, 1);
+      expect(s.progress.stage, SubtitleWorkStage.unloadingModels);
+    } finally {
+      old.stopGate!.complete();
+    }
+    await until(() => replacement.requests.isNotEmpty && s.progress.reachedEnd);
+    expect(created, 2);
+  });
+
+  test(
+    'changing translation model waits for the old server to unload',
+    () async {
+      const alternate = 'tencent/Hy-MT2-7B-GGUF';
+      await installAlternative(alternate, LocalModelPurpose.translation);
+      await preferences.setTarget('vi');
+      final old = _Translator()
+        ..gate = Completer<void>()
+        ..disposeGate = Completer<void>();
+      final replacement = _Translator();
+      var created = 0;
+      final s = session(
+        _Worker.new,
+        runtime: () => created++ == 0 ? old : replacement,
+      );
+      await until(() => old.preparations > 0);
+      await preferences.setTranslationModel(alternate);
+      await until(() => old.disposed);
+      try {
+        await Future<void>.delayed(const Duration(milliseconds: 250));
+        expect(created, 1);
+        expect(s.progress.stage, SubtitleWorkStage.unloadingModels);
+      } finally {
+        old.disposeGate!.complete();
+      }
+      await until(() => replacement.preparations > 0 && s.progress.reachedEnd);
+      expect(created, 2);
+    },
+  );
   test(
     'model management releases the worker before deleting its weights',
     () async {

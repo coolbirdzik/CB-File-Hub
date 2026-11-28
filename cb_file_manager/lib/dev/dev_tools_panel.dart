@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/design_system/primitives/cb_loading_text.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:cb_file_manager/helpers/tags/tag_manager.dart';
 import 'package:cb_file_manager/models/database/database_manager.dart';
@@ -368,9 +369,9 @@ class _DevToolButton extends StatelessWidget {
                   ? SizedBox(
                       width: 20,
                       height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: textSecondaryColor,
+                      child: CbLoadingText(
+                        compact: true,
+                        highlightColor: textSecondaryColor,
                       ),
                     )
                   : Icon(icon, size: 20, color: iconColor),

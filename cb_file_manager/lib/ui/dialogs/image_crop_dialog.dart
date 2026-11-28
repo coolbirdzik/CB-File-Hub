@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:cb_file_manager/design_system/primitives/cb_loading_text.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/helpers/core/app_path_helper.dart';
 import 'package:cb_file_manager/utils/app_logger.dart';
@@ -177,7 +178,7 @@ class _ImageCropDialogState extends State<_ImageCropDialog> {
                 maskColor: Colors.black.withValues(alpha: 0.5),
                 cornerDotBuilder: (size, edgeAlignment) =>
                     DotControl(color: theme.colorScheme.primary),
-                progressIndicator: const CircularProgressIndicator(),
+                progressIndicator: const CbLoadingText(),
                 onCropped: _handleCropped,
               ),
             ),
@@ -261,7 +262,7 @@ class _ImageCropDialogState extends State<_ImageCropDialog> {
                         ? const SizedBox(
                             width: 16,
                             height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                            child: CbLoadingText(compact: true),
                           )
                         : const Icon(PhosphorIconsLight.check, size: 18),
                     label: Text(l10n.applyCrop),

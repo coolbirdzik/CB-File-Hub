@@ -1,4 +1,5 @@
 import 'package:material_ui/material_ui.dart';
+import 'package:cb_file_manager/design_system/primitives/cb_loading_text.dart';
 import 'package:get_it/get_it.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
@@ -47,6 +48,13 @@ class LocalModelSetupLink extends StatelessWidget {
     final label = AppLocalizations.of(
       context,
     )!.localModelDownloading(download.entry.displayName);
+    if (progress == null) {
+      return TextButton(
+        key: const ValueKey('local-model-download-progress'),
+        onPressed: () => openSettings(context, anchor: SettingsAnchor.localAi),
+        child: CbLoadingText(text: label),
+      );
+    }
     return TextButton.icon(
       key: const ValueKey('local-model-download-progress'),
       onPressed: () => openSettings(context, anchor: SettingsAnchor.localAi),
@@ -60,7 +68,7 @@ class LocalModelSetupLink extends StatelessWidget {
         ),
       ),
       label: Text(
-        progress == null ? label : '$label · ${(progress * 100).toInt()}%',
+        '$label · ${(progress * 100).toInt()}%',
         style: compact ? const TextStyle(fontSize: 12) : null,
       ),
     );

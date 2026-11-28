@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/design_system/primitives/cb_loading_text.dart';
 import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -182,24 +183,7 @@ class TreePlaceholderRow extends StatelessWidget {
     Widget content;
     switch (kind) {
       case FlatRowKind.loading:
-        content = Row(
-          children: [
-            const SizedBox(
-              width: 12,
-              height: 12,
-              child: CircularProgressIndicator(strokeWidth: 1.4),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'Loading…',
-              style: TextStyle(
-                fontSize: 12,
-                fontStyle: FontStyle.italic,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-        );
+        content = const CbLoadingText(textAlign: TextAlign.start);
         break;
       case FlatRowKind.error:
         content = Row(

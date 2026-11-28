@@ -256,9 +256,7 @@ class _OpenWithDialogState extends State<OpenWithDialog> {
                                 ConnectionState.waiting)
                               const Padding(
                                 padding: EdgeInsets.symmetric(vertical: 32),
-                                child: Center(
-                                  child: CircularProgressIndicator(),
-                                ),
+                                child: Center(child: CbLoadingText()),
                               )
                             else if (snapshot.hasError || apps.isEmpty)
                               Padding(
@@ -362,11 +360,7 @@ class _OpenWithDialogState extends State<OpenWithDialog> {
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
           ),
           child: _opening
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
+              ? CbLoadingText(text: l10n.open.toUpperCase())
               : Text(l10n.open.toUpperCase()),
         ),
       ],

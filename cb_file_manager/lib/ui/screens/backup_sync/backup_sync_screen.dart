@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:cb_file_manager/design_system/primitives/cb_loading_text.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -539,19 +540,7 @@ class _BackupSyncScreenState extends State<BackupSyncScreen> {
                 if (_busy)
                   Padding(
                     padding: const EdgeInsets.all(24),
-                    child: Column(
-                      children: [
-                        const CircularProgressIndicator(),
-                        if (_busyMessage != null) ...[
-                          const SizedBox(height: 12),
-                          Text(
-                            _busyMessage!,
-                            textAlign: TextAlign.center,
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                        ],
-                      ],
-                    ),
+                    child: CbLoadingText(text: _busyMessage, maxLines: 2),
                   ),
               ],
             ),
@@ -769,7 +758,7 @@ class _BackupSyncScreenState extends State<BackupSyncScreen> {
             SizedBox(
               width: 10,
               height: 10,
-              child: CircularProgressIndicator(strokeWidth: 1.5, color: color),
+              child: CbLoadingText(compact: true, highlightColor: color),
             )
           else
             Container(

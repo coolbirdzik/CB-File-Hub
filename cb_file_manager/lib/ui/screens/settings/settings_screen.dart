@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'desktop_backdrop_strength_control.dart';
 import 'default_file_manager_settings.dart';
+import 'file_browser_settings_section.dart';
 
 import 'package:cb_native/cb_native.dart';
 import 'package:material_ui/material_ui.dart';
@@ -569,13 +570,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           Expanded(
             child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
+                ? const Center(child: CbLoadingText())
                 : SingleChildScrollView(
                     padding: const EdgeInsets.all(16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         _buildQuickSettingsSection(),
+                        const SizedBox(height: 24),
+                        _buildSectionCard(
+                          title: AppLocalizations.of(
+                            context,
+                          )!.fileBrowserSettings,
+                          icon: PhosphorIconsLight.folderOpen,
+                          children: const [FileBrowserSettingsSection()],
+                        ),
                         const SizedBox(height: 24),
                         if (Platform.isWindows ||
                             Platform.isLinux ||
@@ -1495,7 +1504,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             if (_isDatabaseStatsLoading)
               const Padding(
                 padding: EdgeInsets.all(16),
-                child: Center(child: CircularProgressIndicator()),
+                child: Center(child: CbLoadingText()),
               )
             else ...[
               Padding(

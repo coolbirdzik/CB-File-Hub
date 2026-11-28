@@ -9,6 +9,8 @@ import 'package:flutter/foundation.dart' show compute, visibleForTesting;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:path/path.dart' as pathlib;
 import 'package:cb_file_manager/helpers/files/file_attributes.dart';
+import 'package:cb_file_manager/helpers/core/user_preferences.dart';
+import 'package:cb_file_manager/helpers/files/file_browser_options.dart';
 import 'package:cb_file_manager/helpers/files/folder_sort_manager.dart';
 import 'package:cb_file_manager/helpers/core/filesystem_sorter.dart';
 import 'package:cb_file_manager/helpers/core/file_property_sorter.dart';
@@ -40,6 +42,12 @@ class FileNavigationBloc
   /// multiple folder-load events that tab activation, path sync and the tab
   /// refocus pipeline can enqueue for the same folder within a few frames.
   final Set<String> _inFlightScans = <String>{};
+  final _browserOptions = UserPreferences.instance.fileBrowserOptions;
+  late FileBrowserOptions _lastBrowserOptions;
+  bool _visibilityRefreshPending = false;
+  bool _refreshNameSearchForVisibility = false;
+  ({FileNavigationSearchByFileName event, String root})? _lastNameSearch;
+  bool _hasDirectoryListing = false;
 
   static const int _searchResultsPageSize = 200;
   List<FileSystemEntity> _pendingSearchResults = [];
@@ -73,6 +81,8 @@ class FileNavigationBloc
     on<FileNavigationRemovePaths>(_onRemovePaths);
 
     // ── Directory watching ─────────────────────────────────────
+    _lastBrowserOptions = _browserOptions.value;
+    _browserOptions.addListener(_onBrowserOptionsChanged);
     _directoryWatcherSubscription = _directoryWatcher.onDirectoryRefresh.listen(
       (path) {
         // Invalidate the directory listing cache so the next navigation
@@ -82,6 +92,52 @@ class FileNavigationBloc
           add(FileNavigationRefresh(path));
         }
       },
+    );
+  }
+
+  void _onBrowserOptionsChanged() {
+    final next = _browserOptions.value;
+    final visibilityChanged = !_lastBrowserOptions.sameVisibility(next);
+    _lastBrowserOptions = next;
+    if (!visibilityChanged ||
+        isClosed ||
+        (!_hasDirectoryListing && _inFlightScans.isEmpty)) {
+      return;
+    }
+    _visibilityRefreshPending = true;
+    _refreshNameSearchForVisibility = true;
+    _refreshVisibilityIfReady();
+  }
+
+  void _refreshVisibilityIfReady() {
+    if (!_visibilityRefreshPending || _inFlightScans.isNotEmpty || isClosed) {
+      return;
+    }
+    _visibilityRefreshPending = false;
+    final path = state.currentPath.path;
+    if (path.isNotEmpty &&
+        !path.startsWith('#') &&
+        !path.contains('://') &&
+        !_isDrivesPath(path)) {
+      add(FileNavigationRefresh(path));
+    }
+  }
+
+  Future<(List<Directory>, List<File>)> _visibleListing(
+    List<Directory> folders,
+    List<File> files,
+  ) async {
+    final options = _browserOptions.value;
+    if (options.showHidden && (options.showSystem || !Platform.isWindows)) {
+      return (folders, files);
+    }
+    final entries = await visibleBrowserEntries<FileSystemEntity>([
+      ...folders,
+      ...files,
+    ], options);
+    return (
+      entries.whereType<Directory>().toList(),
+      entries.whereType<File>().toList(),
     );
   }
 
@@ -127,6 +183,7 @@ class FileNavigationBloc
 
   @override
   Future<void> close() async {
+    _browserOptions.removeListener(_onBrowserOptionsChanged);
     _searchRequests.dispose();
     // Mark the bloc closed before awaiting I/O so a pending listing cannot
     // start a new watch while the old watch is being released.
@@ -182,6 +239,7 @@ class FileNavigationBloc
     Emitter<FileNavigationState> emit,
   ) async {
     _searchRequests.invalidate();
+    _lastNameSearch = null;
     final totalSw = Stopwatch()..start();
     AppLogger.perf('Starting folder load path=${event.path}');
 
@@ -211,6 +269,7 @@ class FileNavigationBloc
     } finally {
       releaseListing();
       _inFlightScans.remove(event.path);
+      _refreshVisibilityIfReady();
     }
   }
 
@@ -319,15 +378,19 @@ class FileNavigationBloc
             'Dir listing CACHE BYPASS "${event.path}" — sort needs stats',
           );
         } else {
-          final sortedFolders = await FileSystemSorter.sortDirectories(
+          final rawSortedFolders = await FileSystemSorter.sortDirectories(
             cacheResult.folders,
             sortOption,
             fileStatsCache: cacheResult.stats,
           );
-          final sortedFiles = await FileSystemSorter.sortFiles(
+          final rawSortedFiles = await FileSystemSorter.sortFiles(
             cacheResult.files,
             sortOption,
             fileStatsCache: cacheResult.stats,
+          );
+          final (sortedFolders, sortedFiles) = await _visibleListing(
+            rawSortedFolders,
+            rawSortedFiles,
           );
           if (isClosed || state.currentPath.path != event.path) return;
           final listingDisplay = applyFolderDisplay
@@ -338,6 +401,7 @@ class FileNavigationBloc
                 )
               : null;
           if (isClosed || state.currentPath.path != event.path) return;
+          _hasDirectoryListing = true;
           emit(
             state.copyWith(
               isLoading: false,
@@ -376,8 +440,10 @@ class FileNavigationBloc
       // Reconstruct typed objects from the isolate's plain path lists.
       final folders = scanResult.folderPaths.map(Directory.new).toList();
       final files = scanResult.filePaths.map(File.new).toList();
-      final sortedFolders = folders; // already sorted in isolate
-      final sortedFiles = files; // already sorted in isolate
+      final (sortedFolders, sortedFiles) = await _visibleListing(
+        folders,
+        files,
+      );
 
       final listingDisplay = applyFolderDisplay
           ? await FolderDisplayPreferences.instance.resolve(
@@ -388,6 +454,7 @@ class FileNavigationBloc
           : null;
       if (isClosed || state.currentPath.path != event.path) return;
 
+      _hasDirectoryListing = true;
       emit(
         state.copyWith(
           isLoading: false,
@@ -478,6 +545,7 @@ class FileNavigationBloc
       await _performRefresh(event, emit);
     } finally {
       _inFlightScans.remove(event.path);
+      _refreshVisibilityIfReady();
     }
   }
 
@@ -517,8 +585,12 @@ class FileNavigationBloc
       );
       if (isClosed || state.currentPath.path != event.path) return;
 
-      final sortedFolders = scanResult.folderPaths.map(Directory.new).toList();
-      final sortedFiles = scanResult.filePaths.map(File.new).toList();
+      final rawFolders = scanResult.folderPaths.map(Directory.new).toList();
+      final rawFiles = scanResult.filePaths.map(File.new).toList();
+      final (sortedFolders, sortedFiles) = await _visibleListing(
+        rawFolders,
+        rawFiles,
+      );
 
       final listingDisplay = applyFolderDisplay
           ? await FolderDisplayPreferences.instance.resolve(
@@ -529,12 +601,16 @@ class FileNavigationBloc
           : null;
       if (isClosed || state.currentPath.path != event.path) return;
 
+      _hasDirectoryListing = true;
       emit(
         state.copyWith(
           isRefreshing: false,
           viewMode: listingDisplay?.viewMode,
           folders: sortedFolders,
           files: sortedFiles,
+          filteredFiles: state.currentFilter == null
+              ? null
+              : _filterFilesByType(sortedFiles, state.currentFilter!),
           currentPath: Directory(event.path),
           sortOption: sortOption,
           error: null,
@@ -544,8 +620,8 @@ class FileNavigationBloc
       // Re-cache after refresh so navigating back is still instant.
       DirectoryListingCacheService.instance.storeListing(
         path: event.path,
-        files: sortedFiles,
-        folders: sortedFolders,
+        files: rawFiles,
+        folders: rawFolders,
         stats: const {},
       );
 
@@ -559,6 +635,16 @@ class FileNavigationBloc
         VideoThumbnailHelper.regenerateThumbnailsForDirectory(event.path);
       } else {
         _prefetchThumbnails(sortedFiles, event.path);
+      }
+      if (_refreshNameSearchForVisibility && !_visibilityRefreshPending) {
+        _refreshNameSearchForVisibility = false;
+        final search = _lastNameSearch;
+        if (search != null &&
+            search.root == event.path &&
+            state.isSearchByName &&
+            state.currentSearchQuery == search.event.query) {
+          add(search.event);
+        }
       }
     } catch (e) {
       _emitPermissionError(emit, e, event.path);
@@ -591,6 +677,7 @@ class FileNavigationBloc
     Emitter<FileNavigationState> emit,
   ) {
     _searchRequests.invalidate();
+    _lastNameSearch = null;
     _pendingSearchResults = [];
     if (event.fileType == null) {
       emit(
@@ -847,7 +934,9 @@ class FileNavigationBloc
     Emitter<FileNavigationState> emit,
   ) async {
     final request = _searchRequests.begin();
-    emit(state.copyWith(isLoading: true));
+    final searchRoot = state.currentPath.path;
+    _lastNameSearch = (event: event, root: searchRoot);
+    emit(state.copyWith(isLoading: true, error: null));
 
     try {
       final query = event.query.toLowerCase();
@@ -866,7 +955,7 @@ class FileNavigationBloc
         }
       }
 
-      final List<FileSystemEntity> results = [];
+      List<FileSystemEntity> results = [];
 
       if (event.recursive) {
         final root = state.currentPath.path;
@@ -895,6 +984,17 @@ class FileNavigationBloc
       }
 
       if (!_searchRequests.isCurrent(request) || emit.isDone) return;
+      final rawResults = results;
+      FileBrowserOptions visibility;
+      do {
+        visibility = _browserOptions.value;
+        results = await visibleBrowserEntries(
+          rawResults,
+          visibility,
+          rootPath: searchRoot,
+        );
+        if (!_searchRequests.isCurrent(request) || emit.isDone) return;
+      } while (!visibility.sameVisibility(_browserOptions.value));
       if (state.sortOption.metadataColumn != null) {
         final selectedSort = state.sortOption;
         final compare = await FilePropertySorter.prepare(
@@ -923,7 +1023,8 @@ class FileNavigationBloc
           filteredFiles: [],
           searchRecursive: event.recursive,
           isSearchByName: true,
-          error: grouped.isEmpty ? 'No files found matching "$query"' : null,
+          // An empty result is a successful search, not a navigation error.
+          error: null,
         ),
       );
     } catch (e) {
@@ -942,6 +1043,7 @@ class FileNavigationBloc
     Emitter<FileNavigationState> emit,
   ) {
     _searchRequests.invalidate();
+    _lastNameSearch = null;
     _pendingSearchResults = [];
     emit(
       state.copyWith(

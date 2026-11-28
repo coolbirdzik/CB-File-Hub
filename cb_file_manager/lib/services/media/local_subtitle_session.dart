@@ -82,6 +82,7 @@ class LocalSubtitleSession extends ChangeNotifier {
   SubtitleWorker? _worker;
   String? _workerModelPath, _translatorModelPath;
   bool _workerLoading = false, _translationBusy = false;
+  Future<void>? _modelShutdown;
   _RecognitionTask? _recognitionTask, _prefetched;
 
   /// Smoothed native recognition time; null until one chunk was measured.
@@ -417,17 +418,44 @@ class LocalSubtitleSession extends ChangeNotifier {
     _workerModelPath = null;
     _workerLoading = false;
     _releases.remove(LocalModelPurpose.speech)?.call();
-    if (old != null) unawaited(old.stop());
+    if (old != null) _trackModelShutdown(old.stop());
   }
 
   void _dropTranslator() {
     final old = _translator;
+    final preparation = _translationPreparation;
     _translator = null;
     _translatorModelPath = null;
     _translationBusy = false;
     _translationPreparation = null;
     _releases.remove(LocalModelPurpose.translation)?.call();
-    if (old != null) unawaited(old.dispose());
+    if (old != null) {
+      _trackModelShutdown(
+        Future.wait<void>([
+          old.dispose(),
+          if (preparation != null) preparation.then<void>((_) {}),
+        ]).then<void>((_) {}),
+      );
+    }
+  }
+
+  // Cancelling a request wakes the old generation before its native process
+  // has exited. Keep a separate barrier for the actual model shutdown.
+  void _trackModelShutdown(Future<void> shutdown) {
+    final previous = _modelShutdown;
+    final closing = Future.wait<void>([?previous, shutdown]).then<void>((_) {});
+    _modelShutdown = closing;
+    unawaited(
+      closing.then<void>(
+        (_) {
+          if (identical(_modelShutdown, closing)) _modelShutdown = null;
+        },
+        onError: (Object _, StackTrace _) {
+          // The next generation observes the failure rather than loading another
+          // model while the old model may still own GPU memory.
+        },
+      ),
+    );
   }
 
   void restart() => _restart();
@@ -478,9 +506,11 @@ class LocalSubtitleSession extends ChangeNotifier {
         ? SubtitleCacheState.failed
         : SubtitleCacheState.checking;
     _pending = null;
-    _stage = preferences.enabled
-        ? SubtitleWorkStage.loadingSpeech
-        : SubtitleWorkStage.idle;
+    _stage = !preferences.enabled
+        ? SubtitleWorkStage.idle
+        : _modelShutdown != null
+        ? SubtitleWorkStage.unloadingModels
+        : SubtitleWorkStage.loadingSpeech;
     _modelName = models.catalogEntryFor(preferences.speechModel)?.displayName;
     _detectedLanguage = null;
     _lastProgressSecond = -1;
@@ -874,6 +904,12 @@ class LocalSubtitleSession extends ChangeNotifier {
     final chunkCues = <LocalSubtitleCue>[];
     var committed = false;
     try {
+      final shutdown = _modelShutdown;
+      if (shutdown != null) {
+        _work(SubtitleWorkStage.unloadingModels, '');
+        await shutdown;
+        if (stale() || _disposed) return;
+      }
       final selected = await player.subtitleAudioTrackOrdinal();
       if (stale()) return;
       await _readCache(generation, source, selected);

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:cb_file_manager/design_system/primitives/cb_loading_text.dart';
 import 'widgets/drawer/sidebar_pinned_entry.dart';
 import 'dart:ui';
 
@@ -1026,7 +1027,7 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
     if (state.isLoading) {
       return const Padding(
         padding: EdgeInsetsDirectional.only(top: 8, bottom: 12),
-        child: Center(child: fluent.ProgressRing(strokeWidth: 2)),
+        child: Center(child: CbLoadingText()),
       );
     }
     if (state.storageLocations.isEmpty) {

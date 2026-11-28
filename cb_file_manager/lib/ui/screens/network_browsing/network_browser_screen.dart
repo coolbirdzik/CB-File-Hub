@@ -1271,23 +1271,7 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
                       if (state.isLoadingMore)
                         Container(
                           padding: const EdgeInsets.symmetric(vertical: 8.0),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                AppLocalizations.of(context)!.loading,
-                                style: const TextStyle(fontSize: 12),
-                              ),
-                            ],
-                          ),
+                          child: const Center(child: CbLoadingText()),
                         ),
                     ],
                   ),

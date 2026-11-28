@@ -79,7 +79,7 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
         if (_isLoading)
           const Padding(
             padding: EdgeInsets.all(16),
-            child: Center(child: CircularProgressIndicator()),
+            child: Center(child: CbLoadingText()),
           )
         else ...[
           // Provider list
@@ -205,7 +205,7 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
             const SizedBox(
               width: 16,
               height: 16,
-              child: CircularProgressIndicator(strokeWidth: 2),
+              child: CbLoadingText(compact: true),
             )
           else
             IconButton(
@@ -691,9 +691,7 @@ class _ProviderFormDialogState extends State<_ProviderFormDialog> {
                                 child: SizedBox(
                                   width: 20,
                                   height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
+                                  child: CbLoadingText(compact: true),
                                 ),
                               ),
                             )
@@ -826,9 +824,9 @@ class _ProviderFormDialogState extends State<_ProviderFormDialog> {
               ? const SizedBox(
                   width: 16,
                   height: 16,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.white,
+                  child: CbLoadingText(
+                    compact: true,
+                    highlightColor: Colors.white,
                   ),
                 )
               : Text(l.save),

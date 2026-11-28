@@ -515,10 +515,7 @@ class _TagBrowseSectionState extends State<TagBrowseSection> {
     final theme = Theme.of(context);
 
     if (_isLoading) {
-      return const SizedBox(
-        height: 80,
-        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
-      );
+      return const SizedBox(height: 80, child: Center(child: CbLoadingText()));
     }
 
     final isGrid = _viewMode == TagBrowseViewMode.grid;

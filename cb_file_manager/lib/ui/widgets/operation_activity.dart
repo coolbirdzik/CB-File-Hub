@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/design_system/primitives/cb_loading_text.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// Activity stays visible even while a single large item is being processed.
@@ -33,10 +34,7 @@ class OperationActivityIcon extends StatelessWidget {
               ? Padding(
                   key: const ValueKey('running'),
                   padding: const EdgeInsets.all(2),
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: color,
-                  ),
+                  child: CbLoadingText(compact: true, highlightColor: color),
                 )
               : Icon(icon, key: ValueKey(icon), size: size, color: color),
         ),

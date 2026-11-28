@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/design_system/primitives/cb_loading_text.dart';
 import 'package:cb_file_manager/ui/widgets/gallery_nsfw_toggle.dart';
 import 'package:cb_file_manager/design_system/primitives/cb_tooltip.dart';
 import 'package:cb_file_manager/design_system/tokens/cb_geometry_tokens.dart';
@@ -281,7 +282,7 @@ class _VideoLibrarySettingsScreenState
         title: localizations.videoLibrarySettings,
         titleWidget: _buildAddressBar(localizations),
         automaticallyImplyLeading: false,
-        body: const Center(child: CircularProgressIndicator()),
+        body: const Center(child: CbLoadingText()),
       );
     }
 
@@ -714,7 +715,7 @@ class _VideoLibrarySettingsScreenState
             ? const SizedBox(
                 width: 18,
                 height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2.4),
+                child: CbLoadingText(compact: true),
               )
             : const Icon(PhosphorIconsLight.arrowsClockwise),
         label: Text(

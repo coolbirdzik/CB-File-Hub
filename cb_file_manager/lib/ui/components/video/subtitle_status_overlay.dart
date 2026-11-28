@@ -7,6 +7,20 @@ import 'package:cb_file_manager/services/media/subtitle_progress.dart';
 import 'package:cb_file_manager/services/media/subtitle_languages.dart';
 import 'video_player/video_player_utils.dart';
 
+String _subtitleWorkLabel(AppLocalizations l, SubtitleProgress progress) =>
+    switch (progress.stage) {
+      SubtitleWorkStage.unloadingModels => l.aiSubtitleUnloadingModels,
+      SubtitleWorkStage.loadingSpeech => l.aiSubtitleLoadingSpeech,
+      SubtitleWorkStage.loadingTranslation => l.aiSubtitleLoadingTranslation,
+      SubtitleWorkStage.recognizing => l.aiSubtitleRecognizing,
+      SubtitleWorkStage.translating => l.aiSubtitleTranslating,
+      SubtitleWorkStage.readingCache => l.aiSubtitleCacheReading,
+      SubtitleWorkStage.idle =>
+        progress.phase == SubtitlePhase.loading
+            ? l.aiSubtitleLoading
+            : l.aiSubtitleProcessing,
+    };
+
 /// Displays the current caption or the wait message in the subtitle area.
 class SubtitleCaptionOverlay extends StatelessWidget {
   final String caption;
@@ -32,9 +46,10 @@ class SubtitleCaptionOverlay extends StatelessWidget {
           (range) =>
               range.start <= current.position && current.position < range.end,
         )) {
-      text = AppLocalizations.of(context)!.aiSubtitleProcessing;
+      text = _subtitleWorkLabel(AppLocalizations.of(context)!, current);
     }
     if (text.isEmpty) return const SizedBox.shrink();
+    final systemStatus = caption.isEmpty;
     return IgnorePointer(
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -60,28 +75,30 @@ class SubtitleCaptionOverlay extends StatelessWidget {
                   maxWidth: 900,
                   maxHeight: constraints.maxHeight - bottom - 8,
                 ),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 7,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: .78),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    text,
-                    key: const ValueKey('ai-subtitle-caption'),
-                    textAlign: TextAlign.center,
-                    maxLines: compact ? 2 : 4,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: compact ? 16 : 22,
-                      height: 1.35,
-                    ),
-                  ),
-                ),
+                child: systemStatus
+                    ? _SubtitleSystemStatus(text: text, compact: compact)
+                    : Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 7,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: .78),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          text,
+                          key: const ValueKey('ai-subtitle-caption'),
+                          textAlign: TextAlign.center,
+                          maxLines: compact ? 2 : 4,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: compact ? 16 : 22,
+                            height: 1.35,
+                          ),
+                        ),
+                      ),
               ),
             ),
           );
@@ -91,11 +108,45 @@ class SubtitleCaptionOverlay extends StatelessWidget {
   }
 }
 
+/// A transient system message must not look like spoken dialogue.
+class _SubtitleSystemStatus extends StatelessWidget {
+  final String text;
+  final bool compact;
+
+  const _SubtitleSystemStatus({required this.text, required this.compact});
+
+  @override
+  Widget build(BuildContext context) {
+    // The video chrome is dark regardless of the surrounding app theme.
+    final colors = CbColorTokens.of(
+      Brightness.dark,
+      context.cbColors.accent.base,
+    );
+    return CbSurface(
+      key: const ValueKey('ai-subtitle-system-status'),
+      radius: CbRadii.sm,
+      color: colors.surfaceOverlay,
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? CbSpacing.sm : CbSpacing.md,
+        vertical: CbSpacing.xs,
+      ),
+      child: CbLoadingText(
+        text: text,
+        maxLines: 2,
+        style: compact ? CbTypography.bodySm : CbTypography.body,
+        baseColor: colors.textSecondary,
+        highlightColor: colors.accent.text,
+      ),
+    );
+  }
+}
+
 enum _SubtitleAction { settings, retry, regenerate, export }
 
-/// One CC button in the existing playback row. Details/actions appear on demand.
+/// A compact CC toggle next to a progress/settings button.
 class SubtitleControlButton extends StatelessWidget {
   final SubtitleProgress? progress;
+  final ValueChanged<bool>? onEnabledChanged;
   final VoidCallback onSettings, onRetry;
   final VoidCallback? onRegenerate;
 
@@ -104,6 +155,7 @@ class SubtitleControlButton extends StatelessWidget {
   const SubtitleControlButton({
     super.key,
     this.progress,
+    required this.onEnabledChanged,
     required this.onSettings,
     required this.onRetry,
     this.onRegenerate,
@@ -114,18 +166,41 @@ class SubtitleControlButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
     final current = this.progress;
-    if (current == null || current.phase == SubtitlePhase.off) {
-      return IconButton(
+    final enabled = current != null && current.phase != SubtitlePhase.off;
+    Widget toggle(Color color) => Semantics(
+      toggled: enabled,
+      child: IconButton(
         key: const ValueKey('ai-subtitle-control'),
-        tooltip: l.aiSubtitles,
-        onPressed: onSettings,
-        icon: const Icon(
-          Icons.closed_caption_outlined,
-          color: Colors.white70,
+        tooltip: enabled ? l.aiSubtitles : l.aiSubtitleOff,
+        onPressed: onEnabledChanged == null
+            ? null
+            : () => onEnabledChanged!(!enabled),
+        icon: Icon(
+          enabled ? Icons.closed_caption : Icons.closed_caption_outlined,
+          color: color,
           size: 18,
         ),
-        constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+        constraints: const BoxConstraints.tightFor(width: 28, height: 32),
         padding: EdgeInsets.zero,
+      ),
+    );
+    Widget controls(Widget cc, Widget settings) =>
+        Row(mainAxisSize: MainAxisSize.min, children: [cc, settings]);
+    if (current == null || current.phase == SubtitlePhase.off) {
+      return controls(
+        toggle(Colors.white54),
+        IconButton(
+          key: const ValueKey('ai-subtitle-settings-control'),
+          tooltip: '${l.aiSubtitles} · ${l.settings}',
+          onPressed: onSettings,
+          icon: const Icon(
+            PhosphorIconsLight.gearSix,
+            color: Colors.white70,
+            size: 15,
+          ),
+          constraints: const BoxConstraints.tightFor(width: 26, height: 32),
+          padding: EdgeInsets.zero,
+        ),
       );
     }
     final progress = current;
@@ -161,14 +236,7 @@ class SubtitleControlButton extends StatelessWidget {
             ? l.aiSubtitleComplete
             : l.aiSubtitleReady,
       SubtitlePhase.loading ||
-      SubtitlePhase.processing => switch (progress.stage) {
-        SubtitleWorkStage.loadingSpeech => l.aiSubtitleLoadingSpeech,
-        SubtitleWorkStage.loadingTranslation => l.aiSubtitleLoadingTranslation,
-        SubtitleWorkStage.recognizing => l.aiSubtitleRecognizing,
-        SubtitleWorkStage.translating => l.aiSubtitleTranslating,
-        SubtitleWorkStage.readingCache => l.aiSubtitleCacheReading,
-        SubtitleWorkStage.idle => l.aiSubtitleProcessing,
-      },
+      SubtitlePhase.processing => _subtitleWorkLabel(l, progress),
     };
     final model = progress.modelName;
     final source = progress.sourceLanguage;
@@ -209,10 +277,10 @@ class SubtitleControlButton extends StatelessWidget {
       if (progress.error != null) progress.error!,
     ].join('\n');
 
-    return PopupMenuButton<_SubtitleAction>(
+    final settings = PopupMenuButton<_SubtitleAction>(
       popUpAnimationStyle: CbPopoverTransition.menuStyleOf(context),
-      key: const ValueKey('ai-subtitle-control'),
-      tooltip: detail,
+      key: const ValueKey('ai-subtitle-settings-control'),
+      tooltip: '${l.aiSubtitles} · ${l.settings}\n$detail',
       padding: EdgeInsets.zero,
       constraints: const BoxConstraints(maxWidth: 360),
       onSelected: (action) {
@@ -273,57 +341,40 @@ class SubtitleControlButton extends StatelessWidget {
       ],
       child: Semantics(
         button: true,
-        label: '${l.aiSubtitles}: $title',
+        label: '${l.aiSubtitles} · ${l.settings}: $title',
         value: percentage,
         child: SizedBox(
           height: 32,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SizedBox(
-                width: 32,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    Icon(
-                      failed
-                          ? Icons.error_outline
-                          : Icons.closed_caption_outlined,
-                      color: color,
-                      size: 18,
-                    ),
-                    if (progress.busy)
-                      SizedBox(
-                        width: 26,
-                        height: 26,
-                        child: CircularProgressIndicator(
-                          key: const ValueKey('ai-subtitle-busy'),
-                          strokeWidth: 1.5,
-                          color: color,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              if (percentage != null)
-                Padding(
-                  padding: const EdgeInsetsDirectional.only(end: 6),
-                  child: ExcludeSemantics(
-                    child: Text(
-                      percentage,
-                      style: TextStyle(
-                        color: color,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(PhosphorIconsLight.gearSix, color: color, size: 14),
+                if (percentage != null || progress.busy) ...[
+                  const SizedBox(width: 3),
+                  ExcludeSemantics(
+                    child: progress.busy
+                        ? CbLoadingText(
+                            key: const ValueKey('ai-subtitle-busy'),
+                            text: percentage ?? title,
+                            compact: percentage == null,
+                            style: CbTypography.labelXs,
+                            highlightColor: color,
+                          )
+                        : Text(
+                            percentage!,
+                            style: CbTypography.labelXs.copyWith(color: color),
+                          ),
                   ),
-                ),
-            ],
+                ],
+              ],
+            ),
           ),
         ),
       ),
     );
+    return controls(toggle(color), settings);
   }
 }
 

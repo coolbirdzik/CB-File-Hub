@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:path/path.dart' as path;
+import 'file_browser_options_scope.dart';
 
 /// Display names for indexed files and storage roots. Indexed files can have
 /// content-hash storage names; drive roots have no filename component.
@@ -28,6 +29,16 @@ class FileEntryPresentation extends InheritedWidget {
           ?.names[filePath] ??
       fallback ??
       path.basename(filePath);
+
+  /// Display-only extension preference. Folders, input fields and paths keep
+  /// their original names.
+  static String fileNameOf(
+    BuildContext context,
+    String filePath, {
+    String? fallback,
+  }) => FileBrowserOptionsScope.of(
+    context,
+  ).fileLabel(nameOf(context, filePath, fallback: fallback));
 
   @override
   bool updateShouldNotify(FileEntryPresentation oldWidget) =>

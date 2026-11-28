@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:math';
+import 'package:cb_file_manager/design_system/primitives/cb_loading_text.dart';
 import 'package:cb_file_manager/design_system/primitives/cb_popover_transition.dart';
 import 'package:flutter/gestures.dart';
 import 'package:material_ui/material_ui.dart';
@@ -1598,14 +1599,7 @@ class _ImageLoadingIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 28,
-      height: 28,
-      child: CircularProgressIndicator(
-        strokeWidth: 2.2,
-        color: Colors.white.withValues(alpha: 0.6),
-      ),
-    );
+    return const CbLoadingText(highlightColor: Colors.white);
   }
 }
 

@@ -122,7 +122,7 @@ class _DatabaseSettingsScreenState extends State<DatabaseSettingsScreen> {
     return BaseScreen(
       title: context.tr.databaseSettings,
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CbLoadingText())
           : ListView(
               children: [
                 const SizedBox(height: 16),
@@ -504,7 +504,7 @@ class _SharedPreferencesDialogState extends State<_SharedPreferencesDialog> {
             const SizedBox(
               width: 20,
               height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
+              child: CbLoadingText(compact: true),
             )
           else ...[
             IconButton(
@@ -525,7 +525,7 @@ class _SharedPreferencesDialogState extends State<_SharedPreferencesDialog> {
         width: MediaQuery.of(context).size.width * 0.7,
         height: MediaQuery.of(context).size.height * 0.65,
         child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
+            ? const Center(child: CbLoadingText())
             : _prefs.isEmpty
             ? Center(child: Text(context.tr.dbNoPrefs))
             : ListView.builder(
@@ -766,7 +766,7 @@ class _RawDataDialogState extends State<_RawDataDialog> {
         width: MediaQuery.of(context).size.width * 0.8,
         height: MediaQuery.of(context).size.height * 0.6,
         child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
+            ? const Center(child: CbLoadingText())
             : _totalRows == 0
             ? Center(child: Text(context.tr.noDataFound))
             : _buildDataTable(context),
@@ -883,7 +883,7 @@ class _RawDataDialogState extends State<_RawDataDialog> {
                 Positioned.fill(
                   child: ColoredBox(
                     color: colorScheme.surface.withValues(alpha: 0.5),
-                    child: const Center(child: CircularProgressIndicator()),
+                    child: const Center(child: CbLoadingText()),
                   ),
                 ),
             ],

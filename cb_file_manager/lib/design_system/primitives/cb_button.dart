@@ -1,4 +1,5 @@
 import 'package:material_ui/material_ui.dart';
+import 'cb_loading_text.dart';
 
 import '../cb_tokens.dart';
 import '../tokens/cb_color_tokens.dart';
@@ -68,7 +69,7 @@ class CbButton extends StatelessWidget {
   final bool expand;
   final bool outlined;
 
-  /// Replaces the leading icon with a spinner and blocks interaction.
+  /// Animates the label (or a compact marker) and blocks interaction.
   final bool loading;
 
   final String? tooltip;
@@ -296,14 +297,15 @@ class CbButton extends StatelessWidget {
   List<Widget> _content(Color foreground) {
     final children = <Widget>[];
 
-    if (loading) {
+    if (loading && label == null) {
       children.add(
         SizedBox(
           width: _iconSize,
           height: _iconSize,
-          child: CircularProgressIndicator(
-            strokeWidth: CbStrokes.emphasis,
-            valueColor: AlwaysStoppedAnimation<Color>(foreground),
+          child: CbLoadingText(
+            compact: true,
+            text: tooltip,
+            highlightColor: foreground,
           ),
         ),
       );
@@ -317,12 +319,18 @@ class CbButton extends StatelessWidget {
       }
       children.add(
         Flexible(
-          child: Text(
-            label!,
-            style: _textStyle.copyWith(color: foreground),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
+          child: loading
+              ? CbLoadingText(
+                  text: label,
+                  style: _textStyle,
+                  highlightColor: foreground,
+                )
+              : Text(
+                  label!,
+                  style: _textStyle.copyWith(color: foreground),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
         ),
       );
     }

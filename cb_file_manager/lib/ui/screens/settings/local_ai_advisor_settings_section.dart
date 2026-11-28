@@ -167,7 +167,7 @@ class _LocalAiAdvisorSettingsSectionState
         if (_isLoading)
           const Padding(
             padding: EdgeInsets.all(CbSpacing.lg),
-            child: Center(child: CircularProgressIndicator()),
+            child: Center(child: CbLoadingText()),
           )
         else ...[
           if (!widget.compact) ...[
@@ -883,7 +883,7 @@ class _ModelBrowserDialogState extends State<_ModelBrowserDialog> {
             const SizedBox(height: 12),
             Expanded(
               child: catalog == null
-                  ? const Center(child: CircularProgressIndicator())
+                  ? const Center(child: CbLoadingText())
                   : catalog.isEmpty
                   ? Center(child: Text(l.noModelsFound))
                   : ListView.builder(
@@ -940,23 +940,29 @@ class _ModelCatalogTile extends StatelessWidget {
       action = _badge(context, l.localModelInstalledBadge);
     } else if (downloading) {
       final progress = download.progress;
-      action = Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(
-            width: 16,
-            height: 16,
-            child: CircularProgressIndicator(strokeWidth: 2, value: progress),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            progress == null
-                ? context.tr.laDownloading
-                : '${(progress * 100).toInt()}%',
-            style: TextStyle(fontSize: 12, color: theme.colorScheme.primary),
-          ),
-        ],
-      );
+      action = progress == null
+          ? CbLoadingText(text: context.tr.laDownloading)
+          : Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    value: progress,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '${(progress * 100).toInt()}%',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+              ],
+            );
     } else if (!entry.compatible) {
       action = OutlinedButton.icon(
         onPressed: null,

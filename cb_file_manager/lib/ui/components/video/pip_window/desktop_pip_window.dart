@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:cb_file_manager/design_system/primitives/cb_loading_text.dart';
 import 'package:cb_file_manager/design_system/primitives/cb_slider.dart';
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:material_ui/material_ui.dart';
@@ -354,14 +355,7 @@ class _DesktopPipWindowState extends State<DesktopPipWindow>
               // Minimal loader until first frame
               if (!_firstFrameReady)
                 const Center(
-                  child: SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white60,
-                    ),
-                  ),
+                  child: CbLoadingText(highlightColor: Colors.white),
                 ),
 
               // If there is an opening error, show it as a small banner.

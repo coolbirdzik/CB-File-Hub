@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/design_system/primitives/cb_loading_text.dart';
 import 'package:cb_file_manager/ui/widgets/operation_activity.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
@@ -71,10 +72,10 @@ void main() {
       ),
     );
     await tester.pumpWidget(activity(true));
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.byType(CbLoadingText), findsOneWidget);
     await tester.pumpWidget(activity(false));
     await tester.pumpAndSettle();
-    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.byType(CbLoadingText), findsNothing);
     expect(find.byIcon(Icons.check_circle), findsOneWidget);
     expect(tester.binding.hasScheduledFrame, isFalse);
   });
@@ -97,7 +98,7 @@ void main() {
     );
     await tester.pumpWidget(content(null));
     await tester.pumpAndSettle();
-    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.byType(CbLoadingText), findsNothing);
     await tester.pumpWidget(content(0.7));
     await tester.pumpAndSettle();
     expect(

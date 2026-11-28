@@ -867,7 +867,7 @@ class _SftpTransferScreenState extends State<SftpTransferScreen> {
             if (_connecting)
               const SizedBox.square(
                 dimension: CbSizes.iconXl,
-                child: CircularProgressIndicator(strokeWidth: 2),
+                child: CbLoadingText(compact: true),
               )
             else
               Icon(

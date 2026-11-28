@@ -5,6 +5,8 @@ import 'selection_geometry_item.dart';
 import 'drag_selection_region.dart';
 import '../tab_manager/core/tabbed_folder/tabbed_folder_drag_selection_controller.dart';
 import '../components/common/file_entry_presentation.dart';
+import '../components/common/file_browser_options_scope.dart';
+import 'package:cb_file_manager/helpers/files/file_browser_options.dart';
 
 import 'package:cb_native/cb_native.dart';
 import 'package:flutter/foundation.dart';
@@ -69,11 +71,16 @@ class _FileTreeViewState extends State<FileTreeView> {
   /// the directory or the (folders, files) lists change.
   List<TreeNode<FileSystemEntity>> _roots = const [];
   String? _rootSignature;
+  FileBrowserOptions? _lastBrowserOptions;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _maybeRebuildRoots();
+    final options = FileBrowserOptionsScope.of(context);
+    final visibilityChanged =
+        _lastBrowserOptions?.sameVisibility(options) == false;
+    _lastBrowserOptions = options;
+    _maybeRebuildRoots(force: visibilityChanged);
   }
 
   @override
@@ -113,7 +120,14 @@ class _FileTreeViewState extends State<FileTreeView> {
   ) async {
     final entity = node.data;
     if (entity is! Directory) return const [];
-    return _scanDirectory(entity.path);
+    final options = FileBrowserOptionsScope.of(context);
+    final children = await _scanDirectory(entity.path);
+    final visible = await visibleBrowserEntries(
+      children.map((child) => child.data).toList(),
+      options,
+    );
+    final paths = visible.map((entry) => entry.path).toSet();
+    return children.where((child) => paths.contains(child.id)).toList();
   }
 
   void _onTap(TreeNode<FileSystemEntity> node) {
@@ -122,6 +136,13 @@ class _FileTreeViewState extends State<FileTreeView> {
         HardwareKeyboard.instance.isControlPressed ||
         HardwareKeyboard.instance.isMetaPressed;
     final isShift = HardwareKeyboard.instance.isShiftPressed;
+    if (widget.isDesktopPlatform &&
+        FileBrowserOptionsScope.of(context).singleClickToOpen &&
+        !isCtrl &&
+        !isShift) {
+      _onDoubleTap(node);
+      return;
+    }
     if (entity is Directory) {
       widget.toggleFolderSelection(
         entity.path,
@@ -170,7 +191,11 @@ class _FileTreeViewState extends State<FileTreeView> {
         focusedId: widget.selectionState.lastSelectedPath,
         childrenLoader: _loadChildren,
         onTap: _onTap,
-        onDoubleTap: _onDoubleTap,
+        onDoubleTap:
+            widget.isDesktopPlatform &&
+                FileBrowserOptionsScope.of(context).singleClickToOpen
+            ? null
+            : _onDoubleTap,
         onSecondary: (node, pos) => widget.onEntityContextMenu != null
             ? widget.onEntityContextMenu!(node.data, pos)
             : widget.showContextMenu(context, pos),
@@ -183,9 +208,11 @@ class _FileTreeViewState extends State<FileTreeView> {
         itemBuilder: (context, node, depth) {
           final entity = node.data;
           final isDir = entity is Directory;
-          final name = FileEntryPresentation.nameOf(context, entity.path);
+          final name = isDir
+              ? FileEntryPresentation.nameOf(context, entity.path)
+              : FileEntryPresentation.fileNameOf(context, entity.path);
           final theme = Theme.of(context);
-          final row = Row(
+          final rowContent = Row(
             children: [
               FileEntryPresentation.leadingOf(context, entity.path, size: 16) ??
                   Icon(
@@ -209,6 +236,17 @@ class _FileTreeViewState extends State<FileTreeView> {
                 ),
               ),
             ],
+          );
+          final row = FileSelectionFrame(
+            selected: selected.contains(entity.path),
+            onToggle: () {
+              if (isDir) {
+                widget.toggleFolderSelection(entity.path, ctrlSelect: true);
+              } else {
+                widget.toggleFileSelection(entity.path, ctrlSelect: true);
+              }
+            },
+            child: rowContent,
           );
           if (!widget.isDesktopPlatform) return row;
           return SelectionGeometryItem(

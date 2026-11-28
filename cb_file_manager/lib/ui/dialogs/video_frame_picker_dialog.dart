@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:cb_file_manager/design_system/primitives/cb_loading_text.dart';
 import 'package:cb_file_manager/design_system/primitives/cb_slider.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:cb_file_manager/services/media/media_kit_playback.dart';
@@ -277,7 +278,7 @@ class _VideoFramePickerDialogState extends State<VideoFramePickerDialog> {
               width: dialogWidth,
               height: videoHeight,
               child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
+                  ? const Center(child: CbLoadingText())
                   : _error != null && _duration == Duration.zero
                   ? Center(
                       child: Padding(
@@ -459,7 +460,7 @@ class _VideoFramePickerDialogState extends State<VideoFramePickerDialog> {
                         ? const SizedBox(
                             width: 16,
                             height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                            child: CbLoadingText(compact: true),
                           )
                         : const Icon(PhosphorIconsLight.eye, size: 18),
                     label: Text(context.tr.preview),
@@ -473,7 +474,7 @@ class _VideoFramePickerDialogState extends State<VideoFramePickerDialog> {
                         ? const SizedBox(
                             width: 16,
                             height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                            child: CbLoadingText(compact: true),
                           )
                         : const Icon(PhosphorIconsLight.check, size: 18),
                     label: Text(context.tr.vfUseFrame),

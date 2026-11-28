@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:cb_file_manager/design_system/primitives/cb_refresh_indicator.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -524,7 +525,7 @@ class _DeviceMediaAlbumScreenState extends State<DeviceMediaAlbumScreen>
                     child: Text(l10n.retry),
                   ),
                 Expanded(
-                  child: RefreshIndicator(
+                  child: CbRefreshIndicator(
                     onRefresh: library.refresh,
                     child: CustomScrollView(
                       controller: _scroll,

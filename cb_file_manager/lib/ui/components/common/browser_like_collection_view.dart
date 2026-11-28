@@ -1,5 +1,6 @@
 // ignore_for_file: deprecated_member_use
 
+import 'package:cb_file_manager/design_system/primitives/cb_refresh_indicator.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:cb_file_manager/ui/widgets/tree_view/tree_view.dart';
 import 'package:cb_file_manager/ui/widgets/adaptive_file_list.dart';
@@ -108,7 +109,10 @@ class BrowserLikeCollectionView<T> extends StatelessWidget {
               : null,
           onPanEnd: isDesktop && onDragEnd != null ? (_) => onDragEnd!() : null,
           behavior: HitTestBehavior.translucent,
-          child: RefreshIndicator(onRefresh: onRefresh, child: _buildContent()),
+          child: CbRefreshIndicator(
+            onRefresh: onRefresh,
+            child: _buildContent(),
+          ),
         ),
         dragSelectionOverlay,
       ],

@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/design_system/primitives/cb_loading_text.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'dart:io';
@@ -113,8 +114,7 @@ class StreamingHelper {
         showDialog(
           context: context,
           barrierDismissible: false,
-          builder: (context) =>
-              const Center(child: CircularProgressIndicator()),
+          builder: (context) => const Center(child: CbLoadingText()),
         );
       }
 
@@ -839,9 +839,12 @@ class StreamingHelper {
           builder: (ctx) => AlertDialog(
             content: Row(
               children: [
-                const CircularProgressIndicator(),
-                const SizedBox(width: 16),
-                Text(AppLocalizations.of(context)!.downloadingFile),
+                Flexible(
+                  child: CbLoadingText(
+                    text: AppLocalizations.of(context)!.downloadingFile,
+                    maxLines: 2,
+                  ),
+                ),
               ],
             ),
           ),

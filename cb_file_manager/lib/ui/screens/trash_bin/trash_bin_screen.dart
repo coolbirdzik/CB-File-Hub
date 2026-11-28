@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/design_system/primitives/cb_loading_text.dart';
 import 'package:cb_file_manager/ui/components/common/search_text_field.dart';
 import 'dart:async';
 import 'dart:io';
@@ -968,16 +969,8 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              CircularProgressIndicator(
-                                semanticsLabel: _isEmptying
-                                    ? AppLocalizations.of(
-                                        context,
-                                      )!.emptyingTrash
-                                    : AppLocalizations.of(context)!.processing,
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                _isEmptying
+                              CbLoadingText(
+                                text: _isEmptying
                                     ? AppLocalizations.of(
                                         context,
                                       )!.emptyingTrash

@@ -507,7 +507,7 @@ class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
       ),
       contentBuilder: (context, dialogSize) {
         if (_isLoading) {
-          return const Center(child: CircularProgressIndicator());
+          return const Center(child: CbLoadingText());
         }
         // The input + quick picks keep their natural height (scrolling on their
         // own when the dialog is short) and the browse section takes all the
@@ -593,11 +593,7 @@ class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             ),
             child: _isSaving
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
+                ? CbLoadingText(text: l10n.save.toUpperCase())
                 : Text(l10n.save.toUpperCase()),
           ),
         ),
@@ -1164,10 +1160,10 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
                       ),
                     ),
                     child: isSaving
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                        ? CbLoadingText(
+                            text: AppLocalizations.of(
+                              context,
+                            )!.save.toUpperCase(),
                           )
                         : Text(
                             AppLocalizations.of(context)!.save.toUpperCase(),
@@ -1380,9 +1376,9 @@ class _RemoveTagsChipDialogState extends State<RemoveTagsChipDialog> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const CircularProgressIndicator(),
-                      const SizedBox(height: 16),
-                      Text(AppLocalizations.of(context)!.loadingTags),
+                      CbLoadingText(
+                        text: AppLocalizations.of(context)!.loadingTags,
+                      ),
                     ],
                   ),
                 ),
@@ -1490,13 +1486,9 @@ class _RemoveTagsChipDialogState extends State<RemoveTagsChipDialog> {
             foregroundColor: Colors.white,
           ),
           child: _isRemoving
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.white,
-                  ),
+              ? CbLoadingText(
+                  text: AppLocalizations.of(context)!.removeTag.toUpperCase(),
+                  highlightColor: Colors.white,
                 )
               : Text(AppLocalizations.of(context)!.removeTag.toUpperCase()),
         ),

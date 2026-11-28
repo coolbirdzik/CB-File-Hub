@@ -4499,7 +4499,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     final localizations = AppLocalizations.of(context)!;
 
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(child: CbLoadingText());
     }
 
     if (_filesBySelectedTag.isEmpty) {
@@ -4683,13 +4683,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
                       onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) =>
-                                FileDetailsScreen(file: File(path)),
-                          ),
-                        );
+                        FileDetailsScreen.show(context, file: File(path));
                       },
                     ),
                   ),
@@ -4756,12 +4750,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                 title: Text(AppLocalizations.of(context)!.viewDetails),
                 onTap: () {
                   Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => FileDetailsScreen(file: file),
-                    ),
-                  );
+                  FileDetailsScreen.show(this.context, file: file);
                 },
               ),
               ListTile(
@@ -4778,12 +4767,10 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                 title: Text(AppLocalizations.of(context)!.editTags),
                 onTap: () {
                   Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) =>
-                          FileDetailsScreen(file: file, initialTab: 1),
-                    ),
+                  FileDetailsScreen.show(
+                    this.context,
+                    file: file,
+                    initialTab: 1,
                   );
                 },
               ),

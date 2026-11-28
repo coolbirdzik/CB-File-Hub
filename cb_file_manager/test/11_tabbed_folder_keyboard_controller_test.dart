@@ -9,6 +9,114 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/widgets.dart';
 
 void main() {
+  testWidgets('Grid type-ahead reveals distant and cached offscreen matches', (
+    tester,
+  ) async {
+    final controller = TabbedFolderKeyboardController();
+    addTearDown(controller.dispose);
+    const columns = 4;
+    const spacing = 8.0;
+    const height = 160.0;
+    const firstMatch = 80;
+    const secondMatch = 164;
+    final files = List.generate(220, (i) {
+      final prefix = i == firstMatch || i == secondMatch ? 'n' : 'a';
+      return File('C:/grid/$prefix$i.txt');
+    });
+    final state = FolderListState(
+      'C:/grid',
+      files: files,
+      viewMode: ViewMode.grid,
+    );
+    controller.itemMainAxisExtent = height + spacing;
+    controller.focusedPath = files.first.path;
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: GridView.builder(
+          controller: controller.scrollController,
+          padding: const EdgeInsets.all(spacing),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: columns,
+            mainAxisExtent: height,
+            mainAxisSpacing: spacing,
+            crossAxisSpacing: spacing,
+          ),
+          itemCount: files.length,
+          itemBuilder: (_, i) =>
+              SizedBox(key: controller.itemKeyForPath(files[i].path)),
+        ),
+      ),
+    );
+
+    void pressN() {
+      expect(
+        controller.handleKeyEvent(
+          isDesktop: true,
+          folderListState: state,
+          selectionState: const SelectionState(),
+          currentFilter: null,
+          gridCrossAxisCount: columns,
+          onBackInTabHistory: () {},
+          focusFolderPath: (_) {},
+          focusFilePath: (_) {},
+          selectRange:
+              ({
+                required Set<String> folderPaths,
+                required Set<String> filePaths,
+                required String lastSelectedPath,
+                required bool ctrlSelect,
+              }) {},
+          activateEntity: (_) {},
+          onDelete: (_) {},
+          event: const KeyDownEvent(
+            logicalKey: LogicalKeyboardKey.keyN,
+            physicalKey: PhysicalKeyboardKey.keyN,
+            character: 'n',
+            timeStamp: Duration.zero,
+          ),
+        ),
+        KeyEventResult.handled,
+      );
+    }
+
+    void expectVisible(int index) {
+      expect(controller.focusedPath, files[index].path);
+      final item = find.byKey(controller.itemKeyForPath(files[index].path));
+      expect(item, findsOneWidget);
+      final viewport = tester.getRect(find.byType(GridView));
+      final rect = tester.getRect(item);
+      expect(rect.top, greaterThanOrEqualTo(viewport.top - 0.01));
+      expect(rect.bottom, lessThanOrEqualTo(viewport.bottom + 0.01));
+    }
+
+    expect(controller.hasRenderedItem(files[firstMatch].path), isFalse);
+    pressN();
+    await tester.pumpAndSettle();
+    expectVisible(firstMatch);
+
+    expect(controller.hasRenderedItem(files[secondMatch].path), isFalse);
+    pressN();
+    await tester.pumpAndSettle();
+    expectVisible(secondMatch);
+
+    // Repeating N wraps back to the first match, also outside the cache.
+    pressN();
+    await tester.pumpAndSettle();
+    expectVisible(firstMatch);
+
+    // Scroll past the next match without changing focus. Although its index
+    // is higher, the cached target is now above the visible viewport.
+    controller.scrollController.jumpTo(
+      (secondMatch ~/ columns) * (height + spacing) + height + spacing + 16,
+    );
+    await tester.pumpAndSettle();
+    expect(controller.hasRenderedItem(files[secondMatch].path), isTrue);
+    pressN();
+    await tester.pumpAndSettle();
+    expectVisible(secondMatch);
+  });
+
   testWidgets('List arrow navigation follows responsive columns and resize', (
     tester,
   ) async {

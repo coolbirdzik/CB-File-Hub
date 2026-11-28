@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:cb_file_manager/config/languages/app_localizations_delegate.dart';
 import 'package:cb_file_manager/services/local_ai/local_ai_advisor_service.dart';
 import 'package:cb_file_manager/services/media/media_kit_playback.dart';
+import 'package:cb_file_manager/services/media/subtitle_progress.dart';
 import 'package:cb_file_manager/ui/components/video/local_subtitle_overlay.dart';
 import 'package:cb_file_manager/ui/components/video/video_player/video_player.dart';
 import 'package:cupertino_ui/cupertino_ui.dart';
@@ -118,6 +119,54 @@ void main() {
           .notifier,
       same(session),
     );
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('CC button updates the active session enabled preference', (
+    tester,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    final models = LocalAiAdvisorService(prefs: prefs);
+    GetIt.I.registerSingleton<LocalAiAdvisorService>(models);
+    final playback = _Playback();
+    addTearDown(() async {
+      await playback.dispose();
+      await models.dispose();
+      await GetIt.I.reset();
+    });
+    await tester.pumpWidget(
+      _app(
+        LocalSubtitleLayer(
+          player: playback,
+          controlsVisible: true,
+          child: Align(
+            alignment: Alignment.bottomCenter,
+            child: LocalSubtitleControls(onSettings: () {}),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    final session = tester
+        .widget<LocalSubtitleScope>(find.byType(LocalSubtitleScope))
+        .notifier!;
+    final cc = find.byKey(const ValueKey('ai-subtitle-control'));
+    expect(session.preferences.enabled, isTrue);
+    await tester.tap(cc);
+    await tester.pump();
+    expect(session.preferences.enabled, isFalse);
+    expect(session.phase, SubtitlePhase.off);
+    expect(prefs.getBool('ai_subtitles_enabled'), isFalse);
+    expect(find.byKey(const ValueKey('ai-subtitle-status')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('ai-subtitle-settings-control')),
+      findsOneWidget,
+    );
+    await tester.tap(cc);
+    await tester.pump();
+    expect(session.preferences.enabled, isTrue);
+    expect(session.phase, isNot(SubtitlePhase.off));
     await tester.pumpWidget(const SizedBox.shrink());
   });
 }

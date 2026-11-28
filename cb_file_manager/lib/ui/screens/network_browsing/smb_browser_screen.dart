@@ -592,9 +592,7 @@ class _SMBBrowserScreenState extends State<SMBBrowserScreen>
                                   const SizedBox(
                                     width: 16,
                                     height: 16,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
+                                    child: CbLoadingText(compact: true),
                                   )
                                 else
                                   IconButton(
@@ -809,19 +807,7 @@ class _SMBBrowserScreenState extends State<SMBBrowserScreen>
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const SizedBox(
-                    width: 32,
-                    height: 32,
-                    child: CircularProgressIndicator(strokeWidth: 3),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    l10n.scanningForSmbServers,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
+                  CbLoadingText(text: l10n.scanningForSmbServers, maxLines: 2),
                   const SizedBox(height: 8),
                   Text(
                     l10n.devicesWillAppear,
@@ -948,21 +934,7 @@ class _SMBBrowserScreenState extends State<SMBBrowserScreen>
                 if (_isScanning)
                   Row(
                     mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const SizedBox(
-                        width: 12,
-                        height: 12,
-                        child: CircularProgressIndicator(strokeWidth: 1),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        l10n.scanning,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: theme.colorScheme.primary,
-                        ),
-                      ),
-                    ],
+                    children: [CbLoadingText(text: l10n.scanning)],
                   )
                 else if (_hasScanned)
                   Container(

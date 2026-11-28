@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart';
 import 'dart:async';
 import 'dart:io';
+import 'package:cb_file_manager/ui/components/common/file_browser_options_scope.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_platform_interface.dart';
@@ -1498,7 +1499,11 @@ class _CBFileAppState extends State<CBFileApp>
       ],
       builder: (context, child) {
         final wrappedChild = AppBusyCursorOverlay(
-          child: LegacyMaterialBridge(child: child ?? const SizedBox.shrink()),
+          child: FileBrowserOptionsScope(
+            child: LegacyMaterialBridge(
+              child: child ?? const SizedBox.shrink(),
+            ),
+          ),
         );
         if (!_useDesktopAcrylicVisuals) return wrappedChild;
         return DesktopAcrylicBackdrop(
@@ -1541,7 +1546,11 @@ class _CBFileAppState extends State<CBFileApp>
         // screens (e.g. [TabbedFolderListScreen]) and [NavigationController] use
         // [ScaffoldMessenger.of] for snackbars — wrap so those lookups succeed.
         final shell = ScaffoldMessenger(
-          child: AppBusyCursorOverlay(child: child ?? const SizedBox.shrink()),
+          child: AppBusyCursorOverlay(
+            child: FileBrowserOptionsScope(
+              child: child ?? const SizedBox.shrink(),
+            ),
+          ),
         );
         // Bridge sits under the Material Theme added below, so it is applied
         // to `shell` there rather than here.

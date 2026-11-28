@@ -216,7 +216,7 @@ class _TorrentFilesPaneState extends State<TorrentFilesPane> {
           const SizedBox(
             width: 16,
             height: 16,
-            child: CircularProgressIndicator(strokeWidth: 2),
+            child: CbLoadingText(compact: true),
           ),
           CbButton(
             key: const ValueKey('torrent-cancel-metadata'),

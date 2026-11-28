@@ -395,10 +395,8 @@ class _CreateAlbumDialogState extends State<CreateAlbumDialog> {
         ElevatedButton(
           onPressed: _isLoading ? null : _saveAlbum,
           child: _isLoading
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+              ? CbLoadingText(
+                  text: widget.editingAlbum != null ? l10n.update : l10n.create,
                 )
               : Text(widget.editingAlbum != null ? l10n.update : l10n.create),
         ),

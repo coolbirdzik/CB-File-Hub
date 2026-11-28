@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/design_system/primitives/cb_loading_text.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/core/service_locator.dart';
 import 'package:cb_file_manager/helpers/files/file_type_registry.dart';
@@ -78,7 +79,7 @@ class _ArchivePreviewState extends State<ArchivePreview> {
     final theme = Theme.of(context);
 
     if (_loading) {
-      return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+      return const Center(child: CbLoadingText());
     }
 
     if (_error != null) {

@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:async';
 import 'dart:math' as math;
 import 'dart:typed_data';
+import 'package:cb_file_manager/design_system/primitives/cb_loading_text.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:cb_file_manager/design_system/cb_page_transitions.dart';
 import 'package:cb_file_manager/design_system/tokens/cb_geometry_tokens.dart';
@@ -857,7 +858,7 @@ Widget _buildContextMenuActionRow(
   if (isLoading || action.isLoading) {
     icon = SizedBox.square(
       dimension: iconSize,
-      child: const CircularProgressIndicator(strokeWidth: 2),
+      child: const CbLoadingText(compact: true),
     );
   } else if (action.iconBytes != null) {
     icon = Image.memory(
@@ -2182,10 +2183,7 @@ List<ContextMenuSection> _buildFileContextMenuSections({
           id: 'properties',
           label: l10n.properties,
           icon: PhosphorIconsLight.info,
-          onSelected: (_) => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => FileDetailsScreen(file: file)),
-          ),
+          onSelected: (_) => FileDetailsScreen.show(context, file: file),
         ),
         ContextMenuAction(
           id: 'delete',

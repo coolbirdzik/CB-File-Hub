@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:cb_file_manager/design_system/primitives/cb_loading_text.dart';
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
@@ -117,7 +118,7 @@ void main() {
     // The expanded tag browser spins until its catalog loads from SQLite.
     final loading = find.descendant(
       of: find.byType(TagBrowseSection),
-      matching: find.byType(CircularProgressIndicator),
+      matching: find.byType(CbLoadingText),
     );
     for (var i = 0; i < 50 && loading.evaluate().isNotEmpty; i++) {
       await tester.runAsync(

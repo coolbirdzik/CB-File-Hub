@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/design_system/primitives/cb_loading_text.dart';
 import 'package:cb_file_manager/services/disk_cleaner/cleaner_categories.dart';
 import 'dart:io';
 import 'dart:ui' as ui;
@@ -281,7 +282,7 @@ void main() {
         find.byKey(const ValueKey('cleaner-agent-select-recommendations')),
       );
       expect(reviewingButton.onPressed, isNull);
-      expect(find.byType(CircularProgressIndicator), findsWidgets);
+      expect(find.byType(CbLoadingText), findsWidgets);
       expect(
         find.byKey(ValueKey('cleaner-agent-inspecting-${first.fullPath}')),
         findsOneWidget,

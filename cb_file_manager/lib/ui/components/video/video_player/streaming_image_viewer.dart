@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:cb_file_manager/design_system/primitives/cb_loading_text.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
@@ -142,9 +143,7 @@ class _StreamingImageViewerState extends State<StreamingImageViewer> {
     final l10n = AppLocalizations.of(context)!;
 
     if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(color: Colors.white),
-      );
+      return const Center(child: CbLoadingText(highlightColor: Colors.white));
     }
 
     if (_errorMessage != null || _isUrlNotImplemented) {

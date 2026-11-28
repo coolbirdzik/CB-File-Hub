@@ -374,7 +374,7 @@ void main() {
       await tester.pump();
 
       expect(taps, 0);
-      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(find.byType(CbLoadingText), findsOneWidget);
     });
 
     testWidgets('icon-only buttons are square and expose their tooltip', (

@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'package:cb_file_manager/services/drive/drive_browser_entries.dart';
 import 'package:cb_file_manager/ui/components/common/shared_action_bar.dart';
+import 'package:cb_file_manager/ui/components/common/file_browser_preference_option.dart';
+import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 
 import 'package:material_ui/material_ui.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -414,90 +416,126 @@ class MobileFileActionsController {
 
   /// Show more options menu
   void showMoreOptionsMenu(BuildContext context) {
+    final hostContext = context;
     final theme = Theme.of(context);
     final localizations = AppLocalizations.of(context)!;
 
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * .82,
+      ),
       builder: (context) => Material(
         color: theme.scaffoldBackgroundColor,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
         clipBehavior: Clip.antiAlias,
         child: SafeArea(
           top: false,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Handle bar
-              Container(
-                margin: const EdgeInsets.only(top: 8),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: theme.dividerColor.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Text(
-                  localizations.moreOptions,
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: theme.colorScheme.onSurface,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Handle bar
+                Container(
+                  margin: const EdgeInsets.only(top: 8),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: theme.dividerColor.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-              ),
 
-              const Divider(height: 1),
-
-              // More options
-              ListTile(
-                leading: const Icon(PhosphorIconsLight.checks),
-                title: Text(
-                  localizations.selectMultiple ??
-                      localizations.selectMultipleFiles,
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Text(
+                    localizations.moreOptions,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.onSurface,
+                    ),
+                  ),
                 ),
-                onTap: () {
-                  Navigator.pop(context);
-                  onSelectionModeToggled?.call();
-                },
-              ),
 
-              if (onGridSizePressed != null &&
-                  ViewModeUtils.isGridLike(currentViewMode))
+                const Divider(height: 1),
+
+                // More options
                 ListTile(
-                  leading: const Icon(PhosphorIconsLight.rectangle),
-                  title: Text(localizations.gridSize ?? 'Grid size'),
+                  leading: const Icon(PhosphorIconsLight.checks),
+                  title: Text(
+                    localizations.selectMultiple ??
+                        localizations.selectMultipleFiles,
+                  ),
                   onTap: () {
                     Navigator.pop(context);
-                    onGridSizePressed?.call();
+                    onSelectionModeToggled?.call();
                   },
                 ),
 
-              if (onManageTagsPressed != null)
-                ListTile(
-                  leading: const Icon(PhosphorIconsLight.tag),
-                  title: Text(localizations.tagManagement),
-                  onTap: () {
-                    Navigator.pop(context);
-                    onManageTagsPressed?.call();
-                  },
-                ),
+                if (onGridSizePressed != null &&
+                    ViewModeUtils.isGridLike(currentViewMode))
+                  ListTile(
+                    leading: const Icon(PhosphorIconsLight.rectangle),
+                    title: Text(localizations.gridSize ?? 'Grid size'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      onGridSizePressed?.call();
+                    },
+                  ),
 
-              if (onAllowFileExtensionRenameChanged != null)
+                if (onManageTagsPressed != null)
+                  ListTile(
+                    leading: const Icon(PhosphorIconsLight.tag),
+                    title: Text(localizations.tagManagement),
+                    onTap: () {
+                      Navigator.pop(context);
+                      onManageTagsPressed?.call();
+                    },
+                  ),
+
+                if (onAllowFileExtensionRenameChanged != null) ...[
+                  const Divider(height: 1),
+                  for (final option in FileBrowserPreferenceOption.available())
+                    ListTile(
+                      leading: Icon(option.icon),
+                      title: Text(option.label(localizations)),
+                      trailing:
+                          (option == FileBrowserPreferenceOption.renameExtension
+                              ? allowFileExtensionRename
+                              : option.isEnabled(UserPreferences.instance))
+                          ? Icon(
+                              PhosphorIconsLight.check,
+                              color: theme.colorScheme.primary,
+                            )
+                          : null,
+                      onTap: () async {
+                        Navigator.pop(context);
+                        if (option ==
+                            FileBrowserPreferenceOption.renameExtension) {
+                          onAllowFileExtensionRenameChanged?.call(
+                            !allowFileExtensionRename,
+                          );
+                        } else {
+                          await option.toggleFromMenu(hostContext);
+                        }
+                      },
+                    ),
+                  const Divider(height: 1),
+                ],
+
+                // Masonry toggle option
                 ListTile(
                   leading: Icon(
-                    PhosphorIconsLight.textAa,
-                    color: allowFileExtensionRename
+                    PhosphorIconsLight.gridFour,
+                    color: isMasonryLayout
                         ? theme.colorScheme.primary
                         : theme.iconTheme.color,
                   ),
-                  title: Text(localizations.allowFileExtensionRename),
-                  trailing: allowFileExtensionRename
+                  title: Text(localizations.masonryLayout),
+                  trailing: isMasonryLayout
                       ? Icon(
                           PhosphorIconsLight.check,
                           color: theme.colorScheme.primary,
@@ -505,42 +543,19 @@ class MobileFileActionsController {
                       : null,
                   onTap: () {
                     Navigator.pop(context);
-                    allowFileExtensionRename = !allowFileExtensionRename;
-                    onAllowFileExtensionRenameChanged?.call(
-                      allowFileExtensionRename,
-                    );
+                    isMasonryLayout = !isMasonryLayout;
+                    if (isMasonryLayout &&
+                        !ViewModeUtils.isGridLike(currentViewMode)) {
+                      currentViewMode = ViewMode.grid;
+                      onViewModeToggled?.call(ViewMode.grid);
+                    }
+                    onMasonryToggled?.call();
                   },
                 ),
 
-              // Masonry toggle option
-              ListTile(
-                leading: Icon(
-                  PhosphorIconsLight.gridFour,
-                  color: isMasonryLayout
-                      ? theme.colorScheme.primary
-                      : theme.iconTheme.color,
-                ),
-                title: Text(localizations.masonryLayout),
-                trailing: isMasonryLayout
-                    ? Icon(
-                        PhosphorIconsLight.check,
-                        color: theme.colorScheme.primary,
-                      )
-                    : null,
-                onTap: () {
-                  Navigator.pop(context);
-                  isMasonryLayout = !isMasonryLayout;
-                  if (isMasonryLayout &&
-                      !ViewModeUtils.isGridLike(currentViewMode)) {
-                    currentViewMode = ViewMode.grid;
-                    onViewModeToggled?.call(ViewMode.grid);
-                  }
-                  onMasonryToggled?.call();
-                },
-              ),
-
-              const SizedBox(height: 16),
-            ],
+                const SizedBox(height: 16),
+              ],
+            ),
           ),
         ),
       ),

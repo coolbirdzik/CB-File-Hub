@@ -1,5 +1,6 @@
 import 'package:cb_file_manager/ui/widgets/compact_file_list_content.dart';
 import 'dart:io';
+import '../../../components/common/file_browser_options_scope.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
@@ -266,6 +267,21 @@ class _FolderItemState extends State<FolderItem> {
 
   @override
   Widget build(BuildContext context) {
+    return FileSelectionFrame(
+      grid:
+          widget.isDesktopMode && widget.showItemBackground && !widget.compact,
+      selected: widget.isSelected,
+      onToggle: widget.toggleFolderSelection == null
+          ? null
+          : () => widget.toggleFolderSelection!(
+              widget.folder.path,
+              ctrlSelect: true,
+            ),
+      child: _buildItem(context),
+    );
+  }
+
+  Widget _buildItem(BuildContext context) {
     final bool isBeingCut = ItemInteractionStyle.isBeingCut(widget.folder.path);
     final renameController = InlineRenameScope.maybeOf(context);
     final isBeingRenamed =
@@ -460,6 +476,8 @@ class _FolderItemState extends State<FolderItem> {
                       bottom: 0,
                       width: widget.compact ? 36 : 80, // Vùng icon + padding
                       child: OptimizedInteractionLayer(
+                        fileBrowserActivation:
+                            widget.isDesktopMode && widget.compact,
                         onTap: () {
                           // Click vào icon sẽ select item
                           if (widget.toggleFolderSelection != null) {
@@ -492,6 +510,7 @@ class _FolderItemState extends State<FolderItem> {
                         right: 0,
                         bottom: 0,
                         child: OptimizedInteractionLayer(
+                          fileBrowserActivation: widget.isDesktopMode,
                           onTap: () {
                             if (widget.isDesktopMode &&
                                 widget.toggleFolderSelection != null) {

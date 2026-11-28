@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/design_system/primitives/cb_loading_text.dart';
 import 'ssh/ssh_section.dart';
 import 'ssh/ssh_workspace_screen.dart';
 import 'torrent/torrent_screen.dart';
@@ -213,7 +214,7 @@ class SystemScreenRouter {
         future: AlbumService.instance.getAlbumById(albumId),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(child: CbLoadingText());
           }
           if (snapshot.hasData && snapshot.data != null) {
             _syncTabName(context, tabId, snapshot.data!.name);
@@ -306,7 +307,7 @@ class SystemScreenRouter {
         future: VideoLibraryService().getLibraryById(libraryId),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(child: CbLoadingText());
           }
           if (snapshot.hasData && snapshot.data != null) {
             _syncTabName(context, tabId, snapshot.data!.name);
@@ -333,7 +334,7 @@ class SystemScreenRouter {
         future: VideoLibraryService().getLibraryById(libraryId),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(child: CbLoadingText());
           }
           if (snapshot.hasData && snapshot.data != null) {
             _syncTabName(

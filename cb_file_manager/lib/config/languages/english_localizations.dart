@@ -134,6 +134,8 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get aiSubtitleLoadingSpeech => 'Loading speech model';
   @override
+  String get aiSubtitleUnloadingModels => 'Unloading previous models';
+  @override
   String get aiSubtitleLoadingTranslation => 'Loading translation model';
   @override
   String get aiSubtitleRecognizing => 'Recognizing audio';
@@ -2532,6 +2534,30 @@ class EnglishLocalizations implements AppLocalizations {
   String get fileLastModified => 'Last modified';
   @override
   String get fileAccessed => 'Accessed';
+  @override
+  String get propertiesOverview => 'Overview';
+  @override
+  String get propertiesDetails => 'Details';
+  @override
+  String get propertiesMedia => 'Media';
+  @override
+  String get propertiesChecksum => 'Checksum';
+  @override
+  String get propertiesFileSystem => 'File system';
+  @override
+  String get propertiesExactSize => 'Exact size';
+  @override
+  String get propertiesMetadataChanged => 'Metadata changed';
+  @override
+  String get propertiesCalculateChecksum => 'Calculate SHA-256';
+  @override
+  String get propertiesChecksumHint =>
+      'Calculate the checksum only when needed. Large files may take some time.';
+  @override
+  String get propertiesChecksumChanged =>
+      'The file changed during calculation. Calculate again.';
+  @override
+  String get propertiesChecksumCopied => 'Checksum copied to clipboard';
   @override
   String get loadingVideo => 'Loading video...';
   @override
@@ -7825,4 +7851,38 @@ class EnglishLocalizations implements AppLocalizations {
     'failures' => 'reads failed, running fewer',
     _ => '',
   };
+
+  @override
+  String get fileBrowserSettings => 'File browser';
+  @override
+  String get showFileExtensions => 'Show file extensions';
+  @override
+  String get showFileExtensionsDescription =>
+      'Display the full filename, including its extension.';
+  @override
+  String get showHiddenItems => 'Show hidden items';
+  @override
+  String get showHiddenItemsDescription =>
+      'Show items marked hidden by the system or named with a leading dot on Unix.';
+  @override
+  String get showSystemItems => 'Show Windows system items';
+  @override
+  String get showSystemItemsDescription =>
+      'Include items with the Windows system attribute.';
+  @override
+  String get fileSelectionCheckboxes => 'Item selection checkboxes';
+  @override
+  String get fileSelectionCheckboxesDescription =>
+      'Add or remove items from the selection without holding Ctrl or Command.';
+  @override
+  String get singleClickToOpen => 'Single-click to open';
+  @override
+  String get singleClickToOpenDescription =>
+      'Open items with one click instead of two; modifier keys still select.';
+  @override
+  String get fileBrowserSaveFailed =>
+      'Could not save file browser preferences.';
+  @override
+  String get fileBrowserRenameExtensionDescription =>
+      'Allow the extension to change when renaming; otherwise keep it locked.';
 }

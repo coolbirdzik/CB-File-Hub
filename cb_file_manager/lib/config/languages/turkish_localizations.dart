@@ -133,6 +133,9 @@ class TurkishLocalizations implements AppLocalizations {
   @override
   String get aiSubtitleLoadingSpeech => 'Konuşma modeli yükleniyor';
   @override
+  String get aiSubtitleUnloadingModels =>
+      'Önceki modeller bellekten kaldırılıyor';
+  @override
   String get aiSubtitleLoadingTranslation => 'Çeviri modeli yükleniyor';
   @override
   String get aiSubtitleRecognizing => 'Ses tanınıyor';
@@ -2546,6 +2549,30 @@ class TurkishLocalizations implements AppLocalizations {
   String get fileLastModified => 'Son değiştirilme';
   @override
   String get fileAccessed => 'Erişim';
+  @override
+  String get propertiesOverview => 'Genel bakış';
+  @override
+  String get propertiesDetails => 'Ayrıntılar';
+  @override
+  String get propertiesMedia => 'Medya';
+  @override
+  String get propertiesChecksum => 'Sağlama toplamı';
+  @override
+  String get propertiesFileSystem => 'Dosya sistemi';
+  @override
+  String get propertiesExactSize => 'Tam boyut';
+  @override
+  String get propertiesMetadataChanged => 'Meta veri değişikliği';
+  @override
+  String get propertiesCalculateChecksum => 'SHA-256 hesapla';
+  @override
+  String get propertiesChecksumHint =>
+      'Sağlama toplamını yalnızca gerektiğinde hesaplayın. Büyük dosyalar zaman alabilir.';
+  @override
+  String get propertiesChecksumChanged =>
+      'Hesaplama sırasında dosya değişti. Yeniden hesaplayın.';
+  @override
+  String get propertiesChecksumCopied => 'Sağlama toplamı panoya kopyalandı';
   @override
   String get loadingVideo => 'Video yükleniyor...';
   @override
@@ -7879,4 +7906,38 @@ class TurkishLocalizations implements AppLocalizations {
     'failures' => 'okumalar başarısız, azaltıldı',
     _ => '',
   };
+
+  @override
+  String get fileBrowserSettings => 'Dosya tarayıcısı';
+  @override
+  String get showFileExtensions => 'Dosya uzantılarını göster';
+  @override
+  String get showFileExtensionsDescription =>
+      'Uzantısı dahil tam dosya adını göster.';
+  @override
+  String get showHiddenItems => 'Gizli öğeleri göster';
+  @override
+  String get showHiddenItemsDescription =>
+      'Sistem tarafından gizlenen veya Unix’te nokta ile başlayan öğeleri göster.';
+  @override
+  String get showSystemItems => 'Windows sistem öğelerini göster';
+  @override
+  String get showSystemItemsDescription =>
+      'Windows sistem özniteliği olan öğeleri dahil et.';
+  @override
+  String get fileSelectionCheckboxes => 'Öğe seçim kutuları';
+  @override
+  String get fileSelectionCheckboxesDescription =>
+      'Ctrl veya Command tuşuna basmadan öğeleri seç veya seçimden çıkar.';
+  @override
+  String get singleClickToOpen => 'Tek tıklamayla aç';
+  @override
+  String get singleClickToOpenDescription =>
+      'Çift tıklama yerine tek tıklamayla aç; değiştirici tuşlar seçim için çalışır.';
+  @override
+  String get fileBrowserSaveFailed =>
+      'Dosya tarayıcısı ayarları kaydedilemedi.';
+  @override
+  String get fileBrowserRenameExtensionDescription =>
+      'Yeniden adlandırırken uzantıyı değiştir; aksi halde uzantıyı kilitli tut.';
 }

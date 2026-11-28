@@ -165,7 +165,7 @@ class SshHostAvatar extends StatelessWidget {
     if (loading) {
       content = SizedBox.square(
         dimension: size * 0.5,
-        child: CircularProgressIndicator(strokeWidth: 2, color: ink),
+        child: CbLoadingText(compact: true, highlightColor: ink),
       );
     } else if (glyph.icon != null) {
       content = Icon(glyph.icon, size: size * 0.55, color: ink);

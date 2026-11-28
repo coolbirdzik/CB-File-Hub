@@ -91,9 +91,9 @@ class _ThemeOnboardingScreenState extends State<ThemeOnboardingScreen> {
             ? const SizedBox(
                 height: 18,
                 width: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.white,
+                child: CbLoadingText(
+                  compact: true,
+                  highlightColor: Colors.white,
                 ),
               )
             : Row(

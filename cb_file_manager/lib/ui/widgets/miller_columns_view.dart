@@ -5,6 +5,8 @@ import 'file_tags_tooltip.dart';
 import 'selection_geometry_item.dart';
 import 'drag_selection_region.dart';
 import '../components/common/file_entry_presentation.dart';
+import '../components/common/file_browser_options_scope.dart';
+import 'package:cb_file_manager/helpers/files/file_browser_options.dart';
 
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
@@ -129,11 +131,22 @@ class MillerColumnsView extends StatefulWidget {
 class _MillerColumnsViewState extends State<MillerColumnsView> {
   final ScrollController _horizontalScrollController = ScrollController();
   List<_MillerColumnData> _columns = [];
+  final _browserOptions = UserPreferences.instance.fileBrowserOptions;
+  late FileBrowserOptions _lastBrowserOptions;
 
   @override
   void initState() {
     super.initState();
+    _lastBrowserOptions = _browserOptions.value;
+    _browserOptions.addListener(_onBrowserOptionsChanged);
     _initializeColumns();
+  }
+
+  void _onBrowserOptionsChanged() {
+    final next = _browserOptions.value;
+    final visibilityChanged = !_lastBrowserOptions.sameVisibility(next);
+    _lastBrowserOptions = next;
+    if (visibilityChanged && mounted) setState(_initializeColumns);
   }
 
   @override
@@ -215,7 +228,10 @@ class _MillerColumnsViewState extends State<MillerColumnsView> {
     // Load the folder contents.
     try {
       final dir = Directory(folderPath);
-      final entities = await dir.list().toList();
+      final entities = await visibleBrowserEntries(
+        await dir.list().toList(),
+        _browserOptions.value,
+      );
       final folders = entities.whereType<Directory>().toList()
         ..sort((a, b) => a.path.toLowerCase().compareTo(b.path.toLowerCase()));
       final files = entities.whereType<File>().toList()
@@ -285,6 +301,7 @@ class _MillerColumnsViewState extends State<MillerColumnsView> {
 
   @override
   void dispose() {
+    _browserOptions.removeListener(_onBrowserOptionsChanged);
     _horizontalScrollController.dispose();
     super.dispose();
   }
@@ -556,6 +573,19 @@ class _MillerFolderRowState extends State<_MillerFolderRow> {
 
   @override
   Widget build(BuildContext context) {
+    return FileSelectionFrame(
+      selected: widget.isSelected,
+      onToggle: widget.toggleFolderSelection == null
+          ? null
+          : () => widget.toggleFolderSelection!(
+              widget.folder.path,
+              ctrlSelect: true,
+            ),
+      child: _buildRow(context),
+    );
+  }
+
+  Widget _buildRow(BuildContext context) {
     final theme = Theme.of(context);
     final renameController = InlineRenameScope.maybeOf(context);
     final bool isBeingRenamed =
@@ -820,13 +850,22 @@ class _MillerFileRowState extends State<_MillerFileRow> {
 
   @override
   Widget build(BuildContext context) {
+    return FileSelectionFrame(
+      selected: widget.isSelected,
+      onToggle: () =>
+          widget.toggleFileSelection(widget.file.path, ctrlSelect: true),
+      child: _buildRow(context),
+    );
+  }
+
+  Widget _buildRow(BuildContext context) {
     final theme = Theme.of(context);
     final renameController = InlineRenameScope.maybeOf(context);
     final bool isBeingRenamed =
         renameController != null &&
         renameController.renamingPath == widget.file.path;
     final bool isBeingCut = ItemInteractionStyle.isBeingCut(widget.file.path);
-    final String name = FileEntryPresentation.nameOf(
+    final String name = FileEntryPresentation.fileNameOf(
       context,
       widget.file.path,
       fallback: FileTypeUtils.getFileName(widget.file.path),
@@ -850,8 +889,19 @@ class _MillerFileRowState extends State<_MillerFileRow> {
             cursor: SystemMouseCursors.click,
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onTap: _handleSingleTap,
-              onDoubleTap: widget.onOpenFile,
+              onTap: () {
+                final keyboard = HardwareKeyboard.instance;
+                _handleSingleTap();
+                if (FileBrowserOptionsScope.of(context).singleClickToOpen &&
+                    !keyboard.isShiftPressed &&
+                    !keyboard.isControlPressed &&
+                    !keyboard.isMetaPressed) {
+                  widget.onOpenFile();
+                }
+              },
+              onDoubleTap: FileBrowserOptionsScope.of(context).singleClickToOpen
+                  ? null
+                  : widget.onOpenFile,
               onSecondaryTapUp: (details) =>
                   _showContextMenu(details.globalPosition),
               child: Container(

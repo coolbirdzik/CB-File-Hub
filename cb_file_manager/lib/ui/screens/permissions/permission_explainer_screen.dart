@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:cb_file_manager/design_system/primitives/cb_loading_text.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -199,7 +200,7 @@ class _PermissionExplainerScreenState extends State<PermissionExplainerScreen>
         titleSpacing: Platform.isMacOS ? 84 : null,
       ),
       body: _checking
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CbLoadingText())
           : Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -226,7 +227,7 @@ class _PermissionExplainerScreenState extends State<PermissionExplainerScreen>
                           ? const SizedBox(
                               width: 16,
                               height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
+                              child: CbLoadingText(compact: true),
                             )
                           : const Icon(PhosphorIconsLight.shieldCheck),
                       label: Text(

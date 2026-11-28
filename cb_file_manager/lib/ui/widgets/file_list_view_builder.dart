@@ -233,6 +233,7 @@ class FileListViewBuilder {
         onNavigateToPath: onNavigateToPath,
         onFileTap: onFileTap,
         toggleFileSelection: toggleFileSelection,
+        toggleFolderSelection: toggleFolderSelection,
         clearSelection: clearSelection,
         dragSelectionController: dragSelectionController,
         showDeleteTagDialog: showDeleteTagDialog,
@@ -620,6 +621,8 @@ class FileListViewBuilder {
     required Function(File, bool) onFileTap,
     required Function(String, {bool shiftSelect, bool ctrlSelect})
     toggleFileSelection,
+    required Function(String, {bool shiftSelect, bool ctrlSelect})
+    toggleFolderSelection,
     required VoidCallback clearSelection,
     required TabbedFolderDragSelectionController dragSelectionController,
     required Function(BuildContext, String, List<String>) showDeleteTagDialog,
@@ -678,6 +681,7 @@ class FileListViewBuilder {
                   isGridView: false,
                   selectedFiles: selectionState.allSelectedPaths,
                   toggleFileSelection: toggleFileSelection,
+                  toggleFolderSelection: toggleFolderSelection,
                   toggleSelectionMode: toggleSelectionMode,
                   showDeleteTagDialog: showDeleteTagDialog,
                   showAddTagToFileDialog: showAddTagToFileDialog,

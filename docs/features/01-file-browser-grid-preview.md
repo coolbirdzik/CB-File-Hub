@@ -1,5 +1,31 @@
 ## File Browser Grid + Preview Mode
 
+### File browser preferences
+
+The **Settings → File browser** section and the folder toolbar's **More (⋮)**
+menu expose the same global presentation and input preferences independently
+of per-folder layout. Checked menu entries reflect the current saved values.
+They apply to the current
+app's open tabs and persist in the preference database:
+
+- Display or hide filename extensions without changing paths or names.
+- Lock/unlock extensions when renaming, synchronized with the existing menu.
+- Include hidden items (Windows hidden attribute; dotfiles on Unix platforms).
+- Windows only: independently include files and directories with the system
+  attribute. Visibility filtering runs off the UI isolate; directory caches
+  retain the unfiltered listing so revealing items does not lose them.
+- Item-selection checkboxes on desktop and mobile, alongside existing
+  Ctrl/Command and Shift selection on desktop.
+- Desktop only: single-click opening instead of double-click opening. Modified
+  clicks still select items, and an item opens on release rather than when a
+  drag starts. Columns retain folder expansion behavior.
+
+These are app preferences, not changes to native Explorer, Finder, or other
+system file managers. Existing installations retain their previous defaults.
+The visibility rules apply to local folder listings, child columns/tree nodes,
+and local filename search, not tag collections or remote provider-specific
+metadata. Finder-specific invisible metadata is not currently read.
+
 ### Home Browse: storage locations and WSL
 
 Browse shows Windows drive letters and registered WSL distributions. Storage

@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/design_system/primitives/cb_loading_text.dart';
 import 'package:cb_file_manager/helpers/core/search_request_guard.dart';
 import 'package:cb_file_manager/ui/components/common/search_text_field.dart';
 import 'dart:io';
@@ -143,9 +144,12 @@ class _FileSearchDialogState extends State<FileSearchDialog> {
       builder: (context) => AlertDialog(
         content: Row(
           children: [
-            const CircularProgressIndicator(),
-            const SizedBox(width: 16),
-            Text(context.tr.albumAddingFilesToAlbum),
+            Flexible(
+              child: CbLoadingText(
+                text: context.tr.albumAddingFilesToAlbum,
+                maxLines: 2,
+              ),
+            ),
           ],
         ),
       ),
@@ -318,7 +322,7 @@ class _FileSearchDialogState extends State<FileSearchDialog> {
             // Search results
             Expanded(
               child: _isSearching
-                  ? const Center(child: CircularProgressIndicator())
+                  ? const Center(child: CbLoadingText())
                   : _searchResults.isEmpty
                   ? Center(
                       child: Column(

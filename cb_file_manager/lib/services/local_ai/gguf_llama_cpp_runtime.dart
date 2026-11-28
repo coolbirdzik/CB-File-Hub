@@ -66,6 +66,7 @@ class GgufLlamaCppLocalAiChatRuntime
   bool get _background => backgroundInference ?? parallelSlots == 1;
 
   Process? _serverProcess;
+  Future<void>? _serverClosing;
   bool _disposed = false;
   int? _serverPort;
   String? _loadedModelPath;
@@ -461,7 +462,10 @@ class GgufLlamaCppLocalAiChatRuntime
     return port;
   }
 
-  Future<void> _stopServer() async {
+  Future<void> _stopServer() => _serverClosing ??= _terminateServer()
+      .whenComplete(() => _serverClosing = null);
+
+  Future<void> _terminateServer() async {
     final process = _serverProcess;
     _serverProcess = null;
     _serverPort = null;
@@ -473,11 +477,9 @@ class GgufLlamaCppLocalAiChatRuntime
       await process.exitCode.timeout(const Duration(seconds: 5));
     } on TimeoutException {
       process.kill(ProcessSignal.sigkill);
-      // A replacement shared server must not load a second copy of the
-      // weights while the previous process still owns its GPU allocations.
-      if (backgroundInference == true) {
-        await process.exitCode.timeout(const Duration(seconds: 5));
-      }
+      // Both dedicated and shared servers must release their GPU allocations
+      // before another model is allowed to load.
+      await process.exitCode.timeout(const Duration(seconds: 5));
     }
   }
 

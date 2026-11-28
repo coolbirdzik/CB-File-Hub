@@ -1,5 +1,6 @@
 // ignore_for_file: deprecated_member_use
 
+import 'package:cb_file_manager/design_system/primitives/cb_loading_text.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
@@ -122,7 +123,7 @@ class _ContextMenuLayoutSettingsScreenState
         ),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CbLoadingText())
           : Column(
               children: [
                 Container(

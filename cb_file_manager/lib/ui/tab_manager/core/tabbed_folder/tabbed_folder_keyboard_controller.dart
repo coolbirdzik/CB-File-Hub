@@ -36,7 +36,7 @@ class TabbedFolderKeyboardController {
   final Map<String, GlobalKey> _itemKeys = <String, GlobalKey>{};
 
   String? focusedPath;
-  double itemMainAxisExtent = 40.0;
+  double? itemMainAxisExtent;
   double _navigationItemExtent = 48.0;
   final Map<String, ValueNotifier<bool?>> _immediateSelectionNotifiers =
       <String, ValueNotifier<bool?>>{};
@@ -189,7 +189,8 @@ class TabbedFolderKeyboardController {
         if (index != null &&
             crossAxisCount != null &&
             itemHeight != null &&
-            scrollController.hasClients) {
+            scrollController.hasClients &&
+            scrollController.position.hasContentDimensions) {
           final pos = scrollController.position;
           final int rowIndex = (index / crossAxisCount).floor();
           final double itemStart = rowIndex * itemHeight;
@@ -235,12 +236,17 @@ class TabbedFolderKeyboardController {
         return;
       }
 
+      // Index direction can disagree with viewport direction after the user
+      // scrolls without changing focus. Reveal the edge that is actually clipped.
+      final revealAtEnd = itemTop < 0 && itemBottom > viewportHeight
+          ? forward
+          : itemBottom > viewportHeight;
       Scrollable.ensureVisible(
         context,
         duration: const Duration(milliseconds: 120),
         curve: Curves.easeOut,
-        alignment: forward ? 1.0 : 0.0,
-        alignmentPolicy: forward
+        alignment: revealAtEnd ? 1.0 : 0.0,
+        alignmentPolicy: revealAtEnd
             ? ScrollPositionAlignmentPolicy.keepVisibleAtEnd
             : ScrollPositionAlignmentPolicy.keepVisibleAtStart,
       );
@@ -324,9 +330,16 @@ class TabbedFolderKeyboardController {
     if (!isDesktop || event == null || DesktopShortcuts.isTextInputFocused) {
       return KeyEventResult.ignored;
     }
-    _navigationItemExtent = folderListState.viewMode == ViewMode.list
-        ? itemMainAxisExtent
-        : 48.0;
+    // Grid and tiles report their actual row stride (including spacing),
+    // while desktop List reports its horizontal column stride. A details-row
+    // estimate cannot locate a distant item in these lazy layouts.
+    _navigationItemExtent = switch (folderListState.viewMode) {
+      ViewMode.list => itemMainAxisExtent ?? 40.0,
+      ViewMode.grid ||
+      ViewMode.gridPreview ||
+      ViewMode.tiles => itemMainAxisExtent ?? 48.0,
+      _ => 48.0,
+    };
 
     final bool isKeyPress = event is KeyDownEvent || event is KeyRepeatEvent;
     if (!isKeyPress) return KeyEventResult.ignored;

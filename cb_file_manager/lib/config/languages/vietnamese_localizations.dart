@@ -133,6 +133,8 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get aiSubtitleLoadingSpeech => 'Đang nạp model nhận dạng';
   @override
+  String get aiSubtitleUnloadingModels => 'Đang giải phóng model cũ';
+  @override
   String get aiSubtitleLoadingTranslation => 'Đang nạp model dịch';
   @override
   String get aiSubtitleRecognizing => 'Đang nhận dạng audio';
@@ -2528,6 +2530,30 @@ class VietnameseLocalizations implements AppLocalizations {
   String get fileLastModified => 'Lần cuối sửa';
   @override
   String get fileAccessed => 'Truy cập lúc';
+  @override
+  String get propertiesOverview => 'Tổng quan';
+  @override
+  String get propertiesDetails => 'Chi tiết';
+  @override
+  String get propertiesMedia => 'Đa phương tiện';
+  @override
+  String get propertiesChecksum => 'Checksum';
+  @override
+  String get propertiesFileSystem => 'Hệ thống tệp';
+  @override
+  String get propertiesExactSize => 'Kích thước chính xác';
+  @override
+  String get propertiesMetadataChanged => 'Metadata thay đổi';
+  @override
+  String get propertiesCalculateChecksum => 'Tính SHA-256';
+  @override
+  String get propertiesChecksumHint =>
+      'Chỉ tính checksum khi cần. Tệp lớn có thể mất một chút thời gian.';
+  @override
+  String get propertiesChecksumChanged =>
+      'Tệp đã thay đổi trong lúc tính. Vui lòng tính lại.';
+  @override
+  String get propertiesChecksumCopied => 'Đã sao chép checksum';
   @override
   String get loadingVideo => 'Đang tải video...';
   @override
@@ -7799,4 +7825,37 @@ class VietnameseLocalizations implements AppLocalizations {
     'failures' => 'đọc file lỗi nên giảm bớt',
     _ => '',
   };
+
+  @override
+  String get fileBrowserSettings => 'Duyệt tệp';
+  @override
+  String get showFileExtensions => 'Hiển thị phần mở rộng tệp';
+  @override
+  String get showFileExtensionsDescription =>
+      'Hiển thị tên tệp đầy đủ, bao gồm phần mở rộng.';
+  @override
+  String get showHiddenItems => 'Hiển thị mục ẩn';
+  @override
+  String get showHiddenItemsDescription =>
+      'Hiển thị mục có thuộc tính ẩn hoặc tên bắt đầu bằng dấu chấm trên Unix.';
+  @override
+  String get showSystemItems => 'Hiển thị mục hệ thống Windows';
+  @override
+  String get showSystemItemsDescription =>
+      'Bao gồm các mục có thuộc tính hệ thống của Windows.';
+  @override
+  String get fileSelectionCheckboxes => 'Hộp kiểm chọn mục';
+  @override
+  String get fileSelectionCheckboxesDescription =>
+      'Chọn hoặc bỏ chọn nhiều mục mà không cần giữ Ctrl hoặc Command.';
+  @override
+  String get singleClickToOpen => 'Nhấp một lần để mở';
+  @override
+  String get singleClickToOpenDescription =>
+      'Mở mục bằng một lần nhấp thay vì nhấp đúp; phím bổ trợ vẫn dùng để chọn.';
+  @override
+  String get fileBrowserSaveFailed => 'Không thể lưu tùy chọn duyệt tệp.';
+  @override
+  String get fileBrowserRenameExtensionDescription =>
+      'Cho phép sửa phần mở rộng khi đổi tên; nếu tắt, phần mở rộng luôn được giữ nguyên.';
 }

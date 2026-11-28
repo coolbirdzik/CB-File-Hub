@@ -202,10 +202,7 @@ class SshConnectionSteps extends StatelessWidget {
           child: state == SshStepState.active
               ? Padding(
                   padding: const EdgeInsets.all(2),
-                  child: CircularProgressIndicator(
-                    strokeWidth: 1.5,
-                    color: color,
-                  ),
+                  child: CbLoadingText(compact: true, highlightColor: color),
                 )
               : Icon(
                   switch (state) {

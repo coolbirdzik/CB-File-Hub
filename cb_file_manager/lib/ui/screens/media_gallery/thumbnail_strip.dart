@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:cb_file_manager/design_system/primitives/cb_loading_text.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
@@ -104,10 +105,7 @@ class _ThumbnailStripState extends State<ThumbnailStrip> {
                     height: 54,
                     color: Theme.of(context).colorScheme.onSurface,
                     child: const Center(
-                      child: CircularProgressIndicator(
-                        color: Colors.white70,
-                        strokeWidth: 2.0,
-                      ),
+                      child: CbLoadingText(highlightColor: Colors.white70),
                     ),
                   );
                 } else if (snapshot.hasError || !snapshot.hasData) {

@@ -52,9 +52,9 @@ class _ToolCallChipState extends State<ToolCallChip> {
                     SizedBox(
                       width: 14,
                       height: 14,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 1.8,
-                        color: accent,
+                      child: CbLoadingText(
+                        compact: true,
+                        highlightColor: accent,
                       ),
                     )
                   else

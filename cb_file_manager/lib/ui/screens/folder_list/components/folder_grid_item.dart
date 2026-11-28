@@ -15,6 +15,7 @@ import '../../../../bloc/selection/selection_bloc.dart';
 import '../../../../bloc/selection/selection_event.dart';
 import 'folder_thumbnail.dart';
 import '../../../components/common/optimized_interaction_handler.dart';
+import '../../../components/common/file_browser_options_scope.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';
 import '../../../utils/item_interaction_style.dart';
 
@@ -79,6 +80,20 @@ class _FolderGridItemState extends State<FolderGridItem> {
 
   @override
   Widget build(BuildContext context) {
+    return FileSelectionFrame(
+      grid: true,
+      selected: widget.isSelected,
+      onToggle: widget.toggleFolderSelection == null
+          ? null
+          : () => widget.toggleFolderSelection!(
+              widget.folder.path,
+              ctrlSelect: true,
+            ),
+      child: _buildSelection(context),
+    );
+  }
+
+  Widget _buildSelection(BuildContext context) {
     final immediateSelection = widget.immediateSelectionListenable;
     if (immediateSelection == null) {
       return _buildItem(context, widget.isSelected);
@@ -216,6 +231,7 @@ class _FolderGridItemState extends State<FolderGridItem> {
                     bodyRadius: bodyRadius,
                     tabRadius: tabRadius,
                     interactionLayer: OptimizedInteractionLayer(
+                      fileBrowserActivation: widget.isDesktopMode,
                       onTap: () {
                         if (widget.isDesktopMode &&
                             widget.toggleFolderSelection != null) {

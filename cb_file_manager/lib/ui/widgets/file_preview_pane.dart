@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:ui';
+import 'package:cb_file_manager/design_system/primitives/cb_loading_text.dart';
 import '../components/common/file_entry_presentation.dart';
 
 import 'package:cb_file_manager/bloc/selection/selection_state.dart';
@@ -551,9 +552,9 @@ class _TextFilePreviewState extends State<_TextFilePreview> {
               child: SizedBox(
                 width: 18,
                 height: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 1.2,
-                  color: theme.colorScheme.onSurfaceVariant.withValues(
+                child: CbLoadingText(
+                  compact: true,
+                  highlightColor: theme.colorScheme.onSurfaceVariant.withValues(
                     alpha: 0.32,
                   ),
                 ),
@@ -748,9 +749,11 @@ class _PdfPreviewState extends State<_PdfPreview> {
       child: SizedBox(
         width: 18,
         height: 18,
-        child: CircularProgressIndicator(
-          strokeWidth: 1.2,
-          color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.32),
+        child: CbLoadingText(
+          compact: true,
+          highlightColor: theme.colorScheme.onSurfaceVariant.withValues(
+            alpha: 0.32,
+          ),
         ),
       ),
     );
@@ -857,7 +860,7 @@ class _ArchiveEntryPreviewState extends State<_ArchiveEntryPreview> {
 
     final file = _materializedFile;
     if (file == null) {
-      return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+      return const Center(child: CbLoadingText());
     }
 
     final entryName = ArchivePathUtils.entryFileName(widget.virtualPath) ?? '';

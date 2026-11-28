@@ -72,6 +72,67 @@ void main() {
     final native = await search(r'^bo.nao.*\.mkv$', useRegex: true);
     expect(native, dartOnly);
   });
+
+  for (final recursive in [false, true]) {
+    test(
+      'empty filename search is successful (recursive: $recursive)',
+      () async {
+        final bloc = FolderListBloc();
+        try {
+          bloc.add(FolderListLoad(tree.path));
+          await bloc.stream
+              .firstWhere((s) => !s.isLoading && s.files.isNotEmpty)
+              .timeout(const Duration(seconds: 10));
+
+          // A real search error must still be reported.
+          bloc.add(SearchByFileName('[', recursive: recursive, useRegex: true));
+          final invalidRegex = await bloc.stream
+              .firstWhere((s) => !s.isLoading && s.error != null)
+              .timeout(const Duration(seconds: 10));
+          expect(invalidRegex.error, isNotEmpty);
+
+          const query = 'no_matching_filename';
+          final loading = bloc.stream
+              .firstWhere((s) => s.isLoading)
+              .timeout(const Duration(seconds: 10));
+          final completed = bloc.stream
+              .firstWhere((s) => !s.isLoading && s.currentSearchQuery == query)
+              .timeout(const Duration(seconds: 10));
+          bloc.add(SearchByFileName(query, recursive: recursive));
+          expect((await loading).error, isNull);
+          final empty = await completed;
+          expect(empty.searchResults, isEmpty);
+          expect(empty.error, isNull);
+          expect(empty.isSearchByName, isTrue);
+          expect(empty.searchRecursive, recursive);
+          expect(empty.currentPath.path, tree.path);
+          expect(empty.files, isNotEmpty);
+
+          bloc.add(SearchByFileName('other.mp4', recursive: recursive));
+          final found = await bloc.stream
+              .firstWhere(
+                (s) => !s.isLoading && s.currentSearchQuery == 'other.mp4',
+              )
+              .timeout(const Duration(seconds: 10));
+          expect(found.error, isNull);
+          expect(
+            found.searchResults.single.path,
+            p.join(tree.path, 'other.mp4'),
+          );
+
+          bloc.add(const ClearSearchAndFilters());
+          final cleared = await bloc.stream
+              .firstWhere((s) => !s.isLoading && s.currentSearchQuery == null)
+              .timeout(const Duration(seconds: 10));
+          expect(cleared.error, isNull);
+          expect(cleared.isSearchByName, isFalse);
+          expect(cleared.files, isNotEmpty);
+        } finally {
+          await bloc.close();
+        }
+      },
+    );
+  }
 }
 
 Future<Map<String, Type>> _runSearch(

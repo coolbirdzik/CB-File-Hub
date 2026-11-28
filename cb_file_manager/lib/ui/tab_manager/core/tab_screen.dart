@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/design_system/primitives/cb_loading_text.dart';
 import 'package:cb_file_manager/design_system/primitives/cb_popover_transition.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
@@ -1183,10 +1184,8 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                                                                             14,
                                                                         height:
                                                                             14,
-                                                                        child: CircularProgressIndicator(
-                                                                          strokeWidth:
-                                                                              2,
-                                                                        ),
+                                                                        child:
+                                                                            CbLoadingText(),
                                                                       ),
                                                                       const SizedBox(
                                                                         width:

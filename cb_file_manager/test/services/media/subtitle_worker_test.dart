@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:ffi';
 
@@ -129,6 +130,25 @@ Future<void> main(List<String> args) async {
     expect((await w.request({'command': 'transcribe'}))['language'], 'ja');
     expect(w.gpuRequested, isFalse);
     expect(await trace.readAsLines(), ['true', 'false']);
+  });
+  test('stop during process launch waits until the child exits', () async {
+    late SubtitleWorker w;
+    final stopping = Completer<void>();
+    var exited = false;
+    w = SubtitleWorker(
+      executableOverride: dartExecutable(),
+      arguments: [fixture.path, 'ready', trace.path],
+      onProcessStarted: (process) {
+        process.exitCode.then((_) => exited = true);
+        stopping.complete(w.stop());
+      },
+    );
+    workers.add(w);
+    final starting = expectLater(w.start('model.bin'), throwsStateError);
+    await stopping.future;
+    expect(exited, isTrue);
+    expect(w.processId, isNull);
+    await starting;
   });
   test('Nemotron selects its own runtime and starts on CPU', () async {
     const model = 'nemotron-3.5-asr-streaming-0.6b.q8_0.gguf';

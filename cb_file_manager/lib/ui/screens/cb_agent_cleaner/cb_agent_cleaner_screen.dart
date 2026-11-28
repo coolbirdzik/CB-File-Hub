@@ -4435,7 +4435,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
                 ? const SizedBox(
                     width: 16,
                     height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                    child: CbLoadingText(compact: true),
                   )
                 : const Icon(PhosphorIconsLight.sparkle, size: 16),
             label: busy && _agentFullReviewRunning

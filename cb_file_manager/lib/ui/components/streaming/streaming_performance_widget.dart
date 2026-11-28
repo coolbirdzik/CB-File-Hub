@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/design_system/primitives/cb_loading_text.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'dart:async';
@@ -127,9 +128,7 @@ class _StreamingPerformanceWidgetState
                             ? const SizedBox(
                                 width: 16,
                                 height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
+                                child: CbLoadingText(compact: true),
                               )
                             : const Icon(
                                 PhosphorIconsLight.speedometer,

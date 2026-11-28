@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:cb_file_manager/design_system/primitives/cb_loading_text.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/core/service_locator.dart';
 import 'package:cb_file_manager/helpers/files/file_type_registry.dart';
@@ -148,7 +149,7 @@ class _ArchiveBrowserDialogState extends State<ArchiveBrowserDialog> {
             const Divider(height: 1),
             Expanded(
               child: _loading
-                  ? const Center(child: CircularProgressIndicator())
+                  ? const Center(child: CbLoadingText())
                   : _error != null
                   ? Center(
                       child: Padding(

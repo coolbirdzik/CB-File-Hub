@@ -240,7 +240,7 @@ class _GridListCollectionState<T> extends State<GridListCollection<T>> {
       final collection = AnimatedSwitcher(
         duration: CbDurations.fast,
         child: switch (mode) {
-          ViewMode.grid => RefreshIndicator(
+          ViewMode.grid => CbRefreshIndicator(
             key: const ValueKey('grid-list-collection-grid'),
             onRefresh: widget.onRefresh,
             child: GridView.builder(
@@ -257,7 +257,7 @@ class _GridListCollectionState<T> extends State<GridListCollection<T>> {
                   _buildItem(context, widget.items[index], ViewMode.grid),
             ),
           ),
-          ViewMode.tiles => RefreshIndicator(
+          ViewMode.tiles => CbRefreshIndicator(
             key: const ValueKey('grid-list-collection-tiles'),
             onRefresh: widget.onRefresh,
             child: GridView.builder(
@@ -279,7 +279,7 @@ class _GridListCollectionState<T> extends State<GridListCollection<T>> {
             children: [
               ?widget.detailsHeader,
               Expanded(
-                child: RefreshIndicator(
+                child: CbRefreshIndicator(
                   onRefresh: widget.onRefresh,
                   child: ListView.builder(
                     padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -296,7 +296,7 @@ class _GridListCollectionState<T> extends State<GridListCollection<T>> {
               ),
             ],
           ),
-          ViewMode.tree => RefreshIndicator(
+          ViewMode.tree => CbRefreshIndicator(
             key: const ValueKey('grid-list-collection-tree'),
             onRefresh: widget.onRefresh,
             child: ListView.builder(
@@ -307,7 +307,7 @@ class _GridListCollectionState<T> extends State<GridListCollection<T>> {
                   _buildItem(context, widget.items[index], ViewMode.tree),
             ),
           ),
-          _ => RefreshIndicator(
+          _ => CbRefreshIndicator(
             key: const ValueKey('grid-list-collection-list'),
             onRefresh: widget.onRefresh,
             child: AdaptiveFileList(

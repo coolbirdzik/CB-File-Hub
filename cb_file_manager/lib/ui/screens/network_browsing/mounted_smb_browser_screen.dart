@@ -45,7 +45,7 @@ class _MountedSmbBrowserScreenState extends State<MountedSmbBrowserScreen> {
         builder: (context, snapshot) {
           if (!snapshot.hasData &&
               snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(child: CbLoadingText());
           }
           final mounts = (snapshot.data ?? const <DesktopSmbMount>[])
               .where((mount) => !mount.uri.pathSegments.first.endsWith(r'$'))

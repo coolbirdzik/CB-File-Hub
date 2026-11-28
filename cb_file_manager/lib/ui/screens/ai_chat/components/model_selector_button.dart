@@ -406,7 +406,7 @@ class _ModelSelectorButtonState extends State<ModelSelectorButton> {
                     const SizedBox(
                       width: 14,
                       height: 14,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                      child: CbLoadingText(compact: true),
                     )
                   else
                     Icon(

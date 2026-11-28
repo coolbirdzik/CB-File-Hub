@@ -1304,7 +1304,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
   Widget _buildLocalFilePlayer() {
     if (_hasError) return _buildErrorWidget(_errorMessage);
     return _videoController == null
-        ? const Center(child: CircularProgressIndicator(color: Colors.white))
+        ? const Center(child: CbLoadingText(highlightColor: Colors.white))
         : Focus(
             focusNode: _keyboardFocusNode,
             autofocus: true,
@@ -1659,10 +1659,10 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
     );
   }
 
-  /// Single unified loading: same minimal spinner for init and for video placeholder.
+  /// Single unified loading text for init and for the video placeholder.
   /// Avoids "big" VideoPlayerLoadingWidget + a second different loading in SMB/media_kit mode.
   Widget _buildLoadingWidget() {
-    return const Center(child: CircularProgressIndicator(color: Colors.white));
+    return const Center(child: CbLoadingText(highlightColor: Colors.white));
   }
 
   Widget _buildFastSeekIndicator() {
